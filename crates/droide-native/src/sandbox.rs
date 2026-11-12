@@ -73,7 +73,14 @@ fn validate(paths: &[String]) -> Result<(), SandboxError> {
         return Err(SandboxError::TooManyPaths);
     }
     for path in paths {
-        if path.contains('\0') || !(path.starts_with('/') || path.starts_with("\\\\")) {
+        // A profile may be generated for another platform, so accept anything
+        // that is absolute there: a drive or UNC path on Windows, or a
+        // root-relative `/x`. What must be refused is a relative path — it would
+        // silently bind whatever the runtime's working directory happens to be.
+        let absolute = std::path::Path::new(path).is_absolute()
+            || path.starts_with('/')
+            || path.starts_with("\\\\");
+        if path.contains('\0') || !absolute {
             return Err(SandboxError::InvalidPath(path.clone()));
         }
     }

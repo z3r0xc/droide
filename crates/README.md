@@ -74,3 +74,12 @@ cargo test --workspace     # see docs/rust-setup.md if the local linker is broke
 
 CI builds and tests the workspace on Linux; that is the authoritative gate while
 this workstation's mingw toolchain cannot link (`docs/rust-setup.md`).
+
+## Typed TypeScript side
+
+`src/native/methods.ts` wraps every method with a response validator: the helper
+is another process, so its output is untrusted and a wrong shape throws
+`NativeProtocolError` naming the method and field. Unit-level proof uses
+`tests/fixtures/fake-native-helper.mjs` (including a `bad-shape` mode); the
+end-to-end proof is `npm run test:native`, which builds this crate and runs
+`tests/integration/native/real-helper.test.ts` against the compiled binary.

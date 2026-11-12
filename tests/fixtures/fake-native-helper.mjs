@@ -29,6 +29,7 @@ const MODES = new Set([
   "wrong-version",
   "stray",
   "late",
+  "bad-shape",
 ]);
 const PROTOCOL = 1;
 const MAX_LINE_BYTES = 1 << 20;
@@ -157,5 +158,50 @@ lines.on("line", (line) => {
     return;
   }
 
-  send({ id, error: { code: -32601, message: `unknown method: ${method}` } });
+  // Deterministic answers for the typed-method wrappers. Shapes mirror the Rust
+  // helper; `bad-shape` deliberately answers the wrong type so the client's
+  // validators can be proven.
+  const params = request?.params ?? {};
+  if (mode === "bad-shape" && method === "search.walk") {
+    send({ id, result: { paths: "not-an-array", truncated: false } });
+    return;
+  }
+  switch (method) {
+    case "search.walk":
+      send({
+        id,
+        result: { paths: ["src/a.ts", "README.md"], truncated: params.maxResults === 1 },
+      });
+      return;
+    case "search.text":
+      send({
+        id,
+        result: {
+          hits: [{ path: "src/a.ts", line: 2, text: `hit for ${String(params.query ?? "")}` }],
+          truncated: false,
+          filesScanned: 2,
+        },
+      });
+      return;
+    case "sandbox.profile":
+      send({
+        id,
+        result: { mechanism: "bubblewrap", argv: ["--unshare-net", "--"] },
+      });
+      return;
+    case "pty.quote":
+      send({ id, result: { commandLine: "echo 'a b'" } });
+      return;
+    case "path.resolve":
+      send({ id, result: { path: `${String(params.root ?? "")}/src/a.ts` } });
+      return;
+    case "secrets.protect":
+      send({ id, result: { sealed: "c2VhbGVk" } });
+      return;
+    case "secrets.unprotect":
+      send({ id, result: { plaintext: "b3Blbg==" } });
+      return;
+    default:
+      send({ id, error: { code: -32601, message: `unknown method: ${method}` } });
+  }
 });
