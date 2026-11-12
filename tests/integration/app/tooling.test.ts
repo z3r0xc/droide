@@ -25,9 +25,15 @@ async function sandbox(
     join(home, ".factory", "mcp.json"),
     JSON.stringify({ mcpServers }, null, 2),
   );
+  const platform: Environment["platform"] =
+    process.platform === "win32"
+      ? "win32"
+      : process.platform === "darwin"
+        ? "darwin"
+        : "linux";
   return {
     root,
-    environment: { env: {}, home, platform: process.platform, cwd: project },
+    environment: { env: {}, home, platform, cwd: project },
   };
 }
 
