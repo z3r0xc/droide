@@ -36,6 +36,7 @@ const MIGRATION_FILES = [
   "0007_term_prefixes.sql",
   "0008_whole_transcript_records.sql",
   "0009_vector_bookkeeping.sql",
+  "0010_transcript_index.sql",
 ] as const;
 
 interface MigrationSource {

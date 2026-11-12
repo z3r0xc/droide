@@ -170,14 +170,23 @@ lines.on("line", (line) => {
     case "search.walk":
       send({
         id,
-        result: { paths: ["src/a.ts", "README.md"], truncated: params.maxResults === 1 },
+        result: {
+          paths: ["src/a.ts", "README.md"],
+          truncated: params.maxResults === 1,
+        },
       });
       return;
     case "search.text":
       send({
         id,
         result: {
-          hits: [{ path: "src/a.ts", line: 2, text: `hit for ${String(params.query ?? "")}` }],
+          hits: [
+            {
+              path: "src/a.ts",
+              line: 2,
+              text: `hit for ${String(params.query ?? "")}`,
+            },
+          ],
           truncated: false,
           filesScanned: 2,
         },
@@ -201,7 +210,28 @@ lines.on("line", (line) => {
     case "secrets.unprotect":
       send({ id, result: { plaintext: "b3Blbg==" } });
       return;
+    case "pty.spawn":
+      send({ id, result: { sessionId: "fixture-session" } });
+      return;
+    case "pty.read":
+      send({ id, result: { data: "aGk=", exited: false, exitCode: null } });
+      return;
+    case "pty.write":
+      send({ id, result: { written: String(params.data ?? "").length } });
+      return;
+    case "pty.resize":
+      send({ id, result: { cols: params.cols, rows: params.rows } });
+      return;
+    case "pty.kill":
+      send({ id, result: { exitCode: -1 } });
+      return;
+    case "pty.close":
+      send({ id, result: { closed: true } });
+      return;
     default:
-      send({ id, error: { code: -32601, message: `unknown method: ${method}` } });
+      send({
+        id,
+        error: { code: -32601, message: `unknown method: ${method}` },
+      });
   }
 });

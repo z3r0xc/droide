@@ -73,6 +73,7 @@ function baseArgv(overrides: Partial<ExecArgv> = {}): ExecArgv {
     fork: undefined,
     mission: false,
     useSpec: false,
+    disableBuiltinSkills: false,
     specModel: undefined,
     listTools: false,
     onlyTools: [],

@@ -11,6 +11,12 @@ import {
 import { NativeProtocolError } from "../../../src/native/errors.ts";
 import {
   pathResolve,
+  ptyClose,
+  ptyKill,
+  ptyRead,
+  ptyResize,
+  ptySpawn,
+  ptyWrite,
   ptyQuote,
   sandboxProfile,
   searchText,
@@ -121,4 +127,23 @@ test("a remote error propagates as a typed error, not a protocol error", async (
       return true;
     },
   );
+});
+
+test("pty session methods round-trip through the wrappers", async (t) => {
+  const native = await client(t);
+
+  const sessionId = await ptySpawn(native, {
+    program: "cmd.exe",
+    args: ["/c", "echo hi"],
+  });
+  assert.equal(sessionId, "fixture-session");
+
+  const read = await ptyRead(native, sessionId, { timeoutMs: 10 });
+  assert.deepEqual(read, { data: "aGk=", exited: false, exitCode: null });
+
+  assert.equal(await ptyWrite(native, sessionId, "aGk="), 4);
+  await ptyResize(native, sessionId, { cols: 100, rows: 30 });
+  assert.equal(await ptyKill(native, sessionId), -1);
+  await ptyClose(native, sessionId);
+  await ptyClose(native, sessionId);
 });

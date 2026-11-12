@@ -49,3 +49,47 @@ export function toolMoreLines(lines: number): string {
 
 /** B6 — aborted invocation notice body (the glyph is added by the renderer). */
 export const INTERRUPTED = "Interrupted";
+
+/** B12 — the status texts a running turn shows, in the spec's exact wording. */
+export const STATUS_TEXTS = {
+  thinking: "Thinking...",
+  streaming: "Streaming...",
+  invoking: "Invoking tools...",
+  confirmation: "Waiting for tool confirmation...",
+  cancelling: "Cancelling tools...",
+} as const;
+
+/** B12 — the stop hint appended to a running status. */
+export const STOP_HINT = "(Press ESC to stop)";
+
+/** Compose one status-line row: the status then the stop hint. */
+export function withStopHint(text: string): string {
+  return `${text}  ${STOP_HINT}`;
+}
+
+/** R11 — the approval row's header word. */
+export const APPROVAL_TITLE = "Approval";
+
+/** R11 — the one-row help line under the options. */
+export const APPROVAL_HELP = `${GLYPHS.arrowUp}${GLYPHS.arrowDown} navigate ${GLYPHS.separator} Enter select ${GLYPHS.separator} Esc cancel`;
+
+/** R11 — the three options, in the order the subject lists them. */
+export const APPROVAL_OPTION_LABELS = {
+  once: "Yes, allow",
+  session: "Yes, and always allow this session",
+  deny: "No, cancel",
+} as const;
+
+/** R11 — how a decided approval reads in place of the options. */
+export const APPROVAL_DECISION_TEXTS = {
+  once: "allowed",
+  session: "allowed for the rest of the session",
+  deny: "denied",
+} as const;
+
+/** B10 — a submit while a turn runs has no queue yet. */
+export const TURN_ALREADY_RUNNING =
+  "A turn is already running. Press Esc to cancel it.";
+
+/** B12/R? — the notice a cancelled or failed turn appends. */
+export const TURN_CANCELLED = "Cancelled";

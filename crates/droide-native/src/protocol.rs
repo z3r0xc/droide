@@ -5,11 +5,14 @@
 //! parsing, every parameter is type-checked, and a malformed request produces a
 //! structured error instead of a panic.
 
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::paths::resolve_within;
+use crate::pty_session::{PtyError, SessionRegistry, SpawnOptions, MAX_READ_TIMEOUT_MS};
 use crate::sandbox::{profile_for, SandboxRequest};
 use crate::search::{search_text, walk, TextOptions, WalkOptions};
 
@@ -148,6 +151,23 @@ impl<'a> Params<'a> {
                 })
                 .collect(),
             Some(_) => Err(format!("param \"{name}\" must be an array of strings")),
+        }
+    }
+
+    fn string_map(&self, name: &str) -> Result<Option<Vec<(String, String)>>, String> {
+        match self.value.get(name) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::Object(entries)) => {
+                let mut collected = Vec::with_capacity(entries.len());
+                for (key, value) in entries {
+                    match value {
+                        Value::String(text) => collected.push((key.clone(), text.clone())),
+                        _ => return Err(format!("param \"{name}\" must map strings to strings")),
+                    }
+                }
+                Ok(Some(collected))
+            }
+            Some(_) => Err(format!("param \"{name}\" must be an object")),
         }
     }
 }
@@ -356,17 +376,111 @@ fn internal(error: std::io::Error) -> (i32, String) {
     (error_code::INTERNAL, error.to_string())
 }
 
-/// Handle one request line. Pure: no I/O beyond what the method itself needs.
-pub fn handle_line(line: &str) -> Response {
-    if line.len() > MAX_LINE_BYTES {
-        return Response::err(None, error_code::TOO_LARGE, "request line too large");
-    }
-    let request: Request = match serde_json::from_str(line) {
-        Ok(request) => request,
-        Err(error) => return Response::err(None, error_code::PARSE, error.to_string()),
-    };
+fn pty_spawn(request: &Request, sessions: &mut SessionRegistry) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let program = params.string("program").map_err(invalid)?;
+    let args = params.string_list("args").map_err(invalid)?;
+    let cwd = params.optional_string("cwd").map_err(invalid)?;
+    let env = params
+        .string_map("env")
+        .map_err(invalid)?
+        .unwrap_or_default();
+    let cols = params.usize("cols", 80, 1000).map_err(invalid)?;
+    let rows = params.usize("rows", 24, 1000).map_err(invalid)?;
+    let cols = u16::try_from(cols).map_err(|_| invalid("cols is out of range".into()))?;
+    let rows = u16::try_from(rows).map_err(|_| invalid("rows is out of range".into()))?;
+    let id = sessions
+        .spawn(
+            program,
+            &args,
+            SpawnOptions {
+                cwd: cwd.map(PathBuf::from),
+                env,
+                cols,
+                rows,
+            },
+        )
+        .map_err(pty_failure)?;
+    Ok(serde_json::json!({ "sessionId": id }))
+}
 
-    let outcome = match request.method.as_str() {
+fn pty_read(request: &Request, sessions: &mut SessionRegistry) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let id = params.string("sessionId").map_err(invalid)?;
+    let max_timeout = MAX_READ_TIMEOUT_MS as usize;
+    let timeout = params
+        .usize("timeoutMs", 100, max_timeout)
+        .map_err(invalid)?;
+    let timeout =
+        u32::try_from(timeout).map_err(|_| invalid("timeoutMs is out of range".into()))?;
+    let outcome = sessions.read(id, timeout).map_err(pty_failure)?;
+    Ok(serde_json::json!({
+        "data": encode_base64(&outcome.data),
+        "exited": outcome.exited,
+        "exitCode": outcome.exit_code,
+    }))
+}
+
+fn pty_write(request: &Request, sessions: &mut SessionRegistry) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let id = params.string("sessionId").map_err(invalid)?;
+    let data = decode_base64(params.string("data").map_err(invalid)?)?;
+    let written = sessions.write(id, &data).map_err(pty_failure)?;
+    Ok(serde_json::json!({ "written": written }))
+}
+
+fn pty_resize(request: &Request, sessions: &mut SessionRegistry) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let id = params.string("sessionId").map_err(invalid)?;
+    let cols = params.usize("cols", 0, 1000).map_err(invalid)?;
+    let rows = params.usize("rows", 0, 1000).map_err(invalid)?;
+    let cols = u16::try_from(cols).map_err(|_| invalid("cols is out of range".into()))?;
+    let rows = u16::try_from(rows).map_err(|_| invalid("rows is out of range".into()))?;
+    sessions.resize(id, cols, rows).map_err(pty_failure)?;
+    Ok(serde_json::json!({ "cols": cols, "rows": rows }))
+}
+
+fn pty_kill(request: &Request, sessions: &mut SessionRegistry) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let id = params.string("sessionId").map_err(invalid)?;
+    let exit_code = sessions.kill(id).map_err(pty_failure)?;
+    Ok(serde_json::json!({ "exitCode": exit_code }))
+}
+
+fn pty_close(request: &Request, sessions: &mut SessionRegistry) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let id = params.string("sessionId").map_err(invalid)?;
+    sessions.close(id).map_err(pty_failure)?;
+    Ok(serde_json::json!({ "closed": true }))
+}
+
+fn pty_failure(error: PtyError) -> (i32, String) {
+    let code = match &error {
+        PtyError::UnknownSession(_)
+        | PtyError::SessionClosed(_)
+        | PtyError::InvalidParam(_)
+        | PtyError::Limit(_) => error_code::INVALID_PARAMS,
+        PtyError::Unsupported(_) | PtyError::Spawn(_) | PtyError::Io(_) => error_code::INTERNAL,
+    };
+    (code, error.to_string())
+}
+
+fn require_sessions(
+    sessions: Option<&mut SessionRegistry>,
+) -> Result<&mut SessionRegistry, (i32, String)> {
+    sessions.ok_or_else(|| {
+        (
+            error_code::INTERNAL,
+            "pty sessions are unavailable without the session dispatcher".to_string(),
+        )
+    })
+}
+
+fn dispatch(
+    request: &Request,
+    sessions: Option<&mut SessionRegistry>,
+) -> Result<Value, (i32, String)> {
+    match request.method.as_str() {
         "native.version" => Ok(serde_json::json!({
             "protocol": PROTOCOL_VERSION,
             "version": env!("CARGO_PKG_VERSION"),
@@ -378,22 +492,72 @@ pub fn handle_line(line: &str) -> Response {
             }
             None => Err(invalid("hash.sha256 needs a string param \"text\"".into())),
         },
-        "search.walk" => search_walk(&request),
-        "search.text" => search_text_method(&request),
-        "sandbox.profile" => sandbox_profile(&request),
-        "path.resolve" => path_resolve(&request),
-        "secrets.protect" => secrets_protect(&request),
-        "secrets.unprotect" => secrets_unprotect(&request),
-        "pty.quote" => pty_quote(&request),
+        "search.walk" => search_walk(request),
+        "search.text" => search_text_method(request),
+        "sandbox.profile" => sandbox_profile(request),
+        "path.resolve" => path_resolve(request),
+        "secrets.protect" => secrets_protect(request),
+        "secrets.unprotect" => secrets_unprotect(request),
+        "pty.quote" => pty_quote(request),
+        "pty.spawn" => pty_spawn(request, require_sessions(sessions)?),
+        "pty.read" => pty_read(request, require_sessions(sessions)?),
+        "pty.write" => pty_write(request, require_sessions(sessions)?),
+        "pty.resize" => pty_resize(request, require_sessions(sessions)?),
+        "pty.kill" => pty_kill(request, require_sessions(sessions)?),
+        "pty.close" => pty_close(request, require_sessions(sessions)?),
         other => Err((
             error_code::METHOD_NOT_FOUND,
             format!("unknown method: {other}"),
         )),
+    }
+}
+
+fn respond(line: &str, sessions: Option<&mut SessionRegistry>) -> Response {
+    if line.len() > MAX_LINE_BYTES {
+        return Response::err(None, error_code::TOO_LARGE, "request line too large");
+    }
+    let request: Request = match serde_json::from_str(line) {
+        Ok(request) => request,
+        Err(error) => return Response::err(None, error_code::PARSE, error.to_string()),
     };
 
-    match outcome {
+    match dispatch(&request, sessions) {
         Ok(result) => Response::ok(request.id, result),
         Err((code, message)) => Response::err(Some(request.id), code, message),
+    }
+}
+
+/// Handle one request line without session state.
+///
+/// Suitable for the stateless methods; PTY sessions are owned by a
+/// [`Dispatcher`] so they survive across lines.
+pub fn handle_line(line: &str) -> Response {
+    respond(line, None)
+}
+
+/// Stateful dispatcher for the stdio loop.
+///
+/// Holds the PTY session map across requests; dropping it (or stdin EOF)
+/// terminates every child it started.
+#[derive(Debug, Default)]
+pub struct Dispatcher {
+    sessions: SessionRegistry,
+}
+
+impl Dispatcher {
+    /// Create a dispatcher with no live sessions.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Handle one request line, including the stateful `pty.*` methods.
+    pub fn handle_line(&mut self, line: &str) -> Response {
+        respond(line, Some(&mut self.sessions))
+    }
+
+    /// Release every live session.
+    pub fn close_all(&mut self) {
+        self.sessions.close_all();
     }
 }
 
@@ -566,5 +730,99 @@ mod tests {
             .as_str()
             .unwrap()
             .ends_with("src/a.rs"));
+    }
+
+    #[test]
+    fn pty_methods_need_the_session_dispatcher() {
+        let response = call(r#"{"id":40,"method":"pty.read","params":{"sessionId":"x"}}"#);
+        assert_eq!(response["error"]["code"], error_code::INTERNAL);
+    }
+
+    #[test]
+    fn an_unknown_pty_session_is_an_invalid_parameter() {
+        let mut dispatcher = Dispatcher::new();
+        let response = json(
+            &dispatcher
+                .handle_line(r#"{"id":41,"method":"pty.read","params":{"sessionId":"nope"}}"#),
+        );
+        assert_eq!(response["error"]["code"], error_code::INVALID_PARAMS);
+        assert!(response["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("unknown pty session"));
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn pty_sessions_round_trip_over_the_dispatcher() {
+        let (program, args) = if cfg!(windows) {
+            ("cmd.exe", vec!["/d", "/c", "echo proto-pty-marker"])
+        } else {
+            ("/bin/sh", vec!["-c", "printf proto-pty-marker"])
+        };
+        let mut dispatcher = Dispatcher::new();
+        let spawn = serde_json::json!({
+            "id": 42,
+            "method": "pty.spawn",
+            "params": { "program": program, "args": args, "cols": 100, "rows": 30 },
+        });
+        let spawned = json(&dispatcher.handle_line(&spawn.to_string()));
+        let id = spawned["result"]["sessionId"]
+            .as_str()
+            .expect("session id")
+            .to_string();
+
+        let mut output: Vec<u8> = Vec::new();
+        let mut exited = false;
+        let mut exit_code = None;
+        for _ in 0..20 {
+            let line = serde_json::json!({
+                "id": 43,
+                "method": "pty.read",
+                "params": { "sessionId": id, "timeoutMs": 250 },
+            })
+            .to_string();
+            let response = json(&dispatcher.handle_line(&line));
+            assert!(response["error"].is_null(), "read failed: {response}");
+            let chunk = response["result"]["data"]
+                .as_str()
+                .and_then(|value| decode_base64(value).ok())
+                .unwrap_or_default();
+            output.extend_from_slice(&chunk);
+            exited = response["result"]["exited"].as_bool().unwrap_or(false);
+            exit_code = response["result"]["exitCode"].as_i64();
+            if exited {
+                break;
+            }
+        }
+        assert!(
+            String::from_utf8_lossy(&output).contains("proto-pty-marker"),
+            "output: {:?}",
+            String::from_utf8_lossy(&output)
+        );
+        assert!(exited, "the child must report its exit");
+        assert_eq!(exit_code, Some(0));
+
+        let close = serde_json::json!({
+            "id": 44,
+            "method": "pty.close",
+            "params": { "sessionId": id },
+        });
+        assert!(json(&dispatcher.handle_line(&close.to_string()))["error"].is_null());
+        let after = json(
+            &dispatcher.handle_line(
+                &serde_json::json!({
+                    "id": 45,
+                    "method": "pty.read",
+                    "params": { "sessionId": id },
+                })
+                .to_string(),
+            ),
+        );
+        assert_eq!(after["error"]["code"], error_code::INVALID_PARAMS);
+        assert!(after["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("closed"));
     }
 }

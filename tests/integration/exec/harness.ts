@@ -38,6 +38,8 @@ export type MockResponse =
 export interface MockServer {
   readonly url: string;
   readonly requests: readonly string[];
+  /** Raw request bodies, in arrival order; one entry per POST. */
+  readonly bodies: readonly string[];
   close(): Promise<void>;
 }
 
@@ -45,9 +47,15 @@ export async function startMockServer(
   script: readonly MockResponse[],
 ): Promise<MockServer> {
   const requests: string[] = [];
+  const bodies: string[] = [];
   let posts = 0;
   const server: Server = createServer((request, response) => {
     requests.push(`${request.method ?? "GET"} ${request.url ?? ""}`);
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () =>
+      bodies.push(Buffer.concat(chunks).toString("utf8")),
+    );
     request.resume();
     if (request.method !== "POST") {
       response.writeHead(404);
@@ -93,6 +101,7 @@ export async function startMockServer(
   return {
     url: `http://127.0.0.1:${address.port}`,
     requests,
+    bodies,
     async close() {
       server.closeAllConnections();
       const closed = Promise.withResolvers<void>();

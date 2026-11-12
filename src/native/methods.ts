@@ -244,3 +244,132 @@ export async function secretsUnprotect(
   );
   return requireString(method, result, "plaintext");
 }
+
+export interface PtySpawnOptions {
+  readonly program: string;
+  readonly args?: readonly string[];
+  readonly cwd?: string;
+  readonly env?: Readonly<Record<string, string>>;
+  readonly cols?: number;
+  readonly rows?: number;
+}
+
+export interface PtyReadResult {
+  /** Base64 payload; the caller decodes with the helper's encoding. */
+  readonly data: string;
+  readonly exited: boolean;
+  readonly exitCode: number | null;
+}
+
+/** Start a pseudo-terminal session; the id is opaque and lives until `ptyClose`. */
+export async function ptySpawn(
+  client: NativeClient,
+  options: PtySpawnOptions,
+  request: { readonly timeoutMs?: number } = {},
+): Promise<string> {
+  const method = "pty.spawn";
+  const params: Record<string, unknown> = {
+    program: options.program,
+    args: [...(options.args ?? [])],
+    cols: options.cols ?? 80,
+    rows: options.rows ?? 24,
+  };
+  if (options.cwd !== undefined) params["cwd"] = options.cwd;
+  if (options.env !== undefined) params["env"] = options.env;
+  const result = requireRecord(
+    method,
+    await client.request(method, params, request),
+  );
+  return requireString(method, result, "sessionId");
+}
+
+/** Read whatever is available, waiting up to `timeoutMs` for the first byte. */
+export async function ptyRead(
+  client: NativeClient,
+  sessionId: string,
+  options: {
+    readonly timeoutMs?: number;
+    readonly requestTimeoutMs?: number;
+  } = {},
+): Promise<PtyReadResult> {
+  const method = "pty.read";
+  const result = requireRecord(
+    method,
+    await client.request(
+      method,
+      {
+        sessionId,
+        ...(options.timeoutMs === undefined
+          ? {}
+          : { timeoutMs: options.timeoutMs }),
+      },
+      options.requestTimeoutMs === undefined
+        ? {}
+        : { timeoutMs: options.requestTimeoutMs },
+    ),
+  );
+  const exitCode = result["exitCode"];
+  if (
+    exitCode !== null &&
+    (typeof exitCode !== "number" || !Number.isInteger(exitCode))
+  ) {
+    throw protocolError(method, 'field "exitCode" must be an integer or null');
+  }
+  return {
+    data: requireString(method, result, "data"),
+    exited: requireBoolean(method, result, "exited"),
+    exitCode: typeof exitCode === "number" ? exitCode : null,
+  };
+}
+
+export async function ptyWrite(
+  client: NativeClient,
+  sessionId: string,
+  data: string,
+  request: { readonly timeoutMs?: number } = {},
+): Promise<number> {
+  const method = "pty.write";
+  const result = requireRecord(
+    method,
+    await client.request(method, { sessionId, data }, request),
+  );
+  return requireNumber(method, result, "written");
+}
+
+export async function ptyResize(
+  client: NativeClient,
+  sessionId: string,
+  size: { readonly cols: number; readonly rows: number },
+  request: { readonly timeoutMs?: number } = {},
+): Promise<void> {
+  await client.request("pty.resize", { sessionId, ...size }, request);
+}
+
+export async function ptyKill(
+  client: NativeClient,
+  sessionId: string,
+  request: { readonly timeoutMs?: number } = {},
+): Promise<number | null> {
+  const method = "pty.kill";
+  const result = requireRecord(
+    method,
+    await client.request(method, { sessionId }, request),
+  );
+  const exitCode = result["exitCode"];
+  if (
+    exitCode !== null &&
+    (typeof exitCode !== "number" || !Number.isInteger(exitCode))
+  ) {
+    throw protocolError(method, 'field "exitCode" must be an integer or null');
+  }
+  return typeof exitCode === "number" ? exitCode : null;
+}
+
+/** Idempotent: closing an already-closed session succeeds. */
+export async function ptyClose(
+  client: NativeClient,
+  sessionId: string,
+  request: { readonly timeoutMs?: number } = {},
+): Promise<void> {
+  await client.request("pty.close", { sessionId }, request);
+}

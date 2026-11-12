@@ -10,7 +10,8 @@
  */
 
 import type { DatabaseSync } from "node:sqlite";
-import { existsSync, truncateSync } from "node:fs";
+import { readdirSync, statSync, truncateSync, type Dirent } from "node:fs";
+import { join } from "node:path";
 
 import {
   CorruptSessionRowError,
@@ -28,7 +29,22 @@ import {
   type SessionClock,
   type SessionIdFactory,
 } from "./ids.ts";
-import { openSessionIndexDatabase } from "./open.ts";
+import {
+  deleteIndexedTranscript,
+  matchingIndexedPaths,
+  openSessionIndexDatabase,
+  readIndexedTranscripts,
+  replaceTranscriptIndexValues,
+  upsertIndexedTranscript,
+  type TranscriptIndexValueRow,
+} from "./index-db.ts";
+import {
+  planTranscriptIndex,
+  type IndexedTranscriptRow,
+  type ListedTranscript,
+  type TranscriptIndexPlanSummary,
+  type TranscriptStat,
+} from "./index-planner.ts";
 import {
   appendTranscriptLine,
   isJsonObject,
@@ -54,6 +70,7 @@ export const DEFAULT_SEARCH_HITS = 3;
 export const DEFAULT_CONTEXT_CHARS = 80;
 
 const MUTATION_BUSY_TIMEOUT_MS = 25;
+const DELIBERATE_BUSY_TIMEOUT_MS = 5000;
 const RESTING_BUSY_TIMEOUT_MS = 0;
 const MAX_SNIPPETS_PER_HIT = 3;
 const MAX_JSON_DEPTH = 32;
@@ -149,6 +166,11 @@ export interface SearchOptions {
   readonly projectKey?: string | null;
   readonly since?: number;
   readonly until?: number;
+  /**
+   * The `session_index_search` flag: when `false` the literal scan runs and the
+   * transcript index is not consulted at all (B55).
+   */
+  readonly useIndex?: boolean;
 }
 
 export interface SearchHit {
@@ -178,6 +200,8 @@ export interface SessionStoreOptions {
   readonly sessionsDir: string;
   readonly clock: SessionClock;
   readonly idFactory?: SessionIdFactory;
+  /** `false` turns the transcript index off for this store (the B55 flag). */
+  readonly searchIndex?: boolean;
 }
 
 interface SearchCandidate {
@@ -446,6 +470,109 @@ function searchableValues(
   return values;
 }
 
+/** The sessions-dir relative path a transcript is indexed under. */
+function relativeTranscriptPath(projectKey: string, sessionId: string): string {
+  return projectKey === ""
+    ? `${sessionId}.jsonl`
+    : `${projectKey}/${sessionId}.jsonl`;
+}
+
+/** The searchable values of one transcript, in the shape the index stores. */
+function indexValuesFor(
+  records: readonly JsonObject[],
+): readonly TranscriptIndexValueRow[] {
+  const values: TranscriptIndexValueRow[] = [];
+  for (const [index, record] of records.entries()) {
+    const lineNumber = index + 1;
+    let ordinal = 0;
+    for (const value of searchableValues(record, lineNumber)) {
+      values.push({
+        lineNumber,
+        ordinal,
+        kind: value.kind,
+        toolName: value.toolName ?? null,
+        messageRole: value.messageRole ?? null,
+        isSummary: value.summary === true,
+        valueLower: value.value.toLowerCase(),
+      });
+      ordinal += 1;
+    }
+  }
+  return values;
+}
+
+/** The stat a plan is decided from; `null` when the file is not there. */
+function transcriptStat(path: string): TranscriptStat | null {
+  try {
+    const stat = statSync(path);
+    return { mtimeMs: Math.trunc(stat.mtimeMs), size: stat.size };
+  } catch {
+    return null;
+  }
+}
+
+function sortedEntries(directory: string): readonly Dirent[] {
+  try {
+    return readdirSync(directory, { withFileTypes: true }).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Every transcript under the sessions dir, in the documented layout: the root,
+ * `btw/` and one `-<project>` directory per project (B17/"On-disk layout").
+ * A file whose stem is not a session id is not a transcript.
+ */
+function listTranscriptFiles(sessionsDir: string): readonly ListedTranscript[] {
+  const found: ListedTranscript[] = [];
+  const collect = (directory: string, projectKey: string): void => {
+    for (const entry of sortedEntries(directory)) {
+      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      const sessionId = entry.name.slice(0, -".jsonl".length);
+      if (!isSessionId(sessionId)) continue;
+      found.push({
+        transcriptPath:
+          projectKey === "" ? entry.name : `${projectKey}/${entry.name}`,
+        sessionId,
+        projectKey,
+      });
+    }
+  };
+
+  collect(sessionsDir, "");
+  for (const entry of sortedEntries(sessionsDir)) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    try {
+      validateProjectKey(entry.name);
+    } catch {
+      continue;
+    }
+    collect(join(sessionsDir, entry.name), entry.name);
+  }
+  return found;
+}
+
+/** Decode a sessions-relative transcript key back to its identity. */
+function parseTranscriptPath(
+  transcriptPath: string,
+): { readonly projectKey: string; readonly sessionId: string } | null {
+  const parts = transcriptPath.split("/");
+  const file = parts.pop();
+  if (file === undefined || !file.endsWith(".jsonl")) return null;
+  const sessionId = file.slice(0, -".jsonl".length);
+  if (!isSessionId(sessionId)) return null;
+  const projectKey = parts.join("/");
+  try {
+    validateProjectKey(projectKey);
+  } catch {
+    return null;
+  }
+  return { projectKey, sessionId };
+}
+
 function makeSnippet(
   value: string,
   matchIndex: number,
@@ -571,6 +698,7 @@ export class SessionStore {
   readonly #sessionsDir: string;
   readonly #clock: SessionClock;
   readonly #ids: SessionIdFactory;
+  readonly #searchIndex: boolean;
   #inTransaction = false;
   #closed = false;
 
@@ -579,6 +707,7 @@ export class SessionStore {
     this.#sessionsDir = options.sessionsDir;
     this.#clock = options.clock;
     this.#ids = options.idFactory ?? createSessionIdFactory(options.clock);
+    this.#searchIndex = options.searchIndex !== false;
   }
 
   close(): void {
@@ -854,6 +983,15 @@ export class SessionStore {
       until,
     });
 
+    // The transcript index is a prefilter, never a second matcher: a session it
+    // can prove has no match is skipped without reading the file, and every
+    // other session is scanned exactly as it always was. That is what keeps the
+    // indexed and literal paths byte-identical.
+    const indexed =
+      this.#searchIndex && options.useIndex !== false
+        ? this.#indexedMatches(needle, kind)
+        : null;
+
     const matched: MatchedSession[] = [];
     let complete = true;
     for (const candidate of candidates) {
@@ -862,11 +1000,24 @@ export class SessionStore {
         candidate.projectKey,
         candidate.sessionId,
       );
-      if (!existsSync(path)) {
+      const stat = transcriptStat(path);
+      if (stat === null) {
         // A row whose file vanished is a coverage gap, not a crash: the next
         // refresh prunes it (B30). The result says so instead of guessing.
         complete = false;
         continue;
+      }
+      if (indexed !== null) {
+        const relative = relativeTranscriptPath(
+          candidate.projectKey,
+          candidate.sessionId,
+        );
+        const row = indexed.rows.get(relative);
+        const current =
+          row !== undefined &&
+          row.transcriptMtimeMs === stat.mtimeMs &&
+          row.transcriptSize === stat.size;
+        if (current && !indexed.matching.has(relative)) continue;
       }
       const records = readTranscriptFile(path, candidate.sessionId);
       const hits = collectHits(records, needle, kind, limitHits, contextChars);
@@ -903,6 +1054,92 @@ export class SessionStore {
     return result;
   }
 
+  /**
+   * Bring the transcript index up to date: plan from the files on disk and the
+   * rows the last pass left, then read every file the plan calls new or
+   * changed. An unchanged pass writes nothing, so running it twice leaves the
+   * database byte-identical (B23, B30).
+   */
+  reindex(): TranscriptIndexPlanSummary {
+    this.#ensureOpen();
+    const plan = planTranscriptIndex({
+      list: () => listTranscriptFiles(this.#sessionsDir),
+      stat: (transcriptPath) => {
+        const transcript = parseTranscriptPath(transcriptPath);
+        return transcript === null
+          ? null
+          : transcriptStat(
+              transcriptPathFor(
+                this.#sessionsDir,
+                transcript.projectKey,
+                transcript.sessionId,
+              ),
+            );
+      },
+      indexed: readIndexedTranscripts(this.#db),
+    });
+
+    if (plan.entries.length === 0) return plan.summary;
+
+    this.#deliberateTransaction(() => {
+      for (const entry of plan.entries) {
+        if (entry.action === "skip") continue;
+        if (entry.action === "delete") {
+          deleteIndexedTranscript(this.#db, entry.transcriptPath);
+          continue;
+        }
+        const absolute = transcriptPathFor(
+          this.#sessionsDir,
+          entry.projectKey,
+          entry.sessionId,
+        );
+        const stat = transcriptStat(absolute);
+        if (stat === null) {
+          deleteIndexedTranscript(this.#db, entry.transcriptPath);
+          continue;
+        }
+        const records = readTranscriptFile(absolute, entry.sessionId);
+        upsertIndexedTranscript(
+          this.#db,
+          {
+            transcriptPath: entry.transcriptPath,
+            sessionId: entry.sessionId,
+            projectKey: entry.projectKey,
+            transcriptMtimeMs: stat.mtimeMs,
+            transcriptSize: stat.size,
+          },
+          this.#clock.now(),
+        );
+        replaceTranscriptIndexValues(
+          this.#db,
+          entry.transcriptPath,
+          indexValuesFor(records),
+        );
+      }
+    });
+
+    return plan.summary;
+  }
+
+  /**
+   * The rows and the matching paths the index can speak for; `null` when it has
+   * nothing to say (never built), in which case every session is scanned.
+   */
+  #indexedMatches(
+    needle: string,
+    kind: SessionKind | "all",
+  ): {
+    readonly rows: ReadonlyMap<string, IndexedTranscriptRow>;
+    readonly matching: ReadonlySet<string>;
+  } | null {
+    const rows = readIndexedTranscripts(this.#db);
+    if (rows.length === 0) return null;
+    return {
+      rows: new Map(rows.map((row) => [row.transcriptPath, row])),
+      matching: new Set(matchingIndexedPaths(this.#db, needle, kind)),
+    };
+  }
+
   #ensureOpen(): void {
     if (this.#closed) throw new StoreClosedError();
   }
@@ -914,9 +1151,18 @@ export class SessionStore {
   }
 
   #transaction<T>(work: () => T): T {
+    return this.#runTransaction(MUTATION_BUSY_TIMEOUT_MS, work);
+  }
+
+  /** Work a caller is waiting on: a peer gets B2's deliberate 5 s to finish. */
+  #deliberateTransaction<T>(work: () => T): T {
+    return this.#runTransaction(DELIBERATE_BUSY_TIMEOUT_MS, work);
+  }
+
+  #runTransaction<T>(timeoutMs: number, work: () => T): T {
     if (this.#inTransaction) throw new NestedTransactionError();
     this.#inTransaction = true;
-    this.#db.exec(`PRAGMA busy_timeout = ${MUTATION_BUSY_TIMEOUT_MS}`);
+    this.#db.exec(`PRAGMA busy_timeout = ${timeoutMs}`);
     try {
       this.#db.exec("BEGIN IMMEDIATE");
       try {

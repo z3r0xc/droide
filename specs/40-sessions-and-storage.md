@@ -472,6 +472,32 @@ prints the search-failed message and sets 1 (`run.ts:160-173`). `[observed]`
 
 ## Data & config
 
+### Our head: version 10 (a local design, labelled)
+
+The subject's cache head is version 9. This build adds one migration of its own,
+`0010_transcript_index`, because the retrieval shape we need is a *literal
+transcript index* rather than the subject's `session_term_filters` planner.
+The difference is deliberate and recorded here, not hidden:
+
+| object | purpose |
+|---|---|
+| `transcript_index` | one row per transcript path: session, project key, mtime+size fingerprint, `indexed_at`, and six settings-derived columns (`mission`, `tags`, `archived_at`, `worktree`, `artifacts`, `settings_write_seq`) |
+| `transcript_index_value` | one row per indexed line (`path`, `line`, `ordinal` PK): `kind`, `tool`, `role`, `summary`, lowercased `value`, FK-cascaded from `transcript_index` |
+| 3 indexes | by session, by project key, and by lowercased value for the prefilter |
+| 3 triggers | a changed fingerprint clears cached values; an insert seeds the settings copy; a `sessions` update keeps it synced |
+
+**Invariant that keeps this honest.** The index only *prefilters*: a session is
+skipped only when its fingerprint still matches its file **and** no cached value
+matches the query. Everything else is scanned exactly as before, so the results
+of `search()` are identical with the index on or off — proven by
+`tests/integration/session/index.test.ts` (indexed vs literal parity over 15
+query/option cases, plus a prefilter-trust case).
+
+A binary database written by the subject is therefore *not* readable by this
+build (different table names), and this build's database is not readable by the
+subject. That is the cost of a clean-room index; it is stated here instead of
+being discovered by a user.
+
 ### Cache database, head version 9
 
 `schema_migrations` — `version INTEGER PRIMARY KEY`, `name TEXT NOT NULL`,

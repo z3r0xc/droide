@@ -37,19 +37,19 @@ specification is complete and unambiguous enough to build from.
 
 What runs today, run against this tree:
 
-| Surface                                | Today                                                                                                                                                                                            |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--version`, `--help`, subcommand help | works — reports `1.9.0`; 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md))                             |
-| `doctor`                               | works — 16 named checks; nine are real probes (config, environment, system, binaries, filesystem, git, proxy, certs, auth) and the rest report `skip` with a reason                              |
-| `search` / `find`                      | works — queries the local session store, text and `--json`                                                                                                                                       |
-| `mcp list`                             | works — merges the MCP configuration and prints transport and state per server; never starts one                                                                                                 |
-| `exec`                                 | works for `text`, `json` and `stream-json` output with a prompt, `-f` or stdin; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` refuse                                                     |
-| native helper                          | 9 JSON-line methods, typed and validated on the TypeScript side, 57 Rust tests, plus a contract test against the compiled binary (`npm run test:native`) — **not yet wired into tool execution** |
-| `plugin list`                          | works — merges the user and project registries, newest version per id, enablement from settings                                                                                                  |
-| `update --check`                       | works — reads this repository's GitHub releases; installing is refused with exit 2                                                                                                               |
-| `daemon`                               | works locally — WebSocket transport, JSON-RPC, auth gate, single instance, ordered shutdown (132 tests); Remote Control and the port proxy are declared, not built                               |
-| `droide` with no arguments             | launches the interactive shell when stdin and stdout are a terminal                                                                                                                              |
-| test suite                             | 906 tests in 96 files: 903 pass, 3 skipped, plus 57 Rust tests                                                                                                                                   |
+| Surface                                                                                    | Today                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--version`, `--help`, subcommand help                                                     | works — reports `1.9.0`; 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md))                                                                                  |
+| `doctor`                                                                                   | works — 16 named checks; ten are real probes (config, environment, system, binaries, filesystem, git, proxy, certs, auth, mcp) and the rest report `skip` with a reason                                                                               |
+| `search` / `find`                                                                          | works — served from a local transcript index with a proving fallback to the literal scan; `--reindex` refreshes it                                                                                                                                    |
+| `mcp list`, `mcp add`, `mcp remove`, `mcp permissions`                                     | work — merged configuration, surgical JSONC edits that keep comments, atomic writes, permission list/revoke/clear                                                                                                                                     |
+| `plugin list`, `plugin marketplace`, `plugin install`, `plugin uninstall`, `plugin update` | work — git-backed marketplaces validated before adoption, atomic registry merges, collision and reference refusals                                                                                                                                    |
+| `exec`                                                                                     | works for `text`, `json` and `stream-json` with a prompt, `-f` or stdin, session continuation and streaming input; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` refuse                                                                       |
+| `resume`                                                                                   | works — lists sessions, accepts a UUID or link, continues through the `exec -s` path, forks with `--fork`                                                                                                                                             |
+| `daemon`                                                                                   | works locally — WebSocket transport, JSON-RPC, auth gate, single instance, ordered shutdown; Remote Control and the port proxy are declared, not built                                                                                                |
+| `droide` with no arguments                                                                 | launches the interactive shell on a TTY pair; a typed prompt runs an agent turn with streamed rows, approvals and Esc-cancel                                                                                                                          |
+| native helper                                                                              | 15 JSON-line methods (including PTY sessions), typed and validated on the TypeScript side, 69 Rust tests, plus a contract test that spawns a real process through the compiled binary (`npm run test:native`) — **not yet wired into tool execution** |
+| test suite                                                                                 | 1096 tests in 116 files: 1090 pass, 6 skipped, plus 69 Rust tests                                                                                                                                                                                     |
 
 `exec` needs a model credential. Without one it refuses instead of guessing:
 
@@ -60,12 +60,13 @@ Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY
 
 Declared, in flight:
 
-| Surface                                                                                                      | State                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| interactive TUI                                                                                              | the Ink shell renders header, transcript, composer, status line and footer, is driven by a key reducer (`/quit` exits 0, `Ctrl+C` 130) and is frame-tested at 80×24 and 120×40 — but there is no agent loop inside it yet: a submitted line becomes a transcript row |
-| `resume`, `computer`, `plugin install\|uninstall\|update\|marketplace`, `mcp add\|remove\|auth\|permissions` | options parse, help prints, every action refuses                                                                                                                                                                                                                     |
-| native PTY spawn and read loop; macOS/Linux credential stores                                                | only quoting, chunking and Windows DPAPI exist                                                                                                                                                                                                                       |
-| context compaction; session index                                                                            | not implemented; the literal scan is a recorded deviation                                                                                                                                                                                                            |
+| Surface                                                                    | State                                                                                                                                          |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mcp auth`                                                                 | PKCE, the loopback callback, the token exchange and the sealed credential store are implemented and tested; the command that wires them is not |
+| `computer register\|remove\|ssh\|port-forward`, `update` without `--check` | options parse, help prints, every action refuses with exit 1 or 2                                                                              |
+| macOS/Linux credential stores                                              | only Windows DPAPI exists; the store refuses rather than writing plaintext                                                                     |
+| Remote Control, relay and port proxy; the interactive session picker       | declared in `specs/70` and `specs/10`; `docs/gaps.md` names every clause                                                                       |
+| the native layer inside the tool runtime                                   | the helper is tested end to end but the tools still reach it through the fake                                                                  |
 
 The failure is deliberate, and it is observable — exit 64 for a command that is
 specified but not built, exit 1 for an option that is not:
@@ -81,7 +82,7 @@ $ node bin/droide.mjs exec --list-tools
 Current shape of the tree: 11 numbered specification documents — shared context
 plus ten subsystem specs, 9,333 lines under `specs/` — 123 TypeScript files
 under `src/` (33,069 lines), 8 Rust files under `crates/droide-native/src/`,
-7 ADRs, 906 TypeScript tests and 57 Rust tests. Every place where the build is
+8 ADRs, 1096 TypeScript tests and 69 Rust tests. Every place where the build is
 narrower than the clause it cites is marked `TODO(spec …)` in the code and
 counted in [`docs/gaps.md`](./docs/gaps.md), which `npm run gaps` regenerates.
 
@@ -93,7 +94,7 @@ Node 24 or newer, and a Rust toolchain for the native layer.
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 16 named checks (9 real probes), text or --json
+node bin/droide.mjs doctor      # 16 named checks (10 real probes), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
 npm test                        # 906 tests
@@ -134,8 +135,9 @@ node bin/droide.mjs exec -f prompt.txt --auto low
   describes bubblewrap, seatbelt or "no confinement" profiles; `pty.rs` quotes
   the command line the way the subject re-splits it; `secrets.rs` stores secrets
   with DPAPI on Windows.
-- The nine methods are `native.version`, `hash.sha256`, `search.walk`,
-  `search.text`, `path.resolve`, `sandbox.profile`, `pty.quote`,
+- The fifteen methods are `native.version`, `hash.sha256`, `search.walk`,
+  `search.text`, `path.resolve`, `sandbox.profile`, `pty.quote`, `pty.spawn`,
+  `pty.read`, `pty.write`, `pty.resize`, `pty.kill`, `pty.close`,
   `secrets.protect`, `secrets.unprotect`. The TypeScript client validates every
   response shape, the helper has its own tests, and `npm run test:native` runs the
   contract against the compiled binary. The tool layer still reaches the helper
@@ -174,7 +176,8 @@ Decisions that shaped the build:
 | [0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)   | declarative parity cases with an optional oracle                      |
 | [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | the project is `droide`; the CLI design stays identical               |
 | [0006](./docs/adr/0006-terminal-ui-stack.md)                     | the terminal UI is React + Ink, with tokens from the spec             |
-| [0007](./docs/adr/0007-update-channel.md)                       | updates come from this repository's releases, never the subject's     |
+| [0007](./docs/adr/0007-update-channel.md)                        | updates come from this repository's releases, never the subject's     |
+| [0008](./docs/adr/0008-oauth-credential-envelope.md)             | MCP OAuth credentials are sealed by the OS, never by a key file       |
 
 ## Contributing
 

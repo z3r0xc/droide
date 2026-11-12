@@ -287,6 +287,7 @@ export function makeExecCommand(): Command {
           fork: text("fork"),
           mission: flag("mission"),
           useSpec: flag("useSpec"),
+          disableBuiltinSkills: flag("disableBuiltinSkills"),
           specModel: text("specModel"),
           listTools: flag("listTools"),
           onlyTools: names("onlyTools"),

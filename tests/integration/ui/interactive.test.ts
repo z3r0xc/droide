@@ -11,6 +11,11 @@ import assert from "node:assert/strict";
 import { PassThrough, Writable } from "node:stream";
 import { test } from "node:test";
 
+import type {
+  Provider,
+  ProviderDelta,
+  ToolRunner,
+} from "../../../src/agent/ports.ts";
 import type { AppContext } from "../../../src/app/context.ts";
 import {
   INTERRUPT_EXIT_CODE,
@@ -18,6 +23,7 @@ import {
   TERMINATE_EXIT_CODE,
   runInteractiveShell,
   systemTimers,
+  type ShellAgent,
   type TimerApi,
 } from "../../../src/app/interactive.ts";
 import {
@@ -85,12 +91,21 @@ interface FakeClock {
   readonly timers: TimerApi;
   readonly size: () => number;
   advanceTo(ms: number): void;
+  /** Advance relative to the current fake time, firing every due timer once. */
+  advanceBy(ms: number): void;
 }
 
 function fakeClock(): FakeClock {
   let now = 0;
   let nextId = 1;
   const scheduled = new Map<number, { at: number; run: () => void }>();
+  const fireDue = (): void => {
+    for (const [id, entry] of [...scheduled]) {
+      if (entry.at > now) continue;
+      scheduled.delete(id);
+      entry.run();
+    }
+  };
   return {
     clock: () => now,
     timers: {
@@ -107,11 +122,11 @@ function fakeClock(): FakeClock {
     size: () => scheduled.size,
     advanceTo(ms) {
       now = ms;
-      for (const [id, entry] of [...scheduled]) {
-        if (entry.at > now) continue;
-        scheduled.delete(id);
-        entry.run();
-      }
+      fireDue();
+    },
+    advanceBy(ms) {
+      now += ms;
+      fireDue();
     },
   };
 }
@@ -150,6 +165,77 @@ function fakeSignals(): FakeSignals {
     live: () => live.size,
     emit(event) {
       for (const listener of listeners.get(event) ?? []) listener();
+    },
+  };
+}
+
+/** A provider the test drives: one script per call, or a stream held open. */
+interface ScriptedProvider {
+  readonly provider: Provider;
+  /** Calls started so far. */
+  calls: number;
+  /** Streams still open. */
+  active: number;
+  /** Streams that observed the abort signal. */
+  aborts: number;
+}
+
+function scriptedProvider(
+  script: (call: number) => readonly ProviderDelta[] | "hold",
+): ScriptedProvider {
+  const state: ScriptedProvider = {
+    provider: {
+      async *stream(_messages, { signal }) {
+        const call = state.calls;
+        state.calls += 1;
+        state.active += 1;
+        try {
+          const plan = script(call);
+          const deltas: readonly ProviderDelta[] =
+            plan === "hold" ? [{ type: "text", text: "partial" }] : plan;
+          for (const delta of deltas) {
+            if (signal.aborted) {
+              state.aborts += 1;
+              throw Object.assign(new Error("aborted"), { name: "AbortError" });
+            }
+            yield delta;
+          }
+          if (plan === "hold") {
+            if (signal.aborted) {
+              state.aborts += 1;
+              throw Object.assign(new Error("aborted"), { name: "AbortError" });
+            }
+            const aborted = Promise.withResolvers<never>();
+            const onAbort = (): void => {
+              state.aborts += 1;
+              aborted.reject(
+                Object.assign(new Error("aborted"), { name: "AbortError" }),
+              );
+            };
+            signal.addEventListener("abort", onAbort, { once: true });
+            try {
+              await aborted.promise;
+            } finally {
+              signal.removeEventListener("abort", onAbort);
+            }
+          }
+        } finally {
+          state.active -= 1;
+        }
+      },
+    },
+    calls: 0,
+    active: 0,
+    aborts: 0,
+  };
+  return state;
+}
+
+/** A tool port that answers immediately; these tests never touch a tool. */
+function silentToolRunner(): ToolRunner {
+  return {
+    async execute() {
+      return { content: "ok", isError: false };
     },
   };
 }
@@ -201,7 +287,7 @@ interface Session {
   ready(): Promise<void>;
 }
 
-function start(): Session {
+function start(agent?: () => ShellAgent): Session {
   const terminal = fakeTerminal();
   const clock = fakeClock();
   const signals = fakeSignals();
@@ -215,6 +301,7 @@ function start(): Session {
     clock: clock.clock,
     timers: clock.timers,
     signals: signals.source,
+    ...(agent === undefined ? {} : { agent }),
   });
   return {
     terminal,
@@ -622,5 +709,105 @@ test(
       assert.deepEqual(session.terminal.stdin.rawModes, [true, false], signal);
       assertNoLeaks(session.terminal, session.signals, session.clock);
     }
+  },
+);
+
+test(
+  "Esc cancels a streaming turn and the composer still answers",
+  { timeout: 8000 },
+  async () => {
+    const scripted = scriptedProvider((call) =>
+      call === 0
+        ? "hold"
+        : [{ type: "text", text: "second answer" }, { type: "done" }],
+    );
+    const session = start(() => ({
+      provider: scripted.provider,
+      tools: () => silentToolRunner(),
+    }));
+    try {
+      await session.ready();
+      session.terminal.write("first");
+      session.terminal.write("\r");
+      await waitFor(
+        () => session.terminal.text().includes("first"),
+        "user row",
+      );
+
+      // The first delta lands only after its coalescing frame fires.
+      session.clock.advanceBy(16);
+      await waitFor(
+        () => session.terminal.text().includes("partial"),
+        "streamed text",
+      );
+      assert.equal(scripted.active, 1, "stream open");
+      const streamingFrame = session.terminal.lastFrame().join("\n");
+      assert.match(streamingFrame, /Streaming\.\.\./u, "status line text");
+      assert.match(streamingFrame, /\(Press ESC to stop\)/u);
+
+      // A lone Escape waits for its window, then cancels the turn.
+      session.terminal.write("\u001b");
+      session.clock.advanceBy(400);
+      await waitFor(
+        () => session.terminal.text().includes("Cancelled"),
+        "cancel notice",
+      );
+      assert.equal(scripted.active, 0, "aborted stream closed");
+      assert.equal(scripted.aborts, 1, "the provider observed the abort");
+      assert.equal(
+        session.terminal.lastFrame().join("\n").includes("Streaming..."),
+        false,
+        "the status line clears when the turn ends",
+      );
+
+      // The composer kept its draft and does not need a remount.
+      session.terminal.write("again");
+      session.terminal.write("\r");
+      await waitFor(
+        () => session.terminal.text().includes("second answer"),
+        "second turn answered",
+      );
+      assert.equal(scripted.calls, 2);
+    } finally {
+      session.terminal.write("/quit\r");
+      assert.equal(await session.exits, 0);
+    }
+    assertNoLeaks(session.terminal, session.signals, session.clock);
+  },
+);
+
+test(
+  "quitting during a turn aborts it and restores the terminal once",
+  { timeout: 8000 },
+  async () => {
+    const scripted = scriptedProvider(() => "hold");
+    const session = start(() => ({
+      provider: scripted.provider,
+      tools: () => silentToolRunner(),
+    }));
+    await session.ready();
+    session.terminal.write("work");
+    session.terminal.write("\r");
+    await waitFor(
+      () => scripted.active === 1,
+      "turn streaming before the quit",
+    );
+    await waitFor(() => session.terminal.text().includes("work"), "user row");
+
+    session.terminal.write("\u0003");
+    session.terminal.write("\u0003");
+    assert.equal(await session.exits, INTERRUPT_EXIT_CODE);
+
+    assert.equal(scripted.active, 0, "no provider stream outlives the shell");
+    assert.equal(scripted.aborts, 1, "the in-flight request was aborted");
+    assert.equal(
+      countOf(
+        session.terminal.chunks.join(""),
+        TERMINAL_SEQUENCES.alternateScreenOff,
+      ),
+      1,
+      "the alternate screen was left exactly once",
+    );
+    assertNoLeaks(session.terminal, session.signals, session.clock);
   },
 );

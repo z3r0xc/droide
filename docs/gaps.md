@@ -5,16 +5,16 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **40** markers across **34** clauses.
+Total: **43** markers across **37** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
 | `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
+| `src/app/interactive-turn.ts:558` | `95 B10` | steering and the queued-message list are not implemented, so a second submit is refused with a notice instead of being queued or delivered to the running turn. |
 | `src/cli/commands/resume.ts:67` | `10 B22` | the interactive shell cannot adopt a stored transcript yet, so the resumed session is named here but the shell still opens empty. |
 | `src/cli/mcp-mutations.ts:307` | `B7` | org MCP policy is remote-only and this build does not resolve it into AppContext, so a server the policy would block is not refused here. |
 | `src/cli/mcp-mutations.ts:410` | `B26-B30` | the interactive OAuth flow (authorization window, loopback callback, credential store) is not implemented; the command names the servers instead of pretending to authenticate them. |
-| `src/cli/resume-commands.ts:418` | `10 B22` | the interactive session picker is not implemented, so a terminal gets the same bounded list as a pipe instead of a choice; --last is the one way to select without a picker. |
-| `src/cli/search-command.ts:196` | `B43` | the subject rebuilds its index cache here). |
+| `src/cli/resume-commands.ts:419` | `10 B22` | the interactive session picker is not implemented, so a terminal gets the same bounded list as a pipe instead of a choice; --last is the one way to select without a picker. |
 | `src/cli/update-commands.ts:44` | `B75` | installing an update safely (atomic swap, rollback) is a separate slice; ADR 0007 keeps the command read-only until then. |
 | `src/daemon/client.ts:65` | `B19` | the spec pins the four budgets but not the method names that carry them; these daemon.* spellings are this build's map, and callers may replace it through methodTimeouts. |
 | `src/daemon/command.ts:170` | `B1` | --droid-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
@@ -22,13 +22,16 @@ Total: **40** markers across **34** clauses.
 | `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient FACTORY_API_KEY and reports a local identity. |
 | `src/daemon/server.ts:231` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
 | `src/daemon/web-socket.ts:574` | `B33` | the token-gated /port-proxy/<port> surface (query token, cookie exchange, traversal refusal) is not implemented, so those requests answer 404 instead of proxying or refusing with 401. |
-| `src/doctor/checks.ts:26` | `B49` | ${what} check], |
+| `src/doctor/checks.ts:33` | `B49` | ${what} check], |
 | `src/extensions/mcp/client.ts:417` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
 | `src/extensions/mcp/client.ts:428` | `B22` | image blocks are reported by type and size instead of being compressed, and an unsupported image MIME type keeps the same marker. |
 | `src/extensions/mcp/client.ts:47` | `B11` | era negotiation is not attempted — no server/discover probe, no 2026-07-28 rescue after a -32022 refusal, no legacy verdict cache; the server's chosen revision is accepted as returned. |
 | `src/extensions/mcp/client.ts:686` | `B13` | the spec does not pin cursor following, so the page ceiling and the repeated-cursor refusal are this build's bounds. |
 | `src/extensions/mcp/tools.ts:36` | `30 B7` | arguments are not validated against the server's JSON Schema before the call. |
 | `src/extensions/mcp/transport.ts:871` | `B3` | an sse server's server-initiated event stream (a GET that stays open) is not opened, so it never delivers tools/list_changed; the POST response path is supported. |
+| `src/extensions/plugins/install.ts:299` | `B42` | the Claude Code layout translation (.claude-plugin to .factory-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
+| `src/extensions/plugins/install.ts:354` | `B37` | the recorded-source drift refusal and the organization policy denial are not applied: this build resolves neither configured marketplace sources nor org policy into the context. |
+| `src/extensions/plugins/install.ts:376` | `B34` | plugin sources fetched outside the marketplace (github, url, git-subdir, npm, archive) are not downloaded by this build. |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view in the subject; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/grep.ts:24` | `B20` | for the full list. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |

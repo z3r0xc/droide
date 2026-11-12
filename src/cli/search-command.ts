@@ -192,8 +192,10 @@ export async function runSearchCommand(
   }
 
   try {
-    // `--reindex` has nothing to do while the engine scans transcripts directly
-    // (TODO(spec B43): the subject rebuilds its index cache here).
+    // `--reindex` brings the transcript index up to date before the query; the
+    // search itself still falls back to the literal scan for any transcript the
+    // index cannot speak for (B43, B55).
+    if (options.reindex === true) store.reindex();
     const result = await store.search(query, {
       kind: kind as SearchKind,
       ...(sessions.value === undefined

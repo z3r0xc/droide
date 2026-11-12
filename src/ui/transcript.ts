@@ -41,9 +41,41 @@ export interface ToolTranscriptItem {
   readonly interrupted: boolean;
 }
 
-/** The three item kinds this vertical renders. */
+/** How an approval was answered (R11). */
+export type ApprovalChoice = "once" | "session" | "deny";
+
+/** One selectable approval option; `label` is the caller's English string. */
+export interface ApprovalOption {
+  readonly choice: ApprovalChoice;
+  readonly label: string;
+}
+
+/** The pending (or already answered) approval prompt (R11). */
+export interface ApprovalTranscriptItem {
+  readonly kind: "approval";
+  readonly toolName: string;
+  /** One dimmed line naming the class, risk or path the call touches. */
+  readonly summary: string;
+  readonly options: readonly ApprovalOption[];
+  /** Index into `options`; only meaningful while `decision` is absent. */
+  readonly selected: number;
+  /** Set once the user chose; the option rows are then replaced by a state. */
+  readonly decision?: ApprovalChoice;
+}
+
+/** A `●` system notice row (R12). */
+export interface NoticeTranscriptItem {
+  readonly kind: "notice";
+  readonly text: string;
+}
+
+/** The item kinds this vertical renders. */
 export type TranscriptItem =
-  UserTranscriptItem | AssistantTranscriptItem | ToolTranscriptItem;
+  | UserTranscriptItem
+  | AssistantTranscriptItem
+  | ToolTranscriptItem
+  | ApprovalTranscriptItem
+  | NoticeTranscriptItem;
 
 /** An untrusted transcript entry, as delivered by the session layer. */
 export interface TranscriptEntry {
@@ -53,6 +85,10 @@ export interface TranscriptEntry {
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function readParams(value: unknown): readonly ToolParam[] {
@@ -70,6 +106,25 @@ function readParams(value: unknown): readonly ToolParam[] {
 
 function readState(value: unknown): ToolState {
   return value === "pending" || value === "error" ? value : "success";
+}
+
+function readChoice(value: unknown): ApprovalChoice | undefined {
+  return value === "once" || value === "session" || value === "deny"
+    ? value
+    : undefined;
+}
+
+function readOptions(value: unknown): readonly ApprovalOption[] {
+  if (!Array.isArray(value)) return [];
+  const options: ApprovalOption[] = [];
+  for (const option of value) {
+    if (!isRecord(option)) continue;
+    const choice = readChoice(option["choice"]);
+    const label = readString(option["label"]);
+    if (choice === undefined || label === undefined) continue;
+    options.push({ choice, label });
+  }
+  return options;
 }
 
 /**
@@ -102,6 +157,31 @@ export function toTranscriptItem(
         result: readString(entry.result),
         interrupted: entry.interrupted === true,
       };
+    }
+    case "approval": {
+      const toolName = readString(entry.toolName);
+      if (toolName === undefined || toolName.length === 0) return undefined;
+      const options = readOptions(entry.options);
+      const selected =
+        typeof entry.selected === "number" &&
+        Number.isInteger(entry.selected) &&
+        entry.selected >= 0 &&
+        entry.selected < options.length
+          ? entry.selected
+          : 0;
+      const decision = readChoice(entry.decision);
+      return {
+        kind: "approval",
+        toolName,
+        summary: readString(entry.summary) ?? "",
+        options,
+        selected,
+        ...(decision === undefined ? {} : { decision }),
+      };
+    }
+    case "notice": {
+      const text = readString(entry.text);
+      return text === undefined ? undefined : { kind: "notice", text };
     }
     default:
       return undefined;

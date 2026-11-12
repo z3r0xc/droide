@@ -7,8 +7,9 @@
 pub mod paths;
 pub mod protocol;
 pub mod pty;
+pub mod pty_session;
 pub mod sandbox;
 pub mod search;
 pub mod secrets;
 
-pub use protocol::{handle_line, PROTOCOL_VERSION};
+pub use protocol::{handle_line, Dispatcher, PROTOCOL_VERSION};
