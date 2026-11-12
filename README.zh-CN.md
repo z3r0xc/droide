@@ -94,7 +94,7 @@ $ node bin/droide.mjs exec --list-tools
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 16 named checks (10 个真实探测), text or --json
+node bin/droide.mjs doctor      # 16 named checks (11 个真实探测), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
 npm test                        # 906 tests

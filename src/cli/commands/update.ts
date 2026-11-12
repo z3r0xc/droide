@@ -1,8 +1,24 @@
-/** `update` command. Contract: `specs/10-cli-surface.md`. */
+/** `update` command. Contract: `specs/10-cli-surface.md`, ADR 0007, ADR 0009. */
 import { Command } from "commander";
 
-import { DISPLAY, PRODUCT_VERSION } from "../brand.ts";
+import { DISPLAY, PRODUCT_VERSION, VERSION } from "../brand.ts";
+import {
+  factoryDir,
+  joinPath,
+  processEnvironment,
+} from "../../config/paths.ts";
+import { defaultInstallProbe } from "../../update/install.ts";
 import { runUpdateCommand } from "../update-commands.ts";
+
+/**
+ * The managed installation tree. It lives under the Factory directory so the
+ * installer never guesses at (or overwrites) the directory of the running
+ * script; staging is `<installDir>/update/<version>` (ADR 0009).
+ */
+function installDirectory(): string {
+  const environment = processEnvironment();
+  return joinPath(environment.platform, factoryDir(environment), "install");
+}
 
 export function makeUpdateCommand(): Command {
   return new Command("update")
@@ -18,6 +34,12 @@ export function makeUpdateCommand(): Command {
           currentVersion: PRODUCT_VERSION,
           repository: "z3r0xc/droide",
           fetch,
+          installDir: installDirectory(),
+          // `--version` is pinned to the subject's version (ADR 0005), so that
+          // is the text a successful probe must see; the package release number
+          // lives in `PRODUCT_VERSION` and is compared against the feed.
+          probe: async (input) =>
+            defaultInstallProbe({ ...input, version: VERSION }),
           write: (text) => process.stdout.write(text),
           writeError: (text) => process.stderr.write(text),
           setExitCode: (code) => {

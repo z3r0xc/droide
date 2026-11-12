@@ -43,6 +43,7 @@ import { buildHeaders } from "../transport/headers.ts";
 import type { LlmDialect } from "../transport/llm.ts";
 import { joinApiPath, parseApiBaseUrl } from "../transport/urls.ts";
 import { createSessionTooling } from "../app/tooling.ts";
+import type { SearchBackend } from "../tools/native-backend.ts";
 import type { AutonomyLevel } from "../tools/permissions.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { ExecError, ExecUsageError } from "./errors.ts";
@@ -716,9 +717,11 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
   // server that is configured and reachable (specs/60 §B1–B24).
   let registry: ToolRegistry;
   let closeTooling: (() => Promise<void>) | undefined;
+  let nativeBackend: SearchBackend | undefined;
   if (deps.registry === undefined) {
     const tooling = await createSessionTooling({ context });
     registry = tooling.registry;
+    nativeBackend = tooling.searchBackend;
     closeTooling = () => tooling.close();
   } else {
     registry = deps.registry;
@@ -739,6 +742,7 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
       skipConfirmations: argv.skipPermissionsUnsafe,
       interactive: false,
     },
+    ...(nativeBackend === undefined ? {} : { nativeBackend }),
     allowed,
   });
 

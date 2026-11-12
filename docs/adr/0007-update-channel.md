@@ -25,10 +25,9 @@ endpoint is an implementation choice of the original build.
    - `available` — a newer release exists, with its version and page URL;
    - `unavailable` — the check could not be completed (offline, rate-limited,
      no releases yet), with the reason and a distinct exit code.
-3. **Installation is not implemented yet.** `update` without `--check` refuses
-   with the documented message and a `TODO(spec B75)` marker: replacing a running
-   installation safely (permissions, atomic swap, rollback) is a separate slice
-   with its own ADR.
+3. **Installation is specified separately.** `update` without `--check` installs
+   per **ADR 0009** (staged download, digest verification, atomic swap, rollback).
+   This ADR keeps only the feed decision: where the version comes from.
 4. **A private repository is expected to answer 404.** Anonymous clients cannot
    see it, so `--check` reports "no release feed visible to an anonymous client"
    rather than pretending the project has no releases. Authenticating would mean

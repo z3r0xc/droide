@@ -10,11 +10,14 @@
  */
 import { randomUUID } from "node:crypto";
 import { access, mkdir, rm, writeFile } from "node:fs/promises";
+
+import { checkForUpdate } from "../update/check.ts";
 import { constants } from "node:fs";
 import { arch, platform, release, totalmem } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 
+import { PRODUCT_VERSION } from "../cli/brand.ts";
 import { McpClient } from "../extensions/mcp/client.ts";
 import {
   enabledMcpServers,
@@ -25,6 +28,9 @@ import {
 import type { CheckResult, DoctorCheck, DoctorContext } from "./types.ts";
 
 const NOT_IMPLEMENTED = "not implemented in this build";
+
+/** Where update checks read from (ADR 0007). */
+const UPDATE_REPOSITORY = "z3r0xc/droide";
 
 function skipped(what: string): CheckResult {
   return {
@@ -410,6 +416,42 @@ const mcp: DoctorCheck = {
   },
 };
 
+const updates: DoctorCheck = {
+  name: "updates",
+  title: "Updates",
+  async run(context) {
+    const result = await checkForUpdate({
+      repository: UPDATE_REPOSITORY,
+      currentVersion: PRODUCT_VERSION,
+      fetch: context.fetch ?? fetch,
+      timeoutMs: Math.min(context.timeoutMs, 5_000),
+    });
+    switch (result.kind) {
+      case "current":
+        return {
+          status: "ok",
+          summary: `${result.version} is the newest published release`,
+          metadata: { current: result.version },
+        };
+      case "available":
+        return {
+          status: "warn",
+          summary: `${result.version} is available (running ${result.current})`,
+          details: [result.url],
+          fixes: ["run `droide update` to install it"],
+        };
+      case "unavailable":
+        return {
+          status: "skip",
+          summary: `could not check for updates: ${result.reason}`,
+          details: [
+            "the check reads this repository's GitHub releases anonymously",
+          ],
+        };
+    }
+  },
+};
+
 const notImplemented = (name: string): DoctorCheck => ({
   name,
   title: name,
@@ -442,7 +484,7 @@ export const BUILTIN_CHECKS: readonly DoctorCheck[] = [
       }
     },
   },
-  notImplemented("updates"),
+  updates,
   filesystem,
   git,
   notImplemented("custom-models"),

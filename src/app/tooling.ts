@@ -7,6 +7,7 @@
  * catalogue order). A broken server is a diagnostic, not a crash: a run must
  * still start with the servers that work.
  */
+import { nativeHelperFile } from "../config/paths.ts";
 import { McpClient } from "../extensions/mcp/client.ts";
 import {
   type McpConfigDiagnostic,
@@ -18,6 +19,11 @@ import {
 import { createMcpToolDefinitions } from "../extensions/mcp/tools.ts";
 import type { McpToolInfo } from "../extensions/mcp/client.ts";
 import { createCoreRegistry } from "../tools/index.ts";
+import {
+  createSearchBackend,
+  type NativeBackendKind,
+  type SearchBackend,
+} from "../tools/native-backend.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { AppContext } from "./context.ts";
 
@@ -30,7 +36,12 @@ export interface SessionTooling {
   readonly registry: ToolRegistry;
   readonly servers: readonly ConnectedMcpServer[];
   readonly diagnostics: readonly McpConfigDiagnostic[];
-  /** Closes every client; safe to call twice. */
+  /**
+   * The `Glob`/`Grep` discovery backend. `local` unless the helper is
+   * configured and installed; either way it degrades rather than fails.
+   */
+  readonly searchBackend: SearchBackend;
+  /** Closes every client and the helper; safe to call twice. */
   close(): Promise<void>;
 }
 
@@ -43,6 +54,14 @@ export interface CreateToolingOptions {
   ) => McpClient;
   /** Skip connecting servers (doctor, list-only commands). */
   readonly connect?: boolean;
+  /**
+   * `"helper"` opts `Glob`/`Grep` into `crates/droide-native`; a binary that
+   * does not exist means the local walk, and a broken one degrades to it.
+   * Defaults to `"helper"`: the app asks, the binary's presence decides.
+   */
+  readonly nativeBackend?: NativeBackendKind;
+  /** Absolute helper path; overrides `DROIDE_NATIVE_BIN` and the factory bin. */
+  readonly nativeBinaryPath?: string;
 }
 
 interface OpenClient {
@@ -61,6 +80,16 @@ export async function createSessionTooling(
   options: CreateToolingOptions,
 ): Promise<SessionTooling> {
   const registry = createCoreRegistry();
+  const configuredBinary =
+    options.nativeBinaryPath ??
+    options.context.environment.env["DROIDE_NATIVE_BIN"];
+  const searchBackend = await createSearchBackend({
+    kind: options.nativeBackend ?? "helper",
+    helperPath:
+      configuredBinary === undefined || configuredBinary.length === 0
+        ? nativeHelperFile(options.context.environment)
+        : configuredBinary,
+  });
   const sources = mcpConfigFileSources(
     options.context.paths.factoryDir,
     options.context.environment.cwd,
@@ -107,10 +136,14 @@ export async function createSessionTooling(
     registry,
     servers,
     diagnostics,
+    searchBackend,
     async close() {
       if (closed) return;
       closed = true;
-      await Promise.allSettled(open.map((entry) => entry.close()));
+      await Promise.allSettled([
+        ...open.map((entry) => entry.close()),
+        searchBackend.close(),
+      ]);
     },
   };
 }

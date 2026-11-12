@@ -9,6 +9,7 @@ import type { DoctorContext } from "../../../src/doctor/types.ts";
 
 function context(
   env: Readonly<Record<string, string | undefined>> = {},
+  fetchImpl?: typeof fetch,
 ): DoctorContext {
   return {
     settings: {},
@@ -22,6 +23,7 @@ function context(
     },
     timeoutMs: 5_000,
     withTimeout: async (_label, run) => run(new AbortController().signal),
+    ...(fetchImpl === undefined ? {} : { fetch: fetchImpl }),
   };
 }
 
@@ -97,4 +99,42 @@ test("every registered check has a unique name and a title", () => {
     BUILTIN_CHECKS.every((entry) => entry.title.length > 0),
     true,
   );
+});
+
+function releaseFetch(tag: string | undefined, status = 200): typeof fetch {
+  return async () =>
+    new Response(
+      tag === undefined
+        ? ""
+        : JSON.stringify({ tag_name: tag, html_url: "https://example.test/r" }),
+      {
+        status,
+        headers: { "content-type": "application/json" },
+      },
+    );
+}
+
+test("updates reports the current release as ok", async () => {
+  const result = await check("updates").run(
+    context({}, releaseFetch("v0.0.1")),
+  );
+  assert.equal(result.status, "ok");
+  assert.match(result.summary, /newest published release/);
+});
+
+test("updates reports a newer release as a warning with the install fix", async () => {
+  const result = await check("updates").run(
+    context({}, releaseFetch("v99.0.0")),
+  );
+  assert.equal(result.status, "warn");
+  assert.match(result.summary, /99\.0\.0 is available/);
+  assert.match(result.fixes?.[0] ?? "", /droide update/);
+});
+
+test("updates skips when the feed is invisible", async () => {
+  const result = await check("updates").run(
+    context({}, releaseFetch(undefined, 404)),
+  );
+  assert.equal(result.status, "skip");
+  assert.match(result.summary, /could not check for updates/);
 });

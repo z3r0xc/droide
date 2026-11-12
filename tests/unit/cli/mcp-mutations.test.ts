@@ -21,6 +21,9 @@ import {
 } from "../../../src/cli/mcp-mutations.ts";
 import type { McpMutationDeps } from "../../../src/cli/mcp-mutations.ts";
 import { parseJsonc } from "../../../src/extensions/jsonc.ts";
+import { readCredentials } from "../../../src/extensions/mcp/oauth/store.ts";
+import type { CredentialSealer } from "../../../src/extensions/mcp/oauth/store.ts";
+import { startAuthorizationServer } from "../extensions/oauth-fixtures.ts";
 
 interface Sandbox {
   readonly root: string;
@@ -233,7 +236,115 @@ test("auth reports nothing to do without remote OAuth servers", async () => {
   }
 });
 
-test("auth names OAuth servers and refuses instead of pretending", async () => {
+/** The clock the auth tests pin, so an expiry is a constant. */
+const AUTH_CLOCK_MS = 1_760_000_000_000;
+
+/** An identity sealer: this file tests the CLI, not the envelope. */
+const plainSealer: CredentialSealer = {
+  seal: async (plaintext) => plaintext,
+  open: async (sealed) => sealed,
+};
+
+/** The browser: follow the authorization redirect and hit the callback. */
+async function followRedirect(url: string): Promise<void> {
+  const authorize = await fetch(url, { redirect: "manual" });
+  const location = authorize.headers.get("location");
+  if (location === null)
+    throw new Error("the authorize request had no redirect");
+  const callback = await fetch(location);
+  if (callback.status !== 200) {
+    throw new Error(`the callback answered ${callback.status}`);
+  }
+}
+
+test("auth runs the flow for a server that needs authentication", async (t) => {
+  const server = await startAuthorizationServer();
+  const box = await sandbox();
+  t.after(() => server.close());
+  try {
+    const add = capture(box);
+    await runMcpAdd("remote", [server.resource], { type: "http" }, add.deps);
+    const before = await readFile(box.userFile, "utf8");
+
+    const run = capture(box);
+    await runMcpAuth(run.deps, {
+      sealer: plainSealer,
+      openBrowser: followRedirect,
+      fetch: globalThis.fetch,
+      now: () => AUTH_CLOCK_MS,
+      callbackPortStart: 0,
+    });
+
+    assert.equal(run.exitCode(), 0);
+    assert.match(run.stdout(), /1 MCP server needs authentication/);
+    assert.match(run.stdout(), /Authenticating "remote"/);
+    assert.match(run.stdout(), /Authenticated "remote" \(revision 1\)/);
+    assert.equal(run.stderr(), "");
+    assert.equal(await readFile(box.userFile, "utf8"), before);
+
+    const document = await readCredentials({
+      factoryDir: box.factoryDir,
+      sealer: plainSealer,
+    });
+    assert.equal(document.servers["remote"]?.issuer, server.issuer);
+    assert.equal(document.servers["remote"]?.revision, 1);
+    assert.equal(
+      document.servers["remote"]?.client.clientId,
+      "dynamic-client-1",
+    );
+
+    // A credential that has not expired is not re-authenticated, and the
+    // registered client id is not registered again.
+    const second = capture(box);
+    await runMcpAuth(second.deps, {
+      sealer: plainSealer,
+      openBrowser: followRedirect,
+      fetch: globalThis.fetch,
+      now: () => AUTH_CLOCK_MS,
+      callbackPortStart: 0,
+    });
+    assert.equal(second.exitCode(), 0);
+    assert.match(second.stdout(), /No MCP servers require authentication/);
+    assert.equal(server.registrations.length, 1);
+  } finally {
+    await rm(box.root, { recursive: true, force: true });
+  }
+});
+
+test("a failed flow exits 1 and names the server", async (t) => {
+  const server = await startAuthorizationServer({ dynamicRegistration: false });
+  const box = await sandbox();
+  t.after(() => server.close());
+  try {
+    const add = capture(box);
+    await runMcpAdd("remote", [server.resource], { type: "http" }, add.deps);
+
+    const run = capture(box);
+    await runMcpAuth(run.deps, {
+      sealer: plainSealer,
+      openBrowser: followRedirect,
+      fetch: globalThis.fetch,
+      now: () => AUTH_CLOCK_MS,
+      callbackPortStart: 0,
+    });
+
+    assert.equal(run.exitCode(), 1);
+    assert.match(run.stdout(), /Authenticating "remote"/);
+    assert.match(
+      run.stderr(),
+      /MCP server "remote" cannot be authenticated: .*registration/,
+    );
+    const document = await readCredentials({
+      factoryDir: box.factoryDir,
+      sealer: plainSealer,
+    });
+    assert.deepEqual(document.servers, {});
+  } finally {
+    await rm(box.root, { recursive: true, force: true });
+  }
+});
+
+test("auth without the native helper refuses instead of writing plaintext", async () => {
   const box = await sandbox();
   try {
     const add = capture(box);
@@ -243,14 +354,14 @@ test("auth names OAuth servers and refuses instead of pretending", async () => {
       { type: "http" },
       add.deps,
     );
-    const before = await readFile(box.userFile, "utf8");
     const run = capture(box);
-    await runMcpAuth(run.deps);
+    await runMcpAuth(run.deps, {
+      nativeHelperPath: "",
+      openBrowser: followRedirect,
+      fetch: globalThis.fetch,
+    });
     assert.equal(run.exitCode(), 1);
-    assert.match(run.stdout(), /1 MCP server needs authentication/);
-    assert.match(run.stdout(), /remote/);
-    assert.match(run.stderr(), /B26-B30/);
-    assert.equal(await readFile(box.userFile, "utf8"), before);
+    assert.match(run.stderr(), /cannot seal MCP OAuth credentials on/);
   } finally {
     await rm(box.root, { recursive: true, force: true });
   }

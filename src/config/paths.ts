@@ -206,6 +206,20 @@ export function logsDir(environment: Environment): string {
   return joinPath(environment.platform, factoryDir(environment), "logs");
 }
 
+/**
+ * `<base>/bin/droide-native[.exe]`: the built Rust helper
+ * (`specs/90-native-layer.md`). Absent until `npm run native:build` installs
+ * one there; `DROIDE_NATIVE_BIN` overrides it.
+ */
+export function nativeHelperFile(environment: Environment): string {
+  return joinPath(
+    environment.platform,
+    factoryDir(environment),
+    "bin",
+    environment.platform === "win32" ? "droide-native.exe" : "droide-native",
+  );
+}
+
 /** `<base>/temp`: scratch space under the operational root. */
 export function tempDir(environment: Environment): string {
   return joinPath(environment.platform, factoryDir(environment), "temp");

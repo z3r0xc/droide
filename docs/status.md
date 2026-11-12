@@ -26,7 +26,7 @@ cargo test --workspace                   # native layer (CI only here)
 | Command | State |
 |---|---|
 | `--version`, `--help`, subcommand help | **done** — 20/20 parity cases, including the curated `exec --help` page |
-| `doctor` | **done** — ten real probes (config, environment, system, binaries, filesystem, git, proxy, certs, auth, mcp), text and `--json` reports; the remaining names report `skip` |
+| `doctor` | **done** — eleven real probes (config, environment, system, binaries, updates, filesystem, git, proxy, certs, auth, mcp), text and `--json` reports; the remaining names report `skip` |
 | `search\|find` | **done** — store query, text and `--json` output, documented exit codes |
 | `mcp list` | **done** — merged configuration, per-server transport/state, diagnostics, exit 1 on a broken file; never starts a server |
 | `mcp add\|remove` | **done** — surgical JSONC edits that keep comments and key order, atomic write, duplicate/unknown/alias refusals, user scope only |
@@ -34,11 +34,12 @@ cargo test --workspace                   # native layer (CI only here)
 | `plugin list` | **done** — user and project registries merged (project shadows), highest version per id, enablement from settings, `--scope` |
 | `plugin marketplace add\|remove\|list\|update`, `plugin install\|uninstall\|update` | **done** — git-backed marketplaces through an injected runner, manifest validated before adoption, atomic registry merges, collision refusals, uninstall blocked while a settings file references the plugin |
 | `computer list` | **done** — reads `host.json`, reports a registration that belongs to another user or organization as inert; registration/removal need the backend and stay refused |
-| `update --check` | **done** — read-only check against this repository's GitHub releases (ADR 0007); installing is refused with exit 2 |
+| `update`, `update --check`, `update -v <version>` | **done** — check against this repository's releases (ADR 0007) and install (ADR 0009): staged download hashed in flight, `timingSafeEqual`, atomic swap, one probe, rollback on a failed probe, O_EXCL lock, no elevation |
 | `exec` | **done** for `text`/`json`/`stream-json` with custom and managed models; streaming input, mission, ACP and `--list-tools` are refused loudly |
 | `daemon` | **local transport/protocol/lifecycle done** (132 tests); Remote Control, relay and the port proxy are `TODO(spec B28/B29/B32/B33)` |
 | `resume` | **done** — lists recent sessions, accepts a UUID or session link, continues through the same path as `exec -s`, forks with `--fork`, and refuses unknown/archived/invalid ids; the interactive picker is `TODO(spec 10 B22)` |
-| `mcp auth`, `computer register\|remove\|ssh\|port-forward`, `update` without `--check` | help and option parsing only; actions fail loudly (no silent success) |
+| `mcp auth` | **done** — resource/issuer discovery, dynamic registration or a configured client, PKCE, loopback callback, token exchange and a sealed credential with a compare-and-set revision; nothing to authenticate exits 0 |
+| `computer register\|remove\|ssh\|port-forward` | help and option parsing only; actions fail loudly (no silent success) |
 | bare `droide` | **launches the interactive shell on a TTY pair and runs turns**; a prompt argument still exits 64 |
 
 ## Specs
@@ -53,7 +54,7 @@ cargo test --workspace                   # native layer (CI only here)
 | `60-extensions-mcp-and-skills.md` | stable | MCP config merge, tool naming, skill discovery, plugin manifests |
 | `70-daemon-and-remote-control.md` | review | not started |
 | `80-exec-and-streaming.md` | stable | record types, writer, one-shot runner, validation |
-| `90-native-layer.md` | stable | TypeScript client with typed, validated wrappers for every method including the PTY session calls; Rust helper: search, sandbox, paths, PTY quoting, **ConPTY/openpty sessions**, DPAPI secrets (69 tests); `npm run test:native` proves all of it against the compiled binary |
+| `90-native-layer.md` | stable | TypeScript client with typed, validated wrappers for every method including the PTY session calls; Rust helper: search, sandbox, paths, PTY quoting, **ConPTY/openpty sessions**, DPAPI secrets (69 tests); `npm run test:native` proves all of it against the compiled binary; `Glob`/`Grep` use it through `src/tools/native-backend.ts` and degrade to the local walk when it is absent or broken |
 | `95-terminal-ui.md` | review | tokens D1–D13, capability ladder, shell with header/transcript/composer/status line/footer, golden frames at 80×24 and 120×40 |
 
 ## Known gaps and their owners

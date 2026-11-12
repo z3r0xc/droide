@@ -11,11 +11,15 @@ import * as nodePath from "node:path";
 
 import type { ToolContext } from "../context.ts";
 import { ToolFailure } from "../errors.ts";
+import {
+  NATIVE_FILE_BYTES_LIMIT,
+  type LiteralQuery,
+} from "../native-backend.ts";
 import { defineTool, type ToolDefinition } from "../registry.ts";
 import type { ObjectSchema } from "../validate.ts";
 import { matchesGlob } from "./glob-match.ts";
-import { isCredentialFile, resolveInputPath } from "./paths.ts";
-import { walkFiles } from "./walk.ts";
+import { isCredentialFile, isInside, resolveInputPath } from "./paths.ts";
+import { walkFiles, type WalkEntry } from "./walk.ts";
 
 const MAX_CONTENT_MATCHES_PER_FILE = 500;
 const MAX_GREP_RESULT_BYTES = 20 * 1024 * 1024;
@@ -157,11 +161,22 @@ function isBinary(buffer: Buffer): boolean {
 async function candidateFiles(
   input: GrepInput,
   context: ToolContext,
-): Promise<string[]> {
+): Promise<{
+  readonly target: string;
+  readonly entries: readonly WalkEntry[];
+  /** A directory walk the backend can narrow; a single named file cannot. */
+  readonly canNarrow: boolean;
+}> {
   const target =
     input.path === undefined
       ? context.root
       : resolveInputPath(context, input.path, { requireAbsolute: true });
+  const backend = context.nativeBackend;
+  // Defence in depth, exactly as in `Glob`: a contained path is confirmed by
+  // the helper; an absolute path outside the root is allowed by this tool.
+  if (backend !== undefined && isInside(context.root, target)) {
+    await backend.contain(context.root, target);
+  }
   const stats = await fs.promises.stat(target).catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       throw new ToolFailure(`Path does not exist: ${target}`);
@@ -188,13 +203,82 @@ async function candidateFiles(
     return true;
   };
   if (stats.isFile()) {
-    return allowed(target, nodePath.basename(target)) ? [target] : [];
+    return {
+      target,
+      entries: allowed(target, nodePath.basename(target))
+        ? [{ absolute: target, relative: nodePath.basename(target) }]
+        : [],
+      canNarrow: false,
+    };
   }
-  const files: string[] = [];
-  for (const entry of await walkFiles(target)) {
-    if (allowed(entry.absolute, entry.relative)) files.push(entry.absolute);
+  const walked =
+    backend === undefined
+      ? await walkFiles(target)
+      : await backend.discover(target);
+  return {
+    target,
+    entries: walked.filter((entry) => allowed(entry.absolute, entry.relative)),
+    canNarrow: true,
+  };
+}
+
+/**
+ * The literal query the helper can pre-filter exactly, or `null` when the
+ * pattern needs the regex engine (metacharacters, multiline) and the local
+ * matcher must see every candidate.
+ */
+function literalQuery(input: GrepInput): LiteralQuery | null {
+  if (input.pattern.length === 0) return null;
+  // The helper reads text line by line with the CR stripped, so a pattern that
+  // encodes a newline or a carriage return is the regex engine's job.
+  if (
+    input.multiline === true ||
+    input.pattern.includes("\n") ||
+    input.pattern.includes("\r")
+  ) {
+    return null;
   }
-  return files;
+  if (input.fixed_string !== true && /[.*+?^${}()|[\]\\]/.test(input.pattern)) {
+    return null;
+  }
+  return {
+    query: input.pattern,
+    caseSensitive: input.case_insensitive !== true,
+  };
+}
+
+/**
+ * Drops candidates a helper-backed search proved do not contain the pattern.
+ * Order is the discovery order either way, so the result list is unchanged;
+ * a candidate the helper did not read stays, because the helper skips files
+ * above its per-file budget and a match could live only there.
+ */
+async function narrowCandidates(
+  input: GrepInput,
+  target: string,
+  entries: readonly WalkEntry[],
+  context: ToolContext,
+): Promise<readonly WalkEntry[]> {
+  const backend = context.nativeBackend;
+  if (backend === undefined) return entries;
+  const query = literalQuery(input);
+  if (query === null) return entries;
+  const hits = await backend.text(target, query);
+  if (hits === null) return entries;
+  const matched = new Set(hits.map((hit) => hit.path));
+  const narrowed: WalkEntry[] = [];
+  for (const entry of entries) {
+    if (matched.has(entry.relative)) {
+      narrowed.push(entry);
+      continue;
+    }
+    const size = await fs.promises.stat(entry.absolute).then(
+      (stats) => stats.size,
+      () => NATIVE_FILE_BYTES_LIMIT + 1,
+    );
+    if (size > NATIVE_FILE_BYTES_LIMIT) narrowed.push(entry);
+  }
+  return narrowed;
 }
 
 function searchExpression(
@@ -268,20 +352,23 @@ export async function grepFiles(
     input.fixed_string === true,
   );
   const budget = { used: 0 };
-  const files = await candidateFiles(input, context);
+  const { target, entries, canNarrow } = await candidateFiles(input, context);
+  const files = canNarrow
+    ? await narrowCandidates(input, target, entries, context)
+    : entries;
   const matches: FileMatches[] = [];
-  for (const filePath of files) {
-    const buffer = await fs.promises.readFile(filePath);
+  for (const entry of files) {
+    const buffer = await fs.promises.readFile(entry.absolute);
     if (isBinary(buffer)) continue;
     const found = matchLines(
-      filePath,
+      entry.absolute,
       buffer.toString("utf8"),
       expression,
       input.multiline === true,
     );
     if (found.matchedLines.length === 0) continue;
     matches.push(found);
-    account(budget, filePath);
+    account(budget, entry.absolute);
   }
 
   if (outputMode === "file_paths") {

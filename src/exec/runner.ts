@@ -37,6 +37,7 @@ import type {
 import type { LlmToolDefinition } from "../transport/llm.ts";
 import { isRecord } from "../transport/schema.ts";
 import type { ReadTracker, ToolContext } from "../tools/context.ts";
+import type { SearchBackend } from "../tools/native-backend.ts";
 import {
   decide,
   mcpRefusal,
@@ -202,6 +203,8 @@ export interface CreateExecToolRunnerOptions {
   /** Advertised names; omitted means every registered tool. */
   readonly allowed?: readonly string[];
   readonly reads?: ReadTracker;
+  /** `Glob`/`Grep` discovery backend; omitted means the local walk. */
+  readonly nativeBackend?: SearchBackend;
   /** Resolves an interactive `ask`; absent (or `false`) cancels the call. */
   readonly confirm?: (request: PermissionRequest) => Promise<boolean>;
   /** Notified after an immediate denial is recorded. */
@@ -362,6 +365,9 @@ export function createExecToolRunner(
         root: options.root,
         environment: options.environment,
         ...(options.reads === undefined ? {} : { reads: options.reads }),
+        ...(options.nativeBackend === undefined
+          ? {}
+          : { nativeBackend: options.nativeBackend }),
       };
 
       let outcome;
