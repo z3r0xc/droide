@@ -47,3 +47,12 @@ B46's early-exit denial in a non-interactive session.
 
 Writes are temp-file + rename; `Read` is bounded at 64 KiB and every other
 result at 32 KiB, cut in the middle with a notice.
+
+## Search backend
+
+`Glob` and `Grep` get discovery from `ToolContext.nativeBackend`
+(`native-backend.ts`). `local` is the TypeScript walk and the default; `helper`
+uses `crates/droide-native` (`search.walk`, `search.text`, `path.resolve`) only
+when a session asks for it and the binary exists. The tools keep their own
+matching, ordering, filters and bounds, so both backends return the same items;
+a helper failure at call time degrades to `local` and leaves a diagnostic.

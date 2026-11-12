@@ -51,6 +51,16 @@ export {
   type ToolContext,
 } from "./context.ts";
 export {
+  NATIVE_FILE_BYTES_LIMIT,
+  createSearchBackend,
+  type LiteralHit,
+  type LiteralQuery,
+  type NativeBackendKind,
+  type SearchBackend,
+  type SearchBackendDiagnostic,
+  type SearchBackendDiagnosticCode,
+} from "./native-backend.ts";
+export {
   OutputLimitError,
   ToolFailure,
   ToolInputError,

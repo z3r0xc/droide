@@ -13,7 +13,7 @@ import { ToolFailure } from "../errors.ts";
 import { defineTool, type ToolDefinition } from "../registry.ts";
 import { parseStringList, type ObjectSchema } from "../validate.ts";
 import { matchesGlob } from "./glob-match.ts";
-import { isCredentialFile, resolveInputPath } from "./paths.ts";
+import { isCredentialFile, isInside, resolveInputPath } from "./paths.ts";
 import { walkFiles } from "./walk.ts";
 
 const MAX_GLOB_RESULTS = 1000;
@@ -87,6 +87,14 @@ export async function globFiles(
       ? context.root
       : resolveInputPath(context, input.folder, { requireAbsolute: true });
 
+  const backend = context.nativeBackend;
+  // Defence in depth: a path inside the workspace is confirmed by the helper,
+  // which refuses anything that leaves its root. A path deliberately outside
+  // the root is not a jail escape — the tools allow absolute paths anywhere.
+  if (backend !== undefined && isInside(context.root, folder)) {
+    await backend.contain(context.root, folder);
+  }
+
   const stats = await fs.promises.stat(folder).catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       throw new ToolFailure(`Folder does not exist: ${folder}`);
@@ -98,7 +106,11 @@ export async function globFiles(
   }
 
   const matches: string[] = [];
-  for (const entry of await walkFiles(folder)) {
+  const entries =
+    backend === undefined
+      ? await walkFiles(folder)
+      : await backend.discover(folder);
+  for (const entry of entries) {
     if (!includes.some((pattern) => matchesGlob(entry.relative, pattern))) {
       continue;
     }

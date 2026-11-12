@@ -255,6 +255,7 @@ async function buildShellAgent(
             interactionMode: "interactive",
             interactive: true,
           },
+          nativeBackend: tooling.searchBackend,
           allowed,
           confirm,
         }),

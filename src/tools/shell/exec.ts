@@ -6,6 +6,11 @@
  * POSIX, PowerShell with its flags on Windows, stdin ignored), B29 (the
  * non-interactive environment), B30 (timeout accounting and tree kill) and B31
  * (fire-and-forget). Spec text that this build cannot honour carries a TODO.
+ *
+ * `TODO(spec 90 B15)`: `Execute` keeps a pipe child. The pinned pseudo-terminal
+ * surface (B13-B22: login-shell environment, its blocklist and the PTY session
+ * lifecycle) belongs to the daemon terminal, which this build does not spawn,
+ * so there is no terminal to hand this command to.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";

@@ -6,6 +6,7 @@
  * injected {@link Environment} instead of reading them.
  */
 import type { Environment } from "../config/paths.ts";
+import type { SearchBackend } from "./native-backend.ts";
 
 /** What a tool needs to resolve paths and name files. */
 export interface ToolContext {
@@ -17,6 +18,12 @@ export interface ToolContext {
    * and one changed after it was read (B22). Omitted means no tracking.
    */
   readonly reads?: ReadTracker;
+  /**
+   * Discovery backend for `Glob` and `Grep` (`specs/90-native-layer.md`).
+   * Omitted means the local walk, which is also what a configured-but-broken
+   * helper degrades to.
+   */
+  readonly nativeBackend?: SearchBackend;
 }
 
 /** The read/write record `Edit` compares against (B22). */
