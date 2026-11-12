@@ -10,7 +10,7 @@ binary. A reimplementation must not call the original vendor's distribution
 endpoint: it would misappropriate their release channel, and the artefact it
 installed would not be ours.
 
-`specs/10-cli-surface.md` §B75 pins the *command surface* (`-c/--check`,
+`specs/10-cli-surface.md` §B75 pins the _command surface_ (`-c/--check`,
 `-v/--version <v>`) and the exit-code behaviour, but not the transport — the
 endpoint is an implementation choice of the original build.
 
@@ -29,7 +29,11 @@ endpoint is an implementation choice of the original build.
    with the documented message and a `TODO(spec B75)` marker: replacing a running
    installation safely (permissions, atomic swap, rollback) is a separate slice
    with its own ADR.
-4. **Version comparison is semver-only.** A tag that is not `vX.Y.Z` is ignored
+4. **A private repository is expected to answer 404.** Anonymous clients cannot
+   see it, so `--check` reports "no release feed visible to an anonymous client"
+   rather than pretending the project has no releases. Authenticating would mean
+   storing a token, which this command must not do.
+5. **Version comparison is semver-only.** A tag that is not `vX.Y.Z` is ignored
    with a warning rather than "upgrading" on a lexicographic accident.
 
 ## Consequences

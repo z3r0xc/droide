@@ -1,7 +1,7 @@
 /** `update` command. Contract: `specs/10-cli-surface.md`. */
 import { Command } from "commander";
 
-import { DISPLAY, VERSION } from "../brand.ts";
+import { DISPLAY, PRODUCT_VERSION } from "../brand.ts";
 import { runUpdateCommand } from "../update-commands.ts";
 
 export function makeUpdateCommand(): Command {
@@ -15,7 +15,7 @@ export function makeUpdateCommand(): Command {
     .action(
       (options: { readonly check?: boolean; readonly version?: string }) => {
         void runUpdateCommand(options, {
-          currentVersion: VERSION,
+          currentVersion: PRODUCT_VERSION,
           repository: "z3r0xc/droide",
           fetch,
           write: (text) => process.stdout.write(text),
