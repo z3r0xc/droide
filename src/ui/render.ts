@@ -19,6 +19,8 @@ export interface ShellTarget {
   readonly rows?: number;
   /** Ink debug mode: every frame is appended, never repainted (test capture). */
   readonly debug?: boolean;
+  /** Override Ink's TTY/CI detection; production passes the shell's own answer. */
+  readonly interactive?: boolean;
   readonly stdin?: NodeJS.ReadStream;
 }
 
@@ -63,6 +65,9 @@ export async function renderShell(
     stdout: target.stdout,
     ...(target.stdin === undefined ? {} : { stdin: target.stdin }),
     debug: target.debug ?? false,
+    ...(target.interactive === undefined
+      ? {}
+      : { interactive: target.interactive }),
     patchConsole: false,
     exitOnCtrlC: false,
     onRender,
@@ -75,8 +80,10 @@ export async function renderShell(
     unmount: async (): Promise<void> => {
       if (unmounted) return;
       unmounted = true;
+      // `waitUntilExit` installs a `beforeExit` listener; after unmount,
+      // `waitUntilRenderFlush` waits on the same exit promise without one.
       instance.unmount();
-      await instance.waitUntilExit();
+      await instance.waitUntilRenderFlush();
     },
     rerender: async (next, nextSize): Promise<void> => {
       if (unmounted) return;

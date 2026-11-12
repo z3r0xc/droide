@@ -20,6 +20,7 @@ import type {
   LlmTurnRequest,
 } from "../../transport/llm.ts";
 import { mapStream } from "../../transport/llm.ts";
+import { encodeRequest } from "./llm-payload.ts";
 import { parseSse } from "../../transport/sse.ts";
 
 export interface LlmProviderOptions {
@@ -180,7 +181,18 @@ export function createLlmProvider(options: LlmProviderOptions): Provider {
 
   return {
     async *stream(messages, streamOptions) {
-      const body = JSON.stringify(buildTurnRequest(options, messages));
+      const body = JSON.stringify(
+        encodeRequest(
+          options.dialect,
+          {
+            model: options.model,
+            system: options.system,
+            tools: options.tools ?? [],
+            maxTokens: options.maxTokens,
+          },
+          toLlmMessages(messages),
+        ),
+      );
       const response = await doFetch(options.url, {
         method: "POST",
         headers: { "content-type": "application/json", ...options.headers },

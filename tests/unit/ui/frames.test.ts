@@ -152,9 +152,39 @@ test("frames are deterministic across runs in the same process", async () => {
 
 test("mounting and unmounting leaves no process or terminal listeners", async () => {
   const exitListeners = process.listenerCount("exit");
+  const beforeExitListeners = process.listenerCount("beforeExit");
   const frame = await renderFrame(shellAt(80, 24));
   assert.ok(frame.lines.length > 0);
   assert.equal(process.listenerCount("exit"), exitListeners);
+  assert.equal(process.listenerCount("beforeExit"), beforeExitListeners);
+});
+
+test("unmount restores the cursor on an interactive terminal", async () => {
+  const { stdout, chunks } = captureStream(80, 24);
+  (stdout as unknown as { isTTY: boolean }).isTTY = true;
+  const handle = await renderShell(shellAt(80, 24), {
+    stdout,
+    columns: 80,
+    rows: 24,
+    interactive: true,
+  });
+  await handle.unmount();
+  const output = chunks.join("");
+  assert.ok(
+    output.includes("\u001B[?25l"),
+    "the cursor is hidden while mounted",
+  );
+  assert.ok(output.includes("\u001B[?25h"), "unmount restores the cursor");
+  assert.equal(stdout.listenerCount("resize"), 0);
+});
+
+test("a configured status line renders below the footer", async () => {
+  const frame = await renderFrame({
+    ...shellAt(80, 24),
+    statusLine: { text: "branch: main · clean", padding: 1, maxRows: 1 },
+  });
+  assert.equal(frame.lines.length, 19);
+  assert.equal(frame.lines.at(-1), " branch: main · clean");
 });
 
 test("unknown transcript kinds and malformed items render nothing", async () => {
