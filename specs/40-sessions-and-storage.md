@@ -92,6 +92,16 @@ Citation note: two cache migrations (`0001_baseline`, `0003_tags_role_key`) are
 stored UTF-16LE in the bundle. Line numbers cited for them are of the decoded
 text; every other file is ASCII/UTF-8 and cited as-is.
 
+Citation conventions, to keep the clauses short: a bare module name
+(`record.ts`, `search.ts`, `ingest.ts`, `listing.ts`, `driver.ts`,
+`migrate.ts`, `schema.ts`, `cache.ts`, `constants.ts`, `lease.ts`,
+`discovery.ts`, `semantic.ts`, `daemon-search.ts`) means
+`evidence/original/windows-x64/packages/runtime/session-index/src/<name>`;
+a path beginning `src/` means `evidence/original/windows-x64/src/`; a path
+beginning `packages/` means `evidence/original/windows-x64/packages/`; and a
+`<number>_<name>*.sql` asset means
+`evidence/extracted/windows-x64/<number>_<name>-<hash>.sql`.
+
 ## Observable behaviour
 
 ### Open, layout and lifecycle
@@ -150,7 +160,7 @@ version` / `Session index migration version must be positive`
 `sha256("<version>\0<name>\0<normalized sql>")[0..16)`, where normalization strips
 `--` and `/* */` comments, collapses runs of whitespace and removes whitespace
 adjacent to `(`, `)`, `,` and `;`, while copying quoted literals verbatim
-(`migrate.ts:70-176`). Consequently reformatting or commenting a released
+(`migrate.ts:87-183`). Consequently reformatting or commenting a released
 migration keeps its identity; changing a statement does not.
 
 **B8.** A database with no pending migrations is not written to at all — but its
@@ -159,11 +169,11 @@ ledger is still validated (`migrate.ts:315-325`).
 **B9.** Each pending migration runs in its own `BEGIN IMMEDIATE` transaction
 that re-reads the ledger, re-checks compatibility, skips if a peer already
 committed that version (logged as `applied-by-peer`), executes the SQL and
-inserts the ledger row with `Date.now()` (`migrate.ts:327-368`).
+inserts the ledger row with `Date.now()` (`migrate.ts:315-366`).
 
 **B10.** A ledger row whose version this build knows but whose checksum differs
 fails the open with `Session index migration checksum mismatch`; the file is
-left in place (`migrate.ts:196-222`).
+left in place (`migrate.ts:209-235`).
 
 **B11.** A ledger row whose version this build does **not** know is tolerated
 ("the file is ahead"): an older binary keeps opening a newer file. Only unknown
@@ -199,7 +209,7 @@ failure (`driver.ts:777-806`).
 
 **B15.** Every other open failure — checksum mismatch, pre-ledger file, a shape
 the statements cannot use, `SQLITE_FULL`, permissions, a lock — leaves the file
-exactly where it is and propagates (`migrate.ts:412-432`).
+exactly where it is and propagates (`migrate.ts:389-398`, `452-468`).
 
 **B16.** A read-only snapshot open (`immutable=1`, no locks, no sidecars) exists
 for a full disk and reads only the main file, missing whatever is still in the

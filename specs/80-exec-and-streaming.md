@@ -640,7 +640,7 @@ text `Done.`.
 Expected normalised stdout, in this order, one record per line, nothing else:
 
 ```
-{"type":"system","subtype":"init","cwd":"<cwd>","session_id":"<sid>","tools":[…,"Read",…],"model":"custom:mock","reasoning_effort":"low"}
+{"type":"system","subtype":"init","cwd":"<cwd>","session_id":"<sid>","tools":[…,"Read",…],"model":"custom:mock","reasoning_effort":"<effort>"}
 {"type":"message","role":"user","id":"<uuid>","text":"read fixture.txt","timestamp":0,"session_id":"<sid>"}
 {"type":"tool_call","id":"<tool-use-id>","messageId":"<uuid>","toolId":"Read","toolName":"Read","parameters":{"file_path":"fixture.txt"},"timestamp":0,"session_id":"<sid>"}
 {"type":"tool_result","id":"<tool-use-id>","messageId":"<uuid>","toolId":"Read","isError":false,"value":"<tool-output>","timestamp":0,"session_id":"<sid>"}
@@ -648,7 +648,9 @@ Expected normalised stdout, in this order, one record per line, nothing else:
 {"type":"completion","finalText":"Done.","numTurns":2,"durationMs":0,"session_id":"<sid>","timestamp":0,"usage":{"input_tokens":<n>,"output_tokens":<n>,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"factory_credits":0,"thinking_tokens":0}}
 ```
 
-Assertions: exactly three UUID-shaped ids repeat consistently
+Assertions: `reasoning_effort` is the non-empty effort the session resolved
+(the fixture pins the model's effort, so the test compares it exactly); exactly
+three UUID-shaped ids repeat consistently
 (`message.id` ↔ `tool_call.messageId`/`tool_result.messageId`;
 `tool_call.id` = `tool_result.id`); `session_id` identical on all records;
 `Read` ∈ `tools`; no `error` record; exit code `0`; stderr contains no records.

@@ -1,56 +1,61 @@
 # Specifications
 
-This directory holds the specification of `droid` 1.9.0: one file per
-subsystem, written before any reimplementation of that subsystem exists.
-
-A spec is the contract the reimplementation is built against and judged by. If
-the implementation needs a behaviour the spec does not state, the spec is
-incomplete; fix the spec first.
+One file per subsystem of the reimplementation, numbered by layer. A spec is the
+contract the code is written against and judged by: **nothing is implemented
+before it is specified.**
 
 ## Rules
 
-1. **One file per subsystem**, named `<subsystem>.md` in lower kebab case
-   (`config-precedence.md`, `session-store.md`). A spec may reference another;
-   it may not restate it.
-2. **Every claim is observable.** A clause describes something a caller, a file,
-   or a log can see: inputs, outputs, ordering, persisted shapes, exit codes,
-   error identities. Internal structure is described only where it is part of
-   the contract.
-3. **Every clause carries evidence.** Cite ledger ids (`ev_<topic>_<n>`, see
-   `evidence/README.md`) in the Evidence section, mapped to the clauses they
-   support. A clause with no evidence is marked `UNSUPPORTED` and blocks
-   implementation of that clause.
-4. **Every clause has an acceptance test.** The Acceptance tests section names
-   at least one test per behavioural clause, by test id. A clause with no test
-   is not done. See `tests/README.md` for the determinism rules those tests must
-   meet.
-5. **Separate observation from inference.** Where the evidence does not fully
-   determine behaviour, write the narrowest clause the evidence supports and
-   record the remainder under Open questions. Never smooth a gap with a guess.
-6. **State the version.** A spec describes `droid` 1.9.0 and says so in its
-   header. Behaviour attributed to a different version belongs in a different
-   spec file or is out of scope.
-7. **Open questions are first class.** Each one names what would settle it — an
-   extractor change, a specific evidence topic, a decision — and stays until it
-   is closed or explicitly deferred with a reason.
-
-## Template
-
-Start from `template.md`. Keep the section order; delete a section only if it is
-genuinely empty and say why in Scope.
+1. **One file per subsystem**, named `NN-<subsystem>.md`. Numbers group by layer
+   (`10–19` CLI and configuration, `20–39` agent and tools, `40–59` storage and
+   transport, `60–79` extensions and daemon, `80–99` modes, native layer and UI).
+   `00-context.md` is shared context, not a spec.
+2. **Observable only.** Every clause describes something a caller, a file or a
+   log can see: inputs, outputs, ordering, persisted shapes, exit codes, error
+   identities. Internal structure appears only where it is contract.
+3. **Every clause is labelled and cited.** `[observed]` (read directly),
+   `[derived]` (computed from several observations) or `[inferred]` (judgement),
+   with a location (`evidence/original/windows-x64/<path>:<line>`) or a recorded
+   golden (`tests/parity/expected/<case>.json`). A clause without a citation is
+   an open question, not a clause.
+4. **Every clause has a test.** Acceptance tests name at least one deterministic
+   test per behavioural clause. Determinism: no network, no credentials, no wall
+   clock, no dependence on the subject binary.
+5. **Gaps are explicit.** Where evidence is incomplete — re-export barrels and
+   type-only modules were elided from the bundle — write the narrowest supported
+   clause and put the rest under Open questions. Never smooth a gap with a guess.
+6. **Version-locked.** Specs describe `droid` v1.9.0. A different version needs a
+   new recovery run and new specs, never a silent edit.
+7. **Open questions name what would settle them** (a file to read, a probe to
+   run, a decision to make).
 
 ## Status vocabulary
 
-Each spec header carries a status:
-
 | Status | Meaning |
 |---|---|
-| `draft` | Being written; clauses may be incomplete |
-| `review` | All clauses have evidence and tests named; awaiting check |
-| `stable` | Implemented and its tests pass; changes need a new clause |
+| `draft` | Being written; clauses may still be incomplete |
+| `review` | Every clause cited and mapped to a test; awaiting check |
+| `stable` | Implemented; its tests pass; changes need a new clause |
 | `blocked` | Waiting on an open question or missing evidence |
 
 ## Index
 
-_No subsystem specs exist yet. Phase 1 is extraction; the first specs are
-opened once the recovered payload has been mapped._
+| Spec | Status | Covers |
+|---|---|---|
+| `10-cli-surface.md` | review | Router, root options, visible and hidden commands, argument classification, precedence chain, exit codes, error strings |
+| `40-sessions-and-storage.md` | review | SQLite schema and migrations, transcript records, ordering, on-disk layout, search |
+| `80-exec-and-streaming.md` | review | Non-interactive mode, stream formats, exit codes |
+| `90-native-layer.md` | review | Native helpers (pty, search, secrets, sqlite, browser), framing and contracts |
+| `95-terminal-ui.md` | draft | Design tokens, layout, transcript renderers, keys, capability handling |
+| `20-agent-loop.md` | pending | Provider message model, tool-call cycle, context assembly, model catalogue |
+| `30-tools-and-sandbox.md` | pending | Tool registry, permission matrix, filesystem and shell models, sandbox |
+| `50-transport-and-auth.md` | pending | Backend routes, auth flows, error taxonomy, LLM transport |
+| `60-extensions-mcp-and-skills.md` | pending | MCP, plugins, skills, ACP |
+| `70-daemon-and-remote-control.md` | pending | Daemon lifecycle, client protocol, remote control |
+
+`pending` means the spec file does not exist yet; the subsystem must not be
+implemented until it does.
+
+## Template
+
+Start from `template.md` and keep its section order.
