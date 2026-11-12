@@ -38,16 +38,16 @@ sections and ADRs.
 | M0 | Evidence & recovery (done) | — | `tools/*` test suites green; recovery manifest reproducible |
 | M1 | CLI surface: root command, `--version`, `--help`, subcommand help, non-TTY refusal, argument classification | `specs/10-cli-surface.md` | `tests/parity/run.mjs --check` green (13 cases today, extended as specs land) |
 | M2 | Settings & paths: config resolution order, env vars, project config, `--settings` merge, worktree/cwd anchoring | `specs/10-cli-surface.md`, `specs/40-sessions-and-storage.md` | unit tests for precedence matrix; parity cases for `droid doctor`-style read-only paths |
-| M3 | Session store: SQLite schema at head, migrations, transcript append/read, tags, search index | `specs/40-sessions-and-storage.md` | migrate-empty-db snapshot test, append/read round-trip, search fixture |
+| M3 | Session store: SQLite schema at head, migrations, transcript append/read, tags, search index | `specs/40-sessions-and-storage.md` | migrate-empty-db snapshot, append/read round-trip, index planner, indexed-vs-literal search parity |
 | M4 | Provider transport & auth: base-URL resolution, headers, SSE parsing, error mapping, token handling | `specs/50-transport-and-auth.md` | SSE fixture tests, error-mapping table test, no network in CI |
 | M5 | Agent loop: message model, tool-call cycle, permissions, context assembly, compaction | `specs/20-agent-loop.md`, `specs/30-tools-and-sandbox.md` | scripted-provider transcript tests; permission matrix |
 | M6 | Tools: filesystem, search, shell/exec, todo/task; permission enforcement | `specs/30-tools-and-sandbox.md` | per-tool schema tests; sandbox profile assertions |
 | M7 | Non-interactive mode and stream formats (`exec`) | `specs/80-exec-and-streaming.md` | golden stdout line sequences per scripted run |
-| M8 | Extensions: MCP client, plugins, skills, ACP | `specs/60-extensions-mcp-and-skills.md` | config merge tests, collision rules, skill discovery |
+| M8 | Extensions: MCP client, plugins, skills, ACP | `specs/60-extensions-mcp-and-skills.md` | client, config merge, skills, plugin marketplaces and install **done**; `mcp auth` has PKCE/callback/token/sealed store but the command is unwired; ACP not started |
 | M9 | Daemon and remote control | `specs/70-daemon-and-remote-control.md` | local transport, protocol, auth gate, single instance, ordered shutdown **done (132 tests)**; Remote Control, relay and the port proxy are `TODO(spec B28/B29/B32/B33)` |
 | M10a | Native **contract** in TypeScript: JSON-lines client, response validation, failure mapping | `specs/90-native-layer.md` | stub-helper integration tests; no leaked child processes |
-| M10b | Native **implementation** in Rust: search, sandbox, paths, protocol (pty and secrets next) | `specs/90-native-layer.md`, `crates/` | `cargo test --workspace` locally and in CI — toolchain fixed, see `docs/rust-setup.md` |
-| M11 | Terminal UI | `specs/95-terminal-ui.md` | shell, tokens, golden frames, keys, setup/teardown and TTY dispatch **done**; the agent turn inside the shell is in progress |
+| M10b | Native **implementation** in Rust: protocol, paths, search, sandbox, PTY sessions (ConPTY/openpty), Windows DPAPI | `specs/90-native-layer.md`, `crates/` | 69 tests, clippy `-D warnings`, `npm run test:native` against the compiled binary; macOS/Linux credential stores remain |
+| M11 | Terminal UI | `specs/95-terminal-ui.md` | shell, tokens, golden frames, keys, setup/teardown, TTY dispatch **and agent turns with approvals and cancel done** |
 
 ## Definition of done (each milestone)
 
