@@ -103,14 +103,6 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function errorCode(error: unknown): string | undefined {
-  if (typeof error === "object" && error !== null && "code" in error) {
-    const code = error.code;
-    if (typeof code === "string") return code;
-  }
-  return undefined;
-}
-
 /**
  * One helper process. Create it with `createNativeClient`, which also performs
  * the protocol handshake; a client that failed its handshake is never returned,
@@ -135,12 +127,35 @@ export class NativeClient {
   private exitDescription = "";
   private readonly exitWaiters = new Set<() => void>();
 
-  private constructor(options: ResolvedOptions, child: ChildProcessWithoutNullStreams) {
+  private constructor(options: ResolvedOptions) {
     this.helperPath = options.helperPath;
-    this.child = child;
     this.timers = options.timers;
     this.defaultTimeoutMs = options.requestTimeoutMs;
     this.closeGraceMs = options.closeGraceMs;
+
+    const args = [...options.helperArgs];
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      child =
+        options.env === undefined
+          ? spawn(options.helperPath, args, {
+              stdio: ["pipe", "pipe", "pipe"],
+              windowsHide: true,
+              shell: false,
+            })
+          : spawn(options.helperPath, args, {
+              stdio: ["pipe", "pipe", "pipe"],
+              windowsHide: true,
+              shell: false,
+              env: options.env,
+            });
+    } catch (error) {
+      throw new NativeUnavailableError(`could not be started: ${messageOf(error)}`, {
+        helperPath: options.helperPath,
+        cause: error,
+      });
+    }
+    this.child = child;
 
     child.stdout.on("data", (chunk: Buffer) => {
       this.handleChunk(chunk);
@@ -185,7 +200,12 @@ export class NativeClient {
     options: { readonly timeoutMs?: number } = {},
   ): Promise<unknown> {
     if (this.state !== "open") {
-      return Promise.reject(this.closedError(method));
+      return Promise.reject(
+        new NativeUnavailableError("the client is closed", {
+          helperPath: this.helperPath,
+          method,
+        }),
+      );
     }
 
     const timeoutMs = options.timeoutMs ?? this.defaultTimeoutMs;
@@ -280,45 +300,9 @@ export class NativeClient {
     this.state = "closed";
   }
 
-  private static create(
-    options: ResolvedOptions,
-    child: ChildProcessWithoutNullStreams,
-  ): NativeClient {
-    return new NativeClient(options, child);
-  }
-
   /** Spawn the helper; a spawn failure is `NativeUnavailableError`. */
-  static start(options: ResolvedOptions): NativeClient {
-    const args = [...options.helperArgs];
-    let child: ChildProcessWithoutNullStreams;
-    try {
-      child =
-        options.env === undefined
-          ? spawn(options.helperPath, args, {
-              stdio: ["pipe", "pipe", "pipe"],
-              windowsHide: true,
-              shell: false,
-            })
-          : spawn(options.helperPath, args, {
-              stdio: ["pipe", "pipe", "pipe"],
-              windowsHide: true,
-              shell: false,
-              env: options.env,
-            });
-    } catch (error) {
-      throw new NativeUnavailableError(`could not be started: ${messageOf(error)}`, {
-        helperPath: options.helperPath,
-        cause: error,
-      });
-    }
-    return NativeClient.create(options, child);
-  }
-
-  private closedError(method: string): NativeUnavailableError {
-    return new NativeUnavailableError("the client is closed", {
-      helperPath: this.helperPath,
-      method,
-    });
+  private static start(options: ResolvedOptions): NativeClient {
+    return new NativeClient(options);
   }
 
   private captureStderr(chunk: Buffer): void {
@@ -337,7 +321,13 @@ export class NativeClient {
       const line = this.buffer.subarray(0, newline);
       this.buffer = this.buffer.subarray(newline + 1);
       if (line.length > MAX_LINE_BYTES) {
-        this.failWith(() => this.oversizedLineError(line.length));
+        this.failWith(
+          () =>
+            new NativeProtocolError(
+              `response line is ${line.length} bytes, over the ${MAX_LINE_BYTES}-byte cap`,
+              { helperPath: this.helperPath },
+            ),
+        );
         return;
       }
       this.consumeLine(line);
@@ -346,7 +336,13 @@ export class NativeClient {
     }
 
     if (this.buffer.length > MAX_LINE_BYTES) {
-      this.failWith(() => this.oversizedLineError(this.buffer.length));
+      this.failWith(
+        () =>
+          new NativeProtocolError(
+            `response line is ${this.buffer.length} bytes, over the ${MAX_LINE_BYTES}-byte cap`,
+            { helperPath: this.helperPath },
+          ),
+      );
     }
   }
 
@@ -418,15 +414,12 @@ export class NativeClient {
     );
   }
 
-  private oversizedLineError(bytes: number): NativeProtocolError {
-    return new NativeProtocolError(
-      `response line is ${bytes} bytes, over the ${MAX_LINE_BYTES}-byte cap`,
-      { helperPath: this.helperPath },
-    );
-  }
-
   private handleStreamFailure(error: unknown): void {
-    const code = errorCode(error);
+    let code: string | undefined;
+    if (typeof error === "object" && error !== null && "code" in error) {
+      const raw = error.code;
+      if (typeof raw === "string") code = raw;
+    }
     this.failWith(
       () =>
         new NativeUnavailableError(

@@ -14,6 +14,22 @@ sections and ADRs.
 - Any behaviour the specs do not pin is not implemented. Add it to the spec
   first, then implement.
 
+## Status (2026-11-12)
+
+| Milestone | State |
+|---|---|
+| M0 evidence & recovery | done |
+| M1 CLI surface | **done** — 20/20 parity cases green, 47 unit tests, curated `exec --help` page |
+| M2 settings & paths | in progress |
+| M3 session store | in progress |
+| M4 transport & auth | in progress |
+| M6 tools core | in progress |
+| M7 exec streams | in progress |
+| M8 extensions core | in progress |
+| M10a native contract | in progress |
+| M10b native Rust | blocked (toolchain, `docs/rust-setup.md`) |
+| M5 agent loop, M9 daemon, M11 UI | specified, not started (specs `20`, `70`, `95`) |
+
 ## Milestones
 
 | # | Milestone | Spec gate | Acceptance gate |

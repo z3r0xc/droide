@@ -14,10 +14,7 @@
  * the vocabulary is an {@link UnknownSettingError}. Both errors carry the file
  * that produced them.
  */
-import {
-  InvalidSettingsError,
-  UnknownSettingError,
-} from "./errors.ts";
+import { InvalidSettingsError, UnknownSettingError } from "./errors.ts";
 
 export type JsonValue =
   | string
@@ -57,7 +54,7 @@ export interface CustomModelSettings {
 /** Settings applied at the root of a document, merged key by key. */
 export interface GeneralSettings {
   readonly worktreeDirectory?: string;
-  readonly enabledPlugins?: boolean;
+  readonly enabledPlugins?: Readonly<Record<string, boolean>>;
   readonly theme?: string;
   readonly locale?: string;
   readonly droidCoreModel?: string;
@@ -129,70 +126,68 @@ export interface Settings {
 }
 
 type RawObject = Readonly<Record<string, unknown>>;
+type AllowedKeys = Readonly<Record<string, true>>;
 
-const GENERAL_KEYS = new Set([
-  "worktreeDirectory",
-  "enabledPlugins",
-  "theme",
-  "locale",
-  "droidCoreModel",
-  "llmRequestTimeout",
-  "compactionTokenLimit",
-  "trustedFolders",
-  "customModels",
-]);
+const GENERAL_KEYS: AllowedKeys = {
+  worktreeDirectory: true,
+  enabledPlugins: true,
+  theme: true,
+  locale: true,
+  droidCoreModel: true,
+  llmRequestTimeout: true,
+  compactionTokenLimit: true,
+  trustedFolders: true,
+  customModels: true,
+};
 
-const STRUCTURED_KEYS = [
-  "mcp",
-  "hooks",
-  "droids",
-  "skills",
-  "outputStyles",
-  "commands",
-] as const;
+const SETTINGS_KEYS: AllowedKeys = {
+  ...GENERAL_KEYS,
+  mcp: true,
+  hooks: true,
+  droids: true,
+  skills: true,
+  outputStyles: true,
+  commands: true,
+};
 
-const SETTINGS_KEYS = new Set<string>([...GENERAL_KEYS, ...STRUCTURED_KEYS]);
+const CUSTOM_MODEL_KEYS: AllowedKeys = {
+  id: true,
+  index: true,
+  model: true,
+  provider: true,
+  baseUrl: true,
+  apiKey: true,
+  apiKeyHelper: true,
+  apiKeyHelperTtlMs: true,
+  displayName: true,
+  maxContextLimit: true,
+  enableThinking: true,
+};
 
-const CUSTOM_MODEL_KEYS = new Set([
-  "id",
-  "index",
-  "model",
-  "provider",
-  "baseUrl",
-  "apiKey",
-  "apiKeyHelper",
-  "apiKeyHelperTtlMs",
-  "displayName",
-  "maxContextLimit",
-  "enableThinking",
-]);
-
-const CUSTOM_MODEL_PROVIDERS = new Set<string>([
-  "anthropic",
-  "openai",
-  "generic-chat-completion-api",
-  "bedrock-converse",
-]);
+const CUSTOM_MODEL_PROVIDERS: AllowedKeys = {
+  anthropic: true,
+  openai: true,
+  "generic-chat-completion-api": true,
+  "bedrock-converse": true,
+};
 
 const HTTP_URL = /^https?:\/\//i;
 
-const MCP_STDIO_KEYS = new Set([
-  "type",
-  "command",
-  "args",
-  "env",
-  "disabled",
-]);
-const MCP_REMOTE_KEYS = new Set(["type", "url", "headers", "disabled"]);
+const MCP_STDIO_KEYS: AllowedKeys = {
+  type: true,
+  command: true,
+  args: true,
+  env: true,
+  disabled: true,
+};
+const MCP_REMOTE_KEYS: AllowedKeys = {
+  type: true,
+  url: true,
+  headers: true,
+  disabled: true,
+};
 
-const HOOK_KEYS = new Set(["matcher", "commandRegex", "hooks"]);
-const HOOK_COMMAND_KEYS = new Set([
-  "type",
-  "command",
-  "timeout",
-  "preserveRiskLevel",
-]);
-const HOOK_EVENTS = new Set<string>([
+const HOOK_EVENT_NAMES = [
   "PreToolUse",
   "PostToolUse",
   "Notification",
@@ -202,8 +197,37 @@ const HOOK_EVENTS = new Set<string>([
   "PreCompact",
   "SessionStart",
   "SessionEnd",
-]);
-const HOOK_SECTION_KEYS = new Set<string>([...HOOK_EVENTS, "hooksDisabled", "showHookOutput"]);
+] as const;
+
+const HOOK_EVENT_KEYS: AllowedKeys = {
+  PreToolUse: true,
+  PostToolUse: true,
+  Notification: true,
+  UserPromptSubmit: true,
+  Stop: true,
+  SubagentStop: true,
+  PreCompact: true,
+  SessionStart: true,
+  SessionEnd: true,
+};
+
+const HOOK_SECTION_KEYS: AllowedKeys = {
+  ...HOOK_EVENT_KEYS,
+  hooksDisabled: true,
+  showHookOutput: true,
+};
+
+const HOOK_KEYS: AllowedKeys = {
+  matcher: true,
+  commandRegex: true,
+  hooks: true,
+};
+const HOOK_COMMAND_KEYS: AllowedKeys = {
+  type: true,
+  command: true,
+  timeout: true,
+  preserveRiskLevel: true,
+};
 
 function isObject(value: unknown): value is RawObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -215,15 +239,15 @@ function typeName(value: unknown): string {
   return typeof value;
 }
 
+function isCustomModelProvider(value: string): value is CustomModelProvider {
+  return Object.hasOwn(CUSTOM_MODEL_PROVIDERS, value);
+}
+
 function joinKeyPath(parent: string, key: string | number): string {
   return parent === "" ? String(key) : `${parent}.${key}`;
 }
 
-function expectObject(
-  value: unknown,
-  path: string,
-  keyPath: string,
-): RawObject {
+function expectObject(value: unknown, path: string, keyPath: string): RawObject {
   if (!isObject(value)) {
     throw new InvalidSettingsError(
       path,
@@ -273,11 +297,7 @@ function expectInteger(
   return number;
 }
 
-function expectBoolean(
-  value: unknown,
-  path: string,
-  keyPath: string,
-): boolean {
+function expectBoolean(value: unknown, path: string, keyPath: string): boolean {
   if (typeof value !== "boolean") {
     throw new InvalidSettingsError(
       path,
@@ -318,16 +338,27 @@ function expectStringRecord(
   return result;
 }
 
-function rejectUnknownKeys(
-  raw: RawObject,
-  allowed: ReadonlySet<string>,
+function expectBooleanRecord(
+  value: unknown,
   path: string,
   keyPath: string,
-  check: boolean,
+): Readonly<Record<string, boolean>> {
+  const record = expectObject(value, path, keyPath);
+  const result: Record<string, boolean> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    result[key] = expectBoolean(entry, path, joinKeyPath(keyPath, key));
+  }
+  return result;
+}
+
+function rejectUnknownKeys(
+  raw: RawObject,
+  allowed: AllowedKeys,
+  path: string,
+  keyPath: string,
 ): void {
-  if (!check) return;
   for (const key of Object.keys(raw)) {
-    if (!allowed.has(key)) {
+    if (allowed[key] !== true) {
       throw new UnknownSettingError(path, joinKeyPath(keyPath, key));
     }
   }
@@ -360,6 +391,17 @@ function readOptionalNumber(
   key: string,
   path: string,
   keyPath: string,
+): number | undefined {
+  const value = raw[key];
+  if (value === undefined) return undefined;
+  return expectNumber(value, path, joinKeyPath(keyPath, key));
+}
+
+function readOptionalInteger(
+  raw: RawObject,
+  key: string,
+  path: string,
+  keyPath: string,
   minimum: number,
 ): number | undefined {
   const value = raw[key];
@@ -374,23 +416,20 @@ function expectJsonObject(
   keyPath: string,
 ): JsonObject {
   const object = expectObject(value, path, keyPath);
+  const result: Record<string, JsonValue> = {};
   for (const [key, entry] of Object.entries(object)) {
-    expectJsonValue(entry, path, joinKeyPath(keyPath, key));
+    result[key] = expectJsonValue(entry, path, joinKeyPath(keyPath, key));
   }
-  return object as JsonObject;
+  return result;
 }
 
 function expectJsonValue(
   value: unknown,
   path: string,
   keyPath: string,
-): void {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "boolean"
-  ) {
-    return;
+): JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return value;
   }
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
@@ -400,19 +439,15 @@ function expectJsonValue(
         `expected a finite number, got ${value}`,
       );
     }
-    return;
+    return value;
   }
   if (Array.isArray(value)) {
-    value.forEach((entry, index) =>
+    return value.map((entry, index) =>
       expectJsonValue(entry, path, joinKeyPath(keyPath, index)),
     );
-    return;
   }
   if (isObject(value)) {
-    for (const [key, entry] of Object.entries(value)) {
-      expectJsonValue(entry, path, joinKeyPath(keyPath, key));
-    }
-    return;
+    return expectJsonObject(value, path, keyPath);
   }
   throw new InvalidSettingsError(
     path,
@@ -422,14 +457,17 @@ function expectJsonValue(
 }
 
 function parseGeneral(raw: RawObject, path: string): GeneralSettings {
-  rejectUnknownKeys(raw, GENERAL_KEYS, path, "", true);
+  rejectUnknownKeys(raw, GENERAL_KEYS, path, "");
   const worktreeDirectory = readOptionalString(
     raw,
     "worktreeDirectory",
     path,
     "",
   );
-  const enabledPlugins = readOptionalBoolean(raw, "enabledPlugins", path, "");
+  const enabledPlugins =
+    raw.enabledPlugins === undefined
+      ? undefined
+      : expectBooleanRecord(raw.enabledPlugins, path, "enabledPlugins");
   const theme = readOptionalString(raw, "theme", path, "");
   const locale = readOptionalString(raw, "locale", path, "");
   const droidCoreModel = readOptionalString(raw, "droidCoreModel", path, "");
@@ -438,18 +476,17 @@ function parseGeneral(raw: RawObject, path: string): GeneralSettings {
     "llmRequestTimeout",
     path,
     "",
-    1000,
   );
   const compactionTokenLimit = readOptionalNumber(
     raw,
     "compactionTokenLimit",
     path,
     "",
-    0,
   );
-  const trustedFolders = raw.trustedFolders === undefined
-    ? undefined
-    : expectStringArray(raw.trustedFolders, path, "trustedFolders");
+  const trustedFolders =
+    raw.trustedFolders === undefined
+      ? undefined
+      : expectStringArray(raw.trustedFolders, path, "trustedFolders");
 
   let customModels: readonly CustomModelSettings[] | undefined;
   if (raw.customModels !== undefined) {
@@ -484,7 +521,7 @@ function parseCustomModel(
   keyPath: string,
 ): CustomModelSettings {
   const raw = expectObject(value, path, keyPath);
-  rejectUnknownKeys(raw, CUSTOM_MODEL_KEYS, path, keyPath, true);
+  rejectUnknownKeys(raw, CUSTOM_MODEL_KEYS, path, keyPath);
 
   const model = expectString(raw.model, path, joinKeyPath(keyPath, "model"));
   if (model.trim() === "") {
@@ -500,16 +537,16 @@ function parseCustomModel(
     path,
     joinKeyPath(keyPath, "provider"),
   );
-  if (!CUSTOM_MODEL_PROVIDERS.has(provider)) {
+  if (!isCustomModelProvider(provider)) {
     throw new InvalidSettingsError(
       path,
       joinKeyPath(keyPath, "provider"),
-      `expected one of ${[...CUSTOM_MODEL_PROVIDERS].join(", ")}, got ${provider}`,
+      `expected one of ${Object.keys(CUSTOM_MODEL_PROVIDERS).join(", ")}, got ${provider}`,
     );
   }
 
   const id = readOptionalString(raw, "id", path, keyPath);
-  const index = readOptionalNumber(raw, "index", path, keyPath, 0);
+  const index = readOptionalNumber(raw, "index", path, keyPath);
   const baseUrl = readOptionalString(raw, "baseUrl", path, keyPath);
   if (baseUrl !== undefined && !HTTP_URL.test(baseUrl)) {
     throw new InvalidSettingsError(
@@ -519,7 +556,7 @@ function parseCustomModel(
     );
   }
   const apiKey = readOptionalString(raw, "apiKey", path, keyPath);
-  if (apiKey !== undefined && apiKey === "") {
+  if (apiKey === "") {
     throw new InvalidSettingsError(
       path,
       joinKeyPath(keyPath, "apiKey"),
@@ -527,7 +564,7 @@ function parseCustomModel(
     );
   }
   const apiKeyHelper = readOptionalString(raw, "apiKeyHelper", path, keyPath);
-  const apiKeyHelperTtlMs = readOptionalNumber(
+  const apiKeyHelperTtlMs = readOptionalInteger(
     raw,
     "apiKeyHelperTtlMs",
     path,
@@ -535,20 +572,25 @@ function parseCustomModel(
     1,
   );
   const displayName = readOptionalString(raw, "displayName", path, keyPath);
-  const maxContextLimit = readOptionalNumber(
+  const maxContextLimit = readOptionalInteger(
     raw,
     "maxContextLimit",
     path,
     keyPath,
     1,
   );
-  const enableThinking = readOptionalBoolean(raw, "enableThinking", path, keyPath);
+  const enableThinking = readOptionalBoolean(
+    raw,
+    "enableThinking",
+    path,
+    keyPath,
+  );
 
   return {
     ...(id === undefined ? {} : { id }),
     ...(index === undefined ? {} : { index }),
     model,
-    provider: provider as CustomModelProvider,
+    provider,
     ...(baseUrl === undefined ? {} : { baseUrl }),
     ...(apiKey === undefined ? {} : { apiKey }),
     ...(apiKeyHelper === undefined ? {} : { apiKeyHelper }),
@@ -565,12 +607,13 @@ function parseMcpServer(
   keyPath: string,
 ): McpServerSettings {
   const raw = expectObject(value, path, keyPath);
-  const type = raw.type === undefined
-    ? "stdio"
-    : expectString(raw.type, path, joinKeyPath(keyPath, "type"));
+  const type =
+    raw.type === undefined
+      ? undefined
+      : expectString(raw.type, path, joinKeyPath(keyPath, "type"));
 
-  if (type === "stdio") {
-    rejectUnknownKeys(raw, MCP_STDIO_KEYS, path, keyPath, true);
+  if (type === undefined || type === "stdio") {
+    rejectUnknownKeys(raw, MCP_STDIO_KEYS, path, keyPath);
     const command = expectString(
       raw.command,
       path,
@@ -586,6 +629,7 @@ function parseMcpServer(
         : expectStringRecord(raw.env, path, joinKeyPath(keyPath, "env"));
     const disabled = readOptionalBoolean(raw, "disabled", path, keyPath);
     return {
+      ...(type === undefined ? {} : { type }),
       command,
       ...(args === undefined ? {} : { args }),
       ...(env === undefined ? {} : { env }),
@@ -594,7 +638,7 @@ function parseMcpServer(
   }
 
   if (type === "http" || type === "sse") {
-    rejectUnknownKeys(raw, MCP_REMOTE_KEYS, path, keyPath, true);
+    rejectUnknownKeys(raw, MCP_REMOTE_KEYS, path, keyPath);
     const url = expectString(raw.url, path, joinKeyPath(keyPath, "url"));
     if (!HTTP_URL.test(url)) {
       throw new InvalidSettingsError(
@@ -641,7 +685,7 @@ function parseHookCommand(
   keyPath: string,
 ): HookCommandSettings {
   const raw = expectObject(value, path, keyPath);
-  rejectUnknownKeys(raw, HOOK_COMMAND_KEYS, path, keyPath, true);
+  rejectUnknownKeys(raw, HOOK_COMMAND_KEYS, path, keyPath);
   const type = expectString(raw.type, path, joinKeyPath(keyPath, "type"));
   if (type !== "command") {
     throw new InvalidSettingsError(
@@ -655,10 +699,7 @@ function parseHookCommand(
     path,
     joinKeyPath(keyPath, "command"),
   );
-  const timeout =
-    raw.timeout === undefined
-      ? undefined
-      : expectInteger(raw.timeout, path, joinKeyPath(keyPath, "timeout"), 1);
+  const timeout = readOptionalInteger(raw, "timeout", path, keyPath, 1);
   const preserveRiskLevel = readOptionalBoolean(
     raw,
     "preserveRiskLevel",
@@ -679,25 +720,22 @@ function parseHookConfig(
   keyPath: string,
 ): HookConfigSettings {
   const raw = expectObject(value, path, keyPath);
-  rejectUnknownKeys(raw, HOOK_KEYS, path, keyPath, true);
+  rejectUnknownKeys(raw, HOOK_KEYS, path, keyPath);
   const matcher = readOptionalString(raw, "matcher", path, keyPath);
   const commandRegex = readOptionalString(raw, "commandRegex", path, keyPath);
-  if (raw.hooks === undefined) {
-    throw new InvalidSettingsError(
-      path,
-      joinKeyPath(keyPath, "hooks"),
-      "expected an array of hook commands",
-    );
-  }
   if (!Array.isArray(raw.hooks)) {
     throw new InvalidSettingsError(
       path,
       joinKeyPath(keyPath, "hooks"),
-      `expected an array, got ${typeName(raw.hooks)}`,
+      `expected an array of hook commands, got ${typeName(raw.hooks)}`,
     );
   }
   const hooks = raw.hooks.map((entry, index) =>
-    parseHookCommand(entry, path, joinKeyPath(joinKeyPath(keyPath, "hooks"), index)),
+    parseHookCommand(
+      entry,
+      path,
+      joinKeyPath(joinKeyPath(keyPath, "hooks"), index),
+    ),
   );
   return {
     ...(matcher === undefined ? {} : { matcher }),
@@ -708,10 +746,10 @@ function parseHookConfig(
 
 function parseHooksSection(value: unknown, path: string): HooksSettings {
   const raw = expectObject(value, path, "hooks");
-  rejectUnknownKeys(raw, HOOK_SECTION_KEYS, path, "hooks", true);
+  rejectUnknownKeys(raw, HOOK_SECTION_KEYS, path, "hooks");
 
-  const result: Record<string, unknown> = {};
-  for (const event of HOOK_EVENTS) {
+  const events: { [Event in HookEvent]?: readonly HookConfigSettings[] } = {};
+  for (const event of HOOK_EVENT_NAMES) {
     const entry = raw[event];
     if (entry === undefined) continue;
     if (!Array.isArray(entry)) {
@@ -721,7 +759,7 @@ function parseHooksSection(value: unknown, path: string): HooksSettings {
         `expected an array, got ${typeName(entry)}`,
       );
     }
-    result[event] = entry.map((config, index) =>
+    events[event] = entry.map((config, index) =>
       parseHookConfig(
         config,
         path,
@@ -737,10 +775,10 @@ function parseHooksSection(value: unknown, path: string): HooksSettings {
     "hooks",
   );
   return {
-    ...result,
+    ...events,
     ...(hooksDisabled === undefined ? {} : { hooksDisabled }),
     ...(showHookOutput === undefined ? {} : { showHookOutput }),
-  } as HooksSettings;
+  };
 }
 
 function parseOpaqueObjectSection(
@@ -770,9 +808,11 @@ export function parseSettingsDocument(raw: unknown, source: string): Settings {
       'general settings belong at the root of the document; the "general" wrapper is not supported',
     );
   }
-  rejectUnknownKeys(root, SETTINGS_KEYS, source, "", true);
+  rejectUnknownKeys(root, SETTINGS_KEYS, source, "");
 
-  const hasGeneral = Object.keys(root).some((key) => GENERAL_KEYS.has(key));
+  const hasGeneral = Object.keys(root).some(
+    (key) => GENERAL_KEYS[key] === true,
+  );
   const general = hasGeneral ? parseGeneral(root, source) : undefined;
   const mcp =
     root.mcp === undefined ? undefined : parseMcpSection(root.mcp, source);
@@ -807,7 +847,7 @@ export function parseSettingsDocument(raw: unknown, source: string): Settings {
 }
 
 /**
- * Parse the text of a settings file. JSONC is accepted: `//` and `/* *\/`
+ * Parse the text of a settings file. JSONC is accepted: `//` and block
  * comments and trailing commas are removed with their character positions
  * preserved, so a JSON syntax error still points at the right offset.
  */

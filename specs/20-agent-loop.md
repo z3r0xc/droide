@@ -39,26 +39,26 @@ where it changes the parent loop's outcome.
   the tool batch and the resulting tool-result message.
 - **Transcript** — the persisted, ordered `FactoryDroidMessage` list.
 - **Reminder** — CLI-authored text wrapped in `<system-reminder>` …
-  `</system-reminder>` (`packages/droid-sdk-core/src/protocol/droid/constants.ts:24-25`),
+  `</system-reminder>` (`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/droid/constants.ts:24-25`),
   delivered either as a `user`-role message with `visibility: "llm_only"` or
   appended to the user's own message.
 - **Context row** — the per-prompt LLM-only message carrying environment,
   instructions and turn reminders (id prefix `context-`).
 - **Tool call id** — `call_<8-byte blake2b of assistant message id, hex>_<slot>`
-  (`packages/droid-sdk-core/src/protocol/sessionV2/messages/toolCalls.ts:73-76`).
+  (`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/toolCalls.ts:73-76`).
 - **Batch** — the tool calls from one assistant message, executed together.
 - **Segment** — a maximal run of calls that may run concurrently, or a single
   call that must run alone (`segmentToolUsesForExecution`).
 - **Auto Model / router** — session model `auto` or `auto-fast`, resolved to a
   concrete model before dispatch (`ModelID` routers,
-  `packages/droid-sdk-core/src/protocol/llm/enums.ts:7-30`,
-  `packages/droid-sdk-core/src/protocol/llm/enums.ts:118-121`).
+  `evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/llm/enums.ts:7-30`,
+  `evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/llm/enums.ts:118-121`).
 - **Spec mode / plan mode** — `DroidInteractionMode.Spec`, entered by
   `--use-spec`; read-only until `ExitSpecMode` is approved.
 - **Compaction** — replacing the pre-summary transcript with a summary message
   at request time; triggered by a token threshold or a context-limit error.
 - **Pin** — the block tagged `prompt-cache-pin` that anchors the cached prefix
-  (`packages/droid-core/src/llms/client/constants.ts:71`).
+  (`evidence/original/windows-x64/packages/droid-core/src/llms/client/constants.ts:71`).
 
 ## Observable behaviour
 
@@ -67,8 +67,8 @@ where it changes the parent loop's outcome.
 **B1 — Interactive entry.** With no verb, `droid` runs the TUI default command;
 the process entrypoint delegates to the command router, which loads the TUI
 entrypoint lazily. A prompt may be supplied positionally.
-`src/index.ts:1-3`, `src/index.ts:199-207`, `src/cli.ts:31-40`,
-`src/cli.ts:477`.
+`evidence/original/windows-x64/src/index.ts:1-3`, `evidence/original/windows-x64/src/index.ts:199-207`, `evidence/original/windows-x64/src/cli.ts:31-40`,
+`evidence/original/windows-x64/src/cli.ts:477`.
 
 **B2 — Startup overrides are applied after resume/load.** `--use-spec` sets
 `DroidInteractionMode.Spec`; otherwise `--auto <level>` sets
@@ -76,24 +76,24 @@ entrypoint lazily. A prompt may be supplied positionally.
 so resuming a Spec session with only `--auto` does not persist a transient
 mode. `--auto` accepts only `low`, `medium`, `high`; anything else is rejected
 with `Invalid --auto value. Allowed values: low, medium, high.` on stderr and
-exit code 1. `src/entrypoints/tui/run.ts:772-789`,
-`src/entrypoints/tui/autonomyFlag.ts:5-19`, `src/entrypoints/tui/options.ts:47`.
+exit code 1. `evidence/original/windows-x64/src/entrypoints/tui/run.ts:772-789`,
+`evidence/original/windows-x64/src/entrypoints/tui/autonomyFlag.ts:5-19`, `evidence/original/windows-x64/src/entrypoints/tui/options.ts:47`.
 
 **B3 — One turn at a time.** A second `runAgentInternal` while one is running
 is refused (`Concurrent runAgent invocation prevented`) and returns `false`
-without touching the transcript. `src/core/AgentLoop.ts:3336-3348`.
+without touching the transcript. `evidence/original/windows-x64/src/core/AgentLoop.ts:3336-3348`.
 
 **B4 — Turn-start rows are written in view order.** Hook context rows, the
 context row (`llm_only`), an open-file reminder, then the user message are
 appended in that order; a failure stops at the failing row, keeping exactly
-the rows already appended. `src/core/AgentLoop.ts:5104-5108`,
-`src/core/AgentLoop.ts:5240-5282`.
+the rows already appended. `evidence/original/windows-x64/src/core/AgentLoop.ts:5104-5108`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:5240-5282`.
 
 **B5 — A turn ends with one reason.** Completion is reported as one
 `AgentTurnCompletionReason` (`completed`, `cancelled`, `permission_rejected`,
 `error`, `model_authentication_failed`, …),
-`packages/droid-sdk-core/src/protocol/droid/enums.ts:264-292`. A stop request
-also ends the turn as `cancelled` (`src/core/AgentLoop.ts:2062-2082`).
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/droid/enums.ts:264-292`. A stop request
+also ends the turn as `cancelled` (`evidence/original/windows-x64/src/core/AgentLoop.ts:2062-2082`).
 
 ### Message model
 
@@ -101,8 +101,8 @@ also ends the turn as `cancelled` (`src/core/AgentLoop.ts:2062-2082`).
 `{id, role, content[], createdAt, updatedAt, parentId?, seq?, visibility?,
 userMessageSource?, sender?, author?, interactionMode?, …}` with roles
 `user | assistant | tool | system`. `role` is required; `createdAt` and
-`updatedAt` are Unix ms. `packages/droid-sdk-core/src/protocol/sessionV2/messages/enums.ts:13-18`,
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:283-330`.
+`updatedAt` are Unix ms. `evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/enums.ts:13-18`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:283-330`.
 
 **B7 — Content blocks.** `content` is an array of discriminated blocks:
 `text {text}`, `image {source:{type:"base64",mediaType,data}, generated?}`,
@@ -110,25 +110,25 @@ userMessageSource?, sender?, author?, interactionMode?, …}` with roles
 progressUpdate?}`, `redacted_thinking {data}`, `tool_use {id, name, input}`,
 `tool_result {toolUseId, content?, isError?, modelContent?, respondedBy?}`,
 `document {source}`. All but `tool_use` also accept an optional `id`.
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/enums.ts:20-29`,
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:33-115`,
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:214-247`.
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/enums.ts:20-29`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:33-115`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:214-247`.
 
 **B8 — Tool-result content domain.** A `tool_result`'s `content` is a string
 or an array of `text | image | document` blocks. `isError` marks failure; the
 `content` is what a transcript shows, and `modelContent`, when present, is the
-text the model reads instead. `packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:148-160`,
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:214-235`.
+text the model reads instead. `evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:148-160`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:214-235`.
 
 **B9 — Deterministic tool-call ids.** The id is derived from the assistant
 message id and the block slot, so a replayed stream re-derives the same ids.
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/toolCalls.ts:73-76`,
-`packages/droid-core/src/llms/client/chunk-processing.ts:790-800`.
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/toolCalls.ts:73-76`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/chunk-processing.ts:790-800`.
 
 **B10 — Visibility.** `both` (`null`), `llm_only`, `user_only`. A `user_only`
 message is never sent to a provider; an `llm_only` message is never shown in
-the user transcript. `packages/droid-sdk-core/src/protocol/sessionV2/messages/enums.ts:1-5`,
-`packages/utils/src/messages/visibility.ts:234-249`.
+the user transcript. `evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/enums.ts:1-5`,
+`evidence/original/windows-x64/packages/utils/src/messages/visibility.ts:234-249`.
 
 **B11 — Images and documents.** Images are base64 with media type
 `image/jpeg | image/png | image/gif | image/webp`; documents are base64 PDF
@@ -136,24 +136,24 @@ the user transcript. `packages/droid-sdk-core/src/protocol/sessionV2/messages/en
 (`text/plain`). At most the 10 most recent images and 5 most recent PDFs stay
 in a request; older media is dropped from the request and the model is warned
 by the media-limit reminder.
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:43-60`,
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:127-160`,
-`packages/droid-core/src/llms/client/image-limits.ts:16-17`,
-`packages/droid-core/src/llms/client/image-limits.ts:151`.
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:43-60`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:127-160`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/image-limits.ts:16-17`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/image-limits.ts:151`.
 
 **B12 — User content assembly.** Attached images are emitted first, then the
 attached-image path reminder (when paths are known), then the text blocks; a
 caller-supplied `content` array replaces the text/images path. Extra content
-blocks are appended after. `src/core/userMessageInjection.ts:120-169`,
-`src/core/AgentLoop.ts:1172-1195`.
+blocks are appended after. `evidence/original/windows-x64/src/core/userMessageInjection.ts:120-169`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:1172-1195`.
 
 **B13 — Assistant turn attribution is persisted.** An assistant message
 records `modelId` (the model that actually served it), `apiProvider`,
 `reasoningEffort`, router id and reason when the slot was a router, plus
 provider replay metadata (`openaiMessageId`, `openaiPhase`,
 `openaiEncryptedContent`, `thinking.signature`, `geminiNativeContent`).
-`src/core/AgentLoop.ts:7400-7480`,
-`packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:300-380`.
+`evidence/original/windows-x64/src/core/AgentLoop.ts:7400-7480`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:300-380`.
 
 ### Request assembly
 
@@ -163,9 +163,9 @@ first system block's text is exactly
 managed proxy rejects a request whose extracted system prompt does not start
 with it. The last block of the prompt proper carries a one-hour
 `cache_control`, and session-identity text follows the breakpoint so it stays
-outside the shared prefix. `src/hooks/buildSystemMessageBlocks.ts:124-152`,
-`packages/common/src/cli/constants.ts:1-2`,
-`src/hooks/buildSystemMessageBlocks.ts:300-311`.
+outside the shared prefix. `evidence/original/windows-x64/src/hooks/buildSystemMessageBlocks.ts:124-152`,
+`evidence/original/windows-x64/packages/common/src/cli/constants.ts:1-2`,
+`evidence/original/windows-x64/src/hooks/buildSystemMessageBlocks.ts:300-311`.
 
 **B15 — System block order.** After the prefix: base system prompt (with
 model-specific prose guidance substituted when the model asks for it), then
@@ -174,8 +174,8 @@ TodoWrite guidance (only when the TodoWrite tool is offered) and optional
 batched-todo guidance, service-account connector guidance, per-model
 reminders (no-comments, parallel calls, autonomy, Gemini risk/tool/spec
 nudges), Script-only override, output style, then session identity.
-`src/hooks/buildSystemMessageBlocks.ts:154-311`,
-`src/hooks/systemPrompt.ts:84-90`.
+`evidence/original/windows-x64/src/hooks/buildSystemMessageBlocks.ts:154-311`,
+`evidence/original/windows-x64/src/hooks/systemPrompt.ts:84-90`.
 
 **B16 — History preparation.** Before a request the loop drops empty text
 blocks, drops assistant turns with no usable text/tool use (image-only turns
@@ -185,7 +185,7 @@ applies image/PDF caps, strips pre-existing `cache_control`, then applies
 cache breakpoints: a pin on the session-start context block, the same
 message's last cacheable block, and the final message's last cacheable block
 (three conversation breakpoints; the system prompt owns the fourth).
-`packages/droid-core/src/llms/client/message-preparation.ts:914-1080`.
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/message-preparation.ts:914-1080`.
 
 **B17 — Request payload.** The internal request is `{model, max_tokens,
 messages, tools, system[], tool_choice?}`; `max_tokens` is capped by the
@@ -193,22 +193,22 @@ model's output capability and reasoning budget. Anthropic-family transports
 receive these fields (plus `thinking` when enabled and provider betas);
 OpenAI Chat Completions receives each `tool_result` as a `role:"tool"` message
 with `tool_call_id` before any user text from the same message, and each
-`tool_use` as an assistant `tool_calls` entry. `packages/droid-core/src/llms/client/sendMessage.ts:2673-2685`,
-`packages/droid-core/src/llms/client/sendMessage.ts:2804-2826`,
-`packages/droid-core/src/llms/client/converters.ts:1393-1490`.
+`tool_use` as an assistant `tool_calls` entry. `evidence/original/windows-x64/packages/droid-core/src/llms/client/sendMessage.ts:2673-2685`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/sendMessage.ts:2804-2826`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/converters.ts:1393-1490`.
 
 **B18 — Tool descriptors.** The request's `tools` are `{name, description,
 input_schema}` descriptors whose names are provider-safe (≤64 characters);
 MCP tools are validated against the identity advertised for the turn.
-`packages/droid-core/src/llms/client/constants.ts:85`,
-`src/core/AgentLoop.ts:6586-6600`, `src/agent/tools.ts:1500-1530`.
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/constants.ts:85`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:6586-6600`, `evidence/original/windows-x64/src/agent/tools.ts:1500-1530`.
 
 **B19 — Request-only rows.** The compaction summary and re-attached stable
 reminders exist only in the assembled request, never in the transcript; they
 are appended after the cached history so a retry keeps the same prefix.
-`src/agent/requestAssembly.ts:581-627`,
-`src/core/AgentLoop.ts:6520-6540`,
-`src/hooks/compaction/CompactionManager.ts:425-450`.
+`evidence/original/windows-x64/src/agent/requestAssembly.ts:581-627`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:6520-6540`,
+`evidence/original/windows-x64/src/hooks/compaction/CompactionManager.ts:425-450`.
 
 ### Streaming
 
@@ -219,7 +219,7 @@ are appended after the cached history so a retry keeps the same prefix.
 `onStreamingComplete(result, wasAborted?)`; a provider failure calls
 `onStreamingError` and rejects. Each provider *attempt* is bracketed by
 `beginProviderRequestAttempt` / `onProviderRequestAttemptComplete`.
-`src/agent/messaging.ts:264-300`, `src/agent/messaging.ts:385-560`.
+`evidence/original/windows-x64/src/agent/messaging.ts:264-300`, `evidence/original/windows-x64/src/agent/messaging.ts:385-560`.
 
 **B21 — Anthropic chunk mapping.** `message_start` records input, cache-read
 and cache-creation tokens; `content_block_start` opens a text/thinking/
@@ -227,22 +227,22 @@ redacted-thinking/tool_use block (tool_use gets its deterministic id and is
 announced immediately); `content_block_delta` applies `text_delta`,
 `thinking_delta`, `signature_delta`, `input_json_delta`; `message_delta`
 carries `stop_reason`; `message_stop` finalises usage.
-`packages/droid-core/src/llms/client/chunk-processing.ts:735-900`.
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/chunk-processing.ts:735-900`.
 
 **B22 — Partial tool input.** Each delta is parsed optimistically so the UI
 can show growing arguments; execution never uses the partial parse — the
 complete buffer is parsed once with `parseToolInputJson`, whose failure marks
 the call `inputParseFailed`. Tool-call progress notifications are throttled to
 at most one per 100 ms per call (trailing edge), so the last accumulated input
-always ships. `packages/droid-core/src/llms/client/tool-input-stream.ts:1-6`,
-`packages/droid-core/src/llms/client/chunk-processing.ts:320-340`,
-`src/agent/messaging.ts:180-240`.
+always ships. `evidence/original/windows-x64/packages/droid-core/src/llms/client/tool-input-stream.ts:1-6`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/chunk-processing.ts:320-340`,
+`evidence/original/windows-x64/src/agent/messaging.ts:180-240`.
 
 **B23 — A retry discards the partial attempt.** When a send retries within the
 same request, the in-flight assistant message is retracted (event
 `assistant-message-retracted`), unfinished tool invocations are cleared, and
 the retry reopens the same message id so deltas stay attributable.
-`src/agent/messaging.ts:264-296`.
+`evidence/original/windows-x64/src/agent/messaging.ts:264-296`.
 
 **B24 — Emitted event names.** Text: `assistant-text-delta`,
 `thinking-text-delta`, `text-block-complete`, `thinking-block-complete`.
@@ -251,38 +251,38 @@ Tools: `tool-call-start`, `tool-call-progress`, `tool-input-complete`,
 Messages: `message-created`, `user-message`, `assistant-message`,
 `tool-message`. Lifecycle: `streaming-start`, `streaming-complete`,
 `agent-turn-completed`, `agent-error`, `llm-retry-scheduled`,
-`cancellation-requested`. `src/events/AgentEventBus.ts:33-100`,
-`src/agent/messaging.ts:330-560`.
+`cancellation-requested`. `evidence/original/windows-x64/src/events/AgentEventBus.ts:33-100`,
+`evidence/original/windows-x64/src/agent/messaging.ts:330-560`.
 
 **B25 — An empty reply is an error, not an answer.** A stream with no visible
 content, no tool call and no model-generated image raises
 `LLMEmptyResponseError`; the loop does not persist an empty assistant message
 and the turn ends with an error (or a retry per B56). Redacted thinking alone
-does not count as output. `src/core/AgentLoop.ts:7480-7520`,
-`packages/droid-core/src/llms/client/chunk-processing.ts:408-426`.
+does not count as output. `evidence/original/windows-x64/src/core/AgentLoop.ts:7480-7520`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/chunk-processing.ts:408-426`.
 
 **B26 — Token accounting.** Per-send usage is the provider's `inputTokens`,
 `outputTokens`, cache-read and cache-creation counts; thinking tokens are
 estimated from delta length at 4 characters per token. The compaction figure
 is `inputTokens + outputTokens + cacheReadTokens` (prompt-cache writes still
-occupy the context). `packages/droid-core/src/llms/client/sendMessage.ts:6201-6225`,
-`packages/droid-core/src/llms/client/chunk-processing.ts:860-880`,
-`src/utils/contextUsage.ts:21-25`.
+occupy the context). `evidence/original/windows-x64/packages/droid-core/src/llms/client/sendMessage.ts:6201-6225`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/chunk-processing.ts:860-880`,
+`evidence/original/windows-x64/src/utils/contextUsage.ts:21-25`.
 
 ### Tool-call cycle
 
 **B27 — Batch execution answers in request order.** Results are returned in
 the order the tool calls appeared, whatever order segments executed in; each
 call settles exactly once (the first result is the result) and the batch
-produces a single `role:"tool"` message. `src/core/ToolExecutor.ts:2840-2900`,
-`src/core/ToolExecutor.ts:1486-1530`,
-`src/core/AgentLoop.ts:2817-2870`.
+produces a single `role:"tool"` message. `evidence/original/windows-x64/src/core/ToolExecutor.ts:2840-2900`,
+`evidence/original/windows-x64/src/core/ToolExecutor.ts:1486-1530`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:2817-2870`.
 
 **B28 — Admission.** Before any hook, validation or confirmation, the call's
 `llmId` is resolved to one registered tool the session can run. An unknown
 name, a tool the session or exec selection forbids, or an unregistered
 executor is refused with a `MetaError` naming that condition; no hook sees the
-call. `src/agent/tools.ts:1428-1500`, `src/agent/tools.ts:1500-1556`.
+call. `evidence/original/windows-x64/src/agent/tools.ts:1428-1500`, `evidence/original/windows-x64/src/agent/tools.ts:1500-1556`.
 
 **B29 — Input validation gate.** For native tools with a Zod schema, input is
 validated as a gate (the executor receives exactly what confirmation saw).
@@ -291,9 +291,9 @@ themselves. A failure is denied with `Invalid <tool> input: <field: message>;
 received keys: …` (≤10 keys, each JSON-encoded and truncated to 64 code
 points). A hook-rewritten invalid input uses the separate
 `The call was not run: a PreToolUse hook rewrote its input into an invalid
-shape` wording. `src/agent/toolInputValidation.ts:68-180`,
-`src/agent/toolInputValidation.ts:183-205`,
-`src/constants/constants.ts:44-52`.
+shape` wording. `evidence/original/windows-x64/src/agent/toolInputValidation.ts:68-180`,
+`evidence/original/windows-x64/src/agent/toolInputValidation.ts:183-205`,
+`evidence/original/windows-x64/src/constants/constants.ts:44-52`.
 
 **B30 — Pre-flight order.** PreToolUse hooks run first and win in this order:
 `continue:false` stops the turn; exit code 3 aborts the agent; a
@@ -301,8 +301,8 @@ shape` wording. `src/agent/toolInputValidation.ts:68-180`,
 `updatedInput`), `deny` refuses. Then input-shape validation, the Execute
 blocklist, Execute's required risk parameters, spec-mode policy, sandbox
 violation detection, and confirmation.
-`src/agent/tools.ts:1725-1830`, `src/agent/tools.ts:1620-1675`,
-`src/agent/tools.ts:1999-2035`.
+`evidence/original/windows-x64/src/agent/tools.ts:1725-1830`, `evidence/original/windows-x64/src/agent/tools.ts:1620-1675`,
+`evidence/original/windows-x64/src/agent/tools.ts:1999-2035`.
 
 **B31 — Confirmation decision.** Confirmations are skipped entirely when the
 session skips them. `Read` and `LS` never confirm. `Create`/`Edit` confirm
@@ -311,15 +311,15 @@ skip-all → command policy (`block` hard-denies with the policy message,
 `allow` runs, `ask` prompts as high impact) → rolled-in read-only search
 (allowed) → the call's `riskLevel` compared with the session autonomy level
 (missing/invalid risk counts as high). `ExitSpecMode` confirms only in
-interactive mode. `src/agent/shouldConfirmExecution.ts:820-950`,
-`src/agent/autonomy.ts:120-190`.
+interactive mode. `evidence/original/windows-x64/src/agent/shouldConfirmExecution.ts:820-950`,
+`evidence/original/windows-x64/src/agent/autonomy.ts:120-190`.
 
 **B32 — Permission prompting.** One prompt covers a segment's confirmation
 candidates and carries `{toolUses[], options[], requestId}`; the answer
 returns approved tool ids plus an outcome. The request aborts when the batch
 aborts (`ToolAbortError`).
-`src/agent/PermissionRequestHandler.ts:59-118`,
-`src/core/ToolExecutor.ts:780-900`.
+`evidence/original/windows-x64/src/agent/PermissionRequestHandler.ts:59-118`,
+`evidence/original/windows-x64/src/core/ToolExecutor.ts:780-900`.
 
 **B33 — Permission outcome semantics.** `cancel` approves nothing.
 `proceed_once` approves the returned subset (or all when absent).
@@ -329,16 +329,16 @@ autonomy to the level the batch requires (except sandbox-only prompts).
 grants. `proceed_auto_run_*` set the interaction mode. New-session outcomes
 approve all and end the turn with a spec handoff. `proceed_edit` approves all
 and leaves spec mode for editing.
-`src/agent/tool-confirmation.ts:609-700`,
-`packages/droid-sdk-core/src/protocol/droid/enums.ts:2-24`.
+`evidence/original/windows-x64/src/agent/tool-confirmation.ts:609-700`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/droid/enums.ts:2-24`.
 
 **B34 — Execution concurrency.** Each batch is segmented: `Create`, `Edit`,
 `ApplyPatch` are sequential barriers, and `Execute` is a barrier unless it is
 a recognised read-only search with search tools rolled into Execute; every
 other call may run concurrently with its neighbours. Segments run in order;
 within a segment, parallel calls settle as each finishes.
-`src/hooks/segmentToolUsesByConcurrency.ts:70-108`,
-`src/core/ToolExecutor.ts:2490-2510`.
+`evidence/original/windows-x64/src/hooks/segmentToolUsesByConcurrency.ts:70-108`,
+`evidence/original/windows-x64/src/core/ToolExecutor.ts:2490-2510`.
 
 **B35 — Tool result shape and error envelope.** A successful result stores the
 tool's content (and `modelContent` when the model's text differs). A failed
@@ -346,9 +346,9 @@ result stores content prefixed `Error: ` and `isError: true`. A call whose
 arguments never parsed is stored as
 `Tool call rejected: arguments were not a valid JSON object. Re-send the call
 with complete, valid JSON arguments.` with `isError: true`.
-`src/core/ToolExecutor.ts:1336-1420`,
-`packages/utils/src/messages/contentBlocks.ts:264-268`,
-`src/constants/constants.ts:44-46`.
+`evidence/original/windows-x64/src/core/ToolExecutor.ts:1336-1420`,
+`evidence/original/windows-x64/packages/utils/src/messages/contentBlocks.ts:264-268`,
+`evidence/original/windows-x64/src/constants/constants.ts:44-46`.
 
 **B36 — Truncation and large output.** Every model-facing result crosses a
 byte budget: 32 KiB by default, 64 KiB for tools whose tier declares it (Read,
@@ -357,9 +357,9 @@ secrets once and keeps its head and tail around one notice naming the whole
 output (a tool-provided pointer, else a written tool-output artifact). Read
 additionally caps line selection (default 2400 lines) and reports
 `[Showing lines A-B of N total lines]`.
-`packages/droid-core/src/tools/utils/constants.ts:32-56`,
-`packages/droid-core/src/tools/utils/large-output.ts:505-560`,
-`src/utils/truncate.ts:19-64`.
+`evidence/original/windows-x64/packages/droid-core/src/tools/utils/constants.ts:32-56`,
+`evidence/original/windows-x64/packages/droid-core/src/tools/utils/large-output.ts:505-560`,
+`evidence/original/windows-x64/src/utils/truncate.ts:19-64`.
 
 **B37 — A denied call yields a cancellation result, not an exception.** A call
 that is not approved settles with `Tool execution cancelled by user` (short
@@ -368,30 +368,30 @@ appended when the permission request itself failed); under spec mode a
 restricted tool settles with
 `Tool cancelled: Spec mode is active - file edits and other state mutations
 are not allowed until the spec is approved`; a rejected `ExitSpecMode`
-settles with its rejection text. `src/core/ToolExecutor.ts:1600-1660`,
-`src/constants/constants.ts:12-20`.
+settles with its rejection text. `evidence/original/windows-x64/src/core/ToolExecutor.ts:1600-1660`,
+`evidence/original/windows-x64/src/constants/constants.ts:12-20`.
 
 **B38 — Rejection ends the turn only for approver-less or subagent work.** In
 an ordinary interactive turn a user rejection leaves the turn running so the
 model can adjust. A real rejection in an approver-backed subagent, or a
 no-approver session below High autonomy, ends the turn with
-`permission_rejected`. `src/core/ToolExecutor.ts:930-970`,
-`src/core/ToolExecutor.ts:2880-2890`.
+`permission_rejected`. `evidence/original/windows-x64/src/core/ToolExecutor.ts:930-970`,
+`evidence/original/windows-x64/src/core/ToolExecutor.ts:2880-2890`.
 
 **B39 — Tool cancellation.** A stop aborts the streaming request, aborts the
 batch, marks uncommitted calls cancelled, asks process/terminal owners to kill
 their children, settles every batch-owned call with `Tool execution cancelled
 by user`, settles any pending call the batch never owned, and appends
 `Request interrupted by user` to the tool results when a tool message exists.
-`src/core/AgentLoop.ts:2062-2160`,
-`packages/common/src/session/constants.ts:60-68`.
+`evidence/original/windows-x64/src/core/AgentLoop.ts:2062-2160`,
+`evidence/original/windows-x64/packages/common/src/session/constants.ts:60-68`.
 
 **B40 — Special stop tools.** `ExitSpecMode` approval can end the batch
 (`shouldStopAfterTools`); a terminal child outcome (mission/subagent control
 tools) stops the turn after its batch; the loop then returns before sending
-another request. `src/core/ToolExecutor.ts:228-235`,
-`src/core/ToolExecutor.ts:2430-2470`,
-`src/core/AgentLoop.ts:7690-7730`.
+another request. `evidence/original/windows-x64/src/core/ToolExecutor.ts:228-235`,
+`evidence/original/windows-x64/src/core/ToolExecutor.ts:2430-2470`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:7690-7730`.
 
 ### Context management
 
@@ -403,9 +403,9 @@ volatile part (current date, workspace-state snapshot). The per-request
 re-attached reminders (deferred-tool baseline, skills listing, subagent
 listing) are added by the request assembler rather than stored in the row. On the first message the last stable block is
 tagged `prompt-cache-pin`.
-`src/core/AgentLoop.ts:5104-5130`,
-`src/agent/requestAssembly.ts:362-380`,
-`src/utils/systemInfo.ts:1031-1055`.
+`evidence/original/windows-x64/src/core/AgentLoop.ts:5104-5130`,
+`evidence/original/windows-x64/src/agent/requestAssembly.ts:362-380`,
+`evidence/original/windows-x64/src/utils/systemInfo.ts:1031-1055`.
 
 **B42 — Environment block content.** The stable block renders
 `User system info (<os>)`, resources, shell hint, model name, user language,
@@ -413,16 +413,16 @@ a "Session working directory" section with the `pwd` output, environment
 commands, then `# Codebase and user instructions are shown below…`, a
 `## Project Instructions:` section and a `## Personal Global Instructions:`
 section, each rendering `% <cmd>` + output per instruction file.
-`src/utils/systemInfo.ts:938-1030`.
+`evidence/original/windows-x64/src/utils/systemInfo.ts:938-1030`.
 
 **B43 — Instruction-file discovery.** Instruction file names, in preference
 order, are `CLAUDE.md`, `Claude.md`, `AGENTS.md`, `Agents.md`, `agents.md`;
 they are read from agent-context directories in the order
 `.factory` (or the active factory dir), `.factory-dev`, `.agents`, `.agent`,
 project first and personal (`~`) second. The prompt tells the model that
-closer files take precedence. `packages/droid-core/src/core/constants.ts:5-11`,
-`src/utils/agentsMdGuidelines.ts:36-60`,
-`src/hooks/systemPrompt.ts:43-46`.
+closer files take precedence. `evidence/original/windows-x64/packages/droid-core/src/core/constants.ts:5-11`,
+`evidence/original/windows-x64/src/utils/agentsMdGuidelines.ts:36-60`,
+`evidence/original/windows-x64/src/hooks/systemPrompt.ts:43-46`.
 
 **B44 — Skills injection.** The turn's valid, model-invocable skills are
 announced in one reminder whose header is
@@ -434,10 +434,10 @@ appearing twice keeps the earlier bucket. Later discoveries arrive as
 append-only delta reminders
 (`Additional skills now available (…)`) or removals
 (`Skills no longer available (…)`); the Skill tool's description is stable.
-`src/skills/availableSkillsReminder.ts:84-100`,
-`src/skills/constants.ts:8-27`.
+`evidence/original/windows-x64/src/skills/availableSkillsReminder.ts:84-100`,
+`evidence/original/windows-x64/src/skills/constants.ts:8-27`.
 `--disable-builtin-skills` removes Factory's builtin set from the catalog
-(`src/entrypoints/tui/options.ts:50-52`).
+(`evidence/original/windows-x64/src/entrypoints/tui/options.ts:50-52`).
 
 **B45 — `--append-system-prompt`.** The value and/or file text are resolved
 once at startup: the file is read first (a read failure is a `MetaError`
@@ -445,17 +445,17 @@ once at startup: the file is read first (a read failure is a `MetaError`
 text is joined after it with a blank line. The result is inherited by spawned
 children. At request time the behavioural prompt is composed as: base
 (session system prompt or runtime override) → preset `append` → the CLI
-append text, joined with blank lines. `src/utils/appendSystemPromptArgs.ts:67-91`,
-`src/entrypoints/tui/bootstrap.ts:906-930`,
-`src/hooks/buildSystemMessageBlocks.ts:70-100`.
+append text, joined with blank lines. `evidence/original/windows-x64/src/utils/appendSystemPromptArgs.ts:67-91`,
+`evidence/original/windows-x64/src/entrypoints/tui/bootstrap.ts:906-930`,
+`evidence/original/windows-x64/src/hooks/buildSystemMessageBlocks.ts:70-100`.
 
 **B46 — Token accounting and compaction limits.** Token estimates use 4
 characters per token over a length weighted so multi-byte text is not
 under-counted (bytes, or code units + 1.5× the byte excess, whichever is
 larger). The compaction limit for a model is: mission-orchestrator budget if
 configured, else a per-model user override, else the model's default, always
-capped at the provider's maximum input tokens. `packages/utils/src/llm/token-estimation.ts:5-33`,
-`src/services/SettingsService.ts:4838-4855`.
+capped at the provider's maximum input tokens. `evidence/original/windows-x64/packages/utils/src/llm/token-estimation.ts:5-33`,
+`evidence/original/windows-x64/src/services/SettingsService.ts:4838-4855`.
 
 **B47 — Threshold compaction.** After each iteration where tools were not
 cancelled, the loop reads the last call's token figure; if it exceeds the
@@ -463,15 +463,15 @@ compaction limit it compacts before the next request. A failed threshold
 compaction does not end the turn. If compaction ran and usage is still over
 the limit, further threshold compactions are suppressed until usage drops
 below the limit, so a session cannot loop.
-`src/core/AgentLoop.ts:7743-7846`.
+`evidence/original/windows-x64/src/core/AgentLoop.ts:7743-7846`.
 
 **B48 — Context-limit recovery.** On a context-limit error the loop compacts
 (`reason: 'context_limit'`) and retries the same iteration in place; the
 recovery is attempted once, with a fallback compaction model when the session
 model cannot summarize.
-`src/core/AgentLoop.ts:775-798`, `src/core/AgentLoop.ts:5699-5710`,
-`src/core/AgentLoop.ts:7151-7165`,
-`src/hooks/compaction/CompactionManager.ts:892-900`.
+`evidence/original/windows-x64/src/core/AgentLoop.ts:775-798`, `evidence/original/windows-x64/src/core/AgentLoop.ts:5699-5710`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:7151-7165`,
+`evidence/original/windows-x64/src/hooks/compaction/CompactionManager.ts:892-900`.
 
 **B49 — Summary message shape.** The request-time replacement for summarized
 history is a `user` message with id prefix `injected-summary-`, containing
@@ -481,7 +481,7 @@ follows:" or "A previous instance of Droid has summarized …", then
 authorship note, and — as its own trailing text block — the environment block
 captured at summary time. A provider-switch serialization uses a fenced
 transcript and tells the model to keep using native tool calling.
-`src/hooks/compaction/CompactionManager.ts:436-520`.
+`evidence/original/windows-x64/src/hooks/compaction/CompactionManager.ts:436-520`.
 
 **B50 — Plan mode (`--use-spec`).** The session's interaction mode becomes
 `Spec`; `isSpecMode()` then reports true. A spec-mode reminder is persisted
@@ -491,10 +491,10 @@ tools and automation-write tools are refused (B37 wording) unless the target
 is a spec document under the workspace. `ExitSpecMode` proposes the plan; an
 approved plan switches the mode back to Auto, an edit/handoff outcome ends the
 batch, and a rejected one returns the rejection text.
-`src/entrypoints/tui/run.ts:782-786`,
-`src/services/SessionService.ts:4495-4497`,
-`src/core/specModeReminder.ts:25-70`,
-`src/agent/tools.ts:1999-2035`.
+`evidence/original/windows-x64/src/entrypoints/tui/run.ts:782-786`,
+`evidence/original/windows-x64/src/services/SessionService.ts:4495-4497`,
+`evidence/original/windows-x64/src/core/specModeReminder.ts:25-70`,
+`evidence/original/windows-x64/src/agent/tools.ts:1999-2035`.
 
 ### Model catalogue and selection
 
@@ -503,32 +503,32 @@ batch, and a rejected one returns the rejection text.
 overrides), `reasoningEffort {supported[], default}`, tier, `availableInCLI`,
 context limits, optional `thinking` config, pricing/cost multiplier and
 `matchPatterns` used for name resolution. Router ids are `auto` and
-`auto-fast`. `packages/utils/src/llm/model-registry.ts:561-700`,
-`packages/droid-sdk-core/src/protocol/llm/enums.ts:7-30`,
-`packages/droid-sdk-core/src/protocol/llm/enums.ts:128-145`.
+`auto-fast`. `evidence/original/windows-x64/packages/utils/src/llm/model-registry.ts:561-700`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/llm/enums.ts:7-30`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/llm/enums.ts:128-145`.
 
 **B52 — Default and availability.** The available set is built from registry
 entries filtered by feature flag, deployment/region policy and BYOK settings,
 plus `custom:<name>-<index>` entries. The default is the highest-ranked
 available candidate from a fixed default list, else a fixed fallback.
-`src/models/availability.ts:33-46`,
-`packages/utils/src/llm/index.ts:696-712`.
+`evidence/original/windows-x64/src/models/availability.ts:33-46`,
+`evidence/original/windows-x64/packages/utils/src/llm/index.ts:696-712`.
 
 **B53 — Selection, switching and the spec slot.** A session keeps a main model
 slot and an optional spec-mode slot; reads for dispatch resolve the active
 slot and, for a router slot, its concrete pick. A model change mid-session
 does not rewrite history; instead the next request carries a
 `Model:` reminder when the visible name changed.
-`src/services/SessionService.ts:4717-4765`,
-`src/utils/systemInfo.ts:1073-1112`.
+`evidence/original/windows-x64/src/services/SessionService.ts:4717-4765`,
+`evidence/original/windows-x64/src/utils/systemInfo.ts:1073-1112`.
 
 **B54 — Reasoning levels.** A turn sends a `ReasoningEffort`
 (`none|dynamic|off|minimal|low|medium|high|xhigh|max`) that the model supports;
 effort is clamped to the model's supported set, and a provider-coerced effort
 is written back to the session unless the effort was deliberately lowered for
 this turn.
-`packages/droid-sdk-core/src/protocol/llm/enums.ts:128-140`,
-`src/core/AgentLoop.ts:6690-6745`.
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/llm/enums.ts:128-140`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:6690-6745`.
 
 ### Reliability
 
@@ -539,11 +539,11 @@ default is 4 attempts, non-interactive 5, `no_retry` 1. Attempts use
 exponential backoff (`delay × factor^attempt`) with jitter: base 1000 ms
 (interactive) / 2000 ms (non-interactive), factor 2 / 2.5. Interactive
 throttling extends to 6 attempts; a single provider with no rotation extends
-capacity errors to 10. `src/core/AgentLoop.ts:1438-1443`,
-`packages/droid-core/src/llms/client/retryPolicy/index.ts:20-60`,
-`packages/droid-core/src/llms/client/retryPolicy/index.ts:186-203`,
-`packages/droid-core/src/llms/client/sendMessage.ts:2302-2328`,
-`packages/daemon-sdk/src/retry.ts:15-42`.
+capacity errors to 10. `evidence/original/windows-x64/src/core/AgentLoop.ts:1438-1443`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/retryPolicy/index.ts:20-60`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/retryPolicy/index.ts:186-203`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/sendMessage.ts:2302-2328`,
+`evidence/original/windows-x64/packages/daemon-sdk/src/retry.ts:15-42`.
 
 **B56 — Retry delays.** Throttling (429) waits max(5 s, backoff) capped at
 30 s, preferring server `retry-after-ms`/`retry-after` (numeric seconds or an
@@ -552,19 +552,19 @@ Provider capacity (500/502/503/529) waits 500 ms–1 s when another provider is
 eligible, else throttling-style backoff. Timeouts wait
 `3000 ms × 1.5^(attempt-1)` plus ≤1 s jitter, capped at 15 s. Other errors
 jitter within [50 %, 100 %] of the backoff. Every wait is capped below the
-32-bit timer limit. `packages/droid-core/src/llms/client/retryPolicy/index.ts:45-175`.
+32-bit timer limit. `evidence/original/windows-x64/packages/droid-core/src/llms/client/retryPolicy/index.ts:45-175`.
 
 **B57 — Retry observability.** Every retryable failure that will be retried
 emits `llm-retry-scheduled` with `{sessionId, attempt, reason}` where reason is
 `overloaded | rate_limited | timeout | network | empty_response | unknown`;
-aborts do not emit. `src/services/llmStreamingPlatform.ts:60-112`,
-`packages/droid-sdk-core/src/protocol/droid/enums.ts:252-259`.
+aborts do not emit. `evidence/original/windows-x64/src/services/llmStreamingPlatform.ts:60-112`,
+`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/droid/enums.ts:252-259`.
 
 **B58 — Per-request timeout.** Each provider request carries an explicit
 timeout of `general.llmRequestTimeout` ms, default 600 000; the SDK's own
 retry is disabled (`maxRetries: 0`) because the loop is the single retry
-authority. `src/services/SettingsService.ts:5232-5234`,
-`packages/droid-core/src/llms/client/sendMessage.ts:1660-1672`.
+authority. `evidence/original/windows-x64/src/services/SettingsService.ts:5232-5234`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/sendMessage.ts:1660-1672`.
 
 **B59 — Mid-turn auth failure.** A managed-endpoint 401/403 ends the turn with
 `AgentTurnCompletionReason.ModelAuthenticationFailed` and persists a
@@ -573,17 +573,17 @@ user-only system message: with a configured `FACTORY_API_KEY` the
 using /login or set a valid FACTORY_API_KEY environment variable."
 (or the customer-prem login-required copy). A BYOK endpoint's raw error text is
 shown instead, because it may be any body.
-`src/core/AgentLoop.ts:8331-8400`,
-`src/core/AgentLoop.ts:8440-8458`,
-`src/commands/authHelpers.ts:52-68`,
-`src/i18n/authMessages.ts:20-45`,
-`src/utils/agentTurnCompletion.ts:99-140`.
+`evidence/original/windows-x64/src/core/AgentLoop.ts:8331-8400`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:8440-8458`,
+`evidence/original/windows-x64/src/commands/authHelpers.ts:52-68`,
+`evidence/original/windows-x64/src/i18n/authMessages.ts:20-45`,
+`evidence/original/windows-x64/src/utils/agentTurnCompletion.ts:99-140`.
 
 **B60 — Abort is not failure.** An aborted request returns the empty
 `ABORTED_RESULT` without recording a failure metric, and the turn ends as
 `cancelled`; a provider failure records a failure metric and calls
-`onStreamingError`. `packages/droid-core/src/llms/client/sendMessage.ts:6236-6252`,
-`packages/droid-core/src/llms/client/constants.ts:38-42`.
+`onStreamingError`. `evidence/original/windows-x64/packages/droid-core/src/llms/client/sendMessage.ts:6236-6252`,
+`evidence/original/windows-x64/packages/droid-core/src/llms/client/constants.ts:38-42`.
 
 ## Data & config
 
@@ -601,24 +601,24 @@ shown instead, because it may be any body.
 | tool-results model budget | protocol constant | bytes | 32768 (64 KiB tier) | absent tier → 32 KiB |
 | media caps | protocol constant | counts | 10 images / 5 PDFs | over cap → oldest evicted + placeholder |
 
-Flags and settings sources: `src/entrypoints/tui/options.ts:9-52`,
-`src/utils/appendSystemPromptArgs.ts:12-55`,
-`src/entrypoints/tui/autonomyFlag.ts:5-19`,
-`src/services/SettingsService.ts:4838-4855`,
-`src/services/SettingsService.ts:5232-5234`.
+Flags and settings sources: `evidence/original/windows-x64/src/entrypoints/tui/options.ts:9-52`,
+`evidence/original/windows-x64/src/utils/appendSystemPromptArgs.ts:12-55`,
+`evidence/original/windows-x64/src/entrypoints/tui/autonomyFlag.ts:5-19`,
+`evidence/original/windows-x64/src/services/SettingsService.ts:4838-4855`,
+`evidence/original/windows-x64/src/services/SettingsService.ts:5232-5234`.
 
 ## Errors
 
 **Argument errors (before any turn).** Bad `--auto` value → localized
 `Invalid --auto value. Allowed values: low, medium, high.`, exit 1
-(`src/entrypoints/tui/run.ts:549-556`). Missing append-prompt value or an
+(`evidence/original/windows-x64/src/entrypoints/tui/run.ts:549-556`). Missing append-prompt value or an
 unreadable append-prompt file aborts startup, not a turn
-(`src/utils/appendSystemPromptArgs.ts:16-55`, `:67-91`).
+(`evidence/original/windows-x64/src/utils/appendSystemPromptArgs.ts:16-55`, `:67-91`).
 
 **Admission errors.** Unknown tool, session-forbidden tool, unregistered
 executor: `MetaError` naming the tool; the call never reaches hooks or
 confirmation; the batch settles the other calls normally
-(`src/agent/tools.ts:1436-1500`).
+(`evidence/original/windows-x64/src/agent/tools.ts:1436-1500`).
 
 **Validation errors.** Malformed native tool input → denial as a tool result
 (B29); provider-side JSON that never parses → `inputParseFailed` and the
@@ -636,15 +636,15 @@ input into an invalid shape → the hook-specific rejection (B29).
 **Spec-mode errors.** Restricted tool → `Tool cancelled: Spec mode is active
 …` result; blank `ExitSpecMode.plan` → the "called with an empty `plan`"
 correction; rejected plan → `EXIT_SPEC_MODE_REJECTED` result plus a user-only
-system notice. `src/constants/constants.ts:12-22`,
-`src/core/ToolExecutor.ts:1635-1660`.
+system notice. `evidence/original/windows-x64/src/constants/constants.ts:12-22`,
+`evidence/original/windows-x64/src/core/ToolExecutor.ts:1635-1660`.
 
 **Provider errors.** Retryable (throttle/capacity/timeout/network/empty) are
 retried per B55–B58 and reported via `llm-retry-scheduled`. Terminal failures
 end the turn with `error` plus a user-only system message chosen by class:
 auth (B59), overloaded, content moderation, context length, request too large,
 empty response, output degeneration, network (naming the host only for a BYOK
-endpoint), timeout. `src/core/AgentLoop.ts:8400-8500`.
+endpoint), timeout. `evidence/original/windows-x64/src/core/AgentLoop.ts:8400-8500`.
 
 **Cancellation.** Abort yields `ABORTED_RESULT`, no failure metric, turn reason
 `cancelled` (B60), cancelled tool results (B39).
@@ -722,31 +722,47 @@ outcomes. Time, ids and jitter are injected.
 | B59 | `tests/agent_loop/test_auth_failure_mid_turn` | `stream_401.json` |
 | B60 | `tests/agent_loop/test_abort_result_no_failure_metric` | `stream_aborted.json` |
 
-Two tests are load-bearing for this spec's acceptance:
+Two tests are load-bearing for this spec's acceptance.
 
-- `test_stream_callback_sequence` + `test_assistant_attribution_persisted`:
-  feeding `stream_text.json` (`message_start` usage, a text block, deltas
-  `"Hello"`, `" world"`, `message_delta` `end_turn`, `message_stop`) must emit
-  `streaming-start`, one `assistant-text-delta` per delta with the same
-  `messageId` and `blockIndex 0`, `text-block-complete` and
-  `streaming-complete`; the persisted assistant message has exactly one `text`
-  block `"Hello world"`, `role: "assistant"`, the injected fixed `modelId`,
-  and the `apiProvider` the fake transport reported.
-- `test_denied_path_tool_call_feedback`: a batch of one `Edit` call in an
-  interactive session at autonomy `off`, with the permission transport
-  answering `cancel`, must produce exactly one tool result
-  `{toolUseId: <deterministic id>, content: "Error: Tool execution cancelled by user",
-  isError: true}`; no file write occurs; the turn continues (no
-  `permission_rejected`), and the next request's history ends with that tool
-  result.
+**Scripted stream → events and transcript (`test_stream_callback_sequence`,
+`test_assistant_attribution_persisted`).** `stream_text.json` is the inline
+fixture below, fed to the fake Anthropic transport in order:
+
+```
+message_start{id:"msg_1", usage:{input_tokens:12, cache_read_input_tokens:0, cache_creation_input_tokens:0}}
+content_block_start{index:0, content_block:{type:"text", text:""}} · text_delta "Hello" · text_delta " world" · content_block_stop{index:0}
+message_delta{delta:{stop_reason:"end_turn"}, usage:{output_tokens:2}} · message_stop
+```
+
+Expected event sequence (payload fields not listed are ignored):
+`streaming-start` → `assistant-text-delta{blockIndex:0,textDelta:"Hello"}` →
+`assistant-text-delta{blockIndex:0,textDelta:" world"}` →
+`text-block-complete{blockIndex:0}` → `streaming-complete`. Both deltas carry
+the same `messageId`. Expected transcript record: one assistant message,
+`role:"assistant"`, `content` = `[{"type":"text","text":"Hello world"}]`,
+`modelId` = the injected model, `apiProvider` = the fake transport's provider;
+and one tool-message-free turn ending `completed`.
+
+**Denied path → permission decision and feedback (`test_denied_path_tool_call_feedback`).**
+Input: an interactive session at autonomy `off`; one assistant message with a
+single `Edit` call `{file_path:"<tmp>/a.txt", old_str:"x", new_str:"y"}`; the
+permission transport records the request and answers
+`{outcome:"cancel", approvedToolIds:[]}`.
+Expected permission decision: exactly one `PermissionRequest` carrying that
+one tool use, then `PermissionResponse{approvedToolIds:[]}` with outcome
+`cancel`; no execution event (`tool-call-complete`) for the call; the file is
+unchanged. Expected feedback: one tool-result block
+`{"type":"tool_result","toolUseId":"<call_…_0>","content":"Error: Tool execution cancelled by user","isError":true}`;
+the turn ends `completed` (not `permission_rejected`), and the next request's
+serialized history ends with that tool result.
 
 ## Evidence
 
 | Evidence | Supports | Method |
 |---|---|---|
-| `ev_loop_entry` | B1 | read `src/index.ts:1-3,199-207`, `src/cli.ts:31-40,477` |
-| `ev_loop_flags` | B2, B45, B50 | read `src/entrypoints/tui/run.ts:549-556,772-789`, `options.ts:9-52`, `autonomyFlag.ts:5-19` |
-| `ev_loop_turn` | B3, B4, B5, B40 | read `src/core/AgentLoop.ts:3003-3013,3252-3348,5104-5130,5240-5282,7690-7730` |
+| `ev_loop_entry` | B1 | read `evidence/original/windows-x64/src/index.ts:1-3,199-207`, `evidence/original/windows-x64/src/cli.ts:31-40,477` |
+| `ev_loop_flags` | B2, B45, B50 | read `evidence/original/windows-x64/src/entrypoints/tui/run.ts:549-556,772-789`, `options.ts:9-52`, `autonomyFlag.ts:5-19` |
+| `ev_loop_turn` | B3, B4, B5, B40 | read `evidence/original/windows-x64/src/core/AgentLoop.ts:3003-3013,3252-3348,5104-5130,5240-5282,7690-7730` |
 | `ev_loop_messages` | B6, B7, B8, B10 | read `droid-sdk-core/.../sessionV2/messages/{enums,schemas}.ts`, `utils/src/messages/visibility.ts:234-249` |
 | `ev_loop_tool_ids` | B9 | read `droid-sdk-core/.../messages/toolCalls.ts:73-76`, `chunk-processing.ts:790-800` |
 | `ev_loop_media` | B11, B12 | read `image-limits.ts:16-17,151`, `userMessageInjection.ts:120-169` |
@@ -763,7 +779,9 @@ Two tests are load-bearing for this spec's acceptance:
 | `ev_loop_retry` | B55–B58, B60 | read `retryPolicy/index.ts:20-203`, `daemon-sdk/src/retry.ts:15-42`, `llmStreamingPlatform.ts:60-112`, `sendMessage.ts:1660-1672,2302-2328,6236-6252`, `AgentLoop.ts:1438-1443` |
 | `ev_loop_auth` | B59 | read `AgentLoop.ts:8331-8458`, `authHelpers.ts:52-68`, `authMessages.ts:20-45`, `agentTurnCompletion.ts:99-140` |
 
-All citations are `[observed]` unless noted. `[derived]` claims: B15 block order
+Citations written `src/…` or `packages/…` are relative to
+`evidence/original/windows-x64/`; the table below abbreviates them for
+readability. All citations are `[observed]` unless noted. `[derived]` claims: B15 block order
 (assembled from separate pushes in one function), B26 compaction figure
 (composed from four observed fields), B55 attempt budgets (composed from
 `getDefaultRetryCount` and the route-aware wrapper), B56 delay schedule

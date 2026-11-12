@@ -453,8 +453,10 @@ requires a credential can tell offline from logged out
 (`orig/packages/runtime/auth/src/auth/source.ts:83-95,650-663`). `[observed]`
 
 **B57** The identity cache is keyed by token hash; a failed populate is
-negatively cached for 30 s, and logout/refresh clears the cache and aborts
-in-flight identity work (`orig/packages/runtime/auth/src/auth/common/cache.ts:50-88,93-95,506-593`).
+negatively cached for 30 s; logout clears the cache, advances its epoch and
+aborts in-flight identity work, while a refresh is picked up because the new
+token hashes to a different entry
+(`orig/packages/runtime/auth/src/auth/common/cache.ts:50-88,93-95,506-593`).
 `[observed]`
 
 **B58** In airgap the credential is synthetic: `FACTORY_API_KEY`-shaped token
@@ -766,10 +768,10 @@ tool catalogue — which each adapter converts to its wire dialect
 `orig/packages/droid-core/src/llms/client/sendMessage.ts:2676-2696`).
 `[observed]`
 
-**B106** The Anthropic request is `{model, max_tokens, messages, tools, system,
-stream: true}` plus optional `tool_choice` and any custom-model `extraArgs`;
-`max_tokens` is clamped to the model capability's ceiling
-(`orig/packages/droid-core/src/llms/client/sendMessage.ts:2683-2704`).
+**B106** The Anthropic request carries `model`, `max_tokens`, `messages`,
+`tools` and `system`, is sent streaming, and adds optional `tool_choice` and any
+custom-model `extraArgs`; `max_tokens` is clamped to the model capability's
+ceiling (`orig/packages/droid-core/src/llms/client/sendMessage.ts:2683-2704`).
 `[observed]`
 
 **B107** A managed model call's URL is the managed route resolved through the
@@ -799,7 +801,7 @@ blank line terminates and yields the parsed JSON; `\r` before `\n` is tolerated
 
 **B111** The generic reader fails loudly: a payload that is not JSON, an event
 whose bytes exceed the bound, or a body that ends inside a line or an event each
-throws (the last two as truncation); it ends cleanly only at an event boundary.
+throws, the last as a truncation; it ends cleanly only at an event boundary.
 Aborting cancels the body and releases the lock
 (`orig/packages/utils/src/api/response.ts:139-166,193-268`). `[observed]`
 
