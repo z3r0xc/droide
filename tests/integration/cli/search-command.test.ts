@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 
 import {
@@ -21,6 +22,10 @@ interface Captured {
 }
 
 const SESSION_ID = "3f2b8c1e-9a4d-4f6b-8c2e-1a2b3c4d5e6f";
+
+function isRow(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 
 function capture(openStore: () => Promise<SessionStore>): Captured {
   let out = "";
@@ -186,4 +191,28 @@ test("an aborted query exits 130", async () => {
 
   assert.equal(captured.code(), 130);
   assert.equal(captured.err(), "");
+});
+
+test("--reindex brings the transcript index up to date before the query", async () => {
+  await withStore(async (store, dir) => {
+    const captured = capture(async () => store);
+
+    await runSearchCommand("needle", { reindex: true }, captured.deps);
+
+    const db = new DatabaseSync(join(dir, "index.db"));
+    try {
+      const counted = db
+        .prepare("SELECT COUNT(*) AS n FROM transcript_index")
+        .get();
+      assert.equal(isRow(counted) ? Number(counted["n"]) : 0, 1);
+      const values = db
+        .prepare("SELECT COUNT(*) AS n FROM transcript_index_value")
+        .get();
+      assert.equal(isRow(values) ? Number(values["n"]) > 0 : false, true);
+    } finally {
+      db.close();
+    }
+    assert.match(captured.out(), /1 session matched "needle"/);
+    assert.equal(captured.code(), 0);
+  });
 });

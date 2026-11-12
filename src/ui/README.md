@@ -78,6 +78,59 @@ on each signal, raw mode `[true, false]`, and no listener, timer or signal hook
 left behind.
 
 Deferred to later slices: the static/dynamic split and live-tail budget (B4),
-the remaining renderers (R3, R6, R8–R13), markdown, the status banner (B12), the
-full footer (B13), theme switching and OSC (B17), probe execution, sanitisation
-(B20) and animation (B21).
+the remaining renderers (R6, R8–R10, R13), markdown, the status banner's spinner
+(B12), the full footer (B13), theme switching and OSC (B17), probe execution,
+sanitisation (B20) and animation (B21).
+
+## Turn lifecycle
+
+A submitted line is one agent turn. `src/app/interactive-turn.ts` owns it and
+`interactive.ts` owns only the surface around it:
+
+1. **Submit.** The driver appends the user row, builds the user message and sets
+   the status to `Thinking...`. A submit while a turn runs is refused with a `●`
+   notice; steering and the queued-message list are not implemented.
+2. **Connect.** The first turn resolves the injected wiring (model target,
+   system prompt, registry, exec's tool runner). A failure — no credential, a
+   broken tool server — becomes a `● Error: …` notice; the shell stays usable.
+3. **Stream.** `text_delta` events grow one assistant row. Deltas are coalesced:
+   the row is updated in memory and the paint is scheduled for the next ~16 ms
+   frame, so a fast stream costs one frame per burst, not one per token.
+   `thinking_delta` events are collapsed (R3): they change the status to
+   `Thinking...` and print no rows.
+4. **Tools.** A `tool_call` appends a tool row in `pending`; `tool_result` and
+   `tool_message` settle its state and result text. Rows keep request order.
+5. **Approval.** An `ask` from the permission algebra renders the R11 row and
+   leaves the turn waiting — the renderer keeps painting. The promise resolves
+   only through the keys below; a denial returns
+   `Error: Tool execution cancelled by user` to the model as the tool result.
+6. **End.** The loop reports exactly one reason. `completed` appends nothing;
+   `cancelled` appends `● Cancelled`; `error` appends `● Error: <message>`;
+   `max_turns` names the ceiling. The status line disappears and the turn's
+   frame timer is cleared, so a completed turn leaves no timer scheduled.
+7. **Quit or unmount.** The shell marks itself settled, disposes the driver
+   (deny an open approval, abort the turn's `AbortController`, await the turn),
+   then awaits the last paint, unmounts Ink and tears the terminal down. No
+   provider request and no frame timer outlives the session.
+
+While a turn runs the status line prints one of `Thinking...`,
+`Streaming...`, `Invoking tools...`, `Waiting for tool confirmation...` or
+`Cancelling tools...` followed by `(Press ESC to stop)` (B12). The spinner and
+the reserved idle banner row are the animation slice's.
+
+## Approval keys
+
+The approval row is the only owner of the keyboard while it is open; keys it
+does not name are swallowed so they cannot edit the draft behind it.
+
+| Key       | Choice                               | Meaning                                                                                        |
+| --------- | ------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `Enter`   | selected option                      | answer the highlighted option (approve once by default)                                        |
+| `y` / `1` | `Yes, allow`                         | approve this call only                                                                         |
+| `a` / `2` | `Yes, and always allow this session` | approve every later call of the same tool in this session (process tools are never remembered) |
+| `n` / `3` | `No, cancel`                         | deny; the tool result is `Error: Tool execution cancelled by user`                             |
+| `Esc`     | `No, cancel`                         | deny                                                                                           |
+| `↑` / `↓` | —                                    | move the selection (options print in this order: allow, allow for the session, deny)           |
+
+Esc outside an approval cancels the running turn and keeps the draft;
+`Ctrl+C` twice still exits the shell.

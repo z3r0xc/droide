@@ -1,6 +1,7 @@
 /**
- * Transcript region (B2, B5): the three item renderers of this vertical —
- * user message (R1), assistant text (R2) and tool call + result (R4, R5).
+ * Transcript region (B2, B5): the item renderers of this vertical — user
+ * message (R1), assistant text (R2), tool call + result (R4, R5), the approval
+ * prompt (R11) and the system notice (R12).
  *
  * Every other item kind normalises away in `toTranscriptItem` and renders
  * nothing. The transcript is not height-capped here: the static/dynamic split,
@@ -12,12 +13,21 @@ import { Box, Text } from "ink";
 import { createElement as h, type ReactNode } from "react";
 
 import type { Capabilities } from "../capabilities.ts";
-import { INTERRUPTED, toolMoreLines } from "../strings.ts";
+import { truncateToWidth } from "../text.ts";
+import {
+  APPROVAL_DECISION_TEXTS,
+  APPROVAL_HELP,
+  APPROVAL_TITLE,
+  INTERRUPTED,
+  toolMoreLines,
+} from "../strings.ts";
 import { GLYPHS, SPACING, background, foreground } from "../tokens.ts";
 import {
   clampParamValue,
   previewResult,
   toTranscriptItem,
+  type ApprovalTranscriptItem,
+  type NoticeTranscriptItem,
   type ToolTranscriptItem,
   type TranscriptEntry,
   type UserTranscriptItem,
@@ -170,6 +180,111 @@ function renderTool(
   );
 }
 
+/**
+ * R11 — the approval prompt: one header row naming the tool, one dimmed summary
+ * row, the options (selected bold in `text.primary`, the rest muted) and one
+ * help row. A decided prompt keeps only the header, with its outcome.
+ */
+function renderApproval(
+  item: ApprovalTranscriptItem,
+  contentWidth: number,
+  capabilities: Capabilities,
+  key: string,
+): ReactNode {
+  const bold = capabilities.style ? { bold: true } : {};
+  const outcome =
+    item.decision === undefined
+      ? ""
+      : ` ${GLYPHS.separator} ${APPROVAL_DECISION_TEXTS[item.decision]}`;
+  const header = `${GLYPHS.toolMarker} ${APPROVAL_TITLE} ${GLYPHS.separator} ${item.toolName}${outcome}`;
+  const rows: ReactNode[] = [
+    h(
+      Text,
+      {
+        key: "header",
+        ...foreground(
+          item.decision === "deny" ? "error" : "text.primary",
+          capabilities,
+        ),
+        ...bold,
+      },
+      truncateToWidth(header, contentWidth, GLYPHS.ellipsis),
+    ),
+  ];
+  if (item.summary.length > 0) {
+    rows.push(
+      h(
+        Text,
+        { key: "summary", ...foreground("text.muted", capabilities) },
+        truncateToWidth(`  ${item.summary}`, contentWidth, GLYPHS.ellipsis),
+      ),
+    );
+  }
+  if (item.decision === undefined) {
+    for (const [index, option] of item.options.entries()) {
+      const selected = index === item.selected;
+      const prefix = selected ? `${GLYPHS.selected} ` : "  ";
+      rows.push(
+        h(
+          Text,
+          {
+            key: `option-${index}`,
+            ...foreground(
+              selected ? "text.primary" : "text.muted",
+              capabilities,
+            ),
+            ...(selected ? bold : {}),
+          },
+          truncateToWidth(
+            `${prefix}${option.label}`,
+            contentWidth,
+            GLYPHS.ellipsis,
+          ),
+        ),
+      );
+    }
+    rows.push(
+      h(
+        Text,
+        { key: "help", ...foreground("text.muted", capabilities) },
+        truncateToWidth(`  ${APPROVAL_HELP}`, contentWidth, GLYPHS.ellipsis),
+      ),
+    );
+  }
+  return h(
+    Box,
+    { key, flexDirection: "column", width: contentWidth, marginBottom: 1 },
+    ...rows,
+  );
+}
+
+/** R12 — a system notice: `● ` then the body, errors in `error`. */
+function renderNotice(
+  item: NoticeTranscriptItem,
+  contentWidth: number,
+  capabilities: Capabilities,
+  key: string,
+): ReactNode {
+  return h(
+    Box,
+    { key, flexDirection: "row", width: contentWidth, marginBottom: 1 },
+    h(
+      Text,
+      {
+        ...foreground(
+          item.text.startsWith("Error:") ? "error" : "text.muted",
+          capabilities,
+        ),
+      },
+      truncateToWidth(
+        `${GLYPHS.toolMarker} ${item.text}`,
+        contentWidth,
+        GLYPHS.ellipsis,
+      ),
+    ),
+  );
+}
+
 export function Transcript(props: TranscriptProps): ReactNode {
   const { capabilities, width, entries } = props;
   const contentWidth = transcriptContentWidth(width);
@@ -183,8 +298,12 @@ export function Transcript(props: TranscriptProps): ReactNode {
       rendered.push(renderUser(item, contentWidth, capabilities, key));
     } else if (item.kind === "assistant") {
       rendered.push(renderAssistant(item, contentWidth, capabilities, key));
-    } else {
+    } else if (item.kind === "tool") {
       rendered.push(renderTool(item, contentWidth, capabilities, key));
+    } else if (item.kind === "approval") {
+      rendered.push(renderApproval(item, contentWidth, capabilities, key));
+    } else {
+      rendered.push(renderNotice(item, contentWidth, capabilities, key));
     }
   }
   if (rendered.length === 0) return null;

@@ -6,17 +6,35 @@
  * (`src/ui/render.ts`) and owns every keypress while it is mounted. It resolves
  * with the process exit code: `0` for `/quit`, `130` for the `Ctrl+C` exit.
  *
- * There is no agent loop here yet: a submitted line becomes a transcript row and
- * the composer clears. Every path out — quit, interrupt, a rejected mount, a
- * thrown reducer — removes its listeners, clears its timers, unmounts the Ink
+ * A submitted line starts one agent turn through `interactive-turn.ts`: its
+ * deltas stream into transcript rows, tool calls and results become rows, an
+ * `ask` permission becomes an approval prompt, and Esc aborts the turn. Every
+ * path out — quit, interrupt, a rejected mount, a thrown reducer — removes its
+ * listeners, clears its timers, aborts the in-flight turn, unmounts the Ink
  * tree and runs the terminal teardown exactly once.
  */
 
 import { StringDecoder } from "node:string_decoder";
 
+import { createLlmProvider } from "../agent/adapters/llm-provider.ts";
+import type { Provider } from "../agent/ports.ts";
 import { DEFAULT_MODEL_ID } from "../cli/models.ts";
 import { VERSION } from "../cli/brand.ts";
+import {
+  DEFAULT_COMPACTION_LIMIT,
+  createExecToolRunner,
+  createToolCatalogue,
+  selectExecTools,
+} from "../exec/runner.ts";
+import { resolveModelTarget } from "../exec/command.ts";
 import type { AppContext } from "./context.ts";
+import {
+  createTurnDriver,
+  type TurnAgent,
+  type TurnDriver,
+} from "./interactive-turn.ts";
+import { buildStartupPrompt } from "./prompt.ts";
+import { createSessionTooling } from "./tooling.ts";
 import { detectCapabilities, type Capabilities } from "../ui/capabilities.ts";
 import type { ShellProps } from "../ui/components/Shell.ts";
 import type { HeaderStatus } from "../ui/components/Header.ts";
@@ -50,8 +68,8 @@ import {
   HEADER_STATUS_LABELS,
   MODE_ROW_AUTONOMY_OFF,
   STARTUP_PLACEHOLDER,
+  TURN_ALREADY_RUNNING,
 } from "../ui/strings.ts";
-import type { TranscriptEntry } from "../ui/transcript.ts";
 
 /** The exit code for the `Ctrl+C` exit; `/quit` exits 0. */
 export const INTERRUPT_EXIT_CODE = 130;
@@ -95,6 +113,17 @@ export interface InteractiveShellOptions {
   readonly model?: string;
   /** Overrides `renderShell`; only tests use it (to prove the throw path). */
   readonly mount?: ShellMounter;
+  /**
+   * Model and tool wiring for submitted turns. Production builds it from the
+   * context on first use; tests inject a scripted provider and fake tools, so
+   * no test reaches a network or a real terminal.
+   */
+  readonly agent?: () => ShellAgent | Promise<ShellAgent>;
+}
+
+/** The agent wiring a shell turn runs against; `close` releases MCP clients. */
+export interface ShellAgent extends TurnAgent {
+  close?(): Promise<void>;
 }
 
 /** Raised when the surface is asked for on streams that are not a TTY (B18). */
@@ -180,6 +209,65 @@ async function mountSession(
 }
 
 /**
+ * The production wiring: the managed or custom model resolved exactly as exec
+ * resolves it, the session registry (core tools plus reachable MCP servers),
+ * and exec's own tool runner so the shell applies the same permission algebra
+ * and dispatch as the non-interactive path. The autonomy is `off` — every
+ * mutating or process call prompts — and MCP is always a prompt.
+ */
+async function buildShellAgent(
+  options: InteractiveShellOptions,
+): Promise<ShellAgent> {
+  const context = options.context;
+  // B55: a missing credential fails here, before any tool server is contacted.
+  const target = resolveModelTarget({
+    model: options.model,
+    reasoningEffort: undefined,
+    settings: context.settings,
+    env: context.environment.env,
+  });
+  const tooling = await createSessionTooling({ context });
+  try {
+    // The interactive session offers the full set; the permission algebra in
+    // the runner decides every call (reads run, writes prompt).
+    const allowed = selectExecTools(tooling.registry, { autonomy: "low" });
+    const catalogue = createToolCatalogue(tooling.registry, allowed);
+    const system = await buildStartupPrompt({ context });
+    const provider: Provider = createLlmProvider({
+      url: target.url,
+      headers: target.headers,
+      dialect: target.dialect,
+      model: target.wireModel,
+      system,
+      tools: catalogue,
+      maxTokens: target.maxTokens,
+      operation: target.url.pathname,
+    });
+    return {
+      provider,
+      tools: (confirm) =>
+        createExecToolRunner({
+          registry: tooling.registry,
+          root: context.environment.cwd,
+          environment: context.environment,
+          permission: {
+            autonomy: "off",
+            interactionMode: "interactive",
+            interactive: true,
+          },
+          allowed,
+          confirm,
+        }),
+      compactionTokenLimit: DEFAULT_COMPACTION_LIMIT,
+      close: () => tooling.close(),
+    };
+  } catch (error) {
+    await tooling.close();
+    throw error;
+  }
+}
+
+/**
  * Run the interactive shell until it quits.
  *
  * @returns the exit code — `0` for `/quit`, `130` for `Ctrl+C`.
@@ -201,7 +289,7 @@ export async function runInteractiveShell(
   const clock = options.clock ?? (() => Date.now());
   const timers = options.timers ?? systemTimers;
 
-  let transcript: TranscriptEntry[] = [];
+  let driver: TurnDriver | undefined;
   let composer = initialComposerState({
     tmux: env.env.TMUX !== undefined || env.env.STY !== undefined,
   });
@@ -222,7 +310,7 @@ export async function runInteractiveShell(
       statuses: statuses(),
       shortcuts: HEADER_SHORTCUTS,
     },
-    transcript,
+    transcript: driver?.entries ?? [],
     composer: {
       draft: composer.draft,
       placeholder: STARTUP_PLACEHOLDER,
@@ -240,6 +328,9 @@ export async function runInteractiveShell(
         DEFAULT_MODEL_ID,
     },
     footer: {},
+    ...(driver?.statusText === undefined
+      ? {}
+      : { statusLine: { text: driver.statusText, padding: 1 } }),
   });
 
   // Signals restore the terminal inside `setupTerminal`; deciding the exit code
@@ -257,6 +348,20 @@ export async function runInteractiveShell(
       else handleSignal(signal);
     },
   );
+
+  // One wiring attempt per session. The promise is created now (so a fast
+  // failure is ready by the first submit) but only awaited by a turn, and its
+  // rejection is observed here so an idle shell never logs an unhandled one.
+  let assembledAgent: ShellAgent | undefined;
+  const agentWiring: Promise<ShellAgent> = Promise.resolve()
+    .then(() =>
+      options.agent === undefined ? buildShellAgent(options) : options.agent(),
+    )
+    .then((agent) => {
+      assembledAgent = agent;
+      return agent;
+    });
+  agentWiring.catch(() => undefined);
 
   const result = Promise.withResolvers<number>();
   let settled = false;
@@ -283,6 +388,18 @@ export async function runInteractiveShell(
     return paintChain;
   };
 
+  // The turn driver owns the transcript rows beyond the composer's own state.
+  // Its paint callback is the same chain, so a streamed delta, a tool result
+  // and an approval prompt all land in one ordered frame sequence.
+  driver = createTurnDriver({
+    connect: () => agentWiring,
+    clock,
+    timers,
+    onChange: () => {
+      if (!settled) void paint();
+    },
+  });
+
   const close = async (code: number, failure?: unknown): Promise<void> => {
     if (settled) return;
     settled = true;
@@ -293,6 +410,9 @@ export async function runInteractiveShell(
     pendingKeyTimer = undefined;
     deferredTimer = undefined;
     try {
+      // An in-flight turn is aborted and awaited before the tree goes away, so
+      // no provider request (and no AbortController) outlives the session.
+      await driver?.dispose();
       await paintChain;
       await mounted.handle.unmount();
     } catch (error) {
@@ -300,6 +420,9 @@ export async function runInteractiveShell(
       return;
     } finally {
       mounted.terminal.teardown();
+      // A wiring that never finished is not waited for: the process is leaving
+      // and a half-open MCP connection must not hold the exit hostage.
+      await assembledAgent?.close?.().catch(() => undefined);
     }
     if (failure === undefined) result.resolve(code);
     else result.reject(failure);
@@ -369,18 +492,13 @@ export async function runInteractiveShell(
       suggestionsOpen: composer.completion.open,
     };
     if (transition.submitted !== undefined) {
-      transcript = [
-        ...transcript,
-        { kind: "user", text: transition.submitted },
-      ];
+      // The driver appends the user row itself and owns the turn from here.
+      driver?.submit(transition.submitted);
     }
     if (transition.notice !== undefined) {
       // The ephemeral system-message renderer is a later slice; until then the
-      // notice is a transcript row so it is visible, never silent.
-      transcript = [
-        ...transcript,
-        { kind: "assistant", text: transition.notice },
-      ];
+      // notice is a `●` row so it is visible, never silent.
+      driver?.appendNotice(transition.notice);
     }
     if (transition.exit === "quit") {
       requestExit(0);
@@ -404,6 +522,40 @@ export async function runInteractiveShell(
     for (const action of actions) {
       if (action.kind === "pending") continue;
       if (action.kind === "ignore" || action.kind === "app") continue;
+
+      // R11: an open approval owns every key it can answer. Keys it declines
+      // (the quit chord) fall through to the composer.
+      if (driver?.approvalOpen === true) {
+        if (driver.handleApprovalAction(action)) {
+          dirty = true;
+          continue;
+        }
+      }
+
+      // B12: Esc stops the running turn instead of editing the draft. The
+      // composer keeps the draft, so it is usable the moment the turn settles.
+      if (action.kind === "escape" && driver?.running === true) {
+        driver.cancel();
+        dirty = true;
+        continue;
+      }
+
+      // B10: steering and the queued-message list are not implemented, so a
+      // plain submit during a turn is refused in the transcript, never lost.
+      // `/quit` still leaves the session and takes the turn down with it.
+      if (action.kind === "submit" && driver?.running === true) {
+        if (composer.draft.trim() === "/quit") {
+          applyTransition(
+            applyComposerAction(composer, action, now, composerWidth(width)),
+          );
+          dirty = true;
+          continue;
+        }
+        driver.appendNotice(TURN_ALREADY_RUNNING);
+        dirty = true;
+        continue;
+      }
+
       const transition = applyComposerAction(
         composer,
         action,

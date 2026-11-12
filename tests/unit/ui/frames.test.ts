@@ -206,3 +206,44 @@ test("unknown transcript kinds and malformed items render nothing", async () => 
     0,
   );
 });
+
+test("an approval row prints its choices, keys and outcome", async () => {
+  const approval: TranscriptEntry = {
+    kind: "approval",
+    toolName: "Write",
+    summary: "file-edit · risk: high",
+    options: [
+      { choice: "once", label: "Yes, allow" },
+      { choice: "session", label: "Yes, and always allow this session" },
+      { choice: "deny", label: "No, cancel" },
+    ],
+    selected: 1,
+  };
+  const pending: readonly TranscriptEntry[] = [
+    approval,
+    { kind: "notice", text: "Cancelled" },
+  ];
+  const frame = await renderFrame(shellAt(80, 24, { transcript: pending }));
+  assertWidth(frame.lines, 80);
+  const text = frame.lines.join("\n");
+  assert.match(text, /● Approval · Write\n/u);
+  assert.match(text, /  file-edit · risk: high/u);
+  assert.match(text, /> Yes, and always allow this session/u, "the selection");
+  assert.match(text, / {2}Yes, allow/u);
+  assert.match(text, / {2}No, cancel/u);
+  assert.match(text, /↑↓ navigate · Enter select · Esc cancel/u);
+  assert.match(text, /● Cancelled/u);
+
+  const decided = await renderFrame(
+    shellAt(80, 24, {
+      transcript: [{ ...approval, decision: "deny" }],
+    }),
+  );
+  const decidedText = decided.lines.join("\n");
+  assert.match(decidedText, /● Approval · Write · denied/u);
+  assert.equal(
+    decidedText.includes("Yes, allow"),
+    false,
+    "the options are gone once answered",
+  );
+});
