@@ -59,10 +59,7 @@ test("sessions, cache and settings paths are placed under the factory dir", () =
     sessionIndexDatabase(linux),
     "/home/tester/.factory/cache/session-index/index.db",
   );
-  assert.equal(
-    userSettingsFile(linux),
-    "/home/tester/.factory/settings.json",
-  );
+  assert.equal(userSettingsFile(linux), "/home/tester/.factory/settings.json");
   assert.equal(
     projectSettingsFile(linux),
     "/work/project/.factory/settings.json",
@@ -79,10 +76,7 @@ test("sessions, cache and settings paths are placed under the factory dir", () =
     home: "C:\\Users\\tester",
     cwd: "C:\\work\\project",
   });
-  assert.equal(
-    sessionsDir(windows),
-    "C:\\Users\\tester\\.factory\\sessions",
-  );
+  assert.equal(sessionsDir(windows), "C:\\Users\\tester\\.factory\\sessions");
   assert.equal(
     projectSettingsFile(windows),
     "C:\\work\\project\\.factory\\settings.json",
@@ -147,10 +141,10 @@ test("worktrees default under the factory dir and accept only absolute overrides
   const env = environment();
   assert.equal(worktreesRoot(env), "/home/tester/.factory/worktrees");
   assert.equal(worktreesRoot(env, "/mnt/worktrees"), "/mnt/worktrees");
+  assert.equal(worktreesRoot(env, "~/worktrees"), "/home/tester/worktrees");
   assert.equal(
-    worktreesRoot(env, "~/worktrees"),
-    "/home/tester/worktrees",
+    worktreesRoot(env, "relative/worktrees"),
+    "/home/tester/.factory/worktrees",
   );
-  assert.equal(worktreesRoot(env, "relative/worktrees"), "/home/tester/.factory/worktrees");
   assert.equal(worktreesRoot(env, ""), "/home/tester/.factory/worktrees");
 });

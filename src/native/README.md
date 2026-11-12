@@ -21,22 +21,20 @@ await native.close();
   `closeGraceMs` (500 ms), then kills: no child survives it.
 - Bounds: a response line over `MAX_LINE_BYTES` (1 MiB) is refused before it is
   buffered; params over `MAX_PARAMS_BYTES` (512 KiB) before a byte is written.
+- Timers are injectable; `helperArgs` and `env` serve the fake helper.
 
 ## Failure modes
 
-| Trigger | Error | Client |
-| --- | --- | --- |
-| helper missing or not executable | `NativeUnavailableError` | creation fails |
-| helper exits (code or signal) | `NativeUnavailableError`, method named | closed |
-| no frame within the request timeout | `NativeTimeoutError` | request only |
-| `error` frame | `NativeError` (`code`, `method`) | usable |
-| malformed line, not JSON, wrong shape | `NativeProtocolError` | fatal, killed |
-| line over 1 MiB | `NativeProtocolError` | fatal, killed |
-| answer to an id that is not pending | `NativeProtocolError` | fatal, killed |
-| `error` frame with a null id | `NativeProtocolError` | fatal, killed |
-| protocol version mismatch | `NativeProtocolError` | creation fails |
-| params over the cap | `NativeProtocolError` | request only |
-| request after `close()` | `NativeUnavailableError` | rejected |
-
-Timers are injected (`timers`) so tests drive the clock; `helperArgs` and `env`
-exist for `tests/fixtures/fake-native-helper.mjs`.
+| Trigger                               | Error                                  | Client         |
+| ------------------------------------- | -------------------------------------- | -------------- |
+| helper missing or not executable      | `NativeUnavailableError`               | creation fails |
+| helper exits (code or signal)         | `NativeUnavailableError`, method named | closed         |
+| no frame within the request timeout   | `NativeTimeoutError`                   | request only   |
+| `error` frame                         | `NativeError` (`code`, `method`)       | usable         |
+| malformed line, not JSON, wrong shape | `NativeProtocolError`                  | fatal, killed  |
+| line over 1 MiB                       | `NativeProtocolError`                  | fatal, killed  |
+| answer to an id that is not pending   | `NativeProtocolError`                  | fatal, killed  |
+| `error` frame with a null id          | `NativeProtocolError`                  | fatal, killed  |
+| protocol version mismatch             | `NativeProtocolError`                  | creation fails |
+| params over the cap                   | `NativeProtocolError`                  | request only   |
+| request after `close()`               | `NativeUnavailableError`               | rejected       |

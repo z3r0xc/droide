@@ -11,7 +11,9 @@ import {
 } from "../../../src/config/paths.ts";
 import { resolveSettings } from "../../../src/config/resolve.ts";
 
-async function withTree(run: (environment: Environment) => Promise<void>): Promise<void> {
+async function withTree(
+  run: (environment: Environment) => Promise<void>,
+): Promise<void> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "droide-config-int-"));
   const home = path.join(root, "home");
   const cwd = path.join(root, "project");
@@ -77,7 +79,13 @@ test("resolves the on-disk layers for an isolated home and project", async () =>
       resolved.layers.map((layer) => layer.source),
       [overlayFile, projectFile, userFile],
     );
-    assert.ok(resolved.layers.every((layer) => layer.source.startsWith(environment.cwd) || layer.source.startsWith(environment.home)));
+    assert.ok(
+      resolved.layers.every(
+        (layer) =>
+          layer.source.startsWith(environment.cwd) ||
+          layer.source.startsWith(environment.home),
+      ),
+    );
   });
 });
 

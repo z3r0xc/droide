@@ -105,9 +105,9 @@ function messageOf(error: unknown): string {
 }
 
 /**
- * One helper process. Create it with `createNativeClient`, which also performs
- * the protocol handshake; a client that failed its handshake is never returned,
- * and its child is already closed.
+ * One helper process. Construct it through `createNativeClient`, which also
+ * performs the protocol handshake; constructing directly skips the version
+ * check and exists only for tests of the boundary itself.
  */
 export class NativeClient {
   readonly helperPath: string;
@@ -128,33 +128,34 @@ export class NativeClient {
   private exitDescription = "";
   private readonly exitWaiters = new Set<() => void>();
 
-  private constructor(options: ResolvedOptions) {
-    this.helperPath = options.helperPath;
-    this.timers = options.timers;
-    this.defaultTimeoutMs = options.requestTimeoutMs;
-    this.closeGraceMs = options.closeGraceMs;
+  constructor(options: NativeClientOptions) {
+    const resolved = resolveOptions(options);
+    this.helperPath = resolved.helperPath;
+    this.timers = resolved.timers;
+    this.defaultTimeoutMs = resolved.requestTimeoutMs;
+    this.closeGraceMs = resolved.closeGraceMs;
 
-    const args = [...options.helperArgs];
+    const args = [...resolved.helperArgs];
     let child: ChildProcessWithoutNullStreams;
     try {
       child =
-        options.env === undefined
-          ? spawn(options.helperPath, args, {
+        resolved.env === undefined
+          ? spawn(resolved.helperPath, args, {
               stdio: ["pipe", "pipe", "pipe"],
               windowsHide: true,
               shell: false,
             })
-          : spawn(options.helperPath, args, {
+          : spawn(resolved.helperPath, args, {
               stdio: ["pipe", "pipe", "pipe"],
               windowsHide: true,
               shell: false,
-              env: options.env,
+              env: resolved.env,
             });
     } catch (error) {
       throw new NativeUnavailableError(
         `could not be started: ${messageOf(error)}`,
         {
-          helperPath: options.helperPath,
+          helperPath: resolved.helperPath,
           cause: error,
         },
       );
@@ -187,6 +188,11 @@ export class NativeClient {
   /** Process id of the helper, or `undefined` if it never started. */
   get pid(): number | undefined {
     return this.child.pid;
+  }
+
+  /** Whether the boundary can no longer accept or answer requests. */
+  private get boundaryClosed(): boolean {
+    return this.state === "closed";
   }
 
   /** Whether the helper process has exited. */
@@ -293,7 +299,7 @@ export class NativeClient {
     );
 
     if (!this.exited) {
-      if (this.state !== "closed") this.child.stdin.end();
+      this.child.stdin.end();
       const exitedGracefully = await this.waitForExit(this.closeGraceMs);
       if (!exitedGracefully) {
         this.killChild();
@@ -304,11 +310,6 @@ export class NativeClient {
     this.state = "closed";
   }
 
-  /** Spawn the helper; a spawn failure is `NativeUnavailableError`. */
-  private static start(options: ResolvedOptions): NativeClient {
-    return new NativeClient(options);
-  }
-
   private captureStderr(chunk: Buffer): void {
     this.stderrTail = `${this.stderrTail}${chunk.toString("utf8")}`;
     if (this.stderrTail.length > STDERR_TAIL_BYTES) {
@@ -317,7 +318,7 @@ export class NativeClient {
   }
 
   private handleChunk(chunk: Buffer): void {
-    if (this.state === "closed") return;
+    if (this.boundaryClosed) return;
     this.buffer =
       this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
 
@@ -336,7 +337,7 @@ export class NativeClient {
         return;
       }
       this.consumeLine(line);
-      if (this.state === "closed") return;
+      if (this.boundaryClosed) return;
       newline = this.buffer.indexOf(0x0a);
     }
 
@@ -523,25 +524,24 @@ export class NativeClient {
 export async function createNativeClient(
   options: NativeClientOptions,
 ): Promise<NativeClient> {
-  const resolved = resolveOptions(options);
-  const client = NativeClient.start(resolved);
+  const client = new NativeClient(options);
 
   try {
     const result = await client.request(
       NATIVE_VERSION_METHOD,
       {},
       {
-        timeoutMs: resolved.handshakeTimeoutMs,
+        timeoutMs: options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS,
       },
     );
     const version = parseVersionResult(result, {
-      helperPath: resolved.helperPath,
+      helperPath: options.helperPath,
       method: NATIVE_VERSION_METHOD,
     });
     if (version.protocol !== PROTOCOL_VERSION) {
       throw new NativeProtocolError(
         `speaks protocol ${version.protocol} (helper version ${version.version}) but this build requires ${PROTOCOL_VERSION}`,
-        { helperPath: resolved.helperPath, method: NATIVE_VERSION_METHOD },
+        { helperPath: options.helperPath, method: NATIVE_VERSION_METHOD },
       );
     }
     return client;

@@ -461,7 +461,6 @@ function expectJsonValue(
 }
 
 function parseGeneral(raw: RawObject, path: string): GeneralSettings {
-  rejectUnknownKeys(raw, GENERAL_KEYS, path, "");
   const worktreeDirectory = readOptionalString(
     raw,
     "worktreeDirectory",
@@ -826,7 +825,11 @@ export function parseSettingsDocument(raw: unknown, source: string): Settings {
   const hasGeneral = Object.keys(root).some(
     (key) => GENERAL_KEYS[key] === true,
   );
-  const general = hasGeneral ? parseGeneral(root, source) : undefined;
+  const generalRaw: Record<string, unknown> = {};
+  for (const key of Object.keys(root)) {
+    if (GENERAL_KEYS[key] === true) generalRaw[key] = root[key];
+  }
+  const general = hasGeneral ? parseGeneral(generalRaw, source) : undefined;
   const mcp =
     root.mcp === undefined ? undefined : parseMcpSection(root.mcp, source);
   const hooks =

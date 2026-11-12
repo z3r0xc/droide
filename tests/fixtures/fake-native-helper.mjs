@@ -71,7 +71,10 @@ lines.on("line", (line) => {
   const id = request?.id;
   const method = request?.method;
   if (typeof id !== "number" || typeof method !== "string") {
-    send({ id: null, error: { code: -32700, message: "request needs id and method" } });
+    send({
+      id: null,
+      error: { code: -32700, message: "request needs id and method" },
+    });
     return;
   }
 
@@ -115,14 +118,22 @@ lines.on("line", (line) => {
   }
 
   if (mode === "error") {
-    send({ id, error: { code: -32602, message: "params rejected by fake helper" } });
+    send({
+      id,
+      error: { code: -32602, message: "params rejected by fake helper" },
+    });
     return;
   }
 
   if (mode === "late" && method === "hash.sha256") {
     const text = request?.params?.text;
     setTimeout(() => {
-      send({ id, result: { sha256: createHash("sha256").update(String(text)).digest("hex") } });
+      send({
+        id,
+        result: {
+          sha256: createHash("sha256").update(String(text)).digest("hex"),
+        },
+      });
     }, 60);
     return;
   }
@@ -132,11 +143,17 @@ lines.on("line", (line) => {
     if (typeof text !== "string") {
       send({
         id,
-        error: { code: -32602, message: 'hash.sha256 needs a string param "text"' },
+        error: {
+          code: -32602,
+          message: 'hash.sha256 needs a string param "text"',
+        },
       });
       return;
     }
-    send({ id, result: { sha256: createHash("sha256").update(text).digest("hex") } });
+    send({
+      id,
+      result: { sha256: createHash("sha256").update(text).digest("hex") },
+    });
     return;
   }
 

@@ -49,7 +49,9 @@ async function createFixture(): Promise<Fixture> {
   };
 }
 
-async function withFixture(run: (fixture: Fixture) => Promise<void>): Promise<void> {
+async function withFixture(
+  run: (fixture: Fixture) => Promise<void>,
+): Promise<void> {
   const fixture = await createFixture();
   try {
     await run(fixture);
@@ -231,12 +233,15 @@ test("a malformed settings file names its path", async () => {
   await withFixture(async (fixture) => {
     await fs.writeFile(fixture.userSettings, '{ "theme": ', "utf8");
 
-    await assert.rejects(resolveSettings(fixture.environment), (error: unknown) => {
-      assert.ok(error instanceof InvalidSettingsError);
-      assert.equal(error.path, fixture.userSettings);
-      assert.match(error.message, /invalid JSON/);
-      return true;
-    });
+    await assert.rejects(
+      resolveSettings(fixture.environment),
+      (error: unknown) => {
+        assert.ok(error instanceof InvalidSettingsError);
+        assert.equal(error.path, fixture.userSettings);
+        assert.match(error.message, /invalid JSON/);
+        return true;
+      },
+    );
   });
 });
 
@@ -255,11 +260,14 @@ test("an unknown key in a settings file is refused", async () => {
   await withFixture(async (fixture) => {
     await writeJson(fixture.projectSettings, { notASetting: true });
 
-    await assert.rejects(resolveSettings(fixture.environment), (error: unknown) => {
-      assert.ok(error instanceof UnknownSettingError);
-      assert.equal(error.keyPath, "notASetting");
-      return true;
-    });
+    await assert.rejects(
+      resolveSettings(fixture.environment),
+      (error: unknown) => {
+        assert.ok(error instanceof UnknownSettingError);
+        assert.equal(error.keyPath, "notASetting");
+        return true;
+      },
+    );
   });
 });
 

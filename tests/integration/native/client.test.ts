@@ -27,8 +27,12 @@ import {
 } from "../../../src/native/errors.ts";
 import { MAX_PARAMS_BYTES } from "../../../src/native/protocol.ts";
 
-const FAKE_HELPER = resolve(import.meta.dirname, "../../fixtures/fake-native-helper.mjs");
-const SHA256_ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+const FAKE_HELPER = resolve(
+  import.meta.dirname,
+  "../../fixtures/fake-native-helper.mjs",
+);
+const SHA256_ABC =
+  "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
 
 interface Fixture {
   readonly dir: string;
@@ -53,7 +57,10 @@ async function fixture(
     options: {
       helperPath: process.execPath,
       helperArgs: [FAKE_HELPER, mode],
-      env: { ...process.env, FAKE_NATIVE_HELPER_PID_FILE: join(dir, "helper.pid") },
+      env: {
+        ...process.env,
+        FAKE_NATIVE_HELPER_PID_FILE: join(dir, "helper.pid"),
+      },
       ...overrides,
     },
   };
@@ -63,7 +70,10 @@ async function fixture(
 async function helperPid(dir: string): Promise<number> {
   const text = await readFile(join(dir, "helper.pid"), "utf8");
   const pid = Number.parseInt(text, 10);
-  assert.ok(Number.isInteger(pid) && pid > 0, `pid file holds ${JSON.stringify(text)}`);
+  assert.ok(
+    Number.isInteger(pid) && pid > 0,
+    `pid file holds ${JSON.stringify(text)}`,
+  );
   return pid;
 }
 
@@ -73,7 +83,12 @@ function alive(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return typeof error === "object" && error !== null && "code" in error && error.code === "EPERM";
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "EPERM"
+    );
   }
 }
 
@@ -100,7 +115,10 @@ test("a request round-trips and close leaves no process behind", async (t) => {
   await client.close();
   assert.equal(client.finished, true);
   assert.equal(alive(pid), false, `helper ${pid} survived close()`);
-  await assert.rejects(client.request("hash.sha256", { text: "abc" }), NativeUnavailableError);
+  await assert.rejects(
+    client.request("hash.sha256", { text: "abc" }),
+    NativeUnavailableError,
+  );
 });
 
 test("concurrent requests are matched by id, not by arrival order", async (t) => {
@@ -122,14 +140,17 @@ test("an error response becomes NativeError and the client stays usable", async 
   const client = await createNativeClient(options);
   t.after(() => client.close());
 
-  await assert.rejects(client.request("hash.sha256", { text: "abc" }), (error: unknown) => {
-    assert.ok(error instanceof NativeError);
-    assert.equal(error.code, -32602);
-    assert.equal(error.method, "hash.sha256");
-    assert.equal(error.helperPath, options.helperPath);
-    assert.match(error.message, /params rejected by fake helper/);
-    return true;
-  });
+  await assert.rejects(
+    client.request("hash.sha256", { text: "abc" }),
+    (error: unknown) => {
+      assert.ok(error instanceof NativeError);
+      assert.equal(error.code, -32602);
+      assert.equal(error.method, "hash.sha256");
+      assert.equal(error.helperPath, options.helperPath);
+      assert.match(error.message, /params rejected by fake helper/);
+      return true;
+    },
+  );
 
   assert.deepEqual(await client.request("native.version"), {
     protocol: 1,
@@ -143,15 +164,21 @@ test("a malformed response line is fatal and names the boundary", async (t) => {
   t.after(() => client.close());
   const pid = clientPid(client);
 
-  await assert.rejects(client.request("hash.sha256", { text: "abc" }), (error: unknown) => {
-    assert.ok(error instanceof NativeProtocolError);
-    assert.equal(error.helperPath, options.helperPath);
-    assert.match(error.message, /not JSON/);
-    return true;
-  });
+  await assert.rejects(
+    client.request("hash.sha256", { text: "abc" }),
+    (error: unknown) => {
+      assert.ok(error instanceof NativeProtocolError);
+      assert.equal(error.helperPath, options.helperPath);
+      assert.match(error.message, /not JSON/);
+      return true;
+    },
+  );
   assert.equal(client.finished || !alive(pid), true);
 
-  await assert.rejects(client.request("hash.sha256", { text: "abc" }), NativeUnavailableError);
+  await assert.rejects(
+    client.request("hash.sha256", { text: "abc" }),
+    NativeUnavailableError,
+  );
   await client.close();
   assert.equal(alive(pid), false, `helper ${pid} survived a protocol failure`);
 });
@@ -162,11 +189,14 @@ test("an oversized response line is refused at the byte cap", async (t) => {
   t.after(() => client.close());
   const pid = clientPid(client);
 
-  await assert.rejects(client.request("hash.sha256", { text: "abc" }), (error: unknown) => {
-    assert.ok(error instanceof NativeProtocolError);
-    assert.match(error.message, /over the 1048576-byte cap/);
-    return true;
-  });
+  await assert.rejects(
+    client.request("hash.sha256", { text: "abc" }),
+    (error: unknown) => {
+      assert.ok(error instanceof NativeProtocolError);
+      assert.match(error.message, /over the 1048576-byte cap/);
+      return true;
+    },
+  );
 
   await client.close();
   assert.equal(alive(pid), false, `helper ${pid} survived an oversized line`);
@@ -178,11 +208,14 @@ test("an answer for an id that was never sent is fatal", async (t) => {
   t.after(() => client.close());
   const pid = clientPid(client);
 
-  await assert.rejects(client.request("hash.sha256", { text: "abc" }), (error: unknown) => {
-    assert.ok(error instanceof NativeProtocolError);
-    assert.match(error.message, /which is not pending/);
-    return true;
-  });
+  await assert.rejects(
+    client.request("hash.sha256", { text: "abc" }),
+    (error: unknown) => {
+      assert.ok(error instanceof NativeProtocolError);
+      assert.match(error.message, /which is not pending/);
+      return true;
+    },
+  );
 
   await client.close();
   assert.equal(alive(pid), false);
@@ -201,7 +234,8 @@ test("a silent helper times out every request and close settles them", async (t)
 
   for (const outcome of settled) {
     assert.equal(outcome.status, "rejected");
-    const error: unknown = outcome.status === "rejected" ? outcome.reason : undefined;
+    const error: unknown =
+      outcome.status === "rejected" ? outcome.reason : undefined;
     assert.ok(error instanceof NativeTimeoutError);
     assert.equal(error.method, "hash.sha256");
     assert.equal(error.timeoutMs, 100);
@@ -252,12 +286,15 @@ test("a helper that exits before answering is unavailable", async (t) => {
   t.after(() => client.close());
   const pid = clientPid(client);
 
-  await assert.rejects(client.request("hash.sha256", { text: "abc" }), (error: unknown) => {
-    assert.ok(error instanceof NativeUnavailableError);
-    assert.equal(error.method, "hash.sha256");
-    assert.match(error.message, /code 4/);
-    return true;
-  });
+  await assert.rejects(
+    client.request("hash.sha256", { text: "abc" }),
+    (error: unknown) => {
+      assert.ok(error instanceof NativeUnavailableError);
+      assert.equal(error.method, "hash.sha256");
+      assert.match(error.message, /code 4/);
+      return true;
+    },
+  );
 
   await client.close();
   assert.equal(alive(pid), false);
@@ -278,7 +315,9 @@ test("a helper that exits during the handshake is unavailable", async (t) => {
 });
 
 test("a protocol version mismatch fails the handshake by name", async (t) => {
-  const { dir, options } = await fixture(t, "wrong-version", { closeGraceMs: 100 });
+  const { dir, options } = await fixture(t, "wrong-version", {
+    closeGraceMs: 100,
+  });
 
   await assert.rejects(createNativeClient(options), (error: unknown) => {
     assert.ok(error instanceof NativeProtocolError);
@@ -303,7 +342,10 @@ test("params over the documented cap are refused before writing", async (t) => {
     (error: unknown) => {
       assert.ok(error instanceof NativeProtocolError);
       assert.equal(error.method, "hash.sha256");
-      assert.match(error.message, new RegExp(`over the ${MAX_PARAMS_BYTES}-byte cap`));
+      assert.match(
+        error.message,
+        new RegExp(`over the ${MAX_PARAMS_BYTES}-byte cap`),
+      );
       return true;
     },
   );

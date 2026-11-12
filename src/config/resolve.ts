@@ -19,7 +19,7 @@
 import * as fs from "node:fs/promises";
 import type { Stats } from "node:fs";
 
-import { InvalidSettingsError, UnreadableSettingsError } from "./errors.ts";
+import { UnreadableSettingsError } from "./errors.ts";
 import {
   projectSettingsFile,
   resolvePath,
@@ -174,7 +174,6 @@ async function resolveOverlay(
     if (error instanceof UnreadableSettingsError) {
       return { kind: "dropped", path, reason: error.reason };
     }
-    if (error instanceof InvalidSettingsError) throw error;
     throw error;
   }
 }

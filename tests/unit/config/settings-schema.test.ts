@@ -83,11 +83,7 @@ test("a wrong type names the offending key path", () => {
 
 test("a wrong nested type names the full dotted path", () => {
   assert.throws(
-    () =>
-      parseSettingsDocument(
-        { mcp: { context7: { command: 7 } } },
-        SOURCE,
-      ),
+    () => parseSettingsDocument({ mcp: { context7: { command: 7 } } }, SOURCE),
     (error: unknown) => {
       assert.ok(error instanceof InvalidSettingsError);
       assert.equal(error.keyPath, "mcp.context7.command");
