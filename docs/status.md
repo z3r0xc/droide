@@ -32,8 +32,9 @@ cargo test --workspace                   # native layer (CI only here)
 | `plugin list` | **done** — user and project registries merged (project shadows), highest version per id, enablement from settings, `--scope` |
 | `update --check` | **done** — read-only check against this repository's GitHub releases (ADR 0007); installing is refused with exit 2 |
 | `exec` | **done** for `text`/`json`/`stream-json` with custom and managed models; streaming input, mission, ACP and `--list-tools` are refused loudly |
+| `daemon` | **local transport/protocol/lifecycle done** (132 tests); Remote Control, relay and the port proxy are `TODO(spec B28/B29/B32/B33)` |
 | `resume`, `mcp add/remove/auth/permissions`, `plugin install/uninstall/update/marketplace`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
-| bare `droide` | refuses with exit 64 until the interactive UI lands |
+| bare `droide` | **launches the interactive shell on a TTY pair**; a prompt argument still exits 64 until the shell accepts one |
 
 ## Specs
 
