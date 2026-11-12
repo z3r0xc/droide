@@ -21,11 +21,7 @@
  * do; no clock is read for timestamps the sink owns.
  */
 import type { Environment } from "../config/paths.ts";
-import type {
-  Message,
-  Role,
-  ToolResultBlock,
-} from "../agent/messages.ts";
+import type { Message, Role, ToolResultBlock } from "../agent/messages.ts";
 import { runTurn, type TurnOutcome as LoopTurnOutcome } from "../agent/loop.ts";
 import type {
   LoopClock,
@@ -136,7 +132,9 @@ function toJsonSchema(schema: Schema): Record<string, unknown> {
       const required: string[] = [];
       for (const [name, property] of Object.entries(schema.properties)) {
         properties[name] = toJsonSchema(property);
-        if (property.optional !== true && property.default === undefined) {
+        const hasDefault =
+          "default" in property && property.default !== undefined;
+        if (property.optional !== true && !hasDefault) {
           required.push(name);
         }
       }
@@ -366,7 +364,11 @@ export function createExecToolRunner(
 
       let outcome;
       try {
-        outcome = await options.registry.dispatch(definition.id, input, context);
+        outcome = await options.registry.dispatch(
+          definition.id,
+          input,
+          context,
+        );
       } catch (error) {
         if (executeOptions.signal.aborted || isAbort(error)) throw abortError();
         return errorResult(messageOf(error));
@@ -566,7 +568,11 @@ export function createExecTurnRunner(
       // B14: stop before the next request once a confirmation-class denial lands.
       const tools: LoopToolRunner = {
         async execute(name, input, executeOptions) {
-          const result = await options.tools.execute(name, input, executeOptions);
+          const result = await options.tools.execute(
+            name,
+            input,
+            executeOptions,
+          );
           if (options.tools.immediateDenial() !== undefined) {
             controller.abort();
           }
@@ -603,17 +609,18 @@ export function createExecTurnRunner(
         updatedAt: at,
       };
 
-      const outcome: LoopTurnOutcome = await (async (): Promise<LoopTurnOutcome> => {
-        try {
-          return await runTurn(deps, {
-            messages: [userMessage],
-            maxTurns: options.maxTurns,
-            signal: controller.signal,
-          });
-        } finally {
-          await chain;
-        }
-      })();
+      const outcome: LoopTurnOutcome =
+        await (async (): Promise<LoopTurnOutcome> => {
+          try {
+            return await runTurn(deps, {
+              messages: [userMessage],
+              maxTurns: options.maxTurns,
+              signal: controller.signal,
+            });
+          } finally {
+            await chain;
+          }
+        })();
 
       if (sinkFailure !== undefined) throw sinkFailure;
 

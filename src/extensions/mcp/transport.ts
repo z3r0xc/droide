@@ -53,7 +53,11 @@ export interface McpTransport {
     params?: unknown,
     options?: McpTransportRequestOptions,
   ): Promise<unknown>;
-  notify(method: string, params?: unknown): Promise<void>;
+  notify(
+    method: string,
+    params?: unknown,
+    options?: McpTransportRequestOptions,
+  ): Promise<void>;
   close(): Promise<void>;
   /**
    * Optional inbound channel. Server notifications are advisory (the client
@@ -210,8 +214,16 @@ function childEnvironment(
   return merged;
 }
 
-function abortReason(signal: AbortSignal): unknown {
-  const reason: unknown = signal.reason;
+/**
+ * Whether a caller's signal has fired. A function (not an inline comparison)
+ * so one abort check never narrows a later one: the signal changes underneath.
+ */
+export function isAborted(signal: AbortSignal | undefined): boolean {
+  return signal !== undefined && signal.aborted;
+}
+
+export function abortReason(signal: AbortSignal | undefined): unknown {
+  const reason: unknown = signal?.reason;
   return reason;
 }
 
@@ -263,8 +275,7 @@ export class StdioMcpTransport implements McpTransport {
   private exitDescription = "";
   private killPromise: Promise<void> | undefined;
   private notificationHandler:
-    | ((method: string, params: unknown) => void)
-    | undefined;
+    ((method: string, params: unknown) => void) | undefined;
   private readonly exitWaiters = new Set<() => void>();
 
   constructor(options: McpStdioTransportOptions) {
@@ -331,9 +342,12 @@ export class StdioMcpTransport implements McpTransport {
     this.child.stderr?.on("error", () => {
       // Diagnostics only: stderr never changes a request's outcome.
     });
-    this.child.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
-      this.handleExit(code, signal);
-    });
+    this.child.on(
+      "exit",
+      (code: number | null, signal: NodeJS.Signals | null) => {
+        this.handleExit(code, signal);
+      },
+    );
     this.child.on("error", (error: Error) => {
       this.failWith(
         () =>
@@ -355,6 +369,11 @@ export class StdioMcpTransport implements McpTransport {
     return this.stderrTail;
   }
 
+  /** Whether the stream can no longer be read. A getter, so each read is live. */
+  private get boundaryClosed(): boolean {
+    return this.state === "closed";
+  }
+
   setNotificationHandler(
     handler: (method: string, params: unknown) => void,
   ): void {
@@ -370,7 +389,7 @@ export class StdioMcpTransport implements McpTransport {
     if (closed !== undefined) return Promise.reject(closed);
 
     const signal = options.signal;
-    if (signal?.aborted === true) {
+    if (isAborted(signal)) {
       return Promise.reject(
         new McpCancelledError("not_sent", "aborted", {
           server: this.server,
@@ -441,7 +460,7 @@ export class StdioMcpTransport implements McpTransport {
     };
     this.pending.set(id, pending);
     signal?.addEventListener("abort", onAbort, { once: true });
-    if (signal?.aborted === true) {
+    if (isAborted(signal)) {
       onAbort();
       return promise;
     }
@@ -464,9 +483,24 @@ export class StdioMcpTransport implements McpTransport {
     return promise;
   }
 
-  notify(method: string, params?: unknown): Promise<void> {
+  notify(
+    method: string,
+    params?: unknown,
+    options: McpTransportRequestOptions = {},
+  ): Promise<void> {
     const closed = this.closedError(method, "not_sent");
     if (closed !== undefined) return Promise.reject(closed);
+    const signal = options.signal;
+    if (isAborted(signal)) {
+      return Promise.reject(
+        new McpCancelledError("not_sent", "aborted", {
+          server: this.server,
+          method,
+          transport: "stdio",
+          reason: abortReason(signal),
+        }),
+      );
+    }
 
     let line: string;
     try {
@@ -557,7 +591,7 @@ export class StdioMcpTransport implements McpTransport {
   }
 
   private handleChunk(chunk: Buffer): void {
-    if (this.state === "closed") return;
+    if (this.boundaryClosed) return;
     this.buffer =
       this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
 
@@ -576,7 +610,7 @@ export class StdioMcpTransport implements McpTransport {
         return;
       }
       this.consumeLine(line);
-      if (this.state === "closed") return;
+      if (this.boundaryClosed) return;
       newline = this.buffer.indexOf(0x0a);
     }
 
@@ -680,9 +714,12 @@ export class StdioMcpTransport implements McpTransport {
     if (this.abandoned.delete(id)) return;
     this.failWith(
       () =>
-        new McpProtocolError(`answered request id ${id}, which is not pending`, {
-          server: this.server,
-        }),
+        new McpProtocolError(
+          `answered request id ${id}, which is not pending`,
+          {
+            server: this.server,
+          },
+        ),
     );
   }
 
@@ -862,7 +899,7 @@ export class HttpMcpTransport implements McpTransport {
       });
     }
     const signal = options.signal;
-    if (signal?.aborted === true) {
+    if (isAborted(signal)) {
       throw new McpCancelledError("not_sent", "aborted", {
         server: this.server,
         method,
@@ -932,12 +969,25 @@ export class HttpMcpTransport implements McpTransport {
     }
   }
 
-  async notify(method: string, params?: unknown): Promise<void> {
+  async notify(
+    method: string,
+    params?: unknown,
+    options: McpTransportRequestOptions = {},
+  ): Promise<void> {
     if (this.state === "closed") {
       throw new McpCancelledError("not_sent", "client_closed", {
         server: this.server,
         method,
         transport: "http",
+      });
+    }
+    const signal = options.signal;
+    if (isAborted(signal)) {
+      throw new McpCancelledError("not_sent", "aborted", {
+        server: this.server,
+        method,
+        transport: "http",
+        reason: abortReason(signal),
       });
     }
     const body = JSON.stringify({
@@ -951,8 +1001,18 @@ export class HttpMcpTransport implements McpTransport {
         method: "POST",
         headers: this.requestHeaders(),
         body,
+        ...(signal === undefined ? {} : { signal }),
       });
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new McpCancelledError("in_flight", "aborted", {
+          server: this.server,
+          method,
+          transport: "http",
+          ...(signal === undefined ? {} : { reason: abortReason(signal) }),
+          cause: error,
+        });
+      }
       throw new McpConnectError(
         `MCP server "${this.server}" could not be reached at ${this.url}: ${messageOf(error)}`,
         { server: this.server, method, cause: error },

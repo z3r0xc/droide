@@ -8,13 +8,39 @@
  * (specs/10-cli-surface.md B26).
  */
 import { Command, InvalidArgumentError, Option } from "commander";
+import { randomUUID } from "node:crypto";
 
+import { processEnvironment } from "../../config/paths.ts";
+import { runExecCommand, type ExecArgv } from "../../exec/command.ts";
 import { renderExecHelp } from "../exec-help.ts";
 import { execHelpModels } from "../models.ts";
-import { notImplemented } from "../not-implemented.ts";
+import { PROGRAM } from "../brand.ts";
 
 interface ExecInvocationOptions {
   readonly help?: boolean;
+  readonly outputFormat?: string;
+  readonly inputFormat?: string;
+  readonly file?: string;
+  readonly auto?: string;
+  readonly skipPermissionsUnsafe?: boolean;
+  readonly sessionId?: string;
+  readonly fork?: string;
+  readonly model?: string;
+  readonly reasoningEffort?: string;
+  readonly specModel?: string;
+  readonly useSpec?: boolean;
+  readonly listTools?: boolean;
+  readonly mission?: boolean;
+  readonly cwd?: string;
+  readonly settings?: string;
+}
+
+/** Reads stdin to EOF; only called when the prompt is not on the command line. */
+async function readStdinText(): Promise<string> {
+  process.stdin.setEncoding("utf8");
+  let text = "";
+  for await (const chunk of process.stdin) text += chunk;
+  return text;
 }
 
 function parseToolList(value: string, previous: string[] = []): string[] {
@@ -209,13 +235,56 @@ export function makeExecCommand(): Command {
       "--settings <path>",
       "Path to runtime settings file merged for this process only",
     )
-    .action((_prompt: string | undefined, options: ExecInvocationOptions) => {
-      if (options.help === true) {
-        // The golden page carries the subject's own trailing blank line, so the
-        // renderer ends with one newline and the write supplies the second.
-        process.stdout.write(`${renderExecHelp(execHelpModels())}\n`);
-        return;
-      }
-      notImplemented("exec");
-    });
+    .action(
+      async (
+        prompt: string | undefined,
+        _options: ExecInvocationOptions,
+        command: Command,
+      ) => {
+        // The root command declares `--cwd`, `--settings`, `--auto` and
+        // `--use-spec` too, so Commander stores those on the parent; the merged
+        // view is the only one that sees every flag wherever it was written.
+        const options: Readonly<Record<string, unknown>> =
+          command.optsWithGlobals();
+        const text = (name: string): string | undefined => {
+          const value = options[name];
+          return typeof value === "string" ? value : undefined;
+        };
+        const flag = (name: string): boolean => options[name] === true;
+        if (flag("help")) {
+          // The golden page carries the subject's own trailing blank line, so the
+          // renderer ends with one newline and the write supplies the second.
+          process.stdout.write(`${renderExecHelp(execHelpModels())}\n`);
+          return;
+        }
+        const argv: ExecArgv = {
+          prompt,
+          file: text("file"),
+          outputFormat: text("outputFormat"),
+          inputFormat: text("inputFormat"),
+          model: text("model"),
+          reasoningEffort: text("reasoningEffort"),
+          auto: text("auto"),
+          skipPermissionsUnsafe: flag("skipPermissionsUnsafe"),
+          cwd: text("cwd"),
+          settings: text("settings"),
+          sessionId: text("sessionId"),
+          fork: text("fork"),
+          mission: flag("mission"),
+          useSpec: flag("useSpec"),
+          specModel: text("specModel"),
+          listTools: flag("listTools"),
+        };
+        process.exitCode = await runExecCommand(argv, {
+          program: PROGRAM,
+          environment: processEnvironment(),
+          stdout: process.stdout,
+          stderr: process.stderr,
+          stdinIsTTY: process.stdin.isTTY === true,
+          readStdin: readStdinText,
+          clock: Date.now,
+          nextId: randomUUID,
+        });
+      },
+    );
 }

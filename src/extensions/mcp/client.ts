@@ -31,7 +31,9 @@ import {
   type McpTimeoutPhase,
 } from "./errors.ts";
 import {
+  abortReason,
   createMcpTransport,
+  isAborted,
   systemMcpTimers,
   type McpFetch,
   type McpTimers,
@@ -80,18 +82,12 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function abortReason(signal: AbortSignal): unknown {
-  const reason: unknown = signal.reason;
-  return reason;
-}
-
 /** The `initialize` result, as far as this build reads it. */
 export interface McpInitializeResult {
   readonly protocolVersion: string;
   readonly capabilities: Readonly<Record<string, unknown>>;
   readonly serverInfo:
-    | { readonly name: string; readonly version: string }
-    | undefined;
+    { readonly name: string; readonly version: string } | undefined;
 }
 
 /** One tool from a listing, with every field validated. */
@@ -144,10 +140,13 @@ export function parseInitializeResult(
   server: string,
 ): McpInitializeResult {
   if (!isJsonObject(result)) {
-    throw new McpProtocolError("returned an initialize result that is not an object", {
-      server,
-      method: "initialize",
-    });
+    throw new McpProtocolError(
+      "returned an initialize result that is not an object",
+      {
+        server,
+        method: "initialize",
+      },
+    );
   }
   const protocolVersion = result["protocolVersion"];
   if (typeof protocolVersion !== "string" || protocolVersion === "") {
@@ -167,10 +166,10 @@ export function parseInitializeResult(
   let serverInfo: McpInitializeResult["serverInfo"];
   if (rawInfo !== undefined) {
     if (!isJsonObject(rawInfo)) {
-      throw new McpProtocolError(
-        "returned serverInfo that is not an object",
-        { server, method: "initialize" },
-      );
+      throw new McpProtocolError("returned serverInfo that is not an object", {
+        server,
+        method: "initialize",
+      });
     }
     const name = rawInfo["name"];
     const version = rawInfo["version"];
@@ -189,7 +188,8 @@ export function parseInitializeResult(
   };
 }
 
-const INVALID_TOOLS_LIST = "The MCP server returned an invalid tools/list result";
+const INVALID_TOOLS_LIST =
+  "The MCP server returned an invalid tools/list result";
 
 /**
  * Validate one `tools/list` page (B14). The page is parsed strictly first; a
@@ -246,7 +246,7 @@ type ParsedToolInfo =
       readonly reason: string;
     };
 
-function parseToolInfo(entry: unknown, server: string): ParsedToolInfo {
+function parseToolInfo(entry: unknown): ParsedToolInfo {
   if (!isJsonObject(entry)) {
     return { ok: false, name: undefined, reason: "the tool is not an object" };
   }
@@ -291,7 +291,6 @@ function parseToolInfo(entry: unknown, server: string): ParsedToolInfo {
       outputSchema: rawOutput,
     },
   };
-  void server;
 }
 
 /** Validate a `tools/call` result envelope (untrusted). */
@@ -466,4 +465,429 @@ export function renderToolCallResult(
   };
 }
 
-// __MCP_CLIENT_PART2__
+export interface McpClientOptions {
+  /** Canonical (normalized) server name; every identity carries it. */
+  readonly server: string;
+  readonly config: McpServerConfig;
+  /** Sent in `initialize`; the CLI passes its brand values. */
+  readonly clientInfo?: McpClientInfo;
+  readonly timers?: McpTimers;
+  readonly fetch?: McpFetch;
+  /** The session environment a stdio child starts from. */
+  readonly baseEnv?: Readonly<Record<string, string | undefined>>;
+  readonly cwd?: string;
+  readonly platform?: NodeJS.Platform;
+  readonly closeGraceMs?: number;
+  readonly maxFrameBytes?: number;
+  /** Replaces the config's `connectTimeout` and the transport default (B10). */
+  readonly connectTimeoutMs?: number;
+  /** Replaces the 15 s listing budget (B13). */
+  readonly listTimeoutMs?: number;
+  /** Replaces the server's `timeout` and the 180 s call budget (B20). */
+  readonly callTimeoutMs?: number;
+  /** Replaces the 60 s negative-cache lifetime (B13). */
+  readonly listingFailureTtlMs?: number;
+  /** Injected clock for the listing deadline and the cache. */
+  readonly now?: () => number;
+  /** A prepared transport; the client owns it and closes it. */
+  readonly transport?: McpTransport;
+}
+
+interface ListingFailure {
+  readonly at: number;
+  readonly error: McpError;
+}
+
+/**
+ * One server's MCP session. Construct it through {@link createMcpClient}, which
+ * also performs the handshake; a transport that fails mid-lifecycle settles
+ * every pending request and can never accept another.
+ */
+export class McpClient {
+  readonly server: string;
+  readonly config: McpServerConfig;
+
+  private readonly transport: McpTransport;
+  private readonly transportLabel: "stdio" | "http";
+  private readonly clientInfo: McpClientInfo;
+  private readonly timers: McpTimers;
+  private readonly now: () => number;
+  private readonly connectTimeoutMs: number;
+  private readonly listTimeoutMs: number;
+  private readonly callTimeoutMs: number;
+  private readonly listingFailureTtlMs: number;
+  private state: "new" | "connecting" | "open" | "closing" | "closed" = "new";
+  private closePromise: Promise<void> | undefined;
+  private listingFailure: ListingFailure | undefined;
+  private protocolVersionValue: string | undefined;
+  private capabilitiesValue: Readonly<Record<string, unknown>> = {};
+  private serverInfoValue: McpInitializeResult["serverInfo"];
+
+  constructor(options: McpClientOptions) {
+    this.server = options.server;
+    this.config = options.config;
+    this.transportLabel = options.config.type === "stdio" ? "stdio" : "http";
+    this.clientInfo = options.clientInfo ?? DEFAULT_MCP_CLIENT_INFO;
+    this.timers = options.timers ?? systemMcpTimers;
+    this.now = options.now ?? Date.now;
+    this.listTimeoutMs = options.listTimeoutMs ?? DEFAULT_MCP_LIST_TIMEOUT_MS;
+    this.callTimeoutMs =
+      options.callTimeoutMs ??
+      options.config.timeout ??
+      DEFAULT_MCP_CALL_TIMEOUT_MS;
+    this.listingFailureTtlMs =
+      options.listingFailureTtlMs ?? DEFAULT_MCP_LISTING_FAILURE_TTL_MS;
+    this.connectTimeoutMs =
+      options.connectTimeoutMs ??
+      options.config.connectTimeout ??
+      (options.config.type === "stdio"
+        ? DEFAULT_MCP_STDIO_CONNECT_TIMEOUT_MS
+        : DEFAULT_MCP_CONNECT_TIMEOUT_MS);
+    this.transport = options.transport ?? this.buildTransport(options);
+  }
+
+  private buildTransport(options: McpClientOptions): McpTransport {
+    return createMcpTransport(options.config, {
+      server: options.server,
+      timers: this.timers,
+      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+      ...(options.baseEnv === undefined ? {} : { baseEnv: options.baseEnv }),
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      ...(options.platform === undefined ? {} : { platform: options.platform }),
+      ...(options.closeGraceMs === undefined
+        ? {}
+        : { closeGraceMs: options.closeGraceMs }),
+      ...(options.maxFrameBytes === undefined
+        ? {}
+        : { maxFrameBytes: options.maxFrameBytes }),
+    });
+  }
+
+  /** Whether the handshake completed and the transport is still open. */
+  get connected(): boolean {
+    return this.state === "open";
+  }
+
+  /** The revision the server chose; `undefined` before the handshake. */
+  get protocolVersion(): string | undefined {
+    return this.protocolVersionValue;
+  }
+
+  get serverInfo(): McpInitializeResult["serverInfo"] {
+    return this.serverInfoValue;
+  }
+
+  get capabilities(): Readonly<Record<string, unknown>> {
+    return this.capabilitiesValue;
+  }
+
+  /**
+   * `initialize` then `notifications/initialized`, inside the connect budget
+   * (B10). A failure closes the transport, so a rejected connect leaves no
+   * process behind.
+   */
+  async connect(): Promise<void> {
+    if (this.state === "open") return;
+    if (this.state !== "new") {
+      throw new McpConnectError(
+        `MCP server "${this.server}" is already closed`,
+        { server: this.server, method: "initialize" },
+      );
+    }
+    this.state = "connecting";
+
+    try {
+      const result = await this.withinBudget(
+        (signal) =>
+          this.transport.request(
+            "initialize",
+            {
+              protocolVersion: MCP_PROTOCOL_VERSION,
+              capabilities: {},
+              clientInfo: this.clientInfo,
+            },
+            { signal },
+          ),
+        this.connectTimeoutMs,
+        "connect",
+        "initialize",
+        undefined,
+        undefined,
+      );
+      const initialized = parseInitializeResult(result, this.server);
+      this.protocolVersionValue = initialized.protocolVersion;
+      this.capabilitiesValue = initialized.capabilities;
+      this.serverInfoValue = initialized.serverInfo;
+
+      await this.withinBudget(
+        (signal) =>
+          this.transport.notify("notifications/initialized", undefined, {
+            signal,
+          }),
+        this.connectTimeoutMs,
+        "connect",
+        "notifications/initialized",
+        undefined,
+        undefined,
+      );
+    } catch (error) {
+      await this.transport.close();
+      this.state = "closed";
+      if (
+        error instanceof McpTimeoutError ||
+        error instanceof McpProtocolError ||
+        error instanceof McpConnectError
+      ) {
+        throw error;
+      }
+      throw new McpConnectError(
+        `MCP server "${this.server}" could not complete the initialize handshake: ${messageOf(error)}`,
+        { server: this.server, method: "initialize", cause: error },
+      );
+    }
+
+    this.state = "open";
+    this.transport.setNotificationHandler?.((method) => {
+      // B13: a listing-changed notification is manual recovery for the cache.
+      if (method === "notifications/tools/list_changed") {
+        this.listingFailure = undefined;
+      }
+    });
+  }
+
+  /** Forget the negative-cached listing failure (B13's manual recovery). */
+  clearListingFailure(): void {
+    this.listingFailure = undefined;
+  }
+
+  /**
+   * `tools/list`, following `nextCursor` inside one budget (B13). A distinct
+   * failure is remembered for `listingFailureTtlMs`; `refresh` clears it first.
+   *
+   * TODO(spec B13): the spec does not pin cursor following, so the page ceiling
+   * and the repeated-cursor refusal are this build's bounds.
+   */
+  async listTools(
+    options: {
+      readonly signal?: AbortSignal;
+      readonly refresh?: boolean;
+    } = {},
+  ): Promise<McpToolList> {
+    this.requireOpen("tools/list");
+    if (options.refresh === true) this.listingFailure = undefined;
+    const cached = this.listingFailure;
+    if (cached !== undefined) {
+      if (this.now() - cached.at < this.listingFailureTtlMs) throw cached.error;
+      this.listingFailure = undefined;
+    }
+
+    const budget = this.listTimeoutMs;
+    const deadline = this.now() + budget;
+    const tools: McpToolInfo[] = [];
+    const skipped: McpSkippedTool[] = [];
+    const names = new Set<string>();
+    const cursors = new Set<string>();
+
+    try {
+      let cursor: string | undefined;
+      for (let page = 0; ; page += 1) {
+        if (page >= MAX_TOOL_LIST_PAGES) {
+          throw new McpProtocolError(
+            `returned more than ${MAX_TOOL_LIST_PAGES} tools/list pages`,
+            { server: this.server, method: "tools/list" },
+          );
+        }
+        const remaining = deadline - this.now();
+        if (remaining <= 0) {
+          throw new McpTimeoutError("list", budget, {
+            server: this.server,
+            method: "tools/list",
+          });
+        }
+        const result = await this.withinBudget(
+          (signal) =>
+            this.transport.request(
+              "tools/list",
+              cursor === undefined ? {} : { cursor },
+              { signal },
+            ),
+          remaining,
+          "list",
+          "tools/list",
+          undefined,
+          options.signal,
+        );
+        const parsed = parseToolsListResult(result, this.server);
+        skipped.push(...parsed.skipped);
+        for (const tool of parsed.tools) {
+          if (names.has(tool.name)) {
+            skipped.push({ name: tool.name, reason: "duplicate tool name" });
+            continue;
+          }
+          names.add(tool.name);
+          tools.push(tool);
+        }
+        if (parsed.nextCursor === undefined) break;
+        if (cursors.has(parsed.nextCursor)) {
+          throw new McpProtocolError(
+            `returned the tools/list cursor "${parsed.nextCursor}" twice`,
+            { server: this.server, method: "tools/list" },
+          );
+        }
+        cursors.add(parsed.nextCursor);
+        cursor = parsed.nextCursor;
+      }
+    } catch (error) {
+      // A cancel is the caller's, not a server failure: never cached (B13).
+      if (error instanceof McpError && !(error instanceof McpCancelledError)) {
+        this.listingFailure = { at: this.now(), error };
+      }
+      throw error;
+    }
+
+    this.listingFailure = undefined;
+    return { tools, skipped };
+  }
+
+  /**
+   * `tools/call` inside the server's budget (B20). A result with `isError`
+   * becomes a `McpToolError` whose message is the rendered `Error: ...` text
+   * (B22); a successful call returns that text and the validated blocks.
+   */
+  async callTool(
+    tool: string,
+    args: Readonly<Record<string, unknown>> = {},
+    options: {
+      readonly signal?: AbortSignal;
+      readonly timeoutMs?: number;
+    } = {},
+  ): Promise<McpToolCallResult> {
+    this.requireOpen("tools/call", tool);
+    const budget = options.timeoutMs ?? this.callTimeoutMs;
+    const result = await this.withinBudget(
+      (signal) =>
+        this.transport.request(
+          "tools/call",
+          { name: tool, arguments: args },
+          { signal },
+        ),
+      budget,
+      "call",
+      "tools/call",
+      tool,
+      options.signal,
+    );
+    const parsed = parseCallToolResult(result, this.server, tool);
+    const rendered = renderToolCallResult(parsed);
+    if (parsed.isError) {
+      throw new McpToolError(rendered.text, {
+        server: this.server,
+        method: "tools/call",
+        tool,
+        text: rendered.text,
+      });
+    }
+    return rendered;
+  }
+
+  /** Close the transport and settle every pending request. Idempotent. */
+  close(): Promise<void> {
+    if (this.closePromise === undefined) {
+      this.closePromise = this.performClose();
+    }
+    return this.closePromise;
+  }
+
+  private async performClose(): Promise<void> {
+    this.state = "closing";
+    try {
+      await this.transport.close();
+    } finally {
+      this.state = "closed";
+    }
+  }
+
+  private requireOpen(method: string, tool?: string): void {
+    if (this.state === "open") return;
+    throw new McpCancelledError("not_sent", "client_closed", {
+      server: this.server,
+      method,
+      ...(tool === undefined ? {} : { tool }),
+      transport: this.transportLabel,
+    });
+  }
+
+  /**
+   * Run `start` inside `budgetMs`. The timer aborts the request and the timeout
+   * wins the race, so a slow server is never reported as a cancellation; an
+   * abort that came from the caller keeps the transport's `stage`.
+   */
+  private async withinBudget<T>(
+    start: (signal: AbortSignal) => Promise<T>,
+    budgetMs: number,
+    phase: McpTimeoutPhase,
+    method: string,
+    tool: string | undefined,
+    signal: AbortSignal | undefined,
+  ): Promise<T> {
+    if (isAborted(signal)) {
+      throw new McpCancelledError("not_sent", "aborted", {
+        server: this.server,
+        method,
+        ...(tool === undefined ? {} : { tool }),
+        transport: this.transportLabel,
+        reason: abortReason(signal),
+      });
+    }
+
+    const controller = new AbortController();
+    const onAbort = (): void => {
+      controller.abort();
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    let timedOut = false;
+    const cancel = this.timers.set(() => {
+      timedOut = true;
+      controller.abort();
+    }, budgetMs);
+
+    try {
+      return await start(controller.signal);
+    } catch (error) {
+      if (timedOut) {
+        throw new McpTimeoutError(phase, budgetMs, {
+          server: this.server,
+          method,
+          ...(tool === undefined ? {} : { tool }),
+          cause: error,
+        });
+      }
+      if (error instanceof McpCancelledError && isAborted(signal)) {
+        throw new McpCancelledError(error.stage, "aborted", {
+          server: this.server,
+          method,
+          ...(tool === undefined ? {} : { tool }),
+          transport: this.transportLabel,
+          reason: abortReason(signal),
+          cause: error,
+        });
+      }
+      throw error;
+    } finally {
+      cancel();
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+}
+
+/**
+ * Build a client and complete its handshake. Rejects with a typed MCP error
+ * after closing the transport, so a failed connect leaves nothing running.
+ */
+export async function createMcpClient(
+  options: McpClientOptions,
+): Promise<McpClient> {
+  const client = new McpClient(options);
+  await client.connect();
+  return client;
+}

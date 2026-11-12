@@ -1,7 +1,12 @@
 /** `search|find` command. Contract: `specs/40-sessions-and-storage.md`. */
 import { Command, Option } from "commander";
 
-import { notImplemented } from "../not-implemented.ts";
+import { createAppContext } from "../../app/context.ts";
+import { openSessionStore } from "../../session/store.ts";
+import {
+  type SearchCommandOptions,
+  runSearchCommand,
+} from "../search-command.ts";
 
 export function makeSearchCommand(): Command {
   return new Command("search")
@@ -36,5 +41,21 @@ export function makeSearchCommand(): Command {
     .option("--include-archived", "Include archived sessions")
     .option("--exclude-children", "Leave out sessions another session started")
     .option("--include-hidden", "Include sessions with no visible message")
-    .action(() => notImplemented("search"));
+    .action((query: string, options: SearchCommandOptions) => {
+      void runSearchCommand(query, options, {
+        openStore: async () => {
+          const app = await createAppContext();
+          return openSessionStore({
+            dbPath: app.paths.sessionIndexDatabase,
+            sessionsDir: app.paths.sessionsDir,
+            clock: { now: () => Date.now() },
+          });
+        },
+        write: (text) => process.stdout.write(text),
+        writeError: (text) => process.stderr.write(text),
+        setExitCode: (code) => {
+          process.exitCode = code;
+        },
+      });
+    });
 }

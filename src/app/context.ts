@@ -14,6 +14,8 @@ import {
   projectDir,
   projectSettingsFile,
   resolvePath,
+  sessionIndexDatabase,
+  sessionIndexDir,
   sessionsDir,
   userSettingsFile,
   worktreesRoot,
@@ -31,6 +33,8 @@ export interface AppPaths {
   readonly projectDir: string;
   readonly projectSettingsFile: string;
   readonly sessionsDir: string;
+  readonly sessionIndexDir: string;
+  readonly sessionIndexDatabase: string;
   readonly cacheDir: string;
   readonly logsDir: string;
   readonly worktreesRoot: string;
@@ -94,6 +98,8 @@ export async function createAppContext(
       projectDir: projectDir(environment),
       projectSettingsFile: projectSettingsFile(environment),
       sessionsDir: sessionsDir(environment),
+      sessionIndexDir: sessionIndexDir(environment),
+      sessionIndexDatabase: sessionIndexDatabase(environment),
       cacheDir: cacheDir(environment),
       logsDir: logsDir(environment),
       worktreesRoot: worktreesRoot(environment),
