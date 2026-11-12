@@ -124,8 +124,7 @@ export type HooksSettings = {
 };
 
 /** The merged settings a layer contributes. Every field is optional. */
-export interface Settings {
-  readonly general?: GeneralSettings;
+export interface Settings extends GeneralSettings {
   readonly mcp?: Readonly<Record<string, McpServerSettings>>;
   readonly hooks?: HooksSettings;
   readonly droids?: Readonly<Record<string, JsonObject>>;
