@@ -1,14 +1,14 @@
 {
-  "name": "droid-re-cli",
-  "version": "0.0.0",
+  "name": "droide",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Clean-room reimplementation of the droid CLI, built from specs/ (see docs/adr/0003).",
+  "description": "Clean-room reimplementation of the droid CLI: TypeScript product layer, Rust native helper.",
   "engines": {
     "node": ">=24.0.0"
   },
   "bin": {
-    "droid-re": "./bin/droid-re.mjs"
+    "droide": "./bin/droide.mjs"
   },
   "scripts": {
     "cli": "node src/main.ts",
@@ -31,5 +31,25 @@
     "@types/react": "^19.3.0",
     "prettier": "^3.10.1",
     "typescript": "^7.0.2"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/z3r0xc/droid-re.git"
+  },
+  "bugs": {
+    "url": "https://github.com/z3r0xc/droid-re/issues"
+  },
+  "homepage": "https://github.com/z3r0xc/droid-re#readme",
+  "keywords": [
+    "cli",
+    "agent",
+    "clean-room"
+  ],
+  "files": [
+    "src/**/*.ts",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ]
 }

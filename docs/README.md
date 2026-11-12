@@ -57,3 +57,15 @@ No subsystem spec has been written yet. No reimplementation code exists yet.
 | `tools/` | Deterministic analysers and extractors, each with tests |
 | `evidence/` | The evidence ledger: what was observed, derived, or inferred |
 | `raw/` | Untracked vendored upstream artefacts (binaries, reference sources) |
+
+## Documents
+
+| File | Purpose |
+|---|---|
+| `plan.md` | milestones, gates, definition of done |
+| `status.md` | living dashboard: what works, what is in flight, known gaps |
+| `gaps.md` | every `TODO(spec …)` marker, generated from code (`npm run gaps`) |
+| `release.md` | versioning, release gates, artefacts, rollback |
+| `rust-setup.md` | how the Rust toolchain is configured on this workstation |
+| `adr/` | architecture decisions, one file per decision |
+| `architecture/README.md` | evidence-derived map of the subject we reimplement |
