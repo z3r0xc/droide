@@ -7,6 +7,10 @@ import { test } from "node:test";
 import { createNativeClient } from "../../../src/native/client.ts";
 import {
   pathResolve,
+  ptyClose,
+  ptyKill,
+  ptyRead,
+  ptySpawn,
   ptyQuote,
   sandboxProfile,
   searchText,
@@ -86,5 +90,61 @@ test(
         "aGVsbG8=",
       );
     }
+  },
+);
+
+test(
+  "the real helper runs a command in a pseudo-terminal",
+  { skip: BINARY === undefined },
+  async (t) => {
+    const client = await createNativeClient({ helperPath: BINARY ?? "" });
+    t.after(() => client.close());
+
+    const windows = process.platform === "win32";
+    const sessionId = await ptySpawn(client, {
+      program: windows ? "cmd.exe" : "/bin/sh",
+      args: windows ? ["/c", "echo PTY-MARKER"] : ["-c", "echo PTY-MARKER"],
+      cols: 100,
+      rows: 30,
+    });
+
+    let text = "";
+    let exited = false;
+    let exitCode: number | null = null;
+    for (let attempt = 0; attempt < 40 && !exited; attempt += 1) {
+      const chunk = await ptyRead(client, sessionId, { timeoutMs: 100 });
+      text += Buffer.from(chunk.data, "base64").toString("utf8");
+      exited = chunk.exited;
+      if (chunk.exited) exitCode = chunk.exitCode;
+    }
+
+    assert.match(text, /PTY-MARKER/);
+    assert.equal(exited, true);
+    assert.equal(exitCode, 0);
+
+    // A closed session must refuse further reads with a typed error, not hang.
+    await ptyClose(client, sessionId);
+    await assert.rejects(ptyRead(client, sessionId, { timeoutMs: 10 }));
+  },
+);
+
+test(
+  "the real helper kills a long-running child",
+  { skip: BINARY === undefined },
+  async (t) => {
+    const client = await createNativeClient({ helperPath: BINARY ?? "" });
+    t.after(() => client.close());
+
+    const windows = process.platform === "win32";
+    const sessionId = await ptySpawn(client, {
+      program: windows ? "cmd.exe" : "/bin/sh",
+      args: windows ? ["/c", "ping -n 30 127.0.0.1 > nul"] : ["-c", "sleep 30"],
+      cols: 80,
+      rows: 24,
+    });
+
+    const code = await ptyKill(client, sessionId);
+    assert.equal(typeof code === "number" || code === null, true);
+    await ptyClose(client, sessionId);
   },
 );
