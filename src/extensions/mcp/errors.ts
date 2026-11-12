@@ -24,12 +24,6 @@ export interface McpErrorOptions {
   readonly cause?: unknown;
 }
 
-function causeOption(
-  cause: unknown,
-): { readonly cause: unknown } | undefined {
-  return cause === undefined ? undefined : { cause };
-}
-
 /** Base class: no MCP failure reaches a caller without its server's name. */
 export class McpError extends Error {
   readonly server: string;
@@ -37,7 +31,10 @@ export class McpError extends Error {
   readonly tool: string | undefined;
 
   constructor(message: string, options: McpErrorOptions) {
-    super(message, causeOption(options.cause));
+    super(
+      message,
+      options.cause === undefined ? undefined : { cause: options.cause },
+    );
     this.name = "McpError";
     this.server = options.server;
     this.method = options.method;

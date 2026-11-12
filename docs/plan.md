@@ -23,10 +23,11 @@ sections and ADRs.
 | M2 settings & paths | in progress |
 | M3 session store | in progress |
 | M4 transport & auth | in progress |
-| M6 tools core | in progress |
-| M7 exec streams | in progress |
-| M8 extensions core | in progress |
-| M10a native contract | in progress |
+| M6 tools core | **done** — registry, validators, permission matrix, fs/shell/todo |
+| M7 exec streams | **done** (protocols); end-to-end run in progress |
+| M8 extensions core | config/skills/plugins **done**; MCP client in progress |
+| M10a native contract | **done** — client with bounds, timeouts, typed failures |
+| M12 doctor | **done** — catalogue, six real probes, text/JSON reports |
 | M10b native Rust | blocked (toolchain, `docs/rust-setup.md`) |
 | M5 agent loop, M9 daemon, M11 UI | specified, not started (specs `20`, `70`, `95`) |
 
