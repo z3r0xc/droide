@@ -11,7 +11,10 @@ test("file_paths mode lists matching files, absolute and sorted", async () => {
     writeFileSync(fixture.path("a.txt"), "needle\n");
     writeFileSync(fixture.path("b.txt"), "nothing\n");
     assert.deepEqual(
-      await grepFiles({ pattern: "needle", path: fixture.root }, fixture.context),
+      await grepFiles(
+        { pattern: "needle", path: fixture.root },
+        fixture.context,
+      ),
       [fixture.path("a.txt")],
     );
   } finally {
@@ -68,7 +71,10 @@ test("case_insensitive and fixed_string change the match", async () => {
   try {
     writeFileSync(fixture.path("case.txt"), "NEEDLE\nprice is $5.00\n");
     assert.deepEqual(
-      await grepFiles({ pattern: "needle", case_insensitive: true }, fixture.context),
+      await grepFiles(
+        { pattern: "needle", case_insensitive: true },
+        fixture.context,
+      ),
       [fixture.path("case.txt")],
     );
     assert.equal(
@@ -76,7 +82,10 @@ test("case_insensitive and fixed_string change the match", async () => {
       "No matching files found",
     );
     assert.deepEqual(
-      await grepFiles({ pattern: "$5.00", fixed_string: true }, fixture.context),
+      await grepFiles(
+        { pattern: "$5.00", fixed_string: true },
+        fixture.context,
+      ),
       [fixture.path("case.txt")],
     );
   } finally {
@@ -91,7 +100,10 @@ test("glob_pattern and type filter the candidates", async () => {
     writeFileSync(fixture.path("nested", "one.ts"), "needle\n");
     writeFileSync(fixture.path("nested", "two.js"), "needle\n");
     assert.deepEqual(
-      await grepFiles({ pattern: "needle", glob_pattern: "*.ts" }, fixture.context),
+      await grepFiles(
+        { pattern: "needle", glob_pattern: "*.ts" },
+        fixture.context,
+      ),
       [fixture.path("nested", "one.ts")],
     );
     assert.deepEqual(
@@ -124,7 +136,10 @@ test("content mode with no match returns the other documented string", async () 
   try {
     writeFileSync(fixture.path("x.txt"), "nothing\n");
     assert.equal(
-      await grepFiles({ pattern: "needle", output_mode: "content" }, fixture.context),
+      await grepFiles(
+        { pattern: "needle", output_mode: "content" },
+        fixture.context,
+      ),
       "No matches found",
     );
   } finally {

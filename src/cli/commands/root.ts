@@ -87,42 +87,49 @@ export function makeRootCommand(program: Command): Command {
   program.addCommand(makeComputerCommand());
   program.addCommand(makeDoctorCommand());
 
-  program.action(async (options: { readonly settings?: string; readonly cwd?: string }, command: Command) => {
-    // The root declares no arguments on purpose: `[prompt...]` lives in the
-    // usage string, and every operand stays available as excess arguments.
-    const promptParts = command.args;
-    // A prompt with no terminal would start a session nobody can steer.
-    if (promptParts.length > 0 && !process.stdin.isTTY) {
-      writeRefusal(
-        {
-          ...(promptParts[0] === undefined
-            ? {}
-            : { promptWord: promptParts[0] }),
-          ...(process.env.TERM_PROGRAM === undefined
-            ? {}
-            : { termProgram: process.env.TERM_PROGRAM }),
-        },
-        (text) => process.stderr.write(text),
-      );
-      process.exit(1);
-    }
-    // Startup is where configuration becomes real: a malformed settings file
-    // must fail the run before any command does work (spec 10 §B79).
-    try {
-      const context = await createAppContext({
-        ...(options.settings === undefined ? {} : { settingsFlag: options.settings }),
-        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-      });
-      void context;
-    } catch (error) {
-      if (error instanceof ConfigError) {
-        process.stderr.write(`${PROGRAM}: ${error.message}\n`);
+  program.action(
+    async (
+      options: { readonly settings?: string; readonly cwd?: string },
+      command: Command,
+    ) => {
+      // The root declares no arguments on purpose: `[prompt...]` lives in the
+      // usage string, and every operand stays available as excess arguments.
+      const promptParts = command.args;
+      // A prompt with no terminal would start a session nobody can steer.
+      if (promptParts.length > 0 && !process.stdin.isTTY) {
+        writeRefusal(
+          {
+            ...(promptParts[0] === undefined
+              ? {}
+              : { promptWord: promptParts[0] }),
+            ...(process.env.TERM_PROGRAM === undefined
+              ? {}
+              : { termProgram: process.env.TERM_PROGRAM }),
+          },
+          (text) => process.stderr.write(text),
+        );
         process.exit(1);
       }
-      throw error;
-    }
-    notImplemented("interactive");
-  });
+      // Startup is where configuration becomes real: a malformed settings file
+      // must fail the run before any command does work (spec 10 §B79).
+      try {
+        const context = await createAppContext({
+          ...(options.settings === undefined
+            ? {}
+            : { settingsFlag: options.settings }),
+          ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        });
+        void context;
+      } catch (error) {
+        if (error instanceof ConfigError) {
+          process.stderr.write(`${PROGRAM}: ${error.message}\n`);
+          process.exit(1);
+        }
+        throw error;
+      }
+      notImplemented("interactive");
+    },
+  );
 
   return program;
 }

@@ -48,7 +48,10 @@ test("the cut never splits a code point", () => {
 test("a budget too small for the notice keeps only the notice", () => {
   const text = "x".repeat(100);
   const bounded = boundText(text, 5, "somewhere");
-  assert.match(bounded.text, /^\[\.\.\. \d+ bytes cut from the middle of 100; whole output: somewhere\]$/);
+  assert.match(
+    bounded.text,
+    /^\[\.\.\. \d+ bytes cut from the middle of 100; whole output: somewhere\]$/,
+  );
 });
 
 test("the notice names the cut, the total and where the whole output lives", () => {

@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -11,7 +17,10 @@ test("a new file is written with a trailing newline", async () => {
   const fixture = makeToolFixture();
   try {
     const file = fixture.path("new.txt");
-    const result = await createFile({ file_path: file, content: "hello" }, fixture.context);
+    const result = await createFile(
+      { file_path: file, content: "hello" },
+      fixture.context,
+    );
     assert.deepEqual(result, { success: true, file_path: file, created: true });
     assert.equal(readFileSync(file, "utf8"), "hello\n");
   } finally {
@@ -37,7 +46,10 @@ test("an overwrite preserves a UTF-16LE BOM and encoding", async () => {
     const file = fixture.path("utf16.txt");
     writeFileSync(
       file,
-      Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("a\r\n", "utf16le")]),
+      Buffer.concat([
+        Buffer.from([0xff, 0xfe]),
+        Buffer.from("a\r\n", "utf16le"),
+      ]),
     );
     await createFile({ file_path: file, content: "x" }, fixture.context);
     const bytes = readFileSync(file);
@@ -117,7 +129,10 @@ test("a failed atomic write leaves neither a partial target nor a temp file", as
 test("a successful write leaves no temp file behind", async () => {
   const fixture = makeToolFixture();
   try {
-    await createFile({ file_path: fixture.path("clean.txt"), content: "x" }, fixture.context);
+    await createFile(
+      { file_path: fixture.path("clean.txt"), content: "x" },
+      fixture.context,
+    );
     assert.deepEqual(
       readdirSync(fixture.root).filter((name) => name.endsWith(".tmp")),
       [],

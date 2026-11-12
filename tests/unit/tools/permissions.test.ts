@@ -57,23 +57,39 @@ const ROWS: readonly Row[] = [
   },
   {
     name: "Create / Edit / ApplyPatch inside the workspace",
-    request: { toolId: "edit-cli", toolClass: "file-edit", pathClass: "workspace" },
+    request: {
+      toolId: "edit-cli",
+      toolClass: "file-edit",
+      pathClass: "workspace",
+    },
     expected: ["ask", "allow", "allow", "allow", "allow"],
   },
   {
     name: "Create / Edit / ApplyPatch outside the workspace",
-    request: { toolId: "create-cli", toolClass: "file-edit", pathClass: "outside" },
+    request: {
+      toolId: "create-cli",
+      toolClass: "file-edit",
+      pathClass: "outside",
+    },
     expected: ["ask", "allow", "allow", "allow", "allow"],
   },
   {
     // B50: a deny floor is never overridable; a user denyWrite stays promptable.
     name: "file edit on a deny-floor path",
-    request: { toolId: "edit-cli", toolClass: "file-edit", pathClass: "deny-floor" },
+    request: {
+      toolId: "edit-cli",
+      toolClass: "file-edit",
+      pathClass: "deny-floor",
+    },
     expected: ["deny", "deny", "deny", "deny", "deny"],
   },
   {
     name: "file edit on a user denyWrite path",
-    request: { toolId: "edit-cli", toolClass: "file-edit", pathClass: "deny-write" },
+    request: {
+      toolId: "edit-cli",
+      toolClass: "file-edit",
+      pathClass: "deny-write",
+    },
     expected: ["ask", "ask", "ask", "ask", "ask"],
   },
   {
@@ -83,7 +99,11 @@ const ROWS: readonly Row[] = [
   },
   {
     name: "Execute, risk medium",
-    request: { toolId: "execute-cli", toolClass: "execute", riskLevel: "medium" },
+    request: {
+      toolId: "execute-cli",
+      toolClass: "execute",
+      riskLevel: "medium",
+    },
     expected: ["ask", "ask", "allow", "allow", "allow"],
   },
   {
@@ -140,14 +160,19 @@ const ROWS: readonly Row[] = [
 
 test("the permission matrix holds for every tool class and autonomy", () => {
   for (const row of ROWS) {
-    const actual = COLUMNS.map((column) => decide(row.request, contextFor(column)));
+    const actual = COLUMNS.map((column) =>
+      decide(row.request, contextFor(column)),
+    );
     assert.deepEqual(actual, row.expected, row.name);
   }
 });
 
 test("file edits prompt in an interactive session at every level", () => {
   for (const column of ["off", "low", "medium", "high"] as const) {
-    const context = { ...contextFor(column), interactionMode: "interactive" as const };
+    const context = {
+      ...contextFor(column),
+      interactionMode: "interactive" as const,
+    };
     assert.equal(
       decide(
         { toolId: "edit-cli", toolClass: "file-edit", pathClass: "workspace" },

@@ -10,7 +10,10 @@ test("entries are sorted by name with types and sizes from lstat", async () => {
   try {
     writeFileSync(fixture.path("b.txt"), "abc");
     mkdirSync(fixture.path("a-dir"));
-    const entries = await listDirectory({ directory_path: fixture.root }, fixture.context);
+    const entries = await listDirectory(
+      { directory_path: fixture.root },
+      fixture.context,
+    );
     assert.deepEqual(
       entries.map((entry) => [entry.name, entry.type, entry.size]),
       [
@@ -65,8 +68,14 @@ test("a symlink is reported as a symlink", async (context) => {
       context.skip("file symlinks are unavailable on this machine");
       return;
     }
-    const entries = await listDirectory({ directory_path: fixture.root }, fixture.context);
-    assert.equal(entries.find((entry) => entry.name === "link.txt")?.type, "symlink");
+    const entries = await listDirectory(
+      { directory_path: fixture.root },
+      fixture.context,
+    );
+    assert.equal(
+      entries.find((entry) => entry.name === "link.txt")?.type,
+      "symlink",
+    );
   } finally {
     fixture.cleanup();
   }
@@ -90,7 +99,10 @@ test("a missing directory is refused", async () => {
   const fixture = makeToolFixture();
   try {
     await assert.rejects(
-      listDirectory({ directory_path: fixture.path("absent") }, fixture.context),
+      listDirectory(
+        { directory_path: fixture.path("absent") },
+        fixture.context,
+      ),
       { message: /^Directory does not exist: / },
     );
   } finally {

@@ -140,15 +140,16 @@ function realPathOfExistingAncestor(target: string): string {
 }
 
 /**
- * Refuses a path that leaves the workspace root through a symlink: either the
- * real location of the resolved path is outside the real root, or the chain
- * cannot be resolved at all (B24).
+ * Refuses a path that was named inside the workspace root but whose real
+ * location leaves it through a symlink (B24). A path named outside the root is
+ * not a jail escape: the spec allows absolute paths anywhere.
  */
 export function assertNoSymlinkEscape(
   context: FsContext,
   given: string,
   resolved: string,
 ): void {
+  if (!isInside(context.root, resolved)) return;
   const rootReal = realPathOfExistingAncestor(context.root);
   const targetReal = realPathOfExistingAncestor(resolved);
   if (!isInside(rootReal, targetReal)) {

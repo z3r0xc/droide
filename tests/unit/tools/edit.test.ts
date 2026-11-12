@@ -20,7 +20,11 @@ test("an edit replaces the unique match and reports one replacement", async () =
       { file_path: file, old_str: "beta", new_str: "BETA" },
       fixture.context,
     );
-    assert.deepEqual(result, { success: true, file_path: file, replacements: 1 });
+    assert.deepEqual(result, {
+      success: true,
+      file_path: file,
+      replacements: 1,
+    });
     assert.equal(readFileSync(file, "utf8"), "alpha BETA gamma\n");
   } finally {
     fixture.cleanup();
@@ -33,7 +37,10 @@ test("an edit of a file that was not read is refused with the documented text", 
     const file = fixture.path("unread.txt");
     await seed(file, "x\n");
     await assert.rejects(
-      editFile({ file_path: file, old_str: "x", new_str: "y" }, fixture.context),
+      editFile(
+        { file_path: file, old_str: "x", new_str: "y" },
+        fixture.context,
+      ),
       (error: unknown) =>
         error instanceof Error &&
         error.message ===
@@ -53,7 +60,10 @@ test("an external change after the read is refused", async () => {
     await readText({ file_path: file }, fixture.context);
     appendFileSync(file, "two\n");
     await assert.rejects(
-      editFile({ file_path: file, old_str: "one", new_str: "1" }, fixture.context),
+      editFile(
+        { file_path: file, old_str: "one", new_str: "1" },
+        fixture.context,
+      ),
       (error: unknown) =>
         error instanceof Error &&
         error.message ===
@@ -87,7 +97,10 @@ test("text that is not present is refused", async () => {
     await seed(file, "content\n");
     await readText({ file_path: file }, fixture.context);
     await assert.rejects(
-      editFile({ file_path: file, old_str: "absent", new_str: "x" }, fixture.context),
+      editFile(
+        { file_path: file, old_str: "absent", new_str: "x" },
+        fixture.context,
+      ),
       /Error: The text to replace was not found in the file\./,
     );
   } finally {
@@ -102,7 +115,10 @@ test("an ambiguous match is refused unless change_all is set", async () => {
     await seed(file, "x x\n");
     await readText({ file_path: file }, fixture.context);
     await assert.rejects(
-      editFile({ file_path: file, old_str: "x", new_str: "y" }, fixture.context),
+      editFile(
+        { file_path: file, old_str: "x", new_str: "y" },
+        fixture.context,
+      ),
       /Found 2 occurrences of the specified text, but change_all is false\./,
     );
     const result = await editFile(
@@ -123,7 +139,10 @@ test("the line-join guard refuses a replacement that would swallow a newline", a
     await seed(file, "a\nb\n");
     await readText({ file_path: file }, fixture.context);
     await assert.rejects(
-      editFile({ file_path: file, old_str: "a\n", new_str: "c" }, fixture.context),
+      editFile(
+        { file_path: file, old_str: "a\n", new_str: "c" },
+        fixture.context,
+      ),
       /Error: old_str ends with a line break but new_str does not/,
     );
   } finally {
@@ -137,7 +156,10 @@ test("the file's final-newline convention is preserved", async () => {
     const file = fixture.path("nonewline.txt");
     await seed(file, "a\nb");
     await readText({ file_path: file }, fixture.context);
-    await editFile({ file_path: file, old_str: "b", new_str: "B\n" }, fixture.context);
+    await editFile(
+      { file_path: file, old_str: "b", new_str: "B\n" },
+      fixture.context,
+    );
     assert.equal(readFileSync(file, "utf8"), "a\nB");
   } finally {
     fixture.cleanup();
@@ -150,7 +172,10 @@ test("an edit preserves CRLF line endings", async () => {
     const file = fixture.path("crlf-edit.txt");
     writeFileSync(file, "a\r\nb\r\n");
     await readText({ file_path: file }, fixture.context);
-    await editFile({ file_path: file, old_str: "a", new_str: "x" }, fixture.context);
+    await editFile(
+      { file_path: file, old_str: "a", new_str: "x" },
+      fixture.context,
+    );
     assert.equal(readFileSync(file, "utf8"), "x\r\nb\r\n");
   } finally {
     fixture.cleanup();

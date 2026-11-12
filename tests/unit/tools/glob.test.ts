@@ -13,7 +13,10 @@ test("glob returns absolute paths for matching files, sorted", async () => {
     writeFileSync(fixture.path("src", "a.ts"), "");
     writeFileSync(fixture.path("src", "c.js"), "");
     const result = await globFiles({ patterns: "**/*.ts" }, fixture.context);
-    assert.deepEqual(result, [fixture.path("src", "a.ts"), fixture.path("src", "b.ts")]);
+    assert.deepEqual(result, [
+      fixture.path("src", "a.ts"),
+      fixture.path("src", "b.ts"),
+    ]);
   } finally {
     fixture.cleanup();
   }

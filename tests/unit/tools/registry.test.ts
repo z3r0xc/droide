@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { ToolContext } from "../../../src/tools/context.ts";
-import { ToolFailure, ToolRegistrationError } from "../../../src/tools/errors.ts";
+import {
+  ToolFailure,
+  ToolRegistrationError,
+} from "../../../src/tools/errors.ts";
 import {
   ToolRegistry,
   defineTool,
@@ -53,7 +56,10 @@ test("registration rejects non-array and unknown side effects", () => {
     () => registry.register(notArray as unknown as ToolDefinition),
     /Tool has invalid sandbox side-effect metadata/,
   );
-  const unknown = { ...makeTool("b", "B"), sideEffects: ["network", "telepathy"] };
+  const unknown = {
+    ...makeTool("b", "B"),
+    sideEffects: ["network", "telepathy"],
+  };
   assert.throws(
     () => registry.register(unknown as unknown as ToolDefinition),
     /Tool has invalid sandbox side-effect metadata/,

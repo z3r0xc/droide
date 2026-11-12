@@ -31,12 +31,20 @@ function makeExecFixture(): ExecFixture {
   const root = mkdtempSync(join(tmpdir(), "droide-exec-"));
   return {
     root,
-    environment: { env: { ...process.env }, home: root, platform: platform(), cwd: root },
+    environment: {
+      env: { ...process.env },
+      home: root,
+      platform: platform(),
+      cwd: root,
+    },
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
 
-function contextFor(fixture: ExecFixture): { root: string; environment: Environment } {
+function contextFor(fixture: ExecFixture): {
+  root: string;
+  environment: Environment;
+} {
   return { root: fixture.root, environment: fixture.environment };
 }
 
@@ -118,7 +126,10 @@ test("a missing riskLevel is denied with guidance naming the field", async () =>
       contextFor(fixture),
     );
     assert.equal(outcome.ok, false);
-    assert.match(outcome.ok ? "" : outcome.error, /missing required parameter "riskLevel"/);
+    assert.match(
+      outcome.ok ? "" : outcome.error,
+      /missing required parameter "riskLevel"/,
+    );
   } finally {
     fixture.cleanup();
   }
@@ -158,14 +169,15 @@ test("a timeout kills the whole tree, leaving no survivor", async () => {
           [
             'const { spawn } = require("node:child_process");',
             'const grandchild = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });',
-            'console.log(`child=${process.pid}`);',
-            'console.log(`grandchild=${grandchild.pid}`);',
+            "console.log(`child=${process.pid}`);",
+            "console.log(`grandchild=${grandchild.pid}`);",
             "setInterval(() => {}, 1000);",
             "",
           ].join("\n"),
         ),
         riskLevel: "low",
-        timeout: 1,
+        // Long enough for a loaded runner to start the helper and print.
+        timeout: 3,
       },
       contextFor(fixture),
     );
@@ -175,9 +187,13 @@ test("a timeout kills the whole tree, leaving no survivor", async () => {
     const pids = [...result.output.matchAll(/(?:child|grandchild)=(\d+)/g)].map(
       (match) => Number(match[1]),
     );
-    assert.equal(pids.length, 2);
+    assert.equal(pids.length, 2, result.output);
     for (const pid of pids) {
-      assert.equal(await waitForExit(pid), true, `process ${pid} survived the kill`);
+      assert.equal(
+        await waitForExit(pid),
+        true,
+        `process ${pid} survived the kill`,
+      );
     }
   } finally {
     fixture.cleanup();
