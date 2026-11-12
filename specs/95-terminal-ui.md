@@ -81,8 +81,8 @@ queued-message list, mission intro, agent status banner (or a blank spacer row),
 mode/autonomy + model row, organisation/compliance banner, model-blocked notices, migration
 status row, the composer (or the active pane), mission roster line, background-tasks panel, a
 footer banner, the footer hint row, and finally the configurable status line
-`[src/app.tsx:10644-10660]`, `[src/app.tsx:10690-10700]`, `[src/app.tsx:10825-10845]`,
-`[src/app.tsx:10905-10915]`, `[src/app.tsx:10945-10965]`.
+`[src/app.tsx:10644-10660]`, `[src/app.tsx:10690-10700]`, `[src/app.tsx:10720-10735]`,
+`[src/app.tsx:10866-10880]`, `[src/app.tsx:10900-10912]`, `[src/app.tsx:10957-10970]`.
 
 The transcript region is `width = terminal width`, and message content is laid out at
 `contentWidth = max(1, terminalWidth - 6)` `[src/app.tsx:2216-2219]`. The composer is

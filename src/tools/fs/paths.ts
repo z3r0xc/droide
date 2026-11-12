@@ -208,13 +208,21 @@ export function assertWritablePath(
   }
 }
 
-/** The read floor (B48/B49): credential files are never readable. */
-export function assertReadablePath(resolved: string, environment: Environment): void {
+/** Whether `resolved` names a credential file (B48/B49 read floor). */
+export function isCredentialFile(
+  resolved: string,
+  environment: Environment,
+): boolean {
   const factory = factoryDir(environment);
-  if (
+  return (
     protectedName(factory, resolved, CREDENTIAL_FILES, []) ||
     protectedName(factory, resolved, {}, CREDENTIAL_PREFIXES)
-  ) {
+  );
+}
+
+/** The read floor (B48/B49): credential files are never readable. */
+export function assertReadablePath(resolved: string, environment: Environment): void {
+  if (isCredentialFile(resolved, environment)) {
     throw new ToolFailure(`Sandbox: read denied to ${resolved}`);
   }
 }
