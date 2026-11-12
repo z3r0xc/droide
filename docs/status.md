@@ -16,8 +16,8 @@ cargo test --workspace                   # native layer (CI only here)
 | Area | State |
 |---|---|
 | Specifications | 11 subsystem specs + shared context, ~8.2k lines, all clauses cited and mapped to tests |
-| TypeScript product layer | 74 files, ~17k lines: CLI, config, session, agent loop, transport, exec, extensions, tools, native client |
-| Tests | 44 test files (unit + integration) |
+| TypeScript product layer | 75 files, ~17k lines: CLI, app, config, session, agent, transport, exec, extensions, tools, native client |
+| Tests | 56 test files; 489 tests (488 pass, 1 skipped) |
 | CLI parity | 20/20 recorded cases against the subject |
 | Native (Rust) | protocol crate + tests; builds only in CI (see `docs/rust-setup.md`) |
 
@@ -26,14 +26,14 @@ cargo test --workspace                   # native layer (CI only here)
 | Spec | Status | Implemented |
 |---|---|---|
 | `10-cli-surface.md` | stable | yes — root, subcommands, help, refusals, exit codes |
-| `20-agent-loop.md` | review | message model + turn loop (ports injected); context assembly pending |
-| `30-tools-and-sandbox.md` | review | registry, validators, permissions, fs/shell/todo tools |
-| `40-sessions-and-storage.md` | review | migrations, store, transcript, search |
-| `50-transport-and-auth.md` | review | URL/header/error/SSE/LLM delta layers |
-| `60-extensions-mcp-and-skills.md` | draft | MCP config merge, tool naming, skill discovery, plugin manifests |
+| `20-agent-loop.md` | review | message model, turn loop, LLM provider adapter; context assembly pending |
+| `30-tools-and-sandbox.md` | stable | registry, validators, permission matrix, fs/shell/todo tools |
+| `40-sessions-and-storage.md` | stable | migrations, store, transcript, search |
+| `50-transport-and-auth.md` | stable | URL/header/error/SSE/LLM delta layers |
+| `60-extensions-mcp-and-skills.md` | stable | MCP config merge, tool naming, skill discovery, plugin manifests |
 | `70-daemon-and-remote-control.md` | review | not started |
-| `80-exec-and-streaming.md` | review | record types, writer, one-shot runner, validation |
-| `90-native-layer.md` | review | TypeScript client + fake-helper tests; Rust helpers pending |
+| `80-exec-and-streaming.md` | stable | record types, writer, one-shot runner, validation |
+| `90-native-layer.md` | stable | TypeScript client + fake-helper tests; Rust helpers pending |
 | `95-terminal-ui.md` | review | not started |
 
 ## Known gaps and their owners
