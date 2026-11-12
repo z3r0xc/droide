@@ -52,6 +52,14 @@ import {
   type DaemonRequestEnvelope,
   type ProtocolVersionMismatch,
 } from "./protocol.ts";
+import {
+  PARENT_PID_POLL_INTERVAL_MS,
+  isProcessAlive,
+  watchParentPid,
+  watchLivenessPipe,
+  type LivenessPipeOpener,
+  type LivenessWatcher,
+} from "./liveness.ts";
 import { systemTimers, type DaemonTimers } from "./timers.ts";
 import {
   WS_CLOSE,
@@ -90,10 +98,10 @@ export type ParentChannelDisconnectListener = () => void;
 export interface DaemonParentChannel {
   readonly connected?: boolean;
   send(message: string): void;
-  on(event: "message", listener: ParentChannelMessageListener): void;
-  on(event: "disconnect", listener: ParentChannelDisconnectListener): void;
-  off?(event: "message", listener: ParentChannelMessageListener): void;
-  off?(event: "disconnect", listener: ParentChannelDisconnectListener): void;
+  onMessage(listener: ParentChannelMessageListener): void;
+  onDisconnect(listener: ParentChannelDisconnectListener): void;
+  offMessage?(listener: ParentChannelMessageListener): void;
+  offDisconnect?(listener: ParentChannelDisconnectListener): void;
 }
 
 /** Where the daemon ended up listening. */
@@ -145,6 +153,16 @@ export interface DaemonServerOptions {
     context: DaemonMethodContext,
   ) => void;
   readonly parentChannel?: DaemonParentChannel;
+  /** `--parent-pid`: polled for liveness (B10). */
+  readonly parentPid?: number;
+  /** `--liveness-fd`: the inherited pipe that ends when the parent is gone. */
+  readonly livenessFd?: number;
+  /** Defaults to 2000 ms (B10). */
+  readonly parentPollIntervalMs?: number;
+  /** Defaults to {@link watchLivenessPipe}; a test seam. */
+  readonly openLiveness?: LivenessPipeOpener;
+  /** Defaults to {@link isProcessAlive}; a test seam. */
+  readonly isProcessAlive?: (pid: number) => boolean;
   readonly remoteControl?: boolean;
   /** Injected `sd_notify`; called with `READY=1` after the bind (B5). */
   readonly notifyReady?: (state: string) => void;
@@ -340,6 +358,12 @@ class DaemonConnection {
     if (this.closed) return;
     this.closed = true;
     this.transport.close(code, reason);
+  }
+
+  /** Forced teardown: drop the transport without a closing handshake. */
+  terminate(): void {
+    this.closed = true;
+    this.transport.terminate?.();
   }
 
   waitForClose(): Promise<void> {
@@ -619,6 +643,12 @@ export class DaemonServer {
   private readonly onNotification:
     | ((method: string, params: unknown, context: DaemonMethodContext) => void)
     | undefined;
+  private readonly parentPid: number | undefined;
+  private readonly livenessFd: number | undefined;
+  private readonly parentPollIntervalMs: number;
+  private readonly openLiveness: LivenessPipeOpener;
+  private readonly isAlive: (pid: number) => boolean;
+  private livenessWatchers: LivenessWatcher[] = [];
 
   private httpServer: Server | undefined;
   private ipcTransport: IpcTransport | undefined;
@@ -660,6 +690,12 @@ export class DaemonServer {
     this.shutdownSteps = options.shutdownSteps ?? [];
     this.onShutdownStep = options.onShutdownStep;
     this.onNotification = options.onNotification;
+    this.parentPid = options.parentPid;
+    this.livenessFd = options.livenessFd;
+    this.parentPollIntervalMs =
+      options.parentPollIntervalMs ?? PARENT_PID_POLL_INTERVAL_MS;
+    this.openLiveness = options.openLiveness ?? watchLivenessPipe;
+    this.isAlive = options.isProcessAlive ?? isProcessAlive;
     this.connectionStatus = {
       supportsRequestCwd: true,
       supportsPullRequestRecords: true,
@@ -722,6 +758,7 @@ export class DaemonServer {
         endpoint = { kind: "ipc" };
       }
       this.endpointValue = endpoint;
+      this.startLiveness();
       this.started = true;
       this.announce(endpoint);
       return endpoint;
@@ -782,8 +819,8 @@ export class DaemonServer {
       void this.stop("ipc-disconnected");
     };
     this.ipcListeners = { message, disconnect };
-    channel.on("message", message);
-    channel.on("disconnect", disconnect);
+    channel.onMessage(message);
+    channel.onDisconnect(disconnect);
   }
 
   private async bind(
@@ -885,6 +922,33 @@ export class DaemonServer {
     }
   }
 
+  /** B10: the parent-death monitors start once the endpoint exists. */
+  private startLiveness(): void {
+    if (this.parentPid !== undefined) {
+      this.livenessWatchers.push(
+        watchParentPid({
+          pid: this.parentPid,
+          intervalMs: this.parentPollIntervalMs,
+          timers: this.timers,
+          isAlive: this.isAlive,
+          onDead: () => this.requestShutdown("parent-process-gone"),
+        }),
+      );
+    }
+    if (this.livenessFd !== undefined) {
+      this.livenessWatchers.push(
+        this.openLiveness(this.livenessFd, () =>
+          this.requestShutdown("liveness-pipe-closed"),
+        ),
+      );
+    }
+  }
+
+  private stopLiveness(): void {
+    for (const watcher of this.livenessWatchers) watcher.stop();
+    this.livenessWatchers = [];
+  }
+
   private announce(endpoint: DaemonEndpoint): void {
     if (this.notifyReady !== undefined) {
       try {
@@ -976,6 +1040,7 @@ export class DaemonServer {
 
   private internalSteps(): readonly DaemonShutdownStep[] {
     return [
+      { name: "liveness-monitor", stop: () => this.stopLiveness() },
       { name: "ipc-server", stop: () => this.closeIpc() },
       { name: "web-socket-server", stop: () => this.closeWebSocketServer() },
     ];
@@ -1010,14 +1075,15 @@ export class DaemonServer {
     const listeners = this.ipcListeners;
     this.ipcListeners = undefined;
     if (channel === undefined || listeners === undefined) return;
-    channel.off?.("message", listeners.message);
-    channel.off?.("disconnect", listeners.disconnect);
+    channel.offMessage?.(listeners.message);
+    channel.offDisconnect?.(listeners.disconnect);
   }
 
   private forceClose(): void {
+    this.stopLiveness();
     this.removeIpcListeners();
     for (const connection of this.connections) {
-      connection.close(WS_CLOSE.goingAway, "daemon shutting down");
+      connection.terminate();
     }
     this.connections.clear();
     const server = this.httpServer;

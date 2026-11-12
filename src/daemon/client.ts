@@ -43,6 +43,7 @@ import {
 } from "./protocol.ts";
 import { systemTimers, type DaemonTimers } from "./timers.ts";
 import {
+  WS_CLOSE,
   connectWebSocket,
   type DaemonTarget,
   type DaemonTransport,
@@ -393,8 +394,9 @@ export class DaemonClient {
   private handleMalformedFrame(error: unknown): void {
     const detail =
       error instanceof DaemonProtocolError ? error.message : messageOf(error);
+    // B19: pending work rejects with the close code the transport uses.
     const failure = new DaemonConnectionClosedError(
-      JSON_RPC_ERRORS.parse,
+      WS_CLOSE.invalidPayload,
       `unparseable frame: ${detail}`,
     );
     const transport = this.transportValue;

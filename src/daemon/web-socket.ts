@@ -65,6 +65,8 @@ export interface DaemonTransport {
   send(text: string): void;
   sendBinary?(bytes: Uint8Array): void;
   close(code?: number, reason?: string): void;
+  /** Drop the connection without the closing handshake (forced shutdown). */
+  terminate?(): void;
   readonly closed: boolean;
   waitForClose(): Promise<void>;
   setHandlers(handlers: DaemonTransportHandlers): void;
@@ -292,6 +294,7 @@ class SocketTransport implements ServerWebSocketTransport {
   private handlers: DaemonTransportHandlers | undefined;
   private closeInfo: { code: number; reason: string } | undefined;
   private didClose = false;
+  private closeSent = false;
 
   constructor(socket: Duplex, maskOutbound: boolean) {
     this.socket = socket;
@@ -339,18 +342,25 @@ class SocketTransport implements ServerWebSocketTransport {
     if (this.closeInfo === undefined) {
       this.closeInfo = { code, reason };
     }
-    if (this.socket.destroyed || !this.socket.writable) {
-      this.socket.destroy();
-      return;
+    if (this.socket.destroyed) return;
+    if (!this.closeSent) {
+      this.closeSent = true;
+      const payload = Buffer.alloc(2 + Buffer.byteLength(reason, "utf8"));
+      payload.writeUInt16BE(code, 0);
+      payload.write(reason, 2, "utf8");
+      if (this.socket.writable) {
+        this.socket.write(
+          encodeFrame(OPCODE.close, payload, { mask: this.maskOutbound }),
+        );
+      }
     }
-    const payload = Buffer.alloc(2 + Buffer.byteLength(reason, "utf8"));
-    payload.writeUInt16BE(code, 0);
-    payload.write(reason, 2, "utf8");
-    this.socket.write(
-      encodeFrame(OPCODE.close, payload, { mask: this.maskOutbound }),
-    );
-    this.socket.end();
-    this.socket.end();
+    // `finish` fires once the close frame is flushed; destroying then keeps a
+    // peer that never answers from holding the process open.
+    this.socket.end(() => this.socket.destroy());
+  }
+
+  terminate(): void {
+    this.socket.destroy();
   }
 
   waitForClose(): Promise<void> {
@@ -380,13 +390,13 @@ class SocketTransport implements ServerWebSocketTransport {
             ? { code: WS_CLOSE.normal, reason: "" }
             : { code: info.code, reason: info.reason };
       }
+      this.closeSent = true;
       if (this.socket.writable) {
         this.socket.write(
           encodeFrame(OPCODE.close, payload, { mask: this.maskOutbound }),
         );
       }
-      this.socket.end();
-      this.socket.end();
+      this.socket.end(() => this.socket.destroy());
     }
   }
 
@@ -554,9 +564,25 @@ function handshakeAccepted(head: string, expected: string): boolean {
   return false;
 }
 
-/** Create the HTTP server a daemon binds; non-upgrade requests get 404. */
+/** The body the desktop's pre-kill probe reads (B33). */
+export const HEALTH_BODY = "factory-daemon ok";
+
+/**
+ * Create the HTTP server a daemon binds. `GET /health` answers `200` with
+ * {@link HEALTH_BODY} without authenticating; everything else is `404`.
+ *
+ * TODO(spec B33): the token-gated `/port-proxy/<port>` surface (query token,
+ * cookie exchange, traversal refusal) is not implemented, so those requests
+ * answer 404 instead of proxying or refusing with 401.
+ */
 export function createDaemonHttpServer(): Server {
-  return createServer((_request, response) => {
+  return createServer((request, response) => {
+    if (request.method === "GET" && request.url === "/health") {
+      response.statusCode = 200;
+      response.setHeader("Content-Type", "text/plain; charset=utf-8");
+      response.end(HEALTH_BODY);
+      return;
+    }
     response.statusCode = 404;
     response.end("Not Found");
   });

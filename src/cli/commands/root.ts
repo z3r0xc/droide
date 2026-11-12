@@ -2,7 +2,11 @@
 import { Command } from "commander";
 
 import { DISPLAY, DOCS_URL, PROGRAM, VERSION } from "../brand.ts";
-import { createAppContext } from "../../app/context.ts";
+import {
+  createAppContext,
+  type AppContext,
+  type CreateAppContextOptions,
+} from "../../app/context.ts";
 import { ConfigError } from "../../config/errors.ts";
 import { addRuntimeOptions, examplesBlock } from "../help.ts";
 import { notImplemented } from "../not-implemented.ts";
@@ -29,7 +33,143 @@ const EXAMPLES = [
   [`${PROGRAM} update`, "Check for and install updates manually"],
 ] as const;
 
-export function makeRootCommand(program: Command): Command {
+/** The two streams a terminal launch owns. */
+export interface LaunchStreams {
+  readonly stdin: NodeJS.ReadStream;
+  readonly stdout: NodeJS.WriteStream;
+}
+
+/**
+ * The interactive dispatch (`specs/95-terminal-ui.md`, `specs/10-cli-surface.md`
+ * §B20). Kept as a type here so the Ink/React module graph loads only when a
+ * launch actually reaches a terminal.
+ */
+export type LaunchInteractive = (
+  context: AppContext,
+  streams: LaunchStreams,
+) => Promise<number>;
+
+/**
+ * Everything the default command needs from the outside. `process` is read
+ * once, here, so the dispatch contract is testable without mocking it.
+ */
+export interface DefaultCommandRuntime {
+  readonly stdin: NodeJS.ReadStream;
+  readonly stdout: NodeJS.WriteStream;
+  readonly stderr: NodeJS.WriteStream;
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly createContext: (
+    options: CreateAppContextOptions,
+  ) => Promise<AppContext>;
+  readonly launchInteractive: LaunchInteractive;
+  readonly setExitCode: (code: number) => void;
+  readonly exit: (code: number) => void;
+  readonly unimplemented: (command: string) => void;
+}
+
+/** True when the launch owns a terminal on both ends (`95` §B18). */
+export function isInteractiveTerminal(
+  streams: Pick<DefaultCommandRuntime, "stdin" | "stdout">,
+): boolean {
+  return streams.stdin.isTTY === true && streams.stdout.isTTY === true;
+}
+
+const processRuntime: DefaultCommandRuntime = {
+  stdin: process.stdin,
+  stdout: process.stdout,
+  stderr: process.stderr,
+  env: process.env,
+  createContext: createAppContext,
+  // Loaded lazily: `--help`, `--version` and every subcommand must not pay for
+  // React and Ink, and must never write a terminal sequence.
+  launchInteractive: async (context, streams) => {
+    const { runInteractiveShell } = await import("../../app/interactive.ts");
+    return runInteractiveShell({
+      context,
+      stdin: streams.stdin,
+      stdout: streams.stdout,
+    });
+  },
+  setExitCode: (code) => {
+    process.exitCode = code;
+  },
+  exit: (code) => {
+    process.exit(code);
+  },
+  unimplemented: notImplemented,
+};
+
+/**
+ * The default command: the non-TTY refusal first, configuration resolution
+ * second, then the interactive surface when — and only when — both streams are
+ * terminals. Every other launch stays loudly unimplemented.
+ */
+export async function runDefaultCommand(
+  promptParts: readonly string[],
+  options: { readonly settings?: string; readonly cwd?: string },
+  runtime: DefaultCommandRuntime,
+): Promise<void> {
+  // A prompt with no terminal would start a session nobody can steer.
+  if (promptParts.length > 0 && runtime.stdin.isTTY !== true) {
+    const promptWord = promptParts[0];
+    const termProgram = runtime.env.TERM_PROGRAM;
+    writeRefusal(
+      {
+        ...(promptWord === undefined ? {} : { promptWord }),
+        ...(termProgram === undefined ? {} : { termProgram }),
+      },
+      (text) => runtime.stderr.write(text),
+    );
+    runtime.exit(1);
+    return;
+  }
+
+  // Startup is where configuration becomes real: a malformed settings file
+  // must fail the run before any command does work (spec 10 §B79).
+  let context: AppContext;
+  try {
+    context = await runtime.createContext({
+      ...(options.settings === undefined
+        ? {}
+        : { settingsFlag: options.settings }),
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    });
+  } catch (error) {
+    if (!(error instanceof ConfigError)) throw error;
+    runtime.stderr.write(`${PROGRAM}: ${error.message}\n`);
+    runtime.exit(1);
+    return;
+  }
+
+  // `tui [prompt...]` starts the session with that prompt; the shell has no
+  // agent loop to receive it yet, so that path stays loud instead of dropping
+  // the user's words.
+  if (promptParts.length > 0 || !isInteractiveTerminal(runtime)) {
+    runtime.unimplemented("interactive");
+    return;
+  }
+
+  try {
+    runtime.setExitCode(
+      await runtime.launchInteractive(context, {
+        stdin: runtime.stdin,
+        stdout: runtime.stdout,
+      }),
+    );
+  } catch (error) {
+    // The shell refuses a terminal that cannot host it (`95` §B18); the CLI
+    // falls back to the same loud unfinished-mode exit rather than crashing.
+    const { InteractiveUnavailableError } =
+      await import("../../app/interactive.ts");
+    if (!(error instanceof InteractiveUnavailableError)) throw error;
+    runtime.unimplemented("interactive");
+  }
+}
+
+export function makeRootCommand(
+  program: Command,
+  runtime: DefaultCommandRuntime = processRuntime,
+): Command {
   program
     .name(PROGRAM)
     .usage("[options] [command] [prompt...]")
@@ -94,40 +234,7 @@ export function makeRootCommand(program: Command): Command {
     ) => {
       // The root declares no arguments on purpose: `[prompt...]` lives in the
       // usage string, and every operand stays available as excess arguments.
-      const promptParts = command.args;
-      // A prompt with no terminal would start a session nobody can steer.
-      if (promptParts.length > 0 && !process.stdin.isTTY) {
-        writeRefusal(
-          {
-            ...(promptParts[0] === undefined
-              ? {}
-              : { promptWord: promptParts[0] }),
-            ...(process.env.TERM_PROGRAM === undefined
-              ? {}
-              : { termProgram: process.env.TERM_PROGRAM }),
-          },
-          (text) => process.stderr.write(text),
-        );
-        process.exit(1);
-      }
-      // Startup is where configuration becomes real: a malformed settings file
-      // must fail the run before any command does work (spec 10 §B79).
-      try {
-        const context = await createAppContext({
-          ...(options.settings === undefined
-            ? {}
-            : { settingsFlag: options.settings }),
-          ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-        });
-        void context;
-      } catch (error) {
-        if (error instanceof ConfigError) {
-          process.stderr.write(`${PROGRAM}: ${error.message}\n`);
-          process.exit(1);
-        }
-        throw error;
-      }
-      notImplemented("interactive");
+      await runDefaultCommand(command.args, options, runtime);
     },
   );
 

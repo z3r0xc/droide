@@ -33,12 +33,17 @@ import {
   type KeyAction,
   type KeyState,
 } from "../ui/keys.ts";
-import { renderShell, type ShellHandle } from "../ui/render.ts";
+import {
+  renderShell,
+  type ShellHandle,
+  type ShellTarget,
+} from "../ui/render.ts";
 import {
   planTerminal,
   setupTerminal,
   type SignalSource,
   type TerminalSession,
+  type TerminationSignal,
 } from "../ui/setup.ts";
 import {
   HEADER_SHORTCUTS,
@@ -50,6 +55,15 @@ import type { TranscriptEntry } from "../ui/transcript.ts";
 
 /** The exit code for the `Ctrl+C` exit; `/quit` exits 0. */
 export const INTERRUPT_EXIT_CODE = 130;
+
+/** The exit code when the terminal raises `SIGTERM` (128 + 15). */
+export const TERMINATE_EXIT_CODE = 143;
+
+/** How the shell is mounted; tests inject a failing mount. */
+export type ShellMounter = (
+  props: ShellProps,
+  target: ShellTarget,
+) => Promise<ShellHandle>;
 
 /** Injectable timers, so a test never waits and never leaves one scheduled. */
 export interface TimerApi {
@@ -79,6 +93,8 @@ export interface InteractiveShellOptions {
   readonly installSafetyNet?: boolean;
   readonly version?: string;
   readonly model?: string;
+  /** Overrides `renderShell`; only tests use it (to prove the throw path). */
+  readonly mount?: ShellMounter;
 }
 
 /** Raised when the surface is asked for on streams that are not a TTY (B18). */
@@ -129,6 +145,7 @@ async function mountSession(
   options: InteractiveShellOptions,
   size: { readonly columns: number; readonly rows: number },
   props: ShellProps,
+  onSignal: (signal: TerminationSignal) => void,
 ): Promise<MountedSession> {
   const terminal = setupTerminal({
     stdin: options.stdin,
@@ -140,13 +157,14 @@ async function mountSession(
         options.context.environment.env.TMUX !== undefined ||
         options.context.environment.env.STY !== undefined,
     }),
+    onSignal,
     ...(options.signals === undefined ? {} : { signals: options.signals }),
     ...(options.installSafetyNet === undefined
       ? {}
       : { installSafetyNet: options.installSafetyNet }),
   });
   try {
-    const handle = await renderShell(props, {
+    const handle = await (options.mount ?? renderShell)(props, {
       stdout: options.stdout,
       stdin: options.stdin,
       columns: size.columns,
@@ -224,11 +242,20 @@ export async function runInteractiveShell(
     footer: {},
   });
 
+  // Signals restore the terminal inside `setupTerminal`; deciding the exit code
+  // is this module's job. The hook is installed after `close` exists, and a
+  // signal that lands before then is remembered rather than dropped.
+  let pendingSignal: TerminationSignal | undefined;
+  let handleSignal: ((signal: TerminationSignal) => void) | undefined;
   const mounted = await mountSession(
     capabilities,
     options,
     { columns, rows },
     buildProps(),
+    (signal) => {
+      if (handleSignal === undefined) pendingSignal = signal;
+      else handleSignal(signal);
+    },
   );
 
   const result = Promise.withResolvers<number>();
@@ -244,13 +271,19 @@ export async function runInteractiveShell(
   };
 
   const paint = (): Promise<void> => {
+    if (settled) return paintChain;
     paintChain = paintChain.then(() =>
       mounted.handle.rerender(buildProps(), { columns: width, rows: height }),
     );
+    // A failed render must end the session cleanly, not freeze it behind a
+    // rejected chain that every later paint silently skips.
+    paintChain = paintChain.catch((error: unknown) => {
+      fail(error);
+    });
     return paintChain;
   };
 
-  const close = async (code: number): Promise<void> => {
+  const close = async (code: number, failure?: unknown): Promise<void> => {
     if (settled) return;
     settled = true;
     options.stdin.off("data", onData);
@@ -268,11 +301,21 @@ export async function runInteractiveShell(
     } finally {
       mounted.terminal.teardown();
     }
-    result.resolve(code);
+    if (failure === undefined) result.resolve(code);
+    else result.reject(failure);
+  };
+
+  /** End the session after an internal failure, restoring the terminal first. */
+  const fail = (error: unknown): void => {
+    close(0, error).catch((closeError: unknown) => result.reject(closeError));
   };
 
   const schedulePendingKey = (): void => {
     clearTimer(pendingKeyTimer);
+    if (settled) {
+      pendingKeyTimer = undefined;
+      return;
+    }
     const action = keyStatePending;
     if (action === undefined || action.deadlineMs === 0) {
       pendingKeyTimer = undefined;
@@ -290,12 +333,16 @@ export async function runInteractiveShell(
   const scheduleDeferred = (atMs: number | undefined): void => {
     clearTimer(deferredTimer);
     deferredTimer = undefined;
-    if (atMs === undefined) return;
+    if (atMs === undefined || settled) return;
     deferredTimer = timers.setTimeout(
       () => {
         deferredTimer = undefined;
-        const transition = advanceComposer(composer, clock());
-        applyTransition(transition);
+        try {
+          const transition = advanceComposer(composer, clock());
+          applyTransition(transition);
+        } catch (error) {
+          fail(error);
+        }
       },
       Math.max(0, atMs - clock()),
     );
@@ -304,6 +351,15 @@ export async function runInteractiveShell(
   const requestExit = (code: number): void => {
     close(code).catch((error: unknown) => result.reject(error));
   };
+
+  // `setupTerminal` has already restored the terminal by the time this runs;
+  // the shell only decides the exit code.
+  handleSignal = (signal: TerminationSignal): void => {
+    requestExit(
+      signal === "SIGINT" ? INTERRUPT_EXIT_CODE : TERMINATE_EXIT_CODE,
+    );
+  };
+  if (pendingSignal !== undefined) handleSignal(pendingSignal);
 
   const applyTransition = (transition: ComposerTransition): void => {
     composer = transition.state;
@@ -365,10 +421,14 @@ export async function runInteractiveShell(
 
   function handleInput(chunk: string, flush: boolean): void {
     if (settled) return;
-    const now = clock();
-    const resolved = resolveInput(flush ? "" : chunk, keyState, now);
-    keyState = resolved.state;
-    handleActions(resolved.actions, now);
+    try {
+      const now = clock();
+      const resolved = resolveInput(flush ? "" : chunk, keyState, now);
+      keyState = resolved.state;
+      handleActions(resolved.actions, now);
+    } catch (error) {
+      fail(error);
+    }
   }
 
   function onData(chunk: Buffer | string): void {
@@ -389,8 +449,12 @@ export async function runInteractiveShell(
     void paint();
   }
 
-  options.stdin.on("data", onData);
-  options.stdout.on("resize", onResize);
+  // A signal can land during mount and close the session before this point;
+  // attaching listeners afterwards would leak them past teardown.
+  if (!settled) {
+    options.stdin.on("data", onData);
+    options.stdout.on("resize", onResize);
+  }
 
   return result.promise;
 }
