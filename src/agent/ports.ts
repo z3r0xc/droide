@@ -69,6 +69,31 @@ export interface ToolRunner {
   ): Promise<ToolResult>;
 }
 
+/**
+ * Summarizes the part of a transcript that compaction replaces (§B47, §B49).
+ * A port, so the loop's compaction branch is testable with a scripted answer
+ * and never needs a provider or a network.
+ */
+export interface Summarizer {
+  summarize(
+    messages: readonly Message[],
+    options: { readonly signal: AbortSignal; readonly maxTokens: number },
+  ): Promise<string>;
+}
+
+/** Compaction configuration; absent from a turn means "never compact". */
+export interface CompactionConfig {
+  /** The compaction limit in tokens (§B46). */
+  readonly limit: number;
+  readonly summarizer: Summarizer;
+  /** Exchanges kept verbatim after the summary; defaults to two. */
+  readonly keepRecent?: number;
+  /** Proactive share of the limit; defaults to the hard ceiling. */
+  readonly ratio?: number;
+  /** Ceiling handed to the summarizer. */
+  readonly maxSummaryTokens?: number;
+}
+
 export interface RetryPolicy {
   readonly maxAttempts: number;
   readonly baseDelayMs: number;
@@ -108,6 +133,19 @@ export type TurnEvent =
       readonly reason: string;
     }
   | {
+      readonly type: "compaction";
+      /** Estimate for the provider view before the attempt, in tokens. */
+      readonly before: number;
+      /** Estimate after it; equal to `before` when nothing was replaced. */
+      readonly after: number;
+      /** How many messages the summary replaced. */
+      readonly summarized: number;
+      /** True when the request view was actually replaced. */
+      readonly compacted: boolean;
+      /** Present when the summarizer failed; the turn then continues (§B47). */
+      readonly error?: string;
+    }
+  | {
       readonly type: "turn_complete";
       readonly reason: "completed" | "max_turns" | "error" | "cancelled";
       readonly error?: string;
@@ -123,6 +161,11 @@ export interface TurnDependencies {
   readonly emit: (event: TurnEvent) => void;
   /** Assistant message ids; injected so replays stay deterministic. */
   readonly nextMessageId: (role: Role) => string;
+  /**
+   * Context compaction (§B46–B49). Absent disables it entirely, so every
+   * existing caller keeps the loop's behaviour unchanged.
+   */
+  readonly compaction?: CompactionConfig;
 }
 
 export type AssistantBlock = Extract<
