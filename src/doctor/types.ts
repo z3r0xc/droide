@@ -35,6 +35,8 @@ export interface DoctorContext {
   };
   /** Per-probe budget in milliseconds. */
   readonly timeoutMs: number;
+  /** Injected HTTP client for probes that need one; defaults to the global. */
+  readonly fetch?: typeof fetch;
   /** Runs a probe with the budget applied; rejects with a timeout error. */
   readonly withTimeout: <T>(
     label: string,

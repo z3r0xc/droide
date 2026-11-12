@@ -40,7 +40,7 @@ What runs today, run against this tree:
 | Surface                                                                                    | Today                                                                                                                                                                                                                                                 |
 | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--version`, `--help`, subcommand help                                                     | works — reports `1.9.0`; 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md))                                                                                  |
-| `doctor`                                                                                   | works — 16 named checks; ten are real probes (config, environment, system, binaries, filesystem, git, proxy, certs, auth, mcp) and the rest report `skip` with a reason                                                                               |
+| `doctor`                                                                                   | works — 16 named checks; eleven are real probes (config, environment, system, binaries, updates, filesystem, git, proxy, certs, auth, mcp) and the rest report `skip` with a reason                                                                               |
 | `search` / `find`                                                                          | works — served from a local transcript index with a proving fallback to the literal scan; `--reindex` refreshes it                                                                                                                                    |
 | `mcp list`, `mcp add`, `mcp remove`, `mcp permissions`                                     | work — merged configuration, surgical JSONC edits that keep comments, atomic writes, permission list/revoke/clear                                                                                                                                     |
 | `plugin list`, `plugin marketplace`, `plugin install`, `plugin uninstall`, `plugin update` | work — git-backed marketplaces validated before adoption, atomic registry merges, collision and reference refusals                                                                                                                                    |
@@ -94,7 +94,7 @@ Node 24 or newer, and a Rust toolchain for the native layer.
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 16 named checks (10 real probes), text or --json
+node bin/droide.mjs doctor      # 16 named checks (11 real probes), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
 npm test                        # 906 tests
