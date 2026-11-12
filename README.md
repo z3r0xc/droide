@@ -37,15 +37,19 @@ specification is complete and unambiguous enough to build from.
 
 What runs today, run against this tree:
 
-| Surface | Today |
-| --- | --- |
-| `--version`, `--help`, subcommand help | works — reports `1.9.0`; 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)) |
-| `doctor` | works — 12 checks in one run: six real probes (config, environment, system, binaries, filesystem, git), six names report `skip` |
-| `search` / `find` | works — queries the local session store, text and `--json` |
-| `mcp list` | works — merges the MCP configuration and prints transport and state per server; never starts one |
-| `exec` | works for `text`, `json` and `stream-json` output with a prompt, `-f` or stdin; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` refuse |
-| native helper | 8 JSON-line methods, 57 Rust tests — implemented and tested, **not yet called by the CLI** |
-| test suite | 891 tests in 95 files: 889 pass, 2 skipped |
+| Surface                                | Today                                                                                                                                                                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--version`, `--help`, subcommand help | works — reports `1.9.0`; 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md))                             |
+| `doctor`                               | works — 16 named checks; nine are real probes (config, environment, system, binaries, filesystem, git, proxy, certs, auth) and the rest report `skip` with a reason                              |
+| `search` / `find`                      | works — queries the local session store, text and `--json`                                                                                                                                       |
+| `mcp list`                             | works — merges the MCP configuration and prints transport and state per server; never starts one                                                                                                 |
+| `exec`                                 | works for `text`, `json` and `stream-json` output with a prompt, `-f` or stdin; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` refuse                                                     |
+| native helper                          | 9 JSON-line methods, typed and validated on the TypeScript side, 57 Rust tests, plus a contract test against the compiled binary (`npm run test:native`) — **not yet wired into tool execution** |
+| `plugin list`                          | works — merges the user and project registries, newest version per id, enablement from settings                                                                                                  |
+| `update --check`                       | works — reads this repository's GitHub releases; installing is refused with exit 2                                                                                                               |
+| `daemon`                               | works locally — WebSocket transport, JSON-RPC, auth gate, single instance, ordered shutdown (132 tests); Remote Control and the port proxy are declared, not built                               |
+| `droide` with no arguments             | launches the interactive shell when stdin and stdout are a terminal                                                                                                                              |
+| test suite                             | 906 tests in 96 files: 903 pass, 3 skipped, plus 57 Rust tests                                                                                                                                   |
 
 `exec` needs a model credential. Without one it refuses instead of guessing:
 
@@ -56,12 +60,12 @@ Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY
 
 Declared, in flight:
 
-| Surface | State |
-| --- | --- |
-| interactive TUI | the Ink shell renders header, transcript, composer, status line and footer, is driven by a key reducer (`/quit` exits 0, `Ctrl+C` 130) and is frame-tested at 80×24 and 120×40 — but there is no agent loop inside it yet: a submitted line becomes a transcript row |
-| `resume`, `update`, `plugin`, `computer`, `mcp add\|remove\|auth\|permissions` | options parse, help prints, every action refuses |
-| native PTY spawn and read loop; macOS/Linux credential stores | only quoting, chunking and Windows DPAPI exist |
-| context compaction; session index | not implemented; the literal scan is a recorded deviation |
+| Surface                                                                                                      | State                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| interactive TUI                                                                                              | the Ink shell renders header, transcript, composer, status line and footer, is driven by a key reducer (`/quit` exits 0, `Ctrl+C` 130) and is frame-tested at 80×24 and 120×40 — but there is no agent loop inside it yet: a submitted line becomes a transcript row |
+| `resume`, `computer`, `plugin install\|uninstall\|update\|marketplace`, `mcp add\|remove\|auth\|permissions` | options parse, help prints, every action refuses                                                                                                                                                                                                                     |
+| native PTY spawn and read loop; macOS/Linux credential stores                                                | only quoting, chunking and Windows DPAPI exist                                                                                                                                                                                                                       |
+| context compaction; session index                                                                            | not implemented; the literal scan is a recorded deviation                                                                                                                                                                                                            |
 
 The failure is deliberate, and it is observable — exit 64 for a command that is
 specified but not built, exit 1 for an option that is not:
@@ -77,7 +81,7 @@ $ node bin/droide.mjs exec --list-tools
 Current shape of the tree: 11 numbered specification documents — shared context
 plus ten subsystem specs, 9,333 lines under `specs/` — 123 TypeScript files
 under `src/` (33,069 lines), 8 Rust files under `crates/droide-native/src/`,
-6 ADRs, 891 TypeScript tests and 57 Rust tests. Every place where the build is
+7 ADRs, 906 TypeScript tests and 57 Rust tests. Every place where the build is
 narrower than the clause it cites is marked `TODO(spec …)` in the code and
 counted in [`docs/gaps.md`](./docs/gaps.md), which `npm run gaps` regenerates.
 
@@ -89,10 +93,10 @@ Node 24 or newer, and a Rust toolchain for the native layer.
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 12 checks, text or --json
+node bin/droide.mjs doctor      # 16 named checks (9 real probes), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 891 tests
+npm test                        # 906 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 57 tests
@@ -130,26 +134,28 @@ node bin/droide.mjs exec -f prompt.txt --auto low
   describes bubblewrap, seatbelt or "no confinement" profiles; `pty.rs` quotes
   the command line the way the subject re-splits it; `secrets.rs` stores secrets
   with DPAPI on Windows.
-- The eight methods are `native.version`, `search.walk`, `search.text`,
-  `path.resolve`, `sandbox.profile`, `pty.quote`, `secrets.protect`,
-  `secrets.unprotect`. The client and the helper are each tested; the CLI does
-  not dispatch to the helper yet.
+- The nine methods are `native.version`, `hash.sha256`, `search.walk`,
+  `search.text`, `path.resolve`, `sandbox.profile`, `pty.quote`,
+  `secrets.protect`, `secrets.unprotect`. The TypeScript client validates every
+  response shape, the helper has its own tests, and `npm run test:native` runs the
+  contract against the compiled binary. The tool layer still reaches the helper
+  through nothing but the fake, so wiring is the next step.
 
 ## Specifications and decisions
 
-| Document | Subject |
-| --- | --- |
-| [`00-context.md`](./specs/00-context.md) | shared context: the subject, its evidence and vocabulary |
-| [`10-cli-surface.md`](./specs/10-cli-surface.md) | commands, options, help, refusals, exit codes |
-| [`20-agent-loop.md`](./specs/20-agent-loop.md) | message model, turn loop, provider adapter |
-| [`30-tools-and-sandbox.md`](./specs/30-tools-and-sandbox.md) | tool registry, validators, permissions, sandbox |
-| [`40-sessions-and-storage.md`](./specs/40-sessions-and-storage.md) | session files, migrations, transcript, search |
-| [`50-transport-and-auth.md`](./specs/50-transport-and-auth.md) | URLs, headers, SSE, error identity, auth |
-| [`60-extensions-mcp-and-skills.md`](./specs/60-extensions-mcp-and-skills.md) | MCP servers, tool naming, skills, plugins |
-| [`70-daemon-and-remote-control.md`](./specs/70-daemon-and-remote-control.md) | daemon RPC surface and remote control |
-| [`80-exec-and-streaming.md`](./specs/80-exec-and-streaming.md) | non-interactive runs and stream formats |
-| [`90-native-layer.md`](./specs/90-native-layer.md) | the helper process and its methods |
-| [`95-terminal-ui.md`](./specs/95-terminal-ui.md) | tokens, capabilities, shell layout, frames |
+| Document                                                                     | Subject                                                  |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------- |
+| [`00-context.md`](./specs/00-context.md)                                     | shared context: the subject, its evidence and vocabulary |
+| [`10-cli-surface.md`](./specs/10-cli-surface.md)                             | commands, options, help, refusals, exit codes            |
+| [`20-agent-loop.md`](./specs/20-agent-loop.md)                               | message model, turn loop, provider adapter               |
+| [`30-tools-and-sandbox.md`](./specs/30-tools-and-sandbox.md)                 | tool registry, validators, permissions, sandbox          |
+| [`40-sessions-and-storage.md`](./specs/40-sessions-and-storage.md)           | session files, migrations, transcript, search            |
+| [`50-transport-and-auth.md`](./specs/50-transport-and-auth.md)               | URLs, headers, SSE, error identity, auth                 |
+| [`60-extensions-mcp-and-skills.md`](./specs/60-extensions-mcp-and-skills.md) | MCP servers, tool naming, skills, plugins                |
+| [`70-daemon-and-remote-control.md`](./specs/70-daemon-and-remote-control.md) | daemon RPC surface and remote control                    |
+| [`80-exec-and-streaming.md`](./specs/80-exec-and-streaming.md)               | non-interactive runs and stream formats                  |
+| [`90-native-layer.md`](./specs/90-native-layer.md)                           | the helper process and its methods                       |
+| [`95-terminal-ui.md`](./specs/95-terminal-ui.md)                             | tokens, capabilities, shell layout, frames               |
 
 Status vocabulary — `draft`, `review`, `stable`, `blocked` — is defined in
 [`specs/README.md`](./specs/README.md); per-spec state lives in
@@ -160,14 +166,14 @@ mapped in [`docs/architecture/README.md`](./docs/architecture/README.md) and the
 
 Decisions that shaped the build:
 
-| ADR | Decision |
-| --- | --- |
-| [0001](./docs/adr/0001-bun-standalone-extraction.md) | recover the embedded JavaScript bundle before decompiling native code |
-| [0002](./docs/adr/0002-hybrid-rust-typescript-layers.md) | Rust for the native layer, TypeScript for the product layer |
-| [0003](./docs/adr/0003-evidence-first-clean-room-policy.md) | evidence-first clean-room policy |
-| [0004](./docs/adr/0004-parity-harness-with-optional-oracle.md) | declarative parity cases with an optional oracle |
-| [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | the project is `droide`; the CLI design stays identical |
-| [0006](./docs/adr/0006-terminal-ui-stack.md) | the terminal UI is React + Ink, with tokens from the spec |
+| ADR                                                              | Decision                                                              |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [0001](./docs/adr/0001-bun-standalone-extraction.md)             | recover the embedded JavaScript bundle before decompiling native code |
+| [0002](./docs/adr/0002-hybrid-rust-typescript-layers.md)         | Rust for the native layer, TypeScript for the product layer           |
+| [0003](./docs/adr/0003-evidence-first-clean-room-policy.md)      | evidence-first clean-room policy                                      |
+| [0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)   | declarative parity cases with an optional oracle                      |
+| [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | the project is `droide`; the CLI design stays identical               |
+| [0006](./docs/adr/0006-terminal-ui-stack.md)                     | the terminal UI is React + Ink, with tokens from the spec             |
 
 ## Contributing
 

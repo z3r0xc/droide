@@ -28,6 +28,7 @@ import type {
   PermissionGate,
   Provider,
   RetryPolicy,
+  Summarizer,
   ToolResult as LoopToolResult,
   ToolRunner as LoopToolRunner,
   TurnDependencies,
@@ -400,6 +401,8 @@ export const DEFAULT_EXEC_MAX_TURNS = 64;
 
 export interface CreateExecTurnRunnerOptions {
   readonly provider: Provider;
+  /** B46: the compaction limit for this run; defaults to {@link DEFAULT_COMPACTION_LIMIT}. */
+  readonly compactionTokenLimit?: number;
   readonly tools: ExecToolRunner;
   readonly clock: LoopClock;
   readonly maxTurns: number;
@@ -411,6 +414,14 @@ export interface CreateExecTurnRunnerOptions {
 }
 
 /** The loop's own permission gate stays out of the way: the tool runner decides. */
+/** Token ceiling used when the caller does not resolve one from settings (§B46). */
+export const DEFAULT_COMPACTION_LIMIT = 120_000;
+
+/** Instruction appended to the middle of a conversation that is being compacted. */
+const COMPACTION_INSTRUCTION =
+  "Summarize the conversation above for continuity: decisions taken, files touched, " +
+  "open questions and the next concrete step. Keep it under 400 words, no preamble.";
+
 const ALLOW_ALL: PermissionGate = {
   decide: () => "allow",
   confirm: async () => true,
@@ -594,8 +605,36 @@ export function createExecTurnRunner(
         });
       };
 
+      // B35–B45: compaction runs inside the loop, over the same provider. The
+      // summariser is one extra request whose tokens are not part of the turn's
+      // usage accounting (they are not the user's turn), which is why it uses
+      // the untracked provider.
+      const summariser: Summarizer = {
+        async summarize(messages, { signal }) {
+          const instruction: Message = {
+            id: "compaction-instruction",
+            role: "user",
+            content: [{ type: "text", text: COMPACTION_INSTRUCTION }],
+            createdAt: options.clock.now(),
+            updatedAt: options.clock.now(),
+          };
+          let summary = "";
+          for await (const delta of options.provider.stream(
+            [...messages, instruction],
+            { signal },
+          )) {
+            if (delta.type === "text") summary += delta.text;
+          }
+          return summary;
+        },
+      };
+
       const deps: TurnDependencies = {
         provider: trackUsage(options.provider, totals),
+        compaction: {
+          limit: options.compactionTokenLimit ?? DEFAULT_COMPACTION_LIMIT,
+          summarizer: summariser,
+        },
         tools,
         permissions: ALLOW_ALL,
         clock: options.clock,

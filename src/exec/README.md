@@ -82,13 +82,13 @@ record, and exit `1`.
 
 ### Output modes
 
-| `-o` | Behaviour |
-| --- | --- |
-| `text` (default) | final answer + `\n` on stdout; failures write `Error during droid execution: <message>` on stderr |
-| `json` | one `result` object (`runOneShotSummary`) |
-| `stream-json`, `debug` | one record per line (`runOneShot`) |
-| `stream-jsonrpc`, `acp`, `acp-daemon` | refused before any work: not implemented in this build |
-| `--input-format …` | refused before any work: not implemented in this build |
+| `-o`                                  | Behaviour                                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `text` (default)                      | final answer + `\n` on stdout; failures write `Error during droid execution: <message>` on stderr |
+| `json`                                | one `result` object (`runOneShotSummary`)                                                         |
+| `stream-json`, `debug`                | one record per line (`runOneShot`)                                                                |
+| `stream-jsonrpc`, `acp`, `acp-daemon` | refused before any work: not implemented in this build                                            |
+| `--input-format …`                    | refused before any work: not implemented in this build                                            |
 
 ## Record kinds (`-o stream-json`)
 
@@ -119,11 +119,11 @@ the assistant message's id, a tool result carries the tool-role message's id.
 
 ## Exit codes
 
-| Code          | Meaning                                                                     |
-| ------------- | --------------------------------------------------------------------------- |
-| `0`           | turn completed, `--help`, or broken pipe after the result was chosen        |
+| Code          | Meaning                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------- |
+| `0`           | turn completed, `--help`, or broken pipe after the result was chosen                                 |
 | `1`           | usage error, prompt-source error, missing model/credential, failed or cancelled turn, provider error |
-| `130` / `143` | SIGINT / SIGTERM; a signal outranks every turn outcome                      |
+| `130` / `143` | SIGINT / SIGTERM; a signal outranks every turn outcome                                               |
 
 ## Deliberate gaps
 
