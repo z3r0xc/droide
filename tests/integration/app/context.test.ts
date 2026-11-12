@@ -7,6 +7,17 @@ import { test } from "node:test";
 import { createAppContext } from "../../../src/app/context.ts";
 import type { Environment } from "../../../src/config/paths.ts";
 
+/**
+ * Path rules are fixed per platform, so the fixture must use the host's: a
+ * hard-coded platform builds expectations with the wrong separator.
+ */
+const HOST_PLATFORM: Environment["platform"] =
+  process.platform === "win32"
+    ? "win32"
+    : process.platform === "darwin"
+      ? "darwin"
+      : "linux";
+
 async function fixture(): Promise<{
   root: string;
   home: string;
@@ -22,7 +33,9 @@ async function fixture(): Promise<{
   const environment: Environment = {
     env: {},
     home,
-    platform: "win32",
+    // Path rules are fixed per platform, so the fixture must use the host's:
+    // a hard-coded platform builds expectations with the wrong separator.
+    platform: HOST_PLATFORM,
     cwd: project,
   };
   return { root, home, project, environment };
