@@ -868,3 +868,18 @@ layout and resume, and any telemetry naming. Streaming internal class and
 function names (`StreamingState`, `processAnthropicChunk`) are ours to choose;
 only the emitted events, the persisted records and the wire payload shape are
 contractual.
+### Recorded divergence: the identity line
+
+The subject's first system block says it was built by the original vendor. That
+sentence is **not** part of the compatibility contract: reproducing it would make
+this build state something false about its origin. The implemented line is
+
+```
+You are Droide, an AI software engineering agent.
+```
+
+(see `src/agent/context.ts`, `identityLine()`). Everything the clause pins about
+*position* and *ordering* — identity first, then environment, skills, project
+instructions, appended text — is reproduced exactly; only the vendor claim is
+dropped. Any parity test that compares system prompts must normalise this line
+rather than treat it as a drift.

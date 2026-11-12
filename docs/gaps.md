@@ -5,11 +5,13 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **21** markers across **21** clauses.
+Total: **23** markers across **21** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
 | `src/doctor/checks.ts:26` | `B49` | ${what} check], |
+| `src/extensions/mcp/client.ts:416` | `B22` | image blocks are reported by type and size instead of being compressed, and an unsupported image MIME type keeps the same marker. |
+| `src/extensions/mcp/transport.ts:826` | `B3` | an sse server's server-initiated event stream (a GET that stays open) is not opened, so it never delivers tools/list_changed; the POST response path is supported. |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view in the subject; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/grep.ts:24` | `B20` | for the full list. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
