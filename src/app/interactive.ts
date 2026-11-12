@@ -340,12 +340,13 @@ export async function runInteractiveShell(
   };
 
   const handleActions = (actions: readonly KeyAction[], now: number): void => {
+    keyStatePending = actions.find(
+      (action): action is Extract<KeyAction, { kind: "pending" }> =>
+        action.kind === "pending",
+    );
     let dirty = false;
     for (const action of actions) {
-      if (action.kind === "pending") {
-        keyStatePending = action;
-        continue;
-      }
+      if (action.kind === "pending") continue;
       if (action.kind === "ignore" || action.kind === "app") continue;
       const transition = applyComposerAction(
         composer,

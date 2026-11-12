@@ -27,12 +27,7 @@ import { TIMINGS } from "./tokens.ts";
 
 /** A cursor move the composer applies. */
 export type CursorMove =
-  | "left"
-  | "right"
-  | "wordLeft"
-  | "wordRight"
-  | "lineStart"
-  | "lineEnd";
+  "left" | "right" | "wordLeft" | "wordRight" | "lineStart" | "lineEnd";
 
 /** A deletion the composer applies. */
 export type DeleteRange =
@@ -216,9 +211,17 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     action: { kind: "app", command: "toggle-detailed-transcript" },
   },
   { keys: ["alt+p"], action: { kind: "app", command: "toggle-plan" } },
-  { keys: ["?"], action: { kind: "app", command: "open-help" }, context: "emptyDraft" },
+  {
+    keys: ["?"],
+    action: { kind: "app", command: "open-help" },
+    context: "emptyDraft",
+  },
   { keys: ["ctrl+/"], action: { kind: "app", command: "open-help" } },
-  { keys: ["!"], action: { kind: "app", command: "toggle-bash" }, context: "emptyDraft" },
+  {
+    keys: ["!"],
+    action: { kind: "app", command: "toggle-bash" },
+    context: "emptyDraft",
+  },
   { keys: ["ctrl+p"], action: { kind: "app", command: "open-editor" } },
   { keys: ["ctrl+shift+c"], action: { kind: "app", command: "copy-input" } },
   { keys: ["ctrl+v"], action: { kind: "app", command: "paste-clipboard" } },
@@ -226,7 +229,10 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["alt+shift+v"], action: { kind: "pasteExpand" } },
   { keys: ["ctrl+r"], action: { kind: "app", command: "review-queued" } },
   { keys: ["ctrl+g"], action: { kind: "app", command: "pop-queued" } },
-  { keys: ["ctrl+t"], action: { kind: "app", command: "open-mission-control" } },
+  {
+    keys: ["ctrl+t"],
+    action: { kind: "app", command: "open-mission-control" },
+  },
   { keys: ["ctrl+y"], action: { kind: "app", command: "open-side-chat" } },
   { keys: ["ctrl+j"], action: { kind: "app", command: "dismiss-changelog" } },
   { keys: ["alt+s"], action: { kind: "app", command: "open-droids-view" } },
@@ -235,7 +241,10 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     action: { kind: "app", command: "open-droids-view" },
     context: "emptyDraft",
   },
-  { keys: ["alt+x"], action: { kind: "app", command: "toggle-auto-compaction" } },
+  {
+    keys: ["alt+x"],
+    action: { kind: "app", command: "toggle-auto-compaction" },
+  },
   { keys: ["alt+e"], action: { kind: "app", command: "inspect-approval" } },
   {
     keys: ["alt+up"],
@@ -285,7 +294,8 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
 
 const BINDINGS_BY_KEY: ReadonlyMap<string, KeyBinding> = new Map(
   KEY_BINDINGS.filter((binding) => binding.context === undefined).flatMap(
-    (binding) => binding.keys.map((key): [string, KeyBinding] => [key, binding]),
+    (binding) =>
+      binding.keys.map((key): [string, KeyBinding] => [key, binding]),
   ),
 );
 
@@ -325,13 +335,14 @@ function decodeToken(buffer: string): Decoded {
         if (isCsiFinal(code)) {
           const body = buffer.slice(0, index + 1);
           const sequence = buffer.slice(2, index);
-          if (sequence === "200~") {
+          const finalByte = buffer.charAt(index);
+          if (sequence === "200" && finalByte === "~") {
             return {
               status: "token",
               token: { type: "pasteStart", value: body, length: body.length },
             };
           }
-          if (sequence === "201~") {
+          if (sequence === "201" && finalByte === "~") {
             return {
               status: "token",
               token: { type: "pasteEnd", value: body, length: body.length },
@@ -341,7 +352,7 @@ function decodeToken(buffer: string): Decoded {
             status: "token",
             token: {
               type: "key",
-              value: keyFromCsi(sequence, buffer.charAt(index)),
+              value: keyFromCsi(sequence, finalByte),
               length: body.length,
             },
           };
@@ -377,13 +388,16 @@ function decodeToken(buffer: string): Decoded {
         },
       };
     }
+    const upper = next >= "A" && next <= "Z";
+    const alt =
+      next === "\u007f"
+        ? "alt+backspace"
+        : upper
+          ? `alt+shift+${next.toLowerCase()}`
+          : `alt+${next}`;
     return {
       status: "token",
-      token: {
-        type: "key",
-        value: next === "\u007f" ? "alt+backspace" : `alt+${next}`,
-        length: 2,
-      },
+      token: { type: "key", value: alt, length: 2 },
     };
   }
 
@@ -409,7 +423,11 @@ function decodeToken(buffer: string): Decoded {
     };
   }
   if (first < 0x20) {
-    const letter = String.fromCharCode(0x60 + first);
+    // 0x01–0x1a are ctrl+a…ctrl+z; the four above them spell ctrl+\ ] ^ /.
+    const letter =
+      first <= 0x1a
+        ? String.fromCharCode(0x60 + first)
+        : (["\\", "]", "^", "/"][first - 0x1c] ?? "");
     return {
       status: "token",
       token: { type: "key", value: `ctrl+${letter}`, length: 1 },
@@ -451,7 +469,8 @@ function keyFromCsi(sequence: string, final: string): string {
   const params = sequence.startsWith("?") ? "" : sequence;
   if (final === "Z") return "shift+tab";
   const [base = "", modifierText] = params.split(";");
-  const modifier = modifierText === undefined ? 0 : Number.parseInt(modifierText, 10) - 1;
+  const modifier =
+    modifierText === undefined ? 0 : Number.parseInt(modifierText, 10) - 1;
   const prefix = modifierPrefix(modifier);
   if (final === "~") {
     const key = CSI_TILDE_KEYS[base];
@@ -475,7 +494,8 @@ export function canonicalKeyOfEvent(event: KeyEventInput): string {
   const alt = event.alt === true || event.meta === true;
   const ctrl = event.ctrl === true;
   const shift = event.shift === true ? "shift+" : "";
-  const base = NAMED_EVENTS[name] ?? (name.length === 1 ? name.toLowerCase() : name);
+  const base =
+    NAMED_EVENTS[name] ?? (name.length === 1 ? name.toLowerCase() : name);
   return `${ctrl ? "ctrl+" : ""}${alt ? "alt+" : ""}${shift}${base}`;
 }
 
@@ -503,34 +523,43 @@ const NAMED_EVENTS: Readonly<Record<string, string>> = {
 
 /* --------------------------------------------------------------- resolving -- */
 
-function tailAction(state: KeyState, nowMs: number): KeyAction {
+/**
+ * When the undecided bytes must be resolved, or `0` for "no timer" (a bracketed
+ * paste frame in flight).
+ */
+function bufferExpiryMs(state: KeyState): number {
   const buffer = state.buffer;
-  if (buffer.startsWith("\u001b[200~")) {
-    // A paste frame in flight: never on a timer; more bytes are coming.
-    return { kind: "pending", buffer, sinceMs: nowMs, deadlineMs: 0 };
-  }
+  if (buffer.startsWith("\u001b[200~")) return 0;
   if (buffer.startsWith("\u001b[") || buffer.startsWith("\u001bO")) {
-    return {
-      kind: "pending",
-      buffer,
-      sinceMs: nowMs,
-      deadlineMs: nowMs + TIMINGS.incompleteCsiMs,
-    };
+    return state.bufferSinceMs + TIMINGS.incompleteCsiMs;
   }
-  const sinceMs = state.bufferSinceMs === 0 ? nowMs : state.bufferSinceMs;
-  const run = /^\u001b+/.exec(buffer)?.[0].length ?? 1;
+  const run = /^\u001b+/u.exec(buffer)?.[0].length ?? 1;
   const window =
     run > 1
       ? state.tmux
         ? TIMINGS.tmuxEscapeGraceMs
         : TIMINGS.escapeRunFlushMs
       : TIMINGS.escapeSequenceMs;
+  return state.bufferSinceMs + window;
+}
+
+function tailAction(state: KeyState): KeyAction {
   return {
     kind: "pending",
-    buffer,
-    sinceMs,
-    deadlineMs: sinceMs + window,
+    buffer: state.buffer,
+    sinceMs: state.bufferSinceMs,
+    deadlineMs: bufferExpiryMs(state),
   };
+}
+
+/** Resolve bytes whose window has closed: one press per ESC, CSI dropped. */
+function expireBuffer(state: KeyState): KeyAction[] {
+  if (/^\u001b+$/u.test(state.buffer)) {
+    return Array.from({ length: state.buffer.length }, (): KeyAction => ({
+      kind: "escape",
+    }));
+  }
+  return [ignore];
 }
 
 function actionForKey(key: string, state: KeyState, nowMs: number): KeyAction {
@@ -587,22 +616,56 @@ export function resolveInput(
     };
   }
   const chunk =
-    typeof input === "string" ? input : textDecoder.decode(input, { stream: true });
+    typeof input === "string"
+      ? input
+      : textDecoder.decode(input, { stream: true });
+  // An unframed paste: one large chunk with no escape sequence in it. Nothing
+  // a human types arrives this way, so the thresholds are safe at entry.
+  if (
+    state.buffer.length === 0 &&
+    !chunk.includes("\u001b") &&
+    (chunk.length > PASTE_MAX_CHARS ||
+      chunk.split("\n").length > PASTE_MAX_LINES)
+  ) {
+    return {
+      actions: [
+        {
+          kind: "paste",
+          text: chunk,
+          bracketed: false,
+          guardUntilMs: nowMs + TIMINGS.pasteKeyGuardMs,
+        },
+      ],
+      state: { ...state, buffer: "", bufferSinceMs: 0 },
+    };
+  }
   const text = state.buffer + chunk;
   const actions: KeyAction[] = [];
   let index = 0;
+  // A chunk may hold more than one key; state one key changed (the `Ctrl+C`
+  // arming window) must be visible to the next key in the same chunk.
+  let current: KeyState = state;
 
   while (index < text.length) {
     const decoded = decodeToken(text.slice(index));
     if (decoded.status === "incomplete") {
       const carried = index < state.buffer.length;
       const nextState: KeyState = {
-        ...state,
+        ...current,
         buffer: text.slice(index),
         bufferSinceMs: carried ? state.bufferSinceMs : nowMs,
       };
-      const action = tailAction(nextState, nowMs);
-      actions.push(action);
+      // Only the timer's own flush (an empty chunk) closes a window; new bytes
+      // may still complete the sequence and must not race the deadline.
+      const expiry = bufferExpiryMs(nextState);
+      if (chunk.length === 0 && expiry !== 0 && nowMs >= expiry) {
+        actions.push(...expireBuffer(nextState));
+        return {
+          actions,
+          state: { ...nextState, buffer: "", bufferSinceMs: 0 },
+        };
+      }
+      actions.push(tailAction(nextState));
       return { actions, state: nextState };
     }
 
@@ -613,20 +676,8 @@ export function resolveInput(
     switch (token.type) {
       case "text": {
         if (token.value.length === 0) break;
-        if (
-          token.value.length > PASTE_MAX_CHARS ||
-          token.value.split("\n").length > PASTE_MAX_LINES
-        ) {
-          actions.push({
-            kind: "paste",
-            text: token.value,
-            bracketed: false,
-            guardUntilMs: nowMs + TIMINGS.pasteKeyGuardMs,
-          });
-          break;
-        }
-        if (token.value.length === 1 && state.draftLength === 0) {
-          const command = actionForKey(token.value, state, nowMs);
+        if (token.value.length === 1 && current.draftLength === 0) {
+          const command = actionForKey(token.value, current, nowMs);
           if (command.kind === "app") {
             actions.push(command);
             break;
@@ -647,14 +698,19 @@ export function resolveInput(
         const end = text.indexOf("\u001b[201~", index);
         if (end < 0) {
           const nextState: KeyState = {
-            ...state,
+            ...current,
             buffer: text.slice(tokenStart),
             bufferSinceMs: nowMs,
           };
           return {
             actions: [
               ...actions,
-              { kind: "pending", buffer: nextState.buffer, sinceMs: nowMs, deadlineMs: 0 },
+              {
+                kind: "pending",
+                buffer: nextState.buffer,
+                sinceMs: nowMs,
+                deadlineMs: 0,
+              },
             ],
             state: nextState,
           };
@@ -676,13 +732,19 @@ export function resolveInput(
           actions.push(ignore);
           break;
         }
-        actions.push(actionForKey(token.value, state, nowMs));
+        {
+          const action = actionForKey(token.value, current, nowMs);
+          actions.push(action);
+          if (action.kind === "interrupt") {
+            current = { ...current, ctrlCArmedUntilMs: action.armedUntilMs };
+          }
+        }
         break;
       }
     }
   }
 
-  return { actions, state: { ...state, buffer: "", bufferSinceMs: 0 } };
+  return { actions, state: { ...current, buffer: "", bufferSinceMs: 0 } };
 }
 
 /**

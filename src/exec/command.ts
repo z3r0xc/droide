@@ -32,6 +32,7 @@ import {
   type AppContext,
   type CreateAppContextOptions,
 } from "../app/context.ts";
+import { buildStartupPrompt } from "../app/prompt.ts";
 import { resolvePath, type Environment } from "../config/paths.ts";
 import type {
   CustomModelProvider,
@@ -53,6 +54,12 @@ import {
   selectExecTools,
 } from "./runner.ts";
 import {
+  openExecSession,
+  type ExecSession,
+  type TurnTranscript,
+} from "./session.ts";
+import { runStreamingInput } from "./streaming.ts";
+import {
   runOneShot,
   runOneShotSummary,
   type TurnEventSink,
@@ -64,14 +71,18 @@ import {
   assertFilePromptConflict,
   assertInputOutputPair,
   assertNoPromptInStreamingInput,
+  assertSessionFlagConflicts,
   FILE_PROMPT_CONFLICT,
   isStreamJsonOutput,
   parseInputFormat,
   parseOutputFormat,
+  STREAM_JSON_INPUT_DEPRECATION_WARNING,
   type ExecInputFormat,
   type ExecOutputFormat,
 } from "./validate.ts";
 import { createJsonLineWriter, isBrokenPipeError } from "./writer.ts";
+
+import type { SessionStore, SessionStoreOptions } from "../session/store.ts";
 
 /** The default model when neither `-m` nor `droidCoreModel` names one. */
 export const DEFAULT_MODEL_ID = "gpt-6.1-sol";
@@ -90,12 +101,6 @@ const DEFAULT_API_BASE_URL = "https://api.factory.ai";
 
 /** B20: the one failure prefix for a turn, in `text` mode. */
 export const EXEC_FAILURE_PREFIX = "Error during droid execution: ";
-
-/** B14: the system prompt's mandatory first sentence (20 B14). */
-export const EXEC_SYSTEM_PROMPT =
-  "You are Droid, an AI software engineering agent built by Factory.\n\n" +
-  "You are running non-interactively in exec mode. Use the available tools " +
-  "when they help, then answer with the final result.";
 
 /** The options Commander has already parsed, normalised for this module. */
 export interface ExecArgv {
@@ -133,6 +138,11 @@ export interface ExecCommandDeps {
   readonly stderr: Writable;
   readonly stdinIsTTY: boolean;
   readonly readStdin: () => Promise<string>;
+  /**
+   * `--input-format stream-json` lines. Defaults to splitting `readStdin` on
+   * newlines; the CLI streams them as they arrive.
+   */
+  readonly readStdinLines?: () => AsyncIterable<string>;
   readonly clock: () => number;
   readonly nextId: () => string;
   /** Defaults to `createAppContext`; tests inject a fixture. */
@@ -143,6 +153,8 @@ export interface ExecCommandDeps {
   readonly fetch?: typeof fetch;
   /** Defaults to the built-in tool registry. */
   readonly registry?: ToolRegistry;
+  /** Defaults to `openSessionStore`; tests inject a fixture-backed store. */
+  readonly openStore?: (options: SessionStoreOptions) => SessionStore;
   readonly sessionId?: string;
   readonly messageId?: string;
   readonly maxTurns?: number;
@@ -474,19 +486,14 @@ function assertImplemented(
   outputFormat: ExecOutputFormat,
   inputFormat: ExecInputFormat | undefined,
 ): void {
-  if (inputFormat !== undefined) {
+  if (inputFormat === "stream-jsonrpc") {
     throw new ExecCommandError(
-      `--input-format ${inputFormat} is not implemented in this build.`,
+      "--input-format stream-jsonrpc is not implemented in this build.",
     );
   }
   if (IMPLEMENTED_OUTPUT_FORMATS[outputFormat] !== true) {
     throw new ExecCommandError(
       `--output-format ${outputFormat} is not implemented in this build.`,
-    );
-  }
-  if (argv.sessionId !== undefined || argv.fork !== undefined) {
-    throw new ExecCommandError(
-      "Session continuation and forking are not implemented in this build.",
     );
   }
   if (argv.mission) {
@@ -599,6 +606,21 @@ async function runTextTurn(
   return 1;
 }
 
+/** B42: stdin as lines, for callers that did not supply a streaming reader. */
+function linesFrom(read: () => Promise<string>): AsyncIterable<string> {
+  return (async function* (): AsyncGenerator<string> {
+    let text: string;
+    try {
+      text = await read();
+    } catch (error) {
+      throw new ExecUsageError(
+        `Could not read the prompt from stdin: ${messageOf(error)}`,
+      );
+    }
+    for (const line of text.split("\n")) yield line;
+  })();
+}
+
 /* -------------------------------------------------------------------------- */
 /* Entry point                                                                */
 /* -------------------------------------------------------------------------- */
@@ -649,10 +671,27 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
       "Invalid flags: --auto and --skip-permissions-unsafe cannot be used together.",
     );
   }
+  assertSessionFlagConflicts({
+    sessionId: argv.sessionId,
+    fork: argv.fork,
+    useSpec: argv.useSpec,
+    specModel: argv.specModel,
+    mission: argv.mission,
+    worktree: argv.worktree,
+    worktreeDir: argv.worktreeDir,
+    inputFormat,
+    outputFormat,
+  });
   assertImplemented(argv, outputFormat, inputFormat);
 
+  // B41: the deprecated spelling warns once, before any session or model work.
+  if (inputFormat === "stream-json") {
+    await writeText(deps.stderr, `${STREAM_JSON_INPUT_DEPRECATION_WARNING}\n`);
+  }
+
   // B2-B6: the context supplies the effective directory, then the prompt is
-  // resolved before any model, tool or provider work exists.
+  // resolved before any model, tool or provider work exists. Streaming input
+  // takes its prompts from stdin instead (B7/B42).
   const createContext = deps.createContext ?? createAppContext;
   const context = await createContext({
     environment: deps.environment,
@@ -660,14 +699,17 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     ...(argv.settings === undefined ? {} : { settingsFlag: argv.settings }),
   });
 
-  const prompt = await resolvePrompt({
-    program: deps.program,
-    promptArg: argv.prompt,
-    file: argv.file,
-    stdinIsTTY: deps.stdinIsTTY,
-    readStdin: deps.readStdin,
-    environment: context.environment,
-  });
+  let prompt = "";
+  if (inputFormat !== "stream-json") {
+    prompt = await resolvePrompt({
+      program: deps.program,
+      promptArg: argv.prompt,
+      file: argv.file,
+      stdinIsTTY: deps.stdinIsTTY,
+      readStdin: deps.readStdin,
+      environment: context.environment,
+    });
+  }
 
   // B55: a missing model or credential fails here, before any socket exists.
   const target = resolveModelTarget({
@@ -698,12 +740,16 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     allowed,
   });
 
+  // B14/20 B35: the prompt is composed by the one builder that owns identity,
+  // environment, the skills listing and project instructions.
+  const systemPrompt = await buildStartupPrompt({ context });
+
   const provider = createLlmProvider({
     url: target.url,
     headers: target.headers,
     dialect: target.dialect,
     model: target.wireModel,
-    system: EXEC_SYSTEM_PROMPT,
+    system: systemPrompt,
     tools: catalogue,
     maxTokens: target.maxTokens,
     ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
@@ -715,45 +761,89 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     sleep: sleepFor,
   };
 
-  // The echo record and the transcript's user message share one id: the first
-  // id the loop asks for is that message.
-  const sessionId = deps.sessionId ?? deps.nextId();
-  const messageId = deps.messageId ?? deps.nextId();
-  let pendingUserId: string | undefined = messageId;
-  const turnRunner = createExecTurnRunner({
-    provider,
-    tools: toolRunner,
-    clock,
-    maxTurns: deps.maxTurns ?? DEFAULT_EXEC_MAX_TURNS,
-    nextMessageId: () => {
-      const id = pendingUserId ?? deps.nextId();
-      pendingUserId = undefined;
-      return id;
-    },
-  });
-
-  const request: TurnRequest = {
-    prompt,
-    cwd: context.environment.cwd,
-    sessionId,
-    model: target.model,
-    reasoningEffort: target.reasoningEffort,
-    tools: allowed,
-  };
-
-  if (outputFormat === "text") {
-    return await runTextTurn(turnRunner, request, deps);
-  }
-
-  const writer = createJsonLineWriter(deps.stdout);
-  const oneShot = {
-    ...request,
-    messageId,
+  const sessionOptions = {
+    context,
     clock: deps.clock,
-    ...(deps.signal === undefined ? {} : { signal: deps.signal }),
+    nextId: deps.nextId,
+    ...(deps.sessionId === undefined ? {} : { newSessionId: deps.sessionId }),
+    ...(argv.sessionId === undefined
+      ? {}
+      : { continueSessionId: argv.sessionId }),
+    ...(argv.fork === undefined ? {} : { forkSessionId: argv.fork }),
+    ...(deps.openStore === undefined ? {} : { openStore: deps.openStore }),
   };
-  if (isStreamJsonOutput(outputFormat)) {
-    return await runOneShot(turnRunner, oneShot, writer);
+
+  const makeRunner = (transcript: TurnTranscript): TurnRunner =>
+    createExecTurnRunner({
+      provider,
+      tools: toolRunner,
+      clock,
+      maxTurns: deps.maxTurns ?? DEFAULT_EXEC_MAX_TURNS,
+      nextMessageId: () => deps.nextId(),
+      transcript,
+    });
+
+  // B40-B47: streaming input creates (or loads) the session on the first
+  // message and keeps it for every later one.
+  if (inputFormat === "stream-json") {
+    let session: ExecSession | undefined;
+    const openSession = (): ExecSession => {
+      session = openExecSession(sessionOptions);
+      return session;
+    };
+    try {
+      return await runStreamingInput({
+        cwd: context.environment.cwd,
+        model: target.model,
+        reasoningEffort: target.reasoningEffort,
+        tools: allowed,
+        clock: deps.clock,
+        writer: createJsonLineWriter(deps.stdout),
+        lines: deps.readStdinLines?.() ?? linesFrom(deps.readStdin),
+        eager: argv.sessionId !== undefined || argv.fork !== undefined,
+        openSession,
+        runnerFor: makeRunner,
+        nextMessageId: deps.nextId,
+        ...(deps.signal === undefined ? {} : { signal: deps.signal }),
+      });
+    } finally {
+      session?.close();
+    }
   }
-  return await runOneShotSummary(turnRunner, oneShot, writer);
+
+  // B35/B36: one session per run; a continued or forked transcript is loaded
+  // before the turn so the loop sees its messages and nothing is replayed.
+  const session = openExecSession(sessionOptions);
+  try {
+    const messageId = deps.messageId ?? deps.nextId();
+    const turnRunner = makeRunner(session);
+    const request: TurnRequest = {
+      prompt,
+      cwd: context.environment.cwd,
+      sessionId: session.sessionId,
+      model: target.model,
+      reasoningEffort: target.reasoningEffort,
+      tools: allowed,
+      messageId,
+      history: session.messages(),
+    };
+
+    if (outputFormat === "text") {
+      return await runTextTurn(turnRunner, request, deps);
+    }
+
+    const writer = createJsonLineWriter(deps.stdout);
+    const oneShot = {
+      ...request,
+      messageId,
+      clock: deps.clock,
+      ...(deps.signal === undefined ? {} : { signal: deps.signal }),
+    };
+    if (isStreamJsonOutput(outputFormat)) {
+      return await runOneShot(turnRunner, oneShot, writer);
+    }
+    return await runOneShotSummary(turnRunner, oneShot, writer);
+  } finally {
+    session.close();
+  }
 }

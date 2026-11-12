@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760"
+     viewBox="0 0 1200 760" role="img" aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">Droide architecture: TypeScript product layer, JSON-lines boundary, Rust native helper</title>
+  <desc id="arch-desc">The TypeScript product layer under src/ (cli, agent, tools, session, transport, ui, native client) calls one Rust helper process over UTF-8 JSON lines, protocol version 1. The helper under crates/droide-native/src/ owns framing, paths, search, sandbox profiles, PTY quoting and secret storage. The client and helper are tested; the CLI does not dispatch to the helper yet.</desc>
+
+  <style>
+    .bg     { fill: #f5f5f5; }
+    .panel  { fill: #ffffff; stroke: #d8d2cc; }
+    .fg     { fill: #1a1a1a; }
+    .sec    { fill: #4a4a4a; }
+    .muted  { fill: #6b6b6b; }
+    .accent { fill: #d75f00; }
+    .edge   { stroke: #0057a8; }
+    .rule   { stroke: #b0b0b0; }
+    .mono   { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .sans   { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    @media (prefers-color-scheme: dark) {
+      .bg     { fill: #1c1c1c; }
+      .panel  { fill: #262626; stroke: #585858; }
+      .fg     { fill: #eeeeee; }
+      .sec    { fill: #a8a8a8; }
+      .muted  { fill: #767676; }
+      .edge   { stroke: #5fafd7; }
+      .rule   { stroke: #585858; }
+    }
+  </style>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d75f00"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1200" height="760" rx="18"/>
+
+  <g id="heading">
+    <text class="mono muted" x="64" y="64" font-size="18" letter-spacing="2.2">ARCHITECTURE</text>
+    <text class="sans fg" x="64" y="106" font-size="30" font-weight="600">Two runtimes, one written contract</text>
+  </g>
+
+  <!-- product layer -->
+  <g id="typescript">
+    <rect class="panel" x="64" y="150" width="400" height="500" rx="14" stroke-width="1.5"/>
+    <text class="sans fg" x="88" y="196" font-size="21" font-weight="600">TypeScript product layer</text>
+    <text class="mono muted" x="88" y="222" font-size="18">src/</text>
+
+    <g class="mono fg" font-size="19">
+      <text x="88" y="264">cli/</text>
+      <text x="88" y="318">agent/</text>
+      <text x="88" y="372">tools/</text>
+      <text x="88" y="426">session/</text>
+      <text x="88" y="480">transport/</text>
+      <text x="88" y="534">ui/</text>
+      <text x="88" y="588">native/client.ts</text>
+    </g>
+    <g class="sans muted" font-size="18">
+      <text x="88" y="288">argument parsing, help, refusals</text>
+      <text x="88" y="342">turn loop, messages, ports</text>
+      <text x="88" y="396">registry, permissions, fs, shell</text>
+      <text x="88" y="450">store, migrations, search</text>
+      <text x="88" y="504">SSE, LLM deltas, errors</text>
+      <text x="88" y="558">tokens, components, frames</text>
+      <text x="88" y="612">JSON-lines client</text>
+    </g>
+  </g>
+
+  <!-- boundary -->
+  <g id="boundary">
+    <text class="mono muted" x="600" y="190" font-size="18" text-anchor="middle">ONE CHILD PROCESS</text>
+    <text class="mono fg" x="600" y="216" font-size="19" text-anchor="middle">JSON LINES</text>
+    <text class="mono muted" x="600" y="240" font-size="18" text-anchor="middle">protocol 1</text>
+
+    <line class="edge" x1="486" y1="330" x2="714" y2="330" stroke-width="2" marker-end="url(#arrow)"/>
+    <text class="sans sec" x="600" y="316" font-size="18" text-anchor="middle">request</text>
+
+    <line class="edge" x1="714" y1="400" x2="486" y2="400" stroke-width="2" marker-end="url(#arrow)"/>
+    <text class="sans sec" x="600" y="432" font-size="18" text-anchor="middle">response</text>
+
+    <text class="mono muted" x="600" y="520" font-size="18" text-anchor="middle">1 MiB line cap</text>
+    <text class="mono muted" x="600" y="546" font-size="18" text-anchor="middle">one answer per id</text>
+    <text class="mono muted" x="600" y="572" font-size="18" text-anchor="middle">UTF-8, one line</text>
+  </g>
+
+  <!-- native layer -->
+  <g id="rust">
+    <rect class="panel" x="736" y="150" width="400" height="500" rx="14" stroke-width="1.5"/>
+    <text class="sans fg" x="760" y="196" font-size="21" font-weight="600">Rust native layer</text>
+    <text class="mono muted" x="760" y="222" font-size="18">crates/droide-native/src/</text>
+
+    <g class="mono fg" font-size="19">
+      <text x="760" y="264">main.rs</text>
+      <text x="760" y="318">protocol.rs</text>
+      <text x="760" y="372">paths.rs</text>
+      <text x="760" y="426">search.rs</text>
+      <text x="760" y="480">sandbox.rs</text>
+      <text x="760" y="534">pty.rs</text>
+      <text x="760" y="588">secrets.rs</text>
+    </g>
+    <g class="sans muted" font-size="18">
+      <text x="760" y="288">stdin loop, one frame out</text>
+      <text x="760" y="342">framing, dispatch, error codes</text>
+      <text x="760" y="396">path containment</text>
+      <text x="760" y="450">walk, text search</text>
+      <text x="760" y="504">profile per platform</text>
+      <text x="760" y="558">quoting, 4096-byte reads</text>
+      <text x="760" y="612">DPAPI on Windows</text>
+    </g>
+  </g>
+
+  <line class="rule" x1="64" y1="682" x2="1136" y2="682" stroke-width="1"/>
+  <text class="mono muted" x="64" y="716" font-size="18">Methods: native.version · search.walk · search.text · path.resolve</text>
+  <text class="mono muted" x="64" y="742" font-size="18">sandbox.profile · pty.quote · secrets.protect · secrets.unprotect</text>
+
+</svg>

@@ -53,6 +53,7 @@ import type {
   AssistantMessageEvent,
   ExecUsage,
 } from "./records.ts";
+import type { TurnTranscript } from "./session.ts";
 import type {
   TurnEventSink,
   TurnOutcome,
@@ -405,6 +406,8 @@ export interface CreateExecTurnRunnerOptions {
   /** Assistant, tool and user message ids; injected for replayable tests. */
   readonly nextMessageId: (role: Role) => string;
   readonly retry?: RetryPolicy;
+  /** B35-B36: the session transcript this run appends to. */
+  readonly transcript?: TurnTranscript;
 }
 
 /** The loop's own permission gate stays out of the way: the tool runner decides. */
@@ -524,12 +527,15 @@ function countAssistantMessages(messages: readonly Message[]): number {
 async function handleTurnEvent(
   event: TurnEvent,
   sink: TurnEventSink,
+  transcript: TurnTranscript | undefined,
 ): Promise<void> {
   switch (event.type) {
     case "assistant_message":
+      transcript?.assistantMessage(event.message);
       await sink.assistant(toAssistantMessageEvent(event.message));
       return;
     case "tool_message":
+      transcript?.toolMessage(event.message);
       for (const block of event.message.content) {
         if (block.type !== "tool_result") continue;
         await sink.toolResult({
@@ -595,29 +601,42 @@ export function createExecTurnRunner(
         clock: options.clock,
         retry: options.retry ?? NO_EXEC_RETRY,
         emit: (event) => {
-          enqueue(() => handleTurnEvent(event, sink));
+          enqueue(() => handleTurnEvent(event, sink, options.transcript));
         },
         nextMessageId: options.nextMessageId,
       };
 
+      // B46: an outer cancel (SIGINT during streaming input) stops the loop the
+      // same way an immediate denial does.
+      const onOuterAbort = (): void => controller.abort();
+      if (request.signal !== undefined) {
+        if (request.signal.aborted) controller.abort();
+        else
+          request.signal.addEventListener("abort", onOuterAbort, {
+            once: true,
+          });
+      }
+
       const at = options.clock.now();
       const userMessage: Message = {
-        id: options.nextMessageId("user"),
+        id: request.messageId ?? options.nextMessageId("user"),
         role: "user",
         content: [{ type: "text", text: request.prompt }],
         createdAt: at,
         updatedAt: at,
       };
+      options.transcript?.userMessage(userMessage);
 
       const outcome: LoopTurnOutcome =
         await (async (): Promise<LoopTurnOutcome> => {
           try {
             return await runTurn(deps, {
-              messages: [userMessage],
+              messages: [...(request.history ?? []), userMessage],
               maxTurns: options.maxTurns,
               signal: controller.signal,
             });
           } finally {
+            request.signal?.removeEventListener("abort", onOuterAbort);
             await chain;
           }
         })();
@@ -626,33 +645,46 @@ export function createExecTurnRunner(
 
       const immediate = options.tools.immediateDenial();
       if (immediate !== undefined) {
-        await sink.assistant({
+        const endedEarly: Message = {
           id: options.nextMessageId("assistant"),
-          blocks: [{ kind: "text", text: immediate.message }],
-        });
+          role: "assistant",
+          content: [{ type: "text", text: immediate.message }],
+          createdAt: at,
+          updatedAt: at,
+        };
+        options.transcript?.assistantMessage(endedEarly);
+        await sink.assistant(toAssistantMessageEvent(endedEarly));
+        options.transcript?.turnFailed(immediate.message);
         return { kind: "failed", message: immediate.message };
       }
 
       switch (outcome.reason) {
-        case "completed":
-          return {
-            kind: "completed",
-            finalText: finalAssistantText(outcome.messages),
-            numTurns: countAssistantMessages(outcome.messages),
-            usage: usageSnapshot(totals),
-          };
-        case "error":
-          return {
-            kind: "failed",
-            message: outcome.error ?? "The model request failed.",
-          };
+        case "completed": {
+          const finalText = finalAssistantText(outcome.messages);
+          const numTurns = countAssistantMessages(outcome.messages);
+          const usage = usageSnapshot(totals);
+          options.transcript?.turnCompleted({
+            finalText,
+            numTurns,
+            durationMs: options.clock.now() - at,
+            usage,
+          });
+          return { kind: "completed", finalText, numTurns, usage };
+        }
+        case "error": {
+          const message = outcome.error ?? "The model request failed.";
+          options.transcript?.turnFailed(message);
+          return { kind: "failed", message };
+        }
         case "cancelled":
+          options.transcript?.turnCancelled("Cancelled");
           return { kind: "cancelled", message: "Cancelled" };
-        case "max_turns":
-          return {
-            kind: "failed",
-            message: "Turn ended after reaching the maximum number of turns.",
-          };
+        case "max_turns": {
+          const message =
+            "Turn ended after reaching the maximum number of turns.";
+          options.transcript?.turnFailed(message);
+          return { kind: "failed", message };
+        }
       }
     },
   };

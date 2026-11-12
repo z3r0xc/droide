@@ -25,6 +25,25 @@ async function readStdinText(): Promise<string> {
   return text;
 }
 
+/**
+ * `--input-format stream-json` reads one message per line as it arrives, so a
+ * long-lived writer is not forced to close stdin before the first answer.
+ */
+async function* readStdinLines(): AsyncGenerator<string> {
+  process.stdin.setEncoding("utf8");
+  let buffer = "";
+  for await (const chunk of process.stdin) {
+    buffer += chunk;
+    let newline = buffer.indexOf("\n");
+    while (newline >= 0) {
+      yield buffer.slice(0, newline);
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf("\n");
+    }
+  }
+  if (buffer.length > 0) yield buffer;
+}
+
 function parseToolList(value: string, previous: string[] = []): string[] {
   const parts = value
     .split(/[\s,]+/)
@@ -279,16 +298,28 @@ export function makeExecCommand(): Command {
           worktreeDir: text("worktreeDir"),
           tags: names("tag"),
         };
-        process.exitCode = await runExecCommand(argv, {
-          program: PROGRAM,
-          environment: processEnvironment(),
-          stdout: process.stdout,
-          stderr: process.stderr,
-          stdinIsTTY: process.stdin.isTTY === true,
-          readStdin: readStdinText,
-          clock: Date.now,
-          nextId: randomUUID,
-        });
+        // B46/B57: a streaming input run ends on SIGINT with one final record
+        // and exit 0; the signal is delivered to the run, not to the process.
+        const streaming = argv.inputFormat === "stream-json";
+        const controller = new AbortController();
+        const onSigint = (): void => controller.abort();
+        if (streaming) process.once("SIGINT", onSigint);
+        try {
+          process.exitCode = await runExecCommand(argv, {
+            program: PROGRAM,
+            environment: processEnvironment(),
+            stdout: process.stdout,
+            stderr: process.stderr,
+            stdinIsTTY: process.stdin.isTTY === true,
+            readStdin: readStdinText,
+            readStdinLines,
+            clock: Date.now,
+            nextId: randomUUID,
+            ...(streaming ? { signal: controller.signal } : {}),
+          });
+        } finally {
+          if (streaming) process.off("SIGINT", onSigint);
+        }
       },
     );
 }

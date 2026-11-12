@@ -55,6 +55,34 @@ export const STREAM_JSON_OUTPUT_REQUIRED =
 export const STREAM_JSONRPC_OUTPUT_REQUIRED =
   "Invalid flags: --input-format stream-jsonrpc requires --output-format stream-jsonrpc for proper JSON-RPC streaming.";
 
+/** B37: the two session-selection flags cannot be combined. */
+export const SESSION_FLAG_CONFLICT =
+  "Invalid flags: --session-id and --fork cannot be used together.";
+
+/** B38: spec mode owns its own session lifecycle. */
+export const SESSION_SPEC_CONFLICT =
+  "Invalid flags: --session-id and --use-spec/--spec-model cannot be used together.";
+
+/** B37: fork is a whole-transcript copy, so these flags have no meaning. */
+export const FORK_SPEC_CONFLICT =
+  "Invalid flags: --fork and --use-spec/--spec-model cannot be used together.";
+
+export const FORK_WORKTREE_CONFLICT =
+  "Invalid flags: --fork and worktree options cannot be used together.";
+
+export const FORK_MISSION_CONFLICT =
+  "Invalid flags: --fork and --mission cannot be used together.";
+
+export const FORK_STREAMING_JSONRPC_CONFLICT =
+  "Invalid flags: --fork cannot be used with --input-format stream-jsonrpc.";
+
+export const FORK_ACP_CONFLICT =
+  "Invalid flags: --fork cannot be used with an ACP output format.";
+
+/** B17: mission mode drives its own sessions. */
+export const MISSION_SESSION_CONFLICT =
+  "Invalid flags: --mission cannot be used with --session-id.";
+
 /** B41: printed to stderr once when streaming input is selected. */
 export const STREAM_JSON_INPUT_DEPRECATION_WARNING =
   "Warning: --input-format stream-json is deprecated. Use --input-format stream-jsonrpc for daemon-compatible JSON-RPC protocol.";
@@ -99,6 +127,52 @@ export function assertNoPromptInStreamingInput(
   if (inputFormat === undefined) return;
   if (options.promptArg !== undefined || options.file !== undefined) {
     throw new ExecUsageError(STREAMING_PROMPT_REFUSED);
+  }
+}
+
+export interface SessionFlagOptions {
+  readonly sessionId: string | undefined;
+  readonly fork: string | undefined;
+  readonly useSpec: boolean;
+  readonly specModel: string | undefined;
+  readonly mission: boolean;
+  readonly worktree: string | boolean | undefined;
+  readonly worktreeDir: string | undefined;
+  readonly inputFormat: ExecInputFormat | undefined;
+  readonly outputFormat: ExecOutputFormat;
+}
+
+/**
+ * B37/B38 and B17: the session-selection flags and the modes that own session
+ * creation instead. Checked before the generic unimplemented-flag refusals, so
+ * the conflict's own message wins.
+ */
+export function assertSessionFlagConflicts(options: SessionFlagOptions): void {
+  const specMode = options.useSpec || options.specModel !== undefined;
+  if (options.sessionId !== undefined && options.fork !== undefined) {
+    throw new ExecUsageError(SESSION_FLAG_CONFLICT);
+  }
+  if (options.sessionId !== undefined && specMode) {
+    throw new ExecUsageError(SESSION_SPEC_CONFLICT);
+  }
+  if (options.sessionId !== undefined && options.mission) {
+    throw new ExecUsageError(MISSION_SESSION_CONFLICT);
+  }
+  if (options.fork !== undefined) {
+    if (specMode) throw new ExecUsageError(FORK_SPEC_CONFLICT);
+    if (options.worktree !== undefined || options.worktreeDir !== undefined) {
+      throw new ExecUsageError(FORK_WORKTREE_CONFLICT);
+    }
+    if (options.mission) throw new ExecUsageError(FORK_MISSION_CONFLICT);
+    if (options.inputFormat === "stream-jsonrpc") {
+      throw new ExecUsageError(FORK_STREAMING_JSONRPC_CONFLICT);
+    }
+    if (
+      options.outputFormat === "acp" ||
+      options.outputFormat === "acp-daemon"
+    ) {
+      throw new ExecUsageError(FORK_ACP_CONFLICT);
+    }
   }
 }
 
