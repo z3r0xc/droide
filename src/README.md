@@ -27,6 +27,9 @@ strict; no build step (type stripping), no runtime dependency beyond
 | `extensions/` | MCP, plugins, skills, ACP | `60-extensions-mcp-and-skills.md` |
 | `daemon/` | Daemon client and remote control | `70-daemon-and-remote-control.md` |
 | `ui/` | Terminal UI: theme tokens, layout, renderers, keys | `95-terminal-ui.md` |
+| `doctor/` | Check catalogue, probes, text and JSON reports | `10-cli-surface.md` |
+| `daemon/` | WebSocket transport, JSON-RPC protocol, server, client, auth gate | `70-daemon-and-remote-control.md` |
+| `ui/` | Ink shell, tokens, capability ladder, transcript renderers, keys | `95-terminal-ui.md` |
 | `contracts/` | Shared types and validators at layer boundaries | headers above |
 
 Directories appear only when their spec reaches `review`; the table is the plan,

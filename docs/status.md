@@ -26,7 +26,7 @@ cargo test --workspace                   # native layer (CI only here)
 | Command | State |
 |---|---|
 | `--version`, `--help`, subcommand help | **done** — 20/20 parity cases, including the curated `exec --help` page |
-| `doctor` | **done** — catalogue, six real probes (config, environment, system, binaries, filesystem, git), text and `--json` reports; the other ten names report `skip` |
+| `doctor` | **done** — nine real probes (config, environment, system, binaries, filesystem, git, proxy, certs, auth), text and `--json` reports; the remaining names report `skip` |
 | `search\|find` | **done** — store query, text and `--json` output, documented exit codes |
 | `mcp list` | **done** — merged configuration, per-server transport/state, diagnostics, exit 1 on a broken file; never starts a server |
 | `plugin list` | **done** — user and project registries merged (project shadows), highest version per id, enablement from settings, `--scope` |
