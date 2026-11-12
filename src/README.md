@@ -9,6 +9,7 @@ strict; no build step (type stripping), no runtime dependency beyond
 | Path | Responsibility | Spec |
 |---|---|---|
 | `main.ts` | Process entry: hands `argv` to the router, nothing else | `10-cli-surface.md` |
+| `app/` | Startup wiring: build the context once (environment, settings, paths) | `10`, `40` |
 | `cli/router.ts` | Parses and dispatches; converts Commander exits into exit codes | `10-cli-surface.md` |
 | `cli/brand.ts` | Product name, version, docs link — the only place they appear | ADR 0005 |
 | `cli/help.ts` | Static help blocks (aligned examples, footers) | `10-cli-surface.md` |
