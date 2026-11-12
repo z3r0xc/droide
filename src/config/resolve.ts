@@ -46,7 +46,11 @@ export interface DroppedOverlay {
 
 export type RuntimeOverlayResolution =
   | { readonly kind: "absent" }
-  | { readonly kind: "loaded"; readonly path: string; readonly settings: Settings }
+  | {
+      readonly kind: "loaded";
+      readonly path: string;
+      readonly settings: Settings;
+    }
   | ({ readonly kind: "dropped" } & DroppedOverlay);
 
 export interface ResolveSettingsOptions {
@@ -233,15 +237,6 @@ export function mergeSettings(lower: Settings, higher: Settings): Settings {
   };
 }
 
-async function loadLayer(
-  level: SettingsLevel,
-  source: string,
-  settings: Settings | undefined,
-): Promise<ResolvedSettingsLayer | undefined> {
-  if (settings === undefined) return undefined;
-  return { level, source, settings };
-}
-
 /**
  * Resolve every local layer for `environment` and merge them.
  *
@@ -275,25 +270,27 @@ export async function resolveSettings(
     options.projectSettingsFile === undefined
       ? projectSettingsFile(environment)
       : resolveSettingsPath(environment, options.projectSettingsFile);
-  const projectLayer = await loadLayer(
-    "project",
-    projectPath ?? "",
-    projectPath === undefined
-      ? undefined
-      : await readSettingsFile(projectPath),
-  );
-  if (projectLayer !== undefined) layers.push(projectLayer);
+  if (projectPath !== undefined) {
+    const projectSettings = await readSettingsFile(projectPath);
+    if (projectSettings !== undefined) {
+      layers.push({
+        level: "project",
+        source: projectPath,
+        settings: projectSettings,
+      });
+    }
+  }
 
   const userPath =
     options.userSettingsFile === undefined
       ? userSettingsFile(environment)
       : resolveSettingsPath(environment, options.userSettingsFile);
-  const userLayer = await loadLayer(
-    "user",
-    userPath ?? "",
-    userPath === undefined ? undefined : await readSettingsFile(userPath),
-  );
-  if (userLayer !== undefined) layers.push(userLayer);
+  if (userPath !== undefined) {
+    const userSettings = await readSettingsFile(userPath);
+    if (userSettings !== undefined) {
+      layers.push({ level: "user", source: userPath, settings: userSettings });
+    }
+  }
 
   const settings = layers.reduceRight<Settings>(
     (lower, layer) => mergeSettings(lower, layer.settings),

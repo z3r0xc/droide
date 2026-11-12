@@ -13,7 +13,13 @@ import {
 } from "../../../src/session/index.ts";
 import { makeSessionFixture, mutableClock } from "./helpers.ts";
 
-const TABLES = ["meta", "sessions", "session_ingest", "session_spans", "session_term_filters"];
+const TABLES = [
+  "meta",
+  "sessions",
+  "session_ingest",
+  "session_spans",
+  "session_term_filters",
+];
 const INDEXES = [
   "session_spans_embedded_text_idx",
   "session_spans_unembedded_idx",
@@ -50,7 +56,10 @@ function columnSnapshot(db: DatabaseSync, table: string): string[] {
 
 test("migrating an empty database produces the head schema snapshot", (t) => {
   const fixture = makeSessionFixture("droide-migrate-snapshot-");
-  const { db } = openSessionIndexDatabase({ dbPath: fixture.dbPath, clock: mutableClock(1000) });
+  const { db } = openSessionIndexDatabase({
+    dbPath: fixture.dbPath,
+    clock: mutableClock(1000),
+  });
   t.after(() => {
     db.close();
     fixture.cleanup();
@@ -66,9 +75,14 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
 
   assert.deepEqual(objects, [
     ...INDEXES.map((name) => `index:${name}`),
-    ...["meta", "schema_migrations", "session_ingest", "session_spans", "session_term_filters", "sessions"].map(
-      (name) => `table:${name}`,
-    ),
+    ...[
+      "meta",
+      "schema_migrations",
+      "session_ingest",
+      "session_spans",
+      "session_term_filters",
+      "sessions",
+    ].map((name) => `table:${name}`),
     ...TRIGGERS.map((name) => `trigger:${name}`),
   ]);
 
@@ -106,7 +120,9 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
   assert.equal(meta[0]?.["value"], "0");
 
   const ledger = asRows(
-    db.prepare("SELECT version, name FROM schema_migrations ORDER BY version").all(),
+    db
+      .prepare("SELECT version, name FROM schema_migrations ORDER BY version")
+      .all(),
   ).map((row) => `${String(row["version"])}:${String(row["name"])}`);
   assert.deepEqual(ledger, [
     "1:baseline",
@@ -124,19 +140,34 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
   assert.equal(journal?.["journal_mode"], "wal");
   const foreignKeys = asRows(db.prepare("PRAGMA foreign_keys").all())[0];
   assert.equal(foreignKeys?.["foreign_keys"], 1);
-  assert.equal(existsSync(join(fixture.dir, "cache", "session-index", ".metadata_never_index")), true);
+  assert.equal(
+    existsSync(
+      join(fixture.dir, "cache", "session-index", ".metadata_never_index"),
+    ),
+    true,
+  );
 });
 
 test("migrating again is a no-op that does not touch the ledger", (t) => {
   const fixture = makeSessionFixture("droide-migrate-idempotent-");
 
-  const first = openSessionIndexDatabase({ dbPath: fixture.dbPath, clock: mutableClock(1000) });
+  const first = openSessionIndexDatabase({
+    dbPath: fixture.dbPath,
+    clock: mutableClock(1000),
+  });
   const appliedAt = asRows(
-    first.db.prepare("SELECT version, applied_at FROM schema_migrations ORDER BY version").all(),
+    first.db
+      .prepare(
+        "SELECT version, applied_at FROM schema_migrations ORDER BY version",
+      )
+      .all(),
   );
   first.db.close();
 
-  const second = openSessionIndexDatabase({ dbPath: fixture.dbPath, clock: mutableClock(2000) });
+  const second = openSessionIndexDatabase({
+    dbPath: fixture.dbPath,
+    clock: mutableClock(2000),
+  });
   t.after(() => {
     second.db.close();
     fixture.cleanup();
@@ -148,7 +179,13 @@ test("migrating again is a no-op that does not touch the ledger", (t) => {
     alreadyCurrent: true,
   });
   assert.deepEqual(
-    asRows(second.db.prepare("SELECT version, applied_at FROM schema_migrations ORDER BY version").all()),
+    asRows(
+      second.db
+        .prepare(
+          "SELECT version, applied_at FROM schema_migrations ORDER BY version",
+        )
+        .all(),
+    ),
     appliedAt,
   );
 });
@@ -157,7 +194,10 @@ test("a ledger version this build does not know is refused", (t) => {
   const fixture = makeSessionFixture("droide-migrate-newer-");
   t.after(() => fixture.cleanup());
 
-  const opened = openSessionIndexDatabase({ dbPath: fixture.dbPath, clock: mutableClock(1000) });
+  const opened = openSessionIndexDatabase({
+    dbPath: fixture.dbPath,
+    clock: mutableClock(1000),
+  });
   opened.db
     .prepare(
       "INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)",
@@ -166,7 +206,11 @@ test("a ledger version this build does not know is refused", (t) => {
   opened.db.close();
 
   assert.throws(
-    () => openSessionIndexDatabase({ dbPath: fixture.dbPath, clock: mutableClock(1000) }),
+    () =>
+      openSessionIndexDatabase({
+        dbPath: fixture.dbPath,
+        clock: mutableClock(1000),
+      }),
     (error: unknown) => {
       assert.ok(error instanceof SchemaTooNewError);
       assert.equal(error.code, "schema-too-new");
@@ -179,8 +223,15 @@ test("a ledger version this build does not know is refused", (t) => {
 test("a released migration whose checksum changed fails the open", (t) => {
   const fixture = makeSessionFixture("droide-migrate-checksum-");
 
-  const opened = openSessionIndexDatabase({ dbPath: fixture.dbPath, clock: mutableClock(1000) });
-  opened.db.prepare("UPDATE schema_migrations SET checksum = 'deadbeefdeadbeef' WHERE version = 1").run();
+  const opened = openSessionIndexDatabase({
+    dbPath: fixture.dbPath,
+    clock: mutableClock(1000),
+  });
+  opened.db
+    .prepare(
+      "UPDATE schema_migrations SET checksum = 'deadbeefdeadbeef' WHERE version = 1",
+    )
+    .run();
   opened.db.close();
 
   const raw = new DatabaseSync(fixture.dbPath);

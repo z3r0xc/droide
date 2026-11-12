@@ -92,7 +92,8 @@ function resolveOptions(options: NativeClientOptions): ResolvedOptions {
     helperPath: options.helperPath,
     helperArgs: options.helperArgs ?? [],
     requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
-    handshakeTimeoutMs: options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS,
+    handshakeTimeoutMs:
+      options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS,
     closeGraceMs: options.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS,
     timers: options.timers ?? systemTimers,
     env: options.env,
@@ -150,10 +151,13 @@ export class NativeClient {
               env: options.env,
             });
     } catch (error) {
-      throw new NativeUnavailableError(`could not be started: ${messageOf(error)}`, {
-        helperPath: options.helperPath,
-        cause: error,
-      });
+      throw new NativeUnavailableError(
+        `could not be started: ${messageOf(error)}`,
+        {
+          helperPath: options.helperPath,
+          cause: error,
+        },
+      );
     }
     this.child = child;
 
@@ -314,7 +318,8 @@ export class NativeClient {
 
   private handleChunk(chunk: Buffer): void {
     if (this.state === "closed") return;
-    this.buffer = this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
+    this.buffer =
+      this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
 
     let newline = this.buffer.indexOf(0x0a);
     while (newline !== -1) {
@@ -347,7 +352,10 @@ export class NativeClient {
   }
 
   private consumeLine(bytes: Buffer): void {
-    const end = bytes.length > 0 && bytes[bytes.length - 1] === 0x0d ? bytes.length - 1 : bytes.length;
+    const end =
+      bytes.length > 0 && bytes[bytes.length - 1] === 0x0d
+        ? bytes.length - 1
+        : bytes.length;
     const line = bytes.subarray(0, end).toString("utf8");
 
     let response: NativeResponse;
@@ -401,16 +409,21 @@ export class NativeClient {
     }
     this.pending.delete(id);
     request.cancelTimeout();
-    request.reject(new NativeError(code, message, request.method, this.helperPath));
+    request.reject(
+      new NativeError(code, message, request.method, this.helperPath),
+    );
   }
 
   private handleUnexpectedId(id: number): void {
     if (this.abandoned.delete(id)) return;
     this.failWith(
       () =>
-        new NativeProtocolError(`answered request id ${id}, which is not pending`, {
-          helperPath: this.helperPath,
-        }),
+        new NativeProtocolError(
+          `answered request id ${id}, which is not pending`,
+          {
+            helperPath: this.helperPath,
+          },
+        ),
     );
   }
 
@@ -432,7 +445,9 @@ export class NativeClient {
   private handleExit(code: number | null, signal: NodeJS.Signals | null): void {
     this.exited = true;
     this.exitDescription =
-      code === null ? `after signal ${signal ?? "unknown"}` : `with code ${code}`;
+      code === null
+        ? `after signal ${signal ?? "unknown"}`
+        : `with code ${code}`;
     const waiters = [...this.exitWaiters];
     this.exitWaiters.clear();
     for (const waiter of waiters) waiter();
@@ -512,9 +527,13 @@ export async function createNativeClient(
   const client = NativeClient.start(resolved);
 
   try {
-    const result = await client.request(NATIVE_VERSION_METHOD, {}, {
-      timeoutMs: resolved.handshakeTimeoutMs,
-    });
+    const result = await client.request(
+      NATIVE_VERSION_METHOD,
+      {},
+      {
+        timeoutMs: resolved.handshakeTimeoutMs,
+      },
+    );
     const version = parseVersionResult(result, {
       helperPath: resolved.helperPath,
       method: NATIVE_VERSION_METHOD,

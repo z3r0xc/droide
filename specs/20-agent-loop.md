@@ -758,6 +758,10 @@ serialized history ends with that tool result.
 
 ## Evidence
 
+Citations written `src/…` or `packages/…` are relative to
+`evidence/original/windows-x64/`; the table below abbreviates them for
+readability. All citations are `[observed]` unless noted.
+
 | Evidence | Supports | Method |
 |---|---|---|
 | `ev_loop_entry` | B1 | read `evidence/original/windows-x64/src/index.ts:1-3,199-207`, `evidence/original/windows-x64/src/cli.ts:31-40,477` |
@@ -779,9 +783,7 @@ serialized history ends with that tool result.
 | `ev_loop_retry` | B55–B58, B60 | read `retryPolicy/index.ts:20-203`, `daemon-sdk/src/retry.ts:15-42`, `llmStreamingPlatform.ts:60-112`, `sendMessage.ts:1660-1672,2302-2328,6236-6252`, `AgentLoop.ts:1438-1443` |
 | `ev_loop_auth` | B59 | read `AgentLoop.ts:8331-8458`, `authHelpers.ts:52-68`, `authMessages.ts:20-45`, `agentTurnCompletion.ts:99-140` |
 
-Citations written `src/…` or `packages/…` are relative to
-`evidence/original/windows-x64/`; the table below abbreviates them for
-readability. All citations are `[observed]` unless noted. `[derived]` claims: B15 block order
+All citations are `[observed]` unless noted. `[derived]` claims: B15 block order
 (assembled from separate pushes in one function), B26 compaction figure
 (composed from four observed fields), B55 attempt budgets (composed from
 `getDefaultRetryCount` and the route-aware wrapper), B56 delay schedule

@@ -28,10 +28,7 @@ export type JsonValue =
 export type JsonObject = { readonly [key: string]: JsonValue };
 
 export type CustomModelProvider =
-  | "anthropic"
-  | "openai"
-  | "generic-chat-completion-api"
-  | "bedrock-converse";
+  "anthropic" | "openai" | "generic-chat-completion-api" | "bedrock-converse";
 
 /**
  * Persisted custom-model entry consumed by `droid exec`
@@ -80,8 +77,7 @@ export interface McpRemoteServerSettings {
 }
 
 export type McpServerSettings =
-  | McpStdioServerSettings
-  | McpRemoteServerSettings;
+  McpStdioServerSettings | McpRemoteServerSettings;
 
 export type HookEvent =
   | "PreToolUse"
@@ -247,7 +243,11 @@ function joinKeyPath(parent: string, key: string | number): string {
   return parent === "" ? String(key) : `${parent}.${key}`;
 }
 
-function expectObject(value: unknown, path: string, keyPath: string): RawObject {
+function expectObject(
+  value: unknown,
+  path: string,
+  keyPath: string,
+): RawObject {
   if (!isObject(value)) {
     throw new InvalidSettingsError(
       path,
@@ -428,7 +428,11 @@ function expectJsonValue(
   path: string,
   keyPath: string,
 ): JsonValue {
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  ) {
     return value;
   }
   if (typeof value === "number") {
@@ -650,7 +654,11 @@ function parseMcpServer(
     const headers =
       raw.headers === undefined
         ? undefined
-        : expectStringRecord(raw.headers, path, joinKeyPath(keyPath, "headers"));
+        : expectStringRecord(
+            raw.headers,
+            path,
+            joinKeyPath(keyPath, "headers"),
+          );
     const disabled = readOptionalBoolean(raw, "disabled", path, keyPath);
     return {
       type,
@@ -767,7 +775,12 @@ function parseHooksSection(value: unknown, path: string): HooksSettings {
       ),
     );
   }
-  const hooksDisabled = readOptionalBoolean(raw, "hooksDisabled", path, "hooks");
+  const hooksDisabled = readOptionalBoolean(
+    raw,
+    "hooksDisabled",
+    path,
+    "hooks",
+  );
   const showHookOutput = readOptionalBoolean(
     raw,
     "showHookOutput",
@@ -817,7 +830,9 @@ export function parseSettingsDocument(raw: unknown, source: string): Settings {
   const mcp =
     root.mcp === undefined ? undefined : parseMcpSection(root.mcp, source);
   const hooks =
-    root.hooks === undefined ? undefined : parseHooksSection(root.hooks, source);
+    root.hooks === undefined
+      ? undefined
+      : parseHooksSection(root.hooks, source);
   const droids =
     root.droids === undefined
       ? undefined
@@ -858,7 +873,12 @@ export function parseSettingsText(text: string, source: string): Settings {
     raw = JSON.parse(stripJsonc(json));
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new InvalidSettingsError(source, "", `invalid JSON: ${detail}`, error);
+    throw new InvalidSettingsError(
+      source,
+      "",
+      `invalid JSON: ${detail}`,
+      error,
+    );
   }
   return parseSettingsDocument(raw, source);
 }

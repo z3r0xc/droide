@@ -142,7 +142,8 @@ export function parseResponseLine(
 
   if (hasError) {
     const body = payload["error"];
-    if (!isJsonObject(body)) fail("response error is not a JSON object", context);
+    if (!isJsonObject(body))
+      fail("response error is not a JSON object", context);
     const code = body["code"];
     if (typeof code !== "number" || !Number.isInteger(code)) {
       fail("response error code is not an integer", context);

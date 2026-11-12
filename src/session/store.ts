@@ -979,7 +979,7 @@ export class SessionStore {
       )
       .all(
         options.includeArchived ? 1 : 0,
-        options.excludeChildren ? 1 : 0,
+        options.excludeChildren ? 0 : 1,
         options.includeHidden ? 1 : 0,
         options.activeOrgId,
         options.activeOrgId,

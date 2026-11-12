@@ -25,7 +25,9 @@ export const REQUIRES_TERMINAL = [
 export function refusalLines(context: RefusalContext): string[] {
   const lines: string[] = [REQUIRES_TERMINAL];
   if (context.termProgram === "mintty") {
-    lines.push(`  • In mintty, run ${PROGRAM} through winpty: winpty ${PROGRAM}`);
+    lines.push(
+      `  • In mintty, run ${PROGRAM} through winpty: winpty ${PROGRAM}`,
+    );
   }
   if (context.promptWord !== undefined) {
     lines.push(
@@ -36,6 +38,9 @@ export function refusalLines(context: RefusalContext): string[] {
   return lines;
 }
 
-export function writeRefusal(context: RefusalContext, write: (text: string) => void): void {
+export function writeRefusal(
+  context: RefusalContext,
+  write: (text: string) => void,
+): void {
   write(`${refusalLines(context).join("\n")}\n`);
 }

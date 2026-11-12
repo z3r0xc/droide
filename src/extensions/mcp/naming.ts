@@ -182,7 +182,9 @@ export function resolveLlmToolNames(
       continue;
     }
 
-    const safeMembers = group.filter((member) => sanitizeLlmId(member) === member);
+    const safeMembers = group.filter(
+      (member) => sanitizeLlmId(member) === member,
+    );
     const keepClean = safeMembers.length === 1 && safeMembers[0] === rawName;
     const llmId = keepClean ? base : withCollisionSuffix(rawName, base);
     resolved.set(rawName, { rawName, llmId, collided: true });

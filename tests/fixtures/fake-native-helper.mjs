@@ -8,7 +8,8 @@
  * complete its handshake and then observe the mode's fault.
  *
  * Modes: normal (default), error, malformed, oversized, silent, exit,
- * exit-after-version, wrong-version.
+ * exit-after-version, wrong-version, stray (answers an id that was never sent),
+ * late (answers 60 ms after the client's timeout).
  *
  * When `FAKE_NATIVE_HELPER_PID_FILE` is set, the pid is written there before
  * any I/O so a test can prove the process is gone afterwards.
@@ -26,6 +27,8 @@ const MODES = new Set([
   "exit",
   "exit-after-version",
   "wrong-version",
+  "stray",
+  "late",
 ]);
 const PROTOCOL = 1;
 const MAX_LINE_BYTES = 1 << 20;
@@ -95,6 +98,11 @@ lines.on("line", (line) => {
     return;
   }
 
+  if (mode === "stray") {
+    send({ id: id + 9000, result: {} });
+    return;
+  }
+
   if (mode === "malformed") {
     process.stdout.write("this is not a response\n");
     return;
@@ -108,6 +116,14 @@ lines.on("line", (line) => {
 
   if (mode === "error") {
     send({ id, error: { code: -32602, message: "params rejected by fake helper" } });
+    return;
+  }
+
+  if (mode === "late" && method === "hash.sha256") {
+    const text = request?.params?.text;
+    setTimeout(() => {
+      send({ id, result: { sha256: createHash("sha256").update(String(text)).digest("hex") } });
+    }, 60);
     return;
   }
 
