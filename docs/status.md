@@ -28,8 +28,9 @@ cargo test --workspace                   # native layer (CI only here)
 | `--version`, `--help`, subcommand help | **done** — 20/20 parity cases, including the curated `exec --help` page |
 | `doctor` | **done** — catalogue, six real probes (config, environment, system, binaries, filesystem, git), text and `--json` reports; the other ten names report `skip` |
 | `search\|find` | **done** — store query, text and `--json` output, documented exit codes |
+| `mcp list` | **done** — merged configuration, per-server transport/state, diagnostics, exit 1 on a broken file; never starts a server |
 | `exec` | **done** for `text`/`json`/`stream-json` with custom and managed models; streaming input, mission, ACP and `--list-tools` are refused loudly |
-| `resume`, `daemon`, `update`, `mcp`, `plugin`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
+| `resume`, `daemon`, `update`, `mcp add/remove/auth/permissions`, `plugin`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
 | bare `droide` | refuses with exit 64 until the interactive UI lands |
 
 ## Specs
