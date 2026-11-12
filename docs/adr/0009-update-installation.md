@@ -24,7 +24,7 @@ installation, and the obvious implementations are wrong:
 2. **Verify before swap.** The release must publish a `sha256` asset; the
    download is hashed while streaming and compared in constant time. No digest,
    no install — there is no "trust me" path.
-3. **Stage, then swap.** Download to `<factory>/update/<version>/`, verify, then
+3. **Stage, then swap.** Download to `<installDir>/update/<version>/`, verify, then
    rename the current installation aside (`<dir>/.old-<version>`) and move the
    staged files into place. A rename inside the same directory is atomic on both
    NTFS and POSIX; a cross-device move is refused rather than attempted.

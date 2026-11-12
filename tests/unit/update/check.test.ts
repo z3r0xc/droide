@@ -164,11 +164,11 @@ function commandDeps() {
   };
 }
 
-test("update without --check refuses with exit 2 and names the alternative", async () => {
+test("update without --check refuses when the installation directory is unknown", async () => {
   const { deps, read } = commandDeps();
   await runUpdateCommand({}, deps);
-  assert.equal(read().code, 2);
-  assert.match(read().err, /not implemented in this build/);
+  assert.equal(read().code, 1);
+  assert.match(read().err, /installation directory/);
   assert.equal(read().out, "");
 });
 
