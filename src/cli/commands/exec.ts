@@ -31,14 +31,17 @@ function collectTag(value: string, previous: string[] = []): string[] {
 
 function parseDepth(value: string): number {
   const depth = Number.parseInt(value, 10);
-  if (!Number.isFinite(depth)) throw new InvalidArgumentError("depth must be an integer");
+  if (!Number.isFinite(depth))
+    throw new InvalidArgumentError("depth must be an integer");
   return depth;
 }
 
 export function makeExecCommand(): Command {
   return new Command("exec")
+    .helpOption(false)
     .description("Run non-interactively (for scripts/automation)")
     .argument("[prompt]", "The prompt to execute")
+    .option("-h, --help", "display help for command")
     .option("-o, --output-format <format>", "Output format", "text")
     .option(
       "--input-format <format>",
@@ -46,11 +49,27 @@ export function makeExecCommand(): Command {
     )
     .option("-f, --file <path>", "Read prompt from file")
     .option("--auto <level>", "Autonomy level: low|medium|high")
-    .option("--skip-permissions-unsafe", "Skip ALL permission checks - allows all permissions (unsafe)")
-    .addOption(new Option("--tool-execution-mode <mode>", "Tool execution mode: direct-only|script-only").hideHelp())
-    .addOption(new Option("--allow-subagents-in-scripts", "Allow Task calls from Script for this new session").hideHelp())
+    .option(
+      "--skip-permissions-unsafe",
+      "Skip ALL permission checks - allows all permissions (unsafe)",
+    )
     .addOption(
-      new Option("--no-allow-subagents-in-scripts", "Disallow Task calls from Script for this new session")
+      new Option(
+        "--tool-execution-mode <mode>",
+        "Tool execution mode: direct-only|script-only",
+      ).hideHelp(),
+    )
+    .addOption(
+      new Option(
+        "--allow-subagents-in-scripts",
+        "Allow Task calls from Script for this new session",
+      ).hideHelp(),
+    )
+    .addOption(
+      new Option(
+        "--no-allow-subagents-in-scripts",
+        "Disallow Task calls from Script for this new session",
+      )
         .default(undefined)
         .hideHelp(),
     )
@@ -58,15 +77,27 @@ export function makeExecCommand(): Command {
       "--disable-builtin-skills",
       "Disable Factory-provided builtin skills (not supported in ACP modes)",
     )
-    .option("-s, --session-id <id>", "Existing session to continue (requires a prompt)")
-    .option("--fork <id>", "Fork an existing session into a new session (requires a prompt)")
+    .option(
+      "-s, --session-id <id>",
+      "Existing session to continue (requires a prompt)",
+    )
+    .option(
+      "--fork <id>",
+      "Fork an existing session into a new session (requires a prompt)",
+    )
     .option("-m, --model <id>", "Model ID to use")
     .option(
       "-r, --reasoning-effort <level>",
       "Reasoning effort: one of low, medium, high (defaults per model)",
     )
-    .option("--spec-model <id>", "Model ID to use for spec mode (optional, defaults to main model)")
-    .option("--spec-reasoning-effort <level>", "Reasoning effort for spec mode (defaults per spec model)")
+    .option(
+      "--spec-model <id>",
+      "Model ID to use for spec mode (optional, defaults to main model)",
+    )
+    .option(
+      "--spec-reasoning-effort <level>",
+      "Reasoning effort for spec mode (defaults per spec model)",
+    )
     .option("--use-spec", "Start in spec mode")
     .option(
       "--only-tools <ids>",
@@ -86,10 +117,30 @@ export function makeExecCommand(): Command {
       parseToolList,
       [],
     )
-    .addOption(new Option("--enabled-tools <ids>").argParser(parseToolList).default([]).hideHelp())
-    .addOption(new Option("--additional-tools <ids>").argParser(parseToolList).default([]).hideHelp())
-    .addOption(new Option("--disabled-tools <ids>").argParser(parseToolList).default([]).hideHelp())
-    .addOption(new Option("--restrict-tools <ids>").argParser(parseToolList).default([]).hideHelp())
+    .addOption(
+      new Option("--enabled-tools <ids>")
+        .argParser(parseToolList)
+        .default([])
+        .hideHelp(),
+    )
+    .addOption(
+      new Option("--additional-tools <ids>")
+        .argParser(parseToolList)
+        .default([])
+        .hideHelp(),
+    )
+    .addOption(
+      new Option("--disabled-tools <ids>")
+        .argParser(parseToolList)
+        .default([])
+        .hideHelp(),
+    )
+    .addOption(
+      new Option("--restrict-tools <ids>")
+        .argParser(parseToolList)
+        .default([])
+        .hideHelp(),
+    )
     .option("--cwd <path>", "Working directory path")
     .option("-w, --worktree [name]", "Run in a git worktree")
     .option(
@@ -97,33 +148,74 @@ export function makeExecCommand(): Command {
       "Deprecated: set the worktree directory in the Factory desktop app instead",
     )
     .option("--log-group-id <id>", "Log group ID for filtering logs")
-    .option("--list-tools", "List available tools for the selected model and exit")
+    .option(
+      "--list-tools",
+      "List available tools for the selected model and exit",
+    )
     .option("--request-id <id>")
-    .option("--depth <number>", "Recursion depth for subagent spawning (internal use)", parseDepth)
+    .option(
+      "--depth <number>",
+      "Recursion depth for subagent spawning (internal use)",
+      parseDepth,
+    )
     .option(
       "--init-session-id <id>",
       "Create a new session with this specific ID (internal use, for subagent pre-generation)",
     )
-    .option("--calling-session-id <id>", "Parent session ID for linking child/subagent sessions (internal use)")
-    .option("--calling-tool-use-id <id>", "Parent tool use ID that spawned this subagent session (internal use)")
+    .option(
+      "--calling-session-id <id>",
+      "Parent session ID for linking child/subagent sessions (internal use)",
+    )
+    .option(
+      "--calling-tool-use-id <id>",
+      "Parent tool use ID that spawned this subagent session (internal use)",
+    )
     .option("--session-title <title>", "Session title override (internal use)")
-    .option("--tag <spec>", "Session tag (name or JSON object, repeatable)", collectTag, [])
-    .option("--mission", "Run in mission mode (orchestrate a multi-agent mission)")
-    .option("--worker-model <id>", "Model ID used by mission workers (only valid with --mission)")
+    .option(
+      "--tag <spec>",
+      "Session tag (name or JSON object, repeatable)",
+      collectTag,
+      [],
+    )
+    .option(
+      "--mission",
+      "Run in mission mode (orchestrate a multi-agent mission)",
+    )
+    .option(
+      "--worker-model <id>",
+      "Model ID used by mission workers (only valid with --mission)",
+    )
     .option(
       "--worker-reasoning-effort <level>",
       "Reasoning effort for mission workers (only valid with --mission)",
     )
-    .option("--validator-model <id>", "Model ID used by mission validation workers (only valid with --mission)")
+    .option(
+      "--validator-model <id>",
+      "Model ID used by mission validation workers (only valid with --mission)",
+    )
     .option(
       "--validator-reasoning-effort <level>",
       "Reasoning effort for mission validation workers (only valid with --mission)",
     )
-    .option("--append-system-prompt <text>", "Append custom text to the end of the system prompt")
+    .option(
+      "--append-system-prompt <text>",
+      "Append custom text to the end of the system prompt",
+    )
     .option(
       "--append-system-prompt-file <path>",
       "Append file contents to the end of the system prompt",
     )
-    .option("--settings <path>", "Path to runtime settings file merged for this process only")
-    .action(() => notImplemented("exec"));
+    .option(
+      "--settings <path>",
+      "Path to runtime settings file merged for this process only",
+    )
+    .action((_prompt: string | undefined, options: ExecInvocationOptions) => {
+      if (options.help === true) {
+        // The golden page carries the subject's own trailing blank line, so the
+        // renderer ends with one newline and the write supplies the second.
+        process.stdout.write(`${renderExecHelp(execHelpModels())}\n`);
+        return;
+      }
+      notImplemented("exec");
+    });
 }

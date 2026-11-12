@@ -1,7 +1,7 @@
 # Sessions, session store and session search
 
 - **Target:** Factory AI `droid` 1.9.0
-- **Status:** draft
+- **Status:** review
 - **Owner:** storage / session index
 - **Related:** `specs/00-context.md`, `specs/template.md`; session transcript *writer* and `/btw` forks are the CLI session lifecycle; daemon RPC surface (`SEARCH_SESSIONS`) is the daemon spec; embeddings/semantic recall are their own slice. Tool ids: none.
 

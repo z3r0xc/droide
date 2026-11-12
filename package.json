@@ -13,7 +13,7 @@
   "scripts": {
     "cli": "node src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/unit/ tests/integration/",
+    "test": "node --test \"tests/unit/**/*.test.ts\" \"tests/integration/**/*.test.ts\"",
     "test:parity": "node tests/parity/run.mjs --check",
     "test:rust": "cargo test --workspace",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.{mjs,ts}\" \"*.{json,md}\"",

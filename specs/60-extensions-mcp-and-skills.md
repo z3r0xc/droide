@@ -527,9 +527,10 @@ shipped; the table is the required inventory, not an exhaustive behaviour descri
 | 38 | `word-document` | — | Produce polished Word documents | `SKILL-mpyk7mee.md` |
 
 Two assets carry the name `review`: the second replaces the first when the `ReviewRecallSkill` feature
-flag is on (`evidence/original/windows-x64/src/skills/builtin/builtinSkillDefinitions.ts:99-110`). Every
-name in this table except `review (recall)` maps 1:1 to a definition key in
-`evidence/original/windows-x64/src/skills/builtin/builtinSkillDefinitions.ts:97-180`.
+flag is on (`evidence/original/windows-x64/src/skills/builtin/builtinSkillDefinitions.ts:99-110`). Each
+name in this table corresponds to an entry in the builtin definition registry
+(`evidence/original/windows-x64/src/skills/builtin/builtinSkillDefinitions.ts:97-180`); the eight code-only
+builtins named in B52 have no asset and therefore no row here.
 
 ### ACP
 
@@ -577,7 +578,7 @@ the content-moderation message as agent text and returns `refusal`; any other en
 (`evidence/original/windows-x64/src/acp/AcpAgent.ts:2202-2233`).
 
 **B67 — Cancellation.** `session/cancel` is a no-op when the session has no turn; otherwise it marks the
-turn cancelled, aborts the turn controller, and asks the daemon to interrupt the session. A `$​/cancel_request`
+turn cancelled, aborts the turn controller, and asks the daemon to interrupt the session. A `$/cancel_request`
 for the prompt request aborts it the same way, and a turn whose session was closed and reloaded is not
 cancelled by a stale request (`evidence/original/windows-x64/src/acp/AcpAgent.ts:2235-2250`, `:2144-2165`).
 
@@ -621,7 +622,7 @@ removes the session so later requests for that id fail rather than reviving it
 
 | Item | Location / shape | Required | Default | Notes |
 |---|---|---|---|---|
-| User servers | `<factoryDir>/mcp.json` → `mcpServers.<name>` | no | absent | key normalized before use (`:73-81`, `:1286-1310`) |
+| User servers | `<factoryDir>/mcp.json` → `mcpServers.<name>` | no | absent | key normalized before use (`evidence/original/windows-x64/src/services/mcp/mcpConfigPresence.ts:73-81`, `evidence/original/windows-x64/packages/runtime/settings/src/FactorySettingsFolder.ts:1286-1310`) |
 | Project servers | `<projectRoot>/.factory/mcp.json` | no | absent | `projectRoot` = git root else cwd |
 | Transport | `type`: `stdio`\|`http`\|`sse` | no | `stdio` | discriminated union |
 | stdio | `command`, `args[]`, `env{}` | `command` | `args: []` | `env` is the credential channel |
@@ -766,7 +767,8 @@ review-recall pair.
 ## Evidence
 
 Every `path:line` below is relative to `evidence/original/windows-x64/`, e.g.
-`evidence/original/windows-x64/src/mcp/constants.ts:6`.
+`evidence/original/windows-x64/src/mcp/constants.ts:6`; rows that name a repo-relative path
+(`tests/parity/…`) or a path under `evidence/extracted/windows-x64/` say so explicitly.
 
 | Evidence | Supports | Method |
 |---|---|---|
@@ -833,11 +835,11 @@ Every `path:line` below is relative to `evidence/original/windows-x64/`, e.g.
 | `ev_acp_lifecycle_1` (`src/acp/AcpAgent.ts:1554-1780`, `:2097-2130`) | B71 | reading |
 | `ev_cli_goldens_1` (repo-relative `tests/parity/expected/help-mcp.json`, `help-plugin.json`, `help-exec.json`) | B25, B40, B58 | recorded goldens |
 
-Derived claims: B17's stability guarantee is stated by the code comments and follows from hashing the raw
-name, not from an executed collision test `[derived]`; B22's image-compression branch is read but not
-exercised `[observed]` at the code level only; B67's "stale request cannot cancel a reloaded session" is
-`[observed]` in code and `[derived]` as a guarantee. B45 is `[derived]` from the absence of a plugin tool
-component across the loader, archive markers and settings schema.
+Labelling. Two claims are `[derived]` rather than read directly: B17's collision-stability guarantee
+(the code comments assert it and the hashing is of the raw name, but no executed collision case was
+observed) and B45 (derived from the absence of a plugin tool component across the loader, the archive
+markers and the settings schema). B67's stale-request rule is `[observed]` in code as written and
+`[derived]` as a guarantee. Every other clause rests on the cited lines alone.
 
 ## Open questions
 
@@ -855,9 +857,9 @@ component across the loader, archive markers and settings schema.
    ignored, or rejected on install is unknown; `manifest-invalid` (`PluginFailureReason`) names a
    failure class but its trigger site is not in the recovered tree. Blocks a claim that a manifest
    without `name` is accepted or rejected.
-4. **`droid mcp list` exact output.** The command's rendering (table columns, auth status wording) lives
-   in `src/commands/mcp/utils.ts:593` lines of formatting that were not fully read; B25 only pins the
-   command set. Settling it needs the renderer plus a recorded golden.
+4. **`droid mcp list` exact output.** The command's rendering (table columns, auth-status wording) lives in
+   the 593-line `src/commands/mcp/utils.ts`, which was only skimmed; B25 pins the command set only, not
+   the text. Settling it needs the renderer plus a recorded golden.
 5. **Stdio command resolution on Windows.** `spawnStdioFamily` / `windowsJobFamily` implement process
    trees and a job object; whether `command` is resolved through `PATH`, `cmd.exe`, or a shell is not
    established here. Blocks any claim about how a config command string with shell metacharacters runs.
