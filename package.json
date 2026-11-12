@@ -17,7 +17,9 @@
     "test:parity": "node tests/parity/run.mjs --check",
     "test:rust": "cargo test --workspace",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.{ts,mjs}\" \"*.json\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.{ts,mjs}\" \"*.json\""
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.{ts,mjs}\" \"*.json\"",
+    "gaps": "node tools/gaps.mjs",
+    "gaps:check": "node tools/gaps.mjs --check"
   },
   "dependencies": {
     "commander": "^14.0.3"
