@@ -4,6 +4,41 @@ The CLI's `--version` reports the subject's version (`1.9.0`) so parity stays
 meaningful; the package version below tracks this implementation. See
 `docs/release.md`.
 
+## 0.3.0 — 2026-11-13
+
+### Added
+
+- **Agent turns in the interactive shell**: submitted lines run a turn, assistant
+  text is coalesced per frame, tool rows go `pending → success/error`, thinking is
+  collapsed, R11 approvals offer the three documented choices (single call,
+  session, deny), Esc cancels, quit disposes the driver — no provider request,
+  `AbortController` or timer survives.
+- **Plugin marketplaces and installation**: `known_marketplaces.json`, git-backed
+  `marketplace add|remove|list|update` with the manifest validated before
+  adoption, `plugin install|uninstall|update` into either scope through an
+  injected git runner, atomic registry merges, collision and reference refusals.
+- **Session transcript index**: migration 10 (`transcript_index`,
+  `transcript_index_value`, three indexes, three triggers), pragmas and shape
+  validation, corrupt-file quarantine, a pure refresh planner (insert/update/
+  skip/delete by mtime+size), and search served from the index with a _proving_
+  fallback to the literal scan (`--reindex` refreshes).
+- **PTY in the native helper**: ConPTY on Windows and `openpty` on Unix behind one
+  session registry (`pty.spawn|read|write|resize|kill|close`), typed TypeScript
+  wrappers, and a contract test that spawns a real process through the compiled
+  binary.
+- **MCP OAuth building blocks**: PKCE (RFC 7636 vector), the loopback callback
+  with state validation and a 4-minute window, token exchange and refresh with
+  typed errors, and a sealed credential store with revisions and tombstones
+  (ADR 0008). The `mcp auth` command itself is not wired yet.
+- `doctor --checks mcp` connects to enabled servers and reports tool counts;
+  `computer list` reports registration scope; `exec` honours
+  `--append-system-prompt[-file]` and `--disable-builtin-skills`.
+
+### Fixed
+
+- `exec` no longer ignores `--disable-builtin-skills` silently.
+- Sandbox path validation accepts paths absolute on the _target_ platform.
+
 ## 0.2.0 — 2026-11-12
 
 ### Added
