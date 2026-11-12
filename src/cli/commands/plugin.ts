@@ -6,7 +6,9 @@
  */
 import { Command, Option } from "commander";
 
+import { createAppContext } from "../../app/context.ts";
 import { notImplemented } from "../not-implemented.ts";
+import { runPluginList } from "../plugin-commands.ts";
 
 const scopeOption = new Option(
   "-s, --scope <scope>",
@@ -72,7 +74,19 @@ export function makePluginCommand(): Command {
     .command("list")
     .description("List installed plugins")
     .addOption(scopeOption)
-    .action(() => notImplemented("plugin list"));
+    .action((options: { readonly scope?: string }) => {
+      void (async () => {
+        const context = await createAppContext();
+        await runPluginList(options, {
+          context,
+          write: (text) => process.stdout.write(text),
+          writeError: (text) => process.stderr.write(text),
+          setExitCode: (code) => {
+            process.exitCode = code;
+          },
+        });
+      })();
+    });
 
   return plugin;
 }

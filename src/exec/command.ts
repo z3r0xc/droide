@@ -42,7 +42,7 @@ import type { Settings } from "../config/schema.ts";
 import { buildHeaders } from "../transport/headers.ts";
 import type { LlmDialect } from "../transport/llm.ts";
 import { joinApiPath, parseApiBaseUrl } from "../transport/urls.ts";
-import { createCoreRegistry } from "../tools/index.ts";
+import { createSessionTooling } from "../app/tooling.ts";
 import type { AutonomyLevel } from "../tools/permissions.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { ExecError, ExecUsageError } from "./errors.ts";
@@ -719,8 +719,18 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     env: context.environment.env,
   });
 
-  // B9/B10: the advertised set follows the autonomy level.
-  const registry = deps.registry ?? createCoreRegistry();
+  // B9/B10: the advertised set follows the autonomy level. When the caller did
+  // not inject a registry, this is the real one: core tools plus every MCP
+  // server that is configured and reachable (specs/60 §B1–B24).
+  let registry: ToolRegistry;
+  let closeTooling: (() => Promise<void>) | undefined;
+  if (deps.registry === undefined) {
+    const tooling = await createSessionTooling({ context });
+    registry = tooling.registry;
+    closeTooling = () => tooling.close();
+  } else {
+    registry = deps.registry;
+  }
   const allowed = selectExecTools(registry, {
     ...(autonomy === undefined ? {} : { autonomy }),
     skipPermissionsUnsafe: argv.skipPermissionsUnsafe,
@@ -845,5 +855,6 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     return await runOneShotSummary(turnRunner, oneShot, writer);
   } finally {
     session.close();
+    await closeTooling?.();
   }
 }
