@@ -1,0 +1,10 @@
+{
+ "name": "plugin-no-subcommand",
+ "oracle": true,
+ "argv": [
+  "plugin"
+ ],
+ "expect": {
+  "stdout_exact_golden": true
+ }
+}

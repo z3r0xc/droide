@@ -1,0 +1,12 @@
+{
+ "name": "help-command-exec",
+ "oracle": true,
+ "argv": [
+  "help",
+  "exec"
+ ],
+ "expect": {
+  "exit_code": 0,
+  "stdout_exact_golden": true
+ }
+}

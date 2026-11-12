@@ -1,0 +1,10 @@
+{
+ "name": "mcp-no-subcommand",
+ "oracle": true,
+ "argv": [
+  "mcp"
+ ],
+ "expect": {
+  "stdout_exact_golden": true
+ }
+}

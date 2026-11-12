@@ -21,7 +21,7 @@ import process from "node:process";
 const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
 const ROOT = path.resolve(HERE, "../..");
 const WORK_DIR = process.env.DROIDE_PARITY_DIR ?? path.join(ROOT, ".work", "parity");
-const CASES_DIR = path.join(WORK_DIR, "cases");
+const CASES_DIR = path.join(HERE, "cases");
 const EXPECTED_DIR = path.join(WORK_DIR, "expected");
 const OURS_ENTRY = path.join(ROOT, "src/main.ts");
 
@@ -285,8 +285,11 @@ async function main() {
           ),
         );
       } else {
+        // A case that forbids the oracle is verified from its own expectations.
         problems.push(...verify(recorded, testCase.expect ?? {}));
-        problems.push("no golden recorded (run --record with the oracle)");
+        if (testCase.oracle !== false) {
+          problems.push("no golden recorded (run --record with the oracle)");
+        }
       }
       results.push({ name: testCase.name, status: problems.length ? "failed" : "passed", problems });
     } catch (error) {

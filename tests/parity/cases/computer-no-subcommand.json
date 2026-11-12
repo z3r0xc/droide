@@ -1,0 +1,10 @@
+{
+ "name": "computer-no-subcommand",
+ "oracle": true,
+ "argv": [
+  "computer"
+ ],
+ "expect": {
+  "stdout_exact_golden": true
+ }
+}

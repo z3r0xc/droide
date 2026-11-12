@@ -1,0 +1,10 @@
+{
+ "name": "search-no-query",
+ "oracle": true,
+ "argv": [
+  "search"
+ ],
+ "expect": {
+  "stdout_exact_golden": true
+ }
+}

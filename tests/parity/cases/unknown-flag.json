@@ -1,0 +1,11 @@
+{
+ "name": "unknown-flag",
+ "argv": [
+  "--definitely-not-a-flag"
+ ],
+ "oracle": true,
+ "expect": {
+  "stderr_empty": false,
+  "stdout_exact_golden": true
+ }
+}

@@ -3,7 +3,7 @@
 - **Target:** Factory AI `droid` 1.9.0
 - **Status:** draft
 - **Owner:** native/bundled-runtime owner
-- **Related:** `specs/00-context.md`; session-index spec (SQLite schema/search semantics); tools spec (Grep/Glob/Script tool surfaces); daemon spec (JSON-RPC transport); `specs/20-daemon.md`-style terminal callers
+- **Related:** `specs/00-context.md`; session-index spec (SQLite schema/search semantics); tools spec (Grep/Glob/Script tool surfaces); daemon spec (JSON-RPC transport and terminal callers); agent-browser tool/skill spec
 
 ## Purpose
 
@@ -18,7 +18,7 @@ observable CLI behaviour.
 
 ## Scope
 
-Covers the eight payloads listed in §Terms, their on-disk placement under the
+Covers the payloads inventoried in §Data & config, their on-disk placement under the
 Factory home, the environment variables that override or redirect them, the
 wire contracts at each boundary (FFI symbol table, child-process argv/stdio
 framing, WASM instantiation) and the failure text those boundaries produce.
@@ -46,7 +46,7 @@ Open questions.
 | **PTY handle** | Non-negative `i32` returned by `bun_pty_spawn`; `-1`-style negative values mean failure (`vendor:bun-pty/src/terminal.ts:165-172`). |
 | **Bundled binary state** | One of `current`, `stale`, `modified`, `missing`, `removed`, `override`, `override-ignored`, `not-bundled` (`src/utils/enums.ts:270-290`). |
 | **fff** | The fuzzy finder engine (`libfff_c` / `fff_c.dll`), `@ff-labs/fff-bun` in a compiled binary (`packages/daemon-core/src/utils/file-search/index.ts:236-284`). |
-| **slot** | A string of ≥16 KiB UTF-8 lifted out of a Script frame header into a trailing byte buffer (`src/repl/protocol/constants.ts:35`). |
+| **slot** | A string of ≥16 KiB UTF-8 lifted out of a Script frame header into a trailing byte buffer (`src/repl/protocol/constants.ts:24-29`). |
 | **worker** | The extracted `droid-script-runtime` process that evaluates a Script (`src/repl/worker/nativeBinary.ts:53-69`). |
 | **ipc frame** | `u32le` header length + JSON header + slot buffers (`src/repl/protocol/frame.ts:21-25`). |
 
@@ -147,7 +147,7 @@ deliberately overridable (`packages/daemon-core/src/terminal/terminal-manager.ts
 rows, cwd, env})` is called with the cwd canonicalised to an existing
 directory; any throw is wrapped as `Failed to spawn terminal with shell`. The
 `name` option is accepted and **ignored** by bun-pty, so `TERM` is only whatever
-the inherited environment carries (`packages/daemon-core/src/terminal/terminal-manager.ts:140-198`;
+the inherited environment carries (`packages/daemon-core/src/terminal/terminal-manager.ts:131-198`;
 `vendor:bun-pty/src/terminal.ts:147-152`).
 
 **B17** — Each `onData` chunk updates `lastActivity`, is fed to the terminal
@@ -206,14 +206,20 @@ carry kind `unavailable`, `exitCode: null`, `stderr: ''`
 
 **B26** — Daemon file listing: `rg --files --no-messages --null
 --path-separator / [--hidden] --glob '!**/<dir>/**'… --glob
-'!**/<excludedFile>' .` in the target cwd, `timeout` 10 s, `maxBuffer` 100 MB
-(`packages/daemon-core/src/utils/file-listing.ts:23-26,91-110,174-180`).
+'!**/<excludedFile>' .` in the target cwd, `timeout` 10 s. Defaults are
+`maxBuffer` 100 MB; the `daemon.list_files` RPC passes 6 MiB output buffer,
+`maxFiles` 25 000 and `maxBytes` 4 MiB because the reply travels over the
+daemon frame limit (`packages/daemon-core/src/utils/file-listing.ts:23-26,91-110,174-180`;
+`packages/daemon-core/src/server/handlers/droid-request-handler.ts:9834-9854`).
 
-**B27** — Listing output is NUL-terminated records; trailing terminator removed,
-no re-sorting. Exit 1 yields an empty listing; exit 2 with stdout merges the
-surviving prefix with a bounded breadth-first walk (25 000 entries, depth 8,
-5 s) and marks the result truncated; an exit before any output yields
-`{files: [], totalFiles: 0}` (`packages/daemon-core/src/utils/file-listing.ts:112-130,187-215`).
+**B27** — Listing output is NUL-terminated records with a leading `./` stripped
+and no reordering. When a cap is hit, the list is sorted shallowest-first, cut,
+and `truncated: true` is set (the byte cap additionally reports `capped`). Exit
+1 yields an empty listing; exit 2 with stdout merges the surviving prefix with a
+bounded breadth-first walk (25 000 entries, depth 8, 5 s) and marks the result
+truncated; an exit before any output yields `{files: [], totalFiles: 0}`
+(`packages/daemon-core/src/utils/file-listing.ts:112-130,136-215`;
+`packages/daemon-core/src/utils/file-listing-utils.ts:71-78`).
 
 **B28** — Agent search: `rg --no-config <output flags> <caller args> <exclusions>
 -- <pattern> <paths…>` with `timeout` 10 s and `maxBuffer` 20 MB. Output flags
@@ -223,11 +229,15 @@ appended after caller globs so they cannot be re-included
 (`src/utils/grep-utils.ts:156-164,415-529`; `src/utils/constants.ts:27-30`).
 
 **B29** — Search outcomes: exit 0 → `{stdout, stderr, truncated:false}`; exit 1
-→ empty result, no error; killed by the runner's timeout → kind `timed-out`
-with `Search timed out after <n>s`; exit >2 → kind `exited`; maxBuffer before
-any complete record → kind `output-overflow`; maxBuffer with complete records →
-results returned and `[Results truncated: output exceeded maximum buffer size.…]`
-appended to stderr (`src/utils/grep-utils.ts:536-640`).
+→ empty result, no error; exit 2 with at least one match record → the partial
+results are returned with the sanitised diagnostics; exit 2 with no match →
+kind `reported-errors`, `Ripgrep reported errors and returned no results`;
+killed by the runner's timeout → kind `timed-out`, `Search timed out after
+<n>s. …`; terminated by another signal → kind `signaled`; exit >2 → kind
+`exited`; maxBuffer before any complete record → kind `output-overflow`;
+maxBuffer with complete records → results returned and
+`[Results truncated: output exceeded maximum buffer size.…]` appended to stderr
+(`src/utils/grep-utils.ts:536-682`).
 
 **B30** — stderr is sanitised (secrets scrubbed, first 20 lines and 4 000 chars,
 then `… N more lines`) before it reaches an error or a tool result
@@ -385,12 +395,15 @@ attempt is forgotten (`src/repl/worker/nativeBinary.ts:53-135`).
 `The isolated Script runtime is not installed. Rebuild or reinstall Droid.`
 (`src/repl/worker/nativeBinary.ts:95-104`).
 
-**B56** — Start: the absolute binary path is quoted, passed through the sandbox
-argv wrapper and `wrapWorkloadCommand`, then spawned with `shell:false`,
+**B56** — Start: the absolute binary path is quoted and handed to
+`sandbox.wrapCommandArgv`, which returns the argv (just `[binary]` when nothing
+sandboxes, a wrapper otherwise) and the child environment; `wrapWorkloadCommand`
+may then prefix a Linux cgroup launcher. It is spawned with `shell:false`,
 `stdio:['pipe','pipe','pipe']`, `windowsHide:true`, `detached` on POSIX and an
 environment reduced to `LANG, LANGUAGE, SystemRoot, SYSTEMROOT, TEMP, TMP,
 TMPDIR, TZ, WINDIR` plus every `LC_*`. No `PATH`, no user variables
-(`src/repl/worker/processClient.ts:122-132,235-248,1368-1391`).
+(`src/repl/worker/processClient.ts:122-132,235-248,1368-1391`;
+`src/services/SandboxService.ts:661-682`).
 
 **B57** — Handshake: the worker must send `{"type":"ready","protocolVersion":2}`
 within 10 s and before any other frame. A second `ready`, or any frame before
@@ -409,26 +422,31 @@ there, so `"slots"` never reaches the receiving side
 **B59** — Strings of ≥16 KiB UTF-8 are lifted into slots when the host encodes a
 tool result; everything below stays inline. Slot entries are accounted to the
 byte in the header budget, and each string is serialized exactly once
-(`src/repl/protocol/constants.ts:35`; `src/repl/protocol/frame.ts:236-267,273-297`).
+(`src/repl/protocol/constants.ts:24-29`; `src/repl/protocol/frame.ts:236-267,273-297`).
 
 **B60** — Frame ceilings: header ≤ 2 × 128 MiB (268 435 456 B), slots ≤
-max(64 MiB output, input budget); exceeding either fails the stream with
-`Script protocol frame too large` **before** buffering the bytes. A malformed
-header or slot path fails with `Invalid Script protocol frame`. Output inline
-results are capped at 64 KiB (`src/repl/protocol/constants.ts:20-56`;
+max(output budget 5 MiB, input budget 1 MiB) = 5 MiB; exceeding either fails the
+stream with `Script protocol frame too large` **before** buffering the bytes. A
+malformed header or slot path fails with `Invalid Script protocol frame`. A
+terminal Script result returned inline by WaitForScript is capped at 64 KiB
+(`src/repl/protocol/constants.ts:18-22,42-61`;
+`packages/droid-core/src/tools/definitions/cli/script/schema.ts:23-32`;
 `src/repl/protocol/frame.ts:469-487`).
 
 **B61** — Inbound `evaluate` carries `{type, code (transpiled), bindings[],
 inputs?, mission?:{enabled:true}, limits:{heldBytes,inputBytes,outstandingCalls,
-outputBytes,outputItems,heapBytes,slotBytes}}`; the host refuses a mission that
-is not enabled and sends `tool_result` with
+outputBytes,outputItems,heapBytes,slotBytes}}`; the worker refuses a mission that
+is not enabled, and the host sends `tool_result` with
 `{type, toolUseId, isError, heldElsewhere, content?, slots?}`
-(`src/repl/protocol/schema.ts:208-250`; `src/repl/protocol/constants.ts:37-48`).
+(`src/repl/protocol/schema.ts:208-250`; `src/repl/protocol/constants.ts:31-40`).
 
 **B62** — Evaluation must be acknowledged by `evaluation_started` within 10 s or
-the run fails (`evaluation_start_timeout`); the parent dispatches at most 8
-inner tool calls concurrently and may queue up to 64 MiB of unsent results on
-stdin (`src/repl/worker/processClient.ts:70,101-120`).
+the run fails (`evaluation_start_timeout`). The parent dispatches at most 8
+inner tool calls concurrently (a Task takes no slot) and may queue up to 64 MiB
+of unsent results on the worker's stdin; the worker itself refuses beyond
+`outstandingCalls: 128`, 1 MiB of input per call and 5 MiB / 1 024 items of
+output per evaluation (`src/repl/worker/processClient.ts:70,101-120`;
+`packages/droid-core/src/tools/definitions/cli/script/schema.ts:23-32`).
 
 **B63** — Teardown `abort`: kill the whole process group with `SIGKILL`
 immediately, drop content dispatches. `complete`: end stdin, then
@@ -514,9 +532,12 @@ differs, then run `journal_mode=WAL`, `wal_autocheckpoint=0`,
 (`packages/runtime/session-index/src/driver.ts:854-868`;
 `packages/runtime/session-index/src/constants.ts:334-341`).
 
-**B76** — A reported version below 3.51.3 is logged, **not** refused, and the
-index keeps running (`packages/runtime/session-index/src/constants.ts:60-70`;
-`…/driver.ts:234-268`).
+**B76** — Under Bun only, one `SELECT sqlite_version()` runs per open and is
+logged with whether the pin took (`bundled`/`runtime`); a version below 3.51.3
+is logged once as `Session index SQLite version is below the minimum`, **not**
+refused, and the index keeps running
+(`packages/runtime/session-index/src/driver.ts:236-278`;
+`packages/runtime/session-index/src/constants.ts:60-70`).
 
 **B77** — Migrations live in `schema_migrations(version, name, checksum,
 applied_at)`. Each pending migration runs in one `BEGIN IMMEDIATE` transaction
@@ -569,6 +590,27 @@ variable and value (`src/entrypoints/doctor/installationLayers.ts:603-629`;
 
 ## Data & config
 
+### Shipped artefacts (Windows x64 extraction of this build)
+
+| Artefact in `X:` | Size | Format / arch | Becomes |
+|---|---|---|---|
+| `rust_pty-fazdxkv2.dll` | 492 032 B | PE32+ DLL, x86-64 | `BUN_PTY_LIB` (Windows) |
+| `librust_pty-6h2x94h6.so` | 610 024 B | ELF shared, x86-64 | `BUN_PTY_LIB` (Linux x64) |
+| `librust_pty_arm64-kkpzdzzv.so` | 555 704 B | ELF shared, aarch64 | `BUN_PTY_LIB` (Linux arm64) |
+| `librust_pty-0ydm4m2h.dylib` | 516 976 B | Mach-O dylib, x86_64 | `BUN_PTY_LIB` (macOS x64) |
+| `librust_pty_arm64-b7hv765h.dylib` | 504 576 B | Mach-O dylib, arm64 | `BUN_PTY_LIB` (macOS arm64) |
+| `keytar-hqpjzrak` | 707 584 B | PE32+ DLL (N-API), x86-64 | `bin/keytar.node` |
+| `fff_c-43ptfmbb.dll` | 13 906 944 B | PE32+ DLL, x86-64, 91 exports | dlopen'd from the embedded `$bunfs` path, no extraction |
+| `rg-56avgsjb` | 4 919 520 B | PE32+ console, x86-64 | `bin/rg.exe` + `.rg-version` |
+| `agent-browser-wcst4wbn` | 13 942 272 B | PE32+ console, x86-64 | `bin/agent-browser.exe` |
+| `script-runtime-m53sgqc3` | 54 478 336 B | PE32+ console, x86-64 | `bin/script-runtime-<sha256>/droid-script-runtime.exe` |
+| `index_bg-904m1xk3.wasm` | 2 478 606 B | WASM v1 (resvg, wasm-bindgen) | instantiated in-process |
+| `libsqlite3-vvvada9m.dylib` + `.sha256` | 0 B / 0 B | (empty in this extraction) | `bin/libsqlite3-<16 hex>.dylib` on macOS |
+| `apply-seccomp-vvvada9m` | 0 B | (empty in this extraction) | Linux seccomp helper — out of scope |
+
+Only the Windows PTY DLL is present for `win32`; a Windows arm64 host therefore
+hits B1's warning and B4's missing-library error.
+
 ### Environment variables
 
 | Name | Payload | Required | Semantics |
@@ -606,7 +648,7 @@ ignored and reported, never fatal.
 | Trigger | Identity | Observable effect |
 |---|---|---|
 | No PTY library found for the platform | `librust_pty shared library not found.` + `Checked:` list | Every `daemon.create_terminal` fails; `console.warn` at boot when the arch is unsupported (`src/embed-native-libs.ts:46-49`). |
-| `bun_pty_spawn` returns a negative handle | `PTY spawn failed` | Create answers server-side error `Failed to spawn terminal with shell`; the terminal is not registered (`…/terminal-manager.ts:181-198`). |
+| `bun_pty_spawn` returns a negative handle | `PTY spawn failed` | The create request fails with `Failed to spawn terminal with shell`; the terminal is not registered (`…/terminal-manager.ts:181-198`). |
 | Read loop sees a non-`-2` negative | none (silent) | No exit notification; the terminal stays in the registry until the client closes it. |
 | ripgrep unresolvable, retries left | `Ripgrep binary not found. Initialization failed but retries are still available — subsequent calls may succeed.` | Grep/Glob fail for that call only. |
 | ripgrep unresolvable, 3 attempts spent | `Ripgrep binary not found and could not be restored after retries. Do NOT retry Grep or Glob tools — …` | Grep/Glob/Glob-suggestions stay broken for the process (daemon listing throws its own `Ripgrep is unavailable`). |
@@ -635,6 +677,7 @@ use of the original binary.
 | Clause | Test id | Fixture |
 |---|---|---|
 | B1, B2, B4 | `tests/native/test_pty_library_selection_and_missing` | `fixtures/native/pty/` (empty dir) + `BUN_PTY_LIB` unset |
+| B4 | `tests/native/test_pty_missing_library_message` | `fixtures/native/pty/` empty, `BUN_PTY_LIB` unset |
 | B3, B5 | `tests/native/test_pty_spawn_argv_env_block` | `fixtures/native/stub_pty` (echoes received argv/env) |
 | B6 | `tests/native/test_pty_spawn_failure_throws` | `fixtures/native/stub_pty_neg` |
 | B7 | `tests/native/test_pty_data_streaming_utf8` | `fixtures/native/stub_pty_chunks` |
@@ -654,10 +697,12 @@ use of the original binary.
 | B41 | `tests/native/test_file_search_fallback_order` | fff stub failing + rg stub |
 | B42 | `tests/native/test_fff_options_struct_layout` | `fixtures/native/fff_reader` |
 | B43, B44, B45 | `tests/native/test_agent_browser_extract_layout` | `fixtures/agent-browser/` fake binary + digest |
+| B44 | `tests/native/test_agent_browser_missing_after_lock` | `fixtures/agent-browser/lock_only/` (lock present, no binary) |
 | B46, B47 | `tests/native/test_agent_browser_detection_and_path` | none |
 | B48, B49, B50 | `tests/native/test_agent_browser_env_defaults` | none |
 | B51, B52, B53 | `tests/native/test_agent_browser_timeout_cleanup_override` | `fixtures/agent-browser/sockets/` |
 | B54, B55 | `tests/native/test_script_runtime_extract_and_missing` | `fixtures/native/fake-runtime` |
+| B55 | `tests/native/test_script_runtime_missing_message` | none (embedded-asset read forced to fail) |
 | B56 | `tests/native/test_worker_env_allowlist` | `fixtures/native/fake-runtime` (dumps env) |
 | B57, B64 | `tests/native/test_worker_ready_handshake` | `fixtures/native/fake-runtime` modes: none/twice/v1/premature |
 | B58, B59, B60 | `tests/native/test_frame_roundtrip_and_caps` | none |
@@ -665,7 +710,7 @@ use of the original binary.
 | B65 | `tests/native/test_script_worker_starters` | `fixtures/native/fake-runtime` |
 | B66, B67, B68 | `tests/native/test_keytar_resolution_and_stamp` | `fixtures/native/fake-keytar.node` |
 | B69, B72 | `tests/native/test_keyring_accounts_and_keyfile_fallback` | temp factory dir |
-| B70 | `tests/native/test_keyring_missing_module_errors` | loader returning `null` |
+| B68, B70 | `tests/native/test_keyring_missing_module_errors` | loader returning `null` |
 | B71 | `tests/native/test_keyring_get_dedup_set_order` | fake keytar with promises |
 | B73, B75, B76 | `tests/native/test_sqlite_open_pragmas` | temp db, injected sqlite module |
 | B74 | `tests/native/test_sqlite_pin_darwin_only` | temp factory dir, fake platform |

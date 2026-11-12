@@ -1,0 +1,9 @@
+{
+ "name": "no-args",
+ "oracle": false,
+ "argv": [],
+ "expect": {
+  "exit_code": 64,
+  "stderr_matches": "not implemented in this build"
+ }
+}

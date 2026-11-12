@@ -44,8 +44,8 @@ There is **no `--json` and no `--quiet` flag on `droid exec`** in 1.9.0
 (`evidence/original/windows-x64/src/entrypoints/exec/command.ts:47-230` lists the
 whole option set; the curated help lists the same set,
 `entrypoints/exec/help.ts:100-150`). Scripted callers use
-`-o json`/`-o stream-json`, and `exec` is quiet by construction: override
-suppresses protocol chatter and redirects `console.*` to a log file (B33, B34).
+`-o json`/`-o stream-json`, and `exec` is quiet by construction: stdout carries
+only the result, and `console.*` output is redirected to a log file (B33, B34).
 
 ## Terms
 
@@ -148,8 +148,9 @@ header and the insufficient-permission guidance then name the clamped level
 (`services/SessionService.ts:777-781`, `core/ToolExecutor.ts:1056-1091`).
 
 **B13.** In a non-interactive run with no permission callback, a tool call that
-requires confirmation is auto-denied and marked approved-at-decision-time for
-telemetry (`core/ToolExecutor.ts:840-861`).
+requires confirmation is auto-denied without prompting, and the denial is
+recorded against the tool as an `auto` decision
+(`core/ToolExecutor.ts:840-861`).
 
 **B14.** If a denied call is of confirmation type `Execute`, `Script`, or an
 MCP tool, exec enters immediate-exit: the tool result is the denial message, the
@@ -158,10 +159,16 @@ agent loop appends one assistant message
 transcript, the turn's completion reason is `PermissionRejected`, and the
 process exits `1` (`core/ToolExecutor.ts:840-861`, `core/AgentLoop.ts:7667-7700`,
 `exec/sharedAgentRunner.ts:241-268`, `exec/sharedAgentRunner.ts:1526-1530`).
-`<guidance>` is one of the `execMode.guidance*` strings, e.g.
-`Re-run with --auto low|medium|high (to raise autonomy), or use
---skip-permissions-unsafe for dangerous commands.`
-(`core/ToolExecutor.ts:1056-1091`).
+`<guidance>` is selected by the run's live mode and level
+(`core/ToolExecutor.ts:1056-1093`): a spec-mode session gets
+`guidanceSpec`; `high` or mission gets `guidanceHigh`
+(`Re-run with --skip-permissions-unsafe.`); `medium` gets `guidanceMedium`
+(`Re-run with --auto high. For destructive commands, use
+--skip-permissions-unsafe.`); `low` — the exec default — gets `guidanceLow`
+(`Re-run with --auto medium or --auto high. For destructive commands, use
+--skip-permissions-unsafe.`); any other level gets `guidanceDefault`; and when
+the required level exceeds the organization maximum the guidance instead names
+that ceiling (`guidanceMaxAutonomy`).
 
 **B15.** A denied call of any other confirmation type (e.g. file edit) yields a
 per-tool error result and the turn continues; no immediate exit is taken
@@ -182,8 +189,8 @@ is refused with `--spec-*`, `--session-id`, `--fork`, and streaming input
 **B18.** On success the process writes exactly the run's final assistant text
 followed by one newline to stdout, and nothing else
 (`entrypoints/exec/handler.ts:260-284`). An empty answer produces a bare
-newline. Progress notes are never printable output on their own (see B19's
-final-text rule).
+newline. Progress notes are ordinary assistant text in `stream-json` (B28) but
+never replace the final answer when the last assistant message has one (B19).
 
 **B19.** The final text is the last visible assistant answer of *this* run: the
 transcript may hold earlier turns of a resumed session, and none of them
@@ -276,7 +283,10 @@ milliseconds; `session_id` is the session that owns the message.
    `{"type":"completion","finalText":<string>,"numTurns":<number>,
    "durationMs":<number>,"session_id":<string>,"timestamp":<number>,
    "usage":{…}}` where `usage` is B23's object
-   (`exec/streamJsonEventHelpers.ts:233-248`).
+   (`exec/streamJsonEventHelpers.ts:233-248`). `numTurns` counts assistant
+   messages in the session transcript at the end of the run, so a continued
+   session, or a later `--input-format stream-json` message, reports a
+   cumulative count (`exec/renderlessExecRunner.ts:139-141`, `:693-695`).
 
 **B26.** Ordering in a one-shot run is fixed: `system/init` first, before any
 agent work; then the echo of the user message; then one record per transcript
@@ -391,7 +401,8 @@ string or an array whose first `text` block supplies the prompt; no text yields
 **B43.** A malformed line, a non-user role, or a text-less message produces one
 `error` record with `source:"cli"` and the message above, and the stream
 continues with the next line; the process does not exit
-(`exec/streamingExecRunner.ts:286-296`).
+(`exec/streamingExecRunner.ts:286-296`). A record emitted before any session
+exists carries `session_id:""` (`exec/streamingExecRunner.ts:288`).
 
 **B44.** Messages are processed strictly one at a time, in arrival order, via a
 serial chain over stdin lines (`exec/streamingExecRunner.ts:94-96`,
@@ -407,9 +418,9 @@ stream, writes one final `error` record `Streaming session interrupted by user`,
 stops the running turn, and writes nothing afterwards; the process exits `0`
 (`exec/streamingExecRunner.ts:300-321`).
 
-**B47.** Each message's records carry that message's session id; a resumed
-session therefore continues numbering events under the same `session_id` across
-messages.
+**B47.** Each message's records carry that message's session id, so every
+message of one stream shares the same `session_id`
+(`exec/streamingExecRunner.ts:226`, `:288`).
 
 ### Input/output format `stream-jsonrpc` and ACP (boundary contract)
 
@@ -435,7 +446,7 @@ a response carrying `id:null` and error code `-32700` and the messages
 SIGHUP, parent disconnect, or a failed stdout write all close it; a close
 initiated by a signal or EOF drains in flight work, while losing the peer
 (parent disconnect, output closed) interrupts it
-(`exec/wire/StdioWire.ts:157-165`, `:165-256`). A fatal error inside the
+(`exec/wire/StdioWire.ts:157-256`). A fatal error inside the
 JSON-RPC runner exits `1` (`exec/runStreamingJsonRpcExec.ts:84-87`).
 
 **B51.** `-o stream-jsonrpc` **without** `--input-format stream-jsonrpc` is the
@@ -485,10 +496,11 @@ failed turn the signal itself cancelled
 (`entrypoints/exec/handler.ts:955-957`, `utils/shutdownCoordinator.ts:85-88`,
 `:433-444`, `exec/sharedAgentRunner.ts:1591-1597`).
 
-**B57.** `--input-format stream-json` and ACP modes do not take signal exit
-codes: their interrupted runs end with `0`
-(`entrypoints/exec/handler.ts:866-953`,
-`utils/command-wrapper.ts:95-110`).
+**B57.** `--input-format stream-json` does not take signal exit codes: an
+interrupted stream ends with `0` (B46), because the wrapper's signal path exits
+`0` after cleanup (`entrypoints/exec/handler.ts:866-930`,
+`utils/command-wrapper.ts:61-75`). The exit status of an interrupted ACP server
+is owned by the daemon and is not specified here (Open question 3).
 
 ### Owed background work
 
@@ -523,7 +535,8 @@ respective reason when the main turn failed or permission was denied
 | `--tag <spec>` | repeatable name or JSON | — | session tags |
 | `--mission`, `--worker-*`, `--validator-*` | — | — | mission mode (B17) |
 | `--append-system-prompt[-file]`, `--settings` | text / path | — | prompt/settings overlays |
-| `--init-session-id`, `--calling-session-id`, `--calling-tool-use-id`, `--session-title`, `--depth`, `--request-id`, `--log-group-id`, `--tool-execution-mode`, `--allow-subagents-in-scripts`, `--enabled-tools`, `--additional-tools`, `--disabled-tools`, `--restrict-tools`, `--only-tools`, `--add-tools`, `--remove-tools` | — | — | internal / delegated-run plumbing, hidden from `exec --help` (`entrypoints/exec/command.ts:60-230`) |
+| `--only-tools`, `--add-tools`, `--remove-tools` | tool id list | — | tool selection (tool-registry spec); visible in `exec --help` |
+| `--init-session-id`, `--calling-session-id`, `--calling-tool-use-id`, `--session-title`, `--depth`, `--request-id`, `--log-group-id`, `--tool-execution-mode`, `--allow-subagents-in-scripts`, `--enabled-tools`, `--additional-tools`, `--disabled-tools`, `--restrict-tools` | — | — | internal / delegated-run plumbing, hidden from `exec --help` (`entrypoints/exec/command.ts:60-230`) |
 
 `--output-format` values are the `ExecOutputFormat` enum
 (`packages/droid-sdk-core/src/protocol/shared/enums.ts:134-143`); `--input-format`
@@ -563,7 +576,8 @@ values are `ExecInputFormat` (`:128-132`). Any other value is refused with
 | Denied Execute/Script/MCP call | assistant text `Exec ended early: insufficient permission to proceed. <guidance>`; text mode prints it on stderr as `Error during droid execution: …`, stream-json closes with an `error` record | 1 | turn and session persisted; retry with higher `--auto` |
 | Provider/model failure | `error` record (stream-json) or `Error during droid execution: <diagnostic>` | 1 | partial transcript persisted; retry is a new turn |
 | Unauthenticated managed run | auth message as the run's final text | 1 | no model call |
-| Turn cancelled / SIGINT (one-shot) | none added | 130 / 143 (B56) | turn persisted as cancelled |
+| Turn cancelled without a signal | none added | 1 | turn persisted as cancelled |
+| SIGINT / SIGTERM (one-shot modes) | none added | 130 / 143 (B56) | turn persisted as cancelled |
 | SIGINT (`--input-format stream-json`) | final `error` record `Streaming session interrupted by user` | 0 | stream closed, no further records |
 | Fatal JSON-RPC error | process teardown | 1 | server stops |
 | Closed stdout pipe | none | 0 if the result was already chosen | run unaffected |
@@ -601,7 +615,7 @@ exactly. `-o json` fixtures normalise `duration_ms` → `0` and `session_id` →
 | B7 | `tests/exec/test_streaming_rejects_prompt` | none |
 | B8, B9 | `tests/exec/test_default_read_only_tools` | `fixtures/exec/settings.json` |
 | B10, B11, B12 | `tests/exec/test_autonomy_flags` | `fixtures/exec/settings.json`, `fixtures/exec/managed-max.json` |
-| B13–B15 | `tests/exec/test_permission_denied_exit` | `fixtures/exec/wants_write.json` |
+| B13–B15 | `tests/exec/test_permission_denied_exit` | `fixtures/exec/wants_shell.json` |
 | B16 | `tests/exec/test_delegated_auto_reject` | `fixtures/exec/delegated.json` |
 | B17 | `tests/exec/test_mission_flag_conflicts` | none |
 | B18, B19 | `tests/exec/test_text_output` | `fixtures/exec/one_turn_text.json` |
@@ -663,13 +677,16 @@ Four invocations, same mock harness, `settings.json` fixture, stdin
 | Scenario | Invocation | Fixture script | Expected stdout | Expected stderr | Exit |
 |---|---|---|---|---|---|
 | success | `droid exec --model custom:mock "say hi"` | assistant text `hi` | `hi\n` | empty | 0 |
-| denied permission | `droid exec --model custom:mock "write it"` | assistant `tool_calls` → `Create`/`Edit` with a file write | empty | `Error during droid execution: Exec ended early: insufficient permission to proceed. Re-run with --auto low\|medium\|high (to raise autonomy), or use --skip-permissions-unsafe for dangerous commands.` | 1 |
+| denied permission | `droid exec --auto low --model custom:mock "delete it"` | assistant `tool_calls` → `Execute` with `{"command":"rm -rf ./build"}` | empty | `Error during droid execution: Exec ended early: insufficient permission to proceed. Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.` | 1 |
 | provider error | `droid exec --model custom:mock "say hi"` | server returns HTTP 500 on turn 1 | empty | `Error during droid execution: <provider diagnostic>` | 1 |
 | cancelled | `droid exec --model custom:mock "say hi"`, SIGINT sent once the first token is served | assistant stream never completes | empty (or the partial text, if the turn had already answered) | — | 130 |
 
-The denied-permission case must use a *mutating* tool so B13–B14's immediate
-exit applies; a `Read`-only mock must instead assert exit `0` with the tool
-result present.
+The denied-permission case must reach a *confirmation* rather than a
+tool-availability refusal: `--auto low` makes every tool selectable, and an
+`Execute` command above the low risk band is then auto-denied, taking B14's
+immediate exit. (Without `--auto` the same call would be filtered as
+unavailable before confirmation and never reach B14.) A `Read`-only mock must
+assert exit `0` with the tool result present.
 
 ### `tests/exec/test_json_summary_success`
 
@@ -763,8 +780,9 @@ deprecation warning (B41).
   `Exec ended early: insufficient permission to proceed. <guidance>` when the
   denied call is shell/script/MCP, exit `1`; otherwise fail only that tool.
 - The four output modes' byte-level shape: `text` = final answer + `\n`;
-  `json` = one object with exactly the eight keys (B21) and `usage`'s seven-plus
-  optional `ttft_ms`; `stream-json` = the seven record kinds, their exact key
+  `json` = one object with exactly the eight keys (B21) and a `usage` of six
+  counters plus optional `ttft_ms`; `stream-json` = the seven record kinds,
+  their exact key
   names and casing (`session_id`, `finalText`, `numTurns`, `durationMs`,
   `isError`, `toolName`, `messageId`), one record per line, `system/init` first,
   one `completion` last on success, an `error` instead on failure.

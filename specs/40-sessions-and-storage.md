@@ -84,7 +84,7 @@ not in the recovered source; see Open question 1).
 - **Hit** — one match inside a session, identified by `docId`.
 - **`docId`** — locally `line:<n>` with a 1-based transcript line
   (`packages/utils/src/session-search/hit.ts:48-51`); the compact formatter also
-  accepts `event:<id>` and `session:<id>` forms (`src/search/sessionSearch.ts:263-266`).
+  accepts `event:<id>` and `session:<id>` forms (`src/search/sessionSearch.ts:276-280`).
 - **Kind** — `message_text` | `document` | `tool_use` | `tool_result`
   (`packages/droid-sdk-core/src/protocol/daemon/schemas/enums.ts:714-719`).
 
@@ -116,7 +116,7 @@ effort; a failure never blocks the open)
 `journal_size_limit = 524288`, `synchronous = NORMAL`, `busy_timeout = 0`,
 `foreign_keys = ON`. Before them, `auto_vacuum` is read and set to
 `INCREMENTAL` only when the file is not already in that mode
-(`constants.ts:348-360`, `driver.ts:860-872`). Resting `busy_timeout` is 0; it is
+(`constants.ts:302-341`, `driver.ts:860-872`). Resting `busy_timeout` is 0; it is
 raised only for the duration of work a caller is waiting on: 5000 ms for
 migrations, the refresh and lease claims (`DELIBERATE_BUSY_TIMEOUT_MS`), 25 ms
 for a mutation/append write (`MUTATION_BUSY_TIMEOUT_MS`), then restored to 0
@@ -127,13 +127,13 @@ threshold: `PASSIVE` at most once per 64 writes (`WAL_CHECKPOINT_WRITE_INTERVAL`
 scheduled off the writing frame; after 128 un-checkpointed writes a write is
 declined (returned as "refused", retried by the caller) rather than
 checkpointing inline; `TRUNCATE` after a migration batch and on
-`close()`; every 1024 files during a refresh (`constants.ts:237-300`,
-`record.ts:645-700`, `792-812`, `driver.ts:955-970`).
+`close()`; every 1024 files during a refresh (`constants.ts:237-302`,
+`record.ts:620-698`, `driver.ts:955-970`, `migrate.ts:368-386`).
 
 **B4.** One refresh runs at a time per file. The claim is a `meta` row
 `refresh_lease_until` holding `<untilMs>:<pid>`, leased for 60000 ms, renewed at
 half-life, reclaimed immediately when the recorded pid is not alive; a second
-refresher returns without reading (`constants.ts:132-146`,
+refresher returns without reading (`constants.ts:116-146`,
 `lease.ts:29-82`).
 
 **B5.** With the index, a listing answers from the index or rejects; it never
@@ -219,7 +219,7 @@ WAL (`driver.ts:1015-1022`).
 
 **B17.** A session's identity is its id: a lowercase UUIDv4 string taken from
 the transcript's file name (`src/utils/uuid.ts:1-9`,
-`session-paths/src/index.ts:302-306`). The two file paths are **derived** from
+`discovery.ts:238`). The two file paths are **derived** from
 `(sessions dir, project_key, session id)`, never stored; a row whose derivation
 would escape the sessions dir is rejected with
 `Indexed session resolves outside the sessions dir` and only the session id is
@@ -245,7 +245,7 @@ invoking write records `session_ingest.settings_mtime_ms`
 the number of the append's lines that end past `session_ingest.transcript_offset`,
 `last_event_at` takes the max, and `has_user_visible_messages` is set to 1 when
 the append reports visible content (never cleared) (`record.ts:186-194`,
-`220-233`, `975-990`).
+`220-233`, `912-924`).
 
 **B21.** All writes of one call are one `BEGIN IMMEDIATE` transaction under the
 mutation `busy_timeout`; a corruption error reports corruption to the owner and
@@ -281,6 +281,12 @@ canonical append-only body (`ingest.ts:591-612`).
 projection rebuild (missing or untrusted term filter, a filter smaller than the
 file needs, a span tail beyond the offset) or a migration backfill restarts the
 transcript in place while keeping the row (`ingest.ts:580-632`).
+
+Every rewrite a transcript writer performs — a compaction that replaces the
+history, a fork that copies it, a rename that replaces line 1 — is classified by
+this table alone (size, mtime, fingerprint, `project_key`); the index never
+inspects the rewrite's intent. `[inferred]` for the write shapes themselves,
+which belong to the session-lifecycle spec; the classification is `[observed]`.
 
 **B27.** A restart of a **rewritten** transcript (`keepsRow` false) deletes the
 row and, by cascade, its `session_ingest`/span/filter rows, then re-inserts a
@@ -439,8 +445,10 @@ highlighting in the index engine (`search.ts:93`, `1584-1610`).
 (the `compactSessions` message when the count is exact and equals what is shown,
 the `compactShowing` message with `count`/`shown`/`bound` otherwise), then one
 block per session — `<sessionId> <title ≤60 chars> · <matchCount>` — then one
-line per hit: `  L<n> <kind>[ <toolName>]: <snippet>` (kinds render as `user`,
-`assistant`, `call`, `result`, `document`). At most 120 characters of snippet are
+line per hit: `  L<n> <kind>[ <toolName>]: <snippet>` (the anchor is `L<line>`
+for a `line:` docId and `@<id>` for an `event:` one), where `kind` is chosen by
+`compactUser` / `compactDroid` / `compactCall` / `compactResult` /
+`compactDocument`. At most 120 characters of snippet are
 shown per hit, control sequences are stripped, and a `, <compactPartial>` suffix
 marks an incomplete result (`src/search/sessionSearch.ts:200-341`). The literal
 words come from `common:sessionSearch.*` and are Open question 1.
@@ -587,6 +595,14 @@ Environment: `FACTORY_HOME_OVERRIDE` (home override),
 `FACTORY_ENV`/`FACTORY_ENV_DIRS` (which of `.factory` / `.factory-dev`),
 `MIN_SQLITE_VERSION` is a package constant, not an environment variable.
 
+SQLite: the package pins its own library where the runtime would dlopen an older
+one (macOS), through `configureSessionIndexHost({ sqliteLibrary })`
+(`access.ts:1155-1200`); the floor is `3.51.3` — the first release without the
+WAL-reset race that corrupts a database written by two processes, which is the
+CLI-beside-daemon shape — and a lower version is **logged, not refused**, because
+`jsonb()` only needs 3.45 (`constants.ts:40-64`, `driver.ts:250-286`). Opening
+reports `sqlite_version()` and which library supplied it.
+
 ## Errors
 
 | Condition | Identity | Effect |
@@ -602,7 +618,7 @@ Environment: `FACTORY_HOME_OVERRIDE` (home override),
 | Peer holds the writer slot | SQLite busy/locked; log `Deferred a session index write a peer held the lock for` | write returns "refused"; caller retries after yielding; no data lost |
 | WAL at its write cap | log `Declined a session index write because the write-ahead log is at its cap` | write refused, retried later |
 | Refresh lease held | none (silent) | second pass returns without reading |
-| `--kind` outside the enum | `Invalid --kind value` | exit 1 |
+| `--kind` outside the enum | `Invalid --kind value` (a `MetaError`, so the generic search-failure line is printed) | exit 1 |
 | Query outside the supported regex subset | `Search query rejected`; stderr `common:sessionSearch.queryRejected`, exit 1 | nothing scanned |
 | Index-requiring flag with the feature off | `--include-archived, --exclude-children and --include-hidden need the session index, which is off` | exit 1 |
 | `ripgrep` missing or unusable | log `Session search matcher is unavailable` (`state: matcher-unavailable`) | empty result with `complete: false`; no transcript scan |
@@ -681,12 +697,12 @@ Three tests carry the load and must be exact:
 | `ev_schema_cache_head` | B6–B13, Data & config | Decoded assets 1–9 (UTF-16LE for 0001/0003) and applied them with `sqlite3` 3.50.6 to an empty file; inventoried `sqlite_master` and `pragma_table_info` |
 | `ev_schema_annotations` | B37 | Decoded and applied `0001_session_annotations`; inventoried the two tables and four indexes |
 | `ev_migrate_runner` | B6–B16 | Reading `migrate.ts:40-470` [observed] |
-| `ev_driver_pragmas` | B1–B3, B14–B16 | Reading `constants.ts:300-360`, `driver.ts:830-1031` [observed] |
+| `ev_driver_pragmas` | B1–B3, B14–B16 | Reading `constants.ts:237-341`, `driver.ts:830-1031` [observed] |
 | `ev_cache_open` | B12, B14, B15 | Reading `cache.ts:37-172`, `schema.ts:26-238` [observed] |
 | `ev_record_writes` | B17–B22 | Reading `record.ts:92-741`, `ingest.ts:1181-1235` [observed] |
 | `ev_refresh_plan` | B23–B31, B34 | Reading `discovery.ts:43-300`, `ingest.ts:212-330`, `567-632`, `1310-1360`, `2147-2230` [observed] |
 | `ev_lease` | B4 | Reading `lease.ts:1-120` [observed] |
-| `ev_listing` | B38–B42 | Reading `record.ts:239-400`, `925-968`, `listing.ts:71-145`, `driver.ts:1024-1031` [observed] |
+| `ev_listing` | B38–B42 | Reading `record.ts:239-400`, `925-968`, `listing.ts:71-145`, `216-270`, `driver.ts:1024-1031` [observed] |
 | `ev_search_cli` | B43–B46, B53–B56 | Reading `src/entrypoints/search/command.ts:8-66`, `run.ts:36-173`, `src/search/sessionSearch.ts:1-341` [observed] |
 | `ev_search_engine` | B47–B52 | Reading `search.ts:289-400`, `640-900`, `1400-1700`, `2116-2196`, `2333-3064`; `utils/src/session-search/extract.ts:257-340`, `rank.ts:13-67` [observed] |
 | `ev_search_bounds` | B44, B51 | Reading `utils/src/session-search/query.ts:44-73`, `packages/common/src/session/constants.ts:77-86` [observed] |
@@ -717,9 +733,10 @@ absent from the recovered tree), and the annotations database path.
    serialised strings are not. Affects log assertions only.
 4. **`--reindex` semantics for a one-shot search.** `requestRebuild` is a no-op
    for `droid search` (`run.ts:56-62`), and `refresh` is passed through to
-   `searchEverywhere` (`run.ts:99`). Whether `--reindex` performs a full refresh
-   or a per-session one before scanning is not visible in the shipped code
-   path. Blocks the timing claims of B46; does not affect result shape.
+   `searchEverywhere` (`run.ts:98-110`). Whether `--reindex` performs a full
+   refresh or a per-session one before scanning is not visible in the shipped
+   code path. Blocks no clause (B43 only lists the flag); it affects how fresh a
+   result may be.
 5. **Search when the index is unavailable mid-command.** `access.ts` reports
    `unavailable` and the CLI has no JSON-directory fallback (unlike the listing);
    the observable result is an empty, incomplete result, but the sequence that

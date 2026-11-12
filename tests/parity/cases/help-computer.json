@@ -1,0 +1,14 @@
+{
+ "name": "help-computer",
+ "argv": [
+  "computer",
+  "--help"
+ ],
+ "oracle": true,
+ "expect": {
+  "exit_code": 0,
+  "stdout_matches": "Usage:",
+  "stderr_empty": true,
+  "stdout_exact_golden": true
+ }
+}
