@@ -44,7 +44,10 @@ function assistantRows(lines: readonly string[]): number {
 }
 
 test("a width and height change reflows without throwing", async () => {
-  const wide = shellAt(120, 40, { transcript: longTranscript(), changelog: true });
+  const wide = shellAt(120, 40, {
+    transcript: longTranscript(),
+    changelog: true,
+  });
   const { stdout, chunks } = captureStream(120, 40);
   const handle = await renderShell(wide, {
     stdout,
@@ -60,10 +63,10 @@ test("a width and height change reflows without throwing", async () => {
     const wideAssistant = assistantRows(first);
 
     const before = chunks.length;
-    await handle.rerender(
-      shellAt(80, 30, { transcript: longTranscript() }),
-      { columns: 80, rows: 30 },
-    );
+    await handle.rerender(shellAt(80, 30, { transcript: longTranscript() }), {
+      columns: 80,
+      rows: 30,
+    });
     const resized = frameLines(chunks.slice(before).join("\n"));
 
     assert.ok(resized.length > 0, "the resize produced a frame");

@@ -9,7 +9,7 @@ import { createElement as h, type ReactNode } from "react";
 
 import type { Capabilities } from "../capabilities.ts";
 import { splitLines, truncateToWidth } from "../text.ts";
-import { foreground } from "../tokens.ts";
+import { GLYPHS, foreground } from "../tokens.ts";
 
 export interface StatusLineContent {
   readonly text: string;
@@ -69,7 +69,7 @@ export function StatusLine(props: StatusLineProps): ReactNode {
             dimColor: capabilities.style,
             wrap: "truncate-middle",
           },
-          truncateToWidth(line, innerWidth, "…"),
+          truncateToWidth(line, innerWidth, GLYPHS.ellipsis),
         ),
       ),
     ),

@@ -113,7 +113,10 @@ test("CI skips both probes but keeps the terminal's colour depth", () => {
   const caps = detectCapabilities(environment({}, { CI: "1" }));
   assert.equal(caps.colorDepth, "256");
   assert.deepEqual(caps.probes, { trueColor: false, appearance: false });
-  assert.equal(detectCapabilities(environment({}, { CI: "false" })).probes.appearance, false);
+  assert.equal(
+    detectCapabilities(environment({}, { CI: "false" })).probes.appearance,
+    false,
+  );
 });
 
 test("win32 writes neither probe and resolves from COLORFGBG only", () => {

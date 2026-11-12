@@ -714,16 +714,24 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     now: deps.clock,
     sleep: sleepFor,
   };
+
+  // The echo record and the transcript's user message share one id: the first
+  // id the loop asks for is that message.
+  const sessionId = deps.sessionId ?? deps.nextId();
+  const messageId = deps.messageId ?? deps.nextId();
+  let pendingUserId: string | undefined = messageId;
   const turnRunner = createExecTurnRunner({
     provider,
     tools: toolRunner,
     clock,
     maxTurns: deps.maxTurns ?? DEFAULT_EXEC_MAX_TURNS,
-    nextMessageId: () => deps.nextId(),
+    nextMessageId: () => {
+      const id = pendingUserId ?? deps.nextId();
+      pendingUserId = undefined;
+      return id;
+    },
   });
 
-  const sessionId = deps.sessionId ?? deps.nextId();
-  const messageId = deps.messageId ?? deps.nextId();
   const request: TurnRequest = {
     prompt,
     cwd: context.environment.cwd,

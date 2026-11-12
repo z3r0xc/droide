@@ -387,7 +387,7 @@ export function createExecToolRunner(
 /* -------------------------------------------------------------------------- */
 
 /** No retries: exec reports the first provider failure (B55). */
-export const NO_EXEC_RETRY: RetryPolicy = {
+const NO_EXEC_RETRY: RetryPolicy = {
   maxAttempts: 1,
   baseDelayMs: 0,
   factor: 1,

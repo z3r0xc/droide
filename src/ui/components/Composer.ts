@@ -10,7 +10,12 @@ import { Box, Text } from "ink";
 import { createElement as h, type ReactNode } from "react";
 
 import type { Capabilities } from "../capabilities.ts";
-import { displayWidth, splitLines, truncateToWidth, windowLines } from "../text.ts";
+import {
+  displayWidth,
+  splitLines,
+  truncateToWidth,
+  windowLines,
+} from "../text.ts";
 import {
   BORDERS,
   GLYPHS,
@@ -86,7 +91,9 @@ export function buildModeBorder(
   if (width <= 1) return topLeft;
   if (width === 2) return `${topLeft}${topRight}`;
   const withTitle =
-    title === undefined ? ` ${label} ` : ` ${label} ${GLYPHS.separator} ${title} `;
+    title === undefined
+      ? ` ${label} `
+      : ` ${label} ${GLYPHS.separator} ${title} `;
   const candidates =
     title === undefined
       ? [`${topLeft}${horizontal}${horizontal}${withTitle}`]
@@ -134,7 +141,10 @@ function renderDraft(
     const lead = index === 0 ? prompt : "  ";
     const body = empty && index === 0 ? content.placeholder : line.text;
     const textProps = empty
-      ? { ...foreground("text.muted", capabilities), dimColor: capabilities.style }
+      ? {
+          ...foreground("text.muted", capabilities),
+          dimColor: capabilities.style,
+        }
       : foreground("text.primary", capabilities);
     return h(
       Text,
@@ -195,11 +205,7 @@ export function Composer(props: ComposerProps): ReactNode {
   const top =
     content.modeLabel === undefined
       ? `${border.topLeft}${border.horizontal.repeat(Math.max(0, width - 2))}${border.topRight}`
-      : buildModeBorder(
-          content.modeLabel,
-          content.modeTitle,
-          width,
-        );
+      : buildModeBorder(content.modeLabel, content.modeTitle, width);
   const topColor =
     content.modeSlot === undefined
       ? borderColor

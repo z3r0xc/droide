@@ -8,6 +8,7 @@
  */
 
 import { splitLines } from "./text.ts";
+import { GLYPHS } from "./tokens.ts";
 
 export const TOOL_PREVIEW_MAX_LINES = 4;
 export const TOOL_PREVIEW_MAX_CHARS = 1024;
@@ -42,9 +43,7 @@ export interface ToolTranscriptItem {
 
 /** The three item kinds this vertical renders. */
 export type TranscriptItem =
-  | UserTranscriptItem
-  | AssistantTranscriptItem
-  | ToolTranscriptItem;
+  UserTranscriptItem | AssistantTranscriptItem | ToolTranscriptItem;
 
 /** An untrusted transcript entry, as delivered by the session layer. */
 export interface TranscriptEntry {
@@ -77,7 +76,9 @@ function readState(value: unknown): ToolState {
  * Validate one wire entry into a renderable item.
  * Unknown kinds, and known kinds missing their required text, render nothing.
  */
-export function toTranscriptItem(entry: TranscriptEntry): TranscriptItem | undefined {
+export function toTranscriptItem(
+  entry: TranscriptEntry,
+): TranscriptItem | undefined {
   switch (entry.kind) {
     case "user": {
       const text = readString(entry.text);
@@ -109,7 +110,7 @@ export function toTranscriptItem(entry: TranscriptEntry): TranscriptItem | undef
 
 /** Trim a parameter value at 50 characters, with the spec's ellipsis. */
 export function clampParamValue(value: string): string {
-  return value.length > 50 ? `${value.slice(0, 50)}…` : value;
+  return value.length > 50 ? `${value.slice(0, 50)}${GLYPHS.ellipsis}` : value;
 }
 
 /** A collapsed preview: the lines to print and how many were withheld. */
@@ -125,7 +126,10 @@ export interface ResultPreview {
 export function previewResult(text: string): ResultPreview {
   const allLines = splitLines(text);
   const characterCapped = text.slice(0, TOOL_PREVIEW_MAX_CHARS);
-  const cappedLines = splitLines(characterCapped).slice(0, TOOL_PREVIEW_MAX_LINES);
+  const cappedLines = splitLines(characterCapped).slice(
+    0,
+    TOOL_PREVIEW_MAX_LINES,
+  );
   const hidden = Math.max(0, allLines.length - cappedLines.length);
   return { lines: cappedLines, hidden };
 }

@@ -12,7 +12,10 @@ import {
   resolveComposerVisibleRows,
 } from "../../../src/ui/components/Composer.ts";
 import { fitFooter } from "../../../src/ui/components/Footer.ts";
-import { headerHeight, headerGeometry } from "../../../src/ui/components/Header.ts";
+import {
+  headerHeight,
+  headerGeometry,
+} from "../../../src/ui/components/Header.ts";
 import { statusLineHeight } from "../../../src/ui/components/StatusLine.ts";
 import { displayWidth } from "../../../src/ui/text.ts";
 import { headerContent } from "./harness.ts";
@@ -43,7 +46,8 @@ test("the composer is three rows with one draft line, plus one for a hint", () =
   assert.equal(composerHeight(24, { ...base, draft: "", hint: "hint" }), 4);
   assert.ok(resolveComposerVisibleRows(24, true) >= 1);
   assert.ok(
-    resolveComposerVisibleRows(24, false) >= resolveComposerVisibleRows(24, true),
+    resolveComposerVisibleRows(24, false) >=
+      resolveComposerVisibleRows(24, true),
     "the idle composer window is at least as tall",
   );
 });
@@ -52,7 +56,11 @@ test("the mode border fills the width and degrades at tiny widths", () => {
   const border = buildModeBorder("SPEC", "roaming", 40);
   assert.equal(displayWidth(border), 40);
   assert.match(border, /^╭── SPEC · roaming ─+╮$/u);
-  const dropped = buildModeBorder("SPEC", "a title far too long to fit here", 20);
+  const dropped = buildModeBorder(
+    "SPEC",
+    "a title far too long to fit here",
+    20,
+  );
   assert.equal(displayWidth(dropped), 20);
   assert.match(dropped, /^╭── SPEC ─+╮$/u);
   assert.equal(buildModeBorder("SPEC", "x", 2), "╭╮");
@@ -91,5 +99,8 @@ test("the status-line height follows its configuration", () => {
   assert.equal(statusLineHeight(80, { text: "" }), 0);
   assert.equal(statusLineHeight(80, { text: "one" }), 1);
   assert.equal(statusLineHeight(80, { text: "one\ntwo", maxRows: 2 }), 2);
-  assert.equal(statusLineHeight(80, { text: "one\ntwo\nthree", maxRows: 9 }), 3);
+  assert.equal(
+    statusLineHeight(80, { text: "one\ntwo\nthree", maxRows: 9 }),
+    3,
+  );
 });

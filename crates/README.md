@@ -7,8 +7,14 @@ exchanges validated records, so a crash here cannot take the CLI down with it.
 ```
 crates/
 └── droide-native/
-    ├── src/main.rs     protocol dispatch (version, hashing; pty/search/secrets/sandbox to come)
-    └── Cargo.toml
+    ├── src/main.rs       stdio loop (one request line in, one response line out)
+    ├── src/lib.rs        module root
+    ├── src/protocol.rs   request parsing, dispatch, base64, error codes
+    ├── src/paths.rs      resolve-within-root, symlink containment
+    ├── src/search.rs     bounded file walk, glob matching, literal text search
+    ├── src/sandbox.rs    bubblewrap argv / seatbelt profile / Windows "unconfined"
+    ├── src/pty.rs        command-line quoting (POSIX + Windows), 4 KiB chunking
+    └── src/secrets.rs    DPAPI sealing (Windows); other targets fail loudly
 ```
 
 ## Why a process boundary
@@ -35,11 +41,27 @@ Response, one per line:
 ```
 
 Error codes: `-32700` malformed request, `-32601` unknown method, `-32602` bad
-parameters, `-32001` oversized line.
+parameters, `-32001` oversized line, `-32603` operation failed.
+
+## Methods
+
+| method | params | result |
+|---|---|---|
+| `native.version` | — | `{protocol, version}` |
+| `hash.sha256` | `{text}` | `{sha256}` |
+| `path.resolve` | `{root, path}` | `{path}` or an error when the path escapes |
+| `search.walk` | `{root, glob?, maxResults?, includeHidden?}` | `{paths[], truncated}` |
+| `search.text` | `{root, query, maxHits?, caseSensitive?, includeHidden?}` | `{hits[{path,line,text}], truncated, filesScanned}` |
+| `sandbox.profile` | `{target?, network?, readPaths?, writePaths?}` | `{mechanism, argv\|profile\|reason}` |
+| `pty.quote` | `{target?, args[]}` | `{commandLine}` |
+| `secrets.protect` | `{plaintext: base64, entropy?: base64}` | `{sealed: base64}` |
+| `secrets.unprotect` | `{sealed: base64, entropy?: base64}` | `{plaintext: base64}` |
 
 ## Invariants
 
-- `unsafe_code = "forbid"` at the workspace level; `unwrap_used` is denied.
+- `unsafe_code = "deny"` at the workspace level; the only allow is the audited
+  DPAPI module in `secrets.rs`, where each `unsafe` block states its invariant.
+  `unwrap_used` is denied outside tests.
 - Untrusted input is validated before use: line length first, then shape.
 - Every request gets exactly one response, including failures.
 - The process exits when stdin closes; no background threads outlive it.

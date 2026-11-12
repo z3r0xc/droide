@@ -33,7 +33,8 @@ export const STARTUP_PLACEHOLDER =
   'Try "How do I handle errors in async functions?"';
 
 /** D1 — the default mode/autonomy row (autonomy off). */
-export const MODE_ROW_AUTONOMY_OFF = "Auto (Off) · all actions require approval";
+export const MODE_ROW_AUTONOMY_OFF =
+  "Auto (Off) · all actions require approval";
 
 /** B13 — footer primary label. */
 export const FOOTER_HELP = `${GLYPHS.help} for help`;
@@ -43,25 +44,8 @@ export const BLOCK_SEPARATOR = " | ";
 
 /** B7 — truncation notice in the collapsed tool preview. */
 export function toolMoreLines(lines: number): string {
-  return (
-    `${GLYPHS.ellipsisAscii} ${lines} more ` +
-    `lines, press Ctrl+O to expand`
-  );
-}
-
-/** B7 — detailed-view truncation notice. */
-export function toolShowingFirst(shown: number, total: number): string {
-  return `${GLYPHS.resultPrefix} showing first ${shown}/${total} lines`;
+  return `${GLYPHS.ellipsisAscii} ${lines} more lines, press Ctrl+O to expand`;
 }
 
 /** B6 — aborted invocation notice body (the glyph is added by the renderer). */
 export const INTERRUPTED = "Interrupted";
-
-/** B4 — clipped live-tail header (pluralised like the locale bundle). */
-export function hiddenLines(lines: number): string {
-  const noun = lines === 1 ? "line" : "lines";
-  return `---- ${lines} more ${noun} hidden ----`;
-}
-
-/** R7 — suffix for a failed call inside a collapsed group. */
-export const TOOL_ERROR_SUFFIX = "(error)";

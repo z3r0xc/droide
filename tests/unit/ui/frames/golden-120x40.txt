@@ -9,7 +9,7 @@
 
                               v1.9.0
 
-                   Use /model to switch models
+                 TIP: Use /model to switch models
 
         shift+tab to cycle modes · ctrl+N to cycle models
              ctrl+L for autonomy · tab for reasoning

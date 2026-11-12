@@ -6,7 +6,9 @@
 
 pub mod paths;
 pub mod protocol;
+pub mod pty;
 pub mod sandbox;
 pub mod search;
+pub mod secrets;
 
 pub use protocol::{handle_line, PROTOCOL_VERSION};

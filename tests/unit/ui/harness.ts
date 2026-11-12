@@ -9,9 +9,20 @@
 
 import { Writable } from "node:stream";
 
-import { detectCapabilities, type Capabilities } from "../../../src/ui/capabilities.ts";
-import { STARTUP_PLACEHOLDER, HEADER_SHORTCUTS, MODE_ROW_AUTONOMY_OFF } from "../../../src/ui/strings.ts";
-import type { HeaderContent, HeaderStatus } from "../../../src/ui/components/Header.ts";
+import {
+  detectCapabilities,
+  type Capabilities,
+} from "../../../src/ui/capabilities.ts";
+import {
+  HEADER_SHORTCUTS,
+  HEADER_STATUS_LABELS,
+  MODE_ROW_AUTONOMY_OFF,
+  STARTUP_PLACEHOLDER,
+} from "../../../src/ui/strings.ts";
+import type {
+  HeaderContent,
+  HeaderStatus,
+} from "../../../src/ui/components/Header.ts";
 import type { ShellProps } from "../../../src/ui/components/Shell.ts";
 import type { TranscriptEntry } from "../../../src/ui/transcript.ts";
 
@@ -46,7 +57,9 @@ export function captureStream(columns: number, rows: number): Capture {
 
 /** One recorded frame as lines, trailing space padding removed. */
 export function frameLines(text: string): string[] {
-  const lines = stripAnsi(text).split("\n").map((line) => line.trimEnd());
+  const lines = stripAnsi(text)
+    .split("\n")
+    .map((line) => line.trimEnd());
   while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
   return lines;
 }
@@ -66,10 +79,10 @@ export function capabilitiesAt(columns: number, rows: number): Capabilities {
 }
 
 export const STATUSES: readonly HeaderStatus[] = [
-  { label: "Skills", count: 0, ok: false },
-  { label: "MCPs", count: 0, ok: false },
-  { label: "Connectors", count: 0, ok: false },
-  { label: "AGENTS.md", count: undefined, ok: false },
+  { label: HEADER_STATUS_LABELS.skills, count: 0, ok: false },
+  { label: HEADER_STATUS_LABELS.mcps, count: 0, ok: false },
+  { label: HEADER_STATUS_LABELS.connectors, count: 0, ok: false },
+  { label: HEADER_STATUS_LABELS.agentsMd, count: undefined, ok: false },
 ];
 
 export function headerContent(changelog: boolean): HeaderContent {

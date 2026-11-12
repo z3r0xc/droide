@@ -254,6 +254,100 @@ fn path_resolve(request: &Request) -> Result<Value, (i32, String)> {
     }
 }
 
+/// Indices are safe: the decode table has 256 entries and is indexed by a byte,
+/// and the encoder masks its slot to `0..=0x3f`.
+#[allow(clippy::indexing_slicing)]
+fn decode_base64(value: &str) -> Result<Vec<u8>, (i32, String)> {
+    // Base64 is decoded here rather than pulled from a crate: the helper must
+    // build without a registry mirror.
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut table = [255u8; 256];
+    for (index, byte) in ALPHABET.iter().enumerate() {
+        table[usize::from(*byte)] = index as u8;
+    }
+    let mut accumulator: u32 = 0;
+    let mut bits = 0u32;
+    let mut out = Vec::with_capacity(value.len() * 3 / 4);
+    for byte in value.bytes() {
+        if byte == b'=' || byte == b'\n' || byte == b'\r' {
+            continue;
+        }
+        let decoded = table[usize::from(byte)];
+        if decoded == 255 {
+            return Err(invalid("param is not valid base64".into()));
+        }
+        accumulator = (accumulator << 6) | u32::from(decoded);
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push(((accumulator >> bits) & 0xff) as u8);
+        }
+    }
+    Ok(out)
+}
+
+#[allow(clippy::indexing_slicing)]
+fn encode_base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let first = chunk.first().copied().unwrap_or(0);
+        let second = chunk.get(1).copied().unwrap_or(0);
+        let third = chunk.get(2).copied().unwrap_or(0);
+        let triple = (u32::from(first) << 16) | (u32::from(second) << 8) | u32::from(third);
+        for index in 0..4 {
+            if chunk.len() + 1 > index {
+                let slot = (triple >> (18 - 6 * index)) & 0x3f;
+                out.push(char::from(ALPHABET[slot as usize]));
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+fn secrets_protect(request: &Request) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let plaintext = decode_base64(params.string("plaintext").map_err(invalid)?)?;
+    let entropy = params
+        .optional_string("entropy")
+        .map_err(invalid)?
+        .map_or_else(|| Ok(Vec::new()), decode_base64)?;
+    match crate::secrets::protect(&plaintext, &entropy) {
+        Ok(sealed) => Ok(serde_json::json!({ "sealed": encode_base64(&sealed) })),
+        Err(error) => Err((error_code::INTERNAL, error.to_string())),
+    }
+}
+
+fn secrets_unprotect(request: &Request) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let sealed = decode_base64(params.string("sealed").map_err(invalid)?)?;
+    let entropy = params
+        .optional_string("entropy")
+        .map_err(invalid)?
+        .map_or_else(|| Ok(Vec::new()), decode_base64)?;
+    match crate::secrets::unprotect(&sealed, &entropy) {
+        Ok(plaintext) => Ok(serde_json::json!({ "plaintext": encode_base64(&plaintext) })),
+        Err(error) => Err((error_code::INTERNAL, error.to_string())),
+    }
+}
+
+fn pty_quote(request: &Request) -> Result<Value, (i32, String)> {
+    let params = Params::new(&request.params);
+    let arguments = params.string_list("args").map_err(invalid)?;
+    let target = params
+        .optional_string("target")
+        .map_err(invalid)?
+        .unwrap_or(std::env::consts::OS);
+    let command_line = if target == "windows" {
+        crate::pty::quote_windows_command_line(&arguments)
+    } else {
+        crate::pty::quote_posix_command_line(&arguments)
+    };
+    Ok(serde_json::json!({ "commandLine": command_line }))
+}
+
 fn invalid(message: String) -> (i32, String) {
     (error_code::INVALID_PARAMS, message)
 }
@@ -288,6 +382,9 @@ pub fn handle_line(line: &str) -> Response {
         "search.text" => search_text_method(&request),
         "sandbox.profile" => sandbox_profile(&request),
         "path.resolve" => path_resolve(&request),
+        "secrets.protect" => secrets_protect(&request),
+        "secrets.unprotect" => secrets_unprotect(&request),
+        "pty.quote" => pty_quote(&request),
         other => Err((
             error_code::METHOD_NOT_FOUND,
             format!("unknown method: {other}"),
@@ -394,6 +491,39 @@ mod tests {
         assert_eq!(response["result"]["hits"][0]["line"], 2);
         assert_eq!(response["result"]["hits"][0]["path"], "a.txt");
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn pty_quote_produces_a_platform_command_line() {
+        let windows = call(
+            r#"{"id":20,"method":"pty.quote","params":{"target":"windows","args":["cmd","a b"]}}"#,
+        );
+        assert_eq!(windows["result"]["commandLine"], "cmd \"a b\"");
+        let posix = call(
+            r#"{"id":21,"method":"pty.quote","params":{"target":"linux","args":["sh","-c","echo $x"]}}"#,
+        );
+        assert_eq!(posix["result"]["commandLine"], "sh -c 'echo $x'");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn secrets_round_trip_over_the_protocol() {
+        let sealed = call(
+            r#"{"id":22,"method":"secrets.protect","params":{"plaintext":"aGVsbG8=","entropy":"ZQ=="}}"#,
+        );
+        let sealed_value = sealed["result"]["sealed"].as_str().unwrap().to_string();
+        assert!(!sealed_value.is_empty());
+        let line = format!(
+            r#"{{"id":23,"method":"secrets.unprotect","params":{{"sealed":"{sealed_value}","entropy":"ZQ=="}}}}"#
+        );
+        assert_eq!(call(&line)["result"]["plaintext"], "aGVsbG8=");
+    }
+
+    #[test]
+    fn invalid_base64_is_refused() {
+        let response =
+            call(r#"{"id":24,"method":"secrets.protect","params":{"plaintext":"not base64!"}}"#);
+        assert_eq!(response["error"]["code"], error_code::INVALID_PARAMS);
     }
 
     #[test]

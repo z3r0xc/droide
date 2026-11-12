@@ -18,7 +18,7 @@ import {
   SPACING,
   foreground,
 } from "../tokens.ts";
-import { VERSION_PREFIX } from "../strings.ts";
+import { TIP_PREFIX, VERSION_PREFIX } from "../strings.ts";
 
 /** `COMPACT_HEADER_MAX_HEIGHT` (B3). */
 export const COMPACT_HEADER_MAX_HEIGHT = 24;
@@ -173,7 +173,7 @@ export function Header(props: HeaderProps): ReactNode {
   rows.push(blankLeft(leftColWidth, "gap-after-version"));
 
   const tipLimit = Math.max(0, leftColWidth - 4);
-  const tip = truncateToWidth(content.tip, tipLimit);
+  const tip = truncateToWidth(`${TIP_PREFIX}${content.tip}`, tipLimit);
   rows.push(
     centeredRow(
       leftColWidth,
@@ -207,13 +207,17 @@ export function Header(props: HeaderProps): ReactNode {
     const count =
       status.count === undefined ? "" : ` (${String(status.count)})`;
     statusChildren.push(
-      h(Text, { key: `label-${index}`, ...secondary }, `${status.label}${count} `),
+      h(
+        Text,
+        { key: `label-${index}`, ...secondary },
+        `${status.label}${count} `,
+      ),
     );
     statusChildren.push(
       h(
         Text,
         { key: `mark-${index}`, ...(status.ok ? okColor : errorColor) },
-        status.ok ? "✓" : "✗",
+        status.ok ? GLYPHS.statusOk : GLYPHS.statusMissing,
       ),
     );
   }
@@ -244,11 +248,7 @@ export function Header(props: HeaderProps): ReactNode {
           : h(
               Box,
               { key: "changelog", width: rightWidth, paddingLeft: 1 },
-              h(
-                Text,
-                { key: "text", ...muted, wrap: "truncate-end" },
-                right,
-              ),
+              h(Text, { key: "text", ...muted, wrap: "truncate-end" }, right),
             ),
       );
     }),
@@ -256,4 +256,3 @@ export function Header(props: HeaderProps): ReactNode {
 
   return headerColumn;
 }
-

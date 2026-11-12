@@ -39,12 +39,7 @@ test("known entries normalise with defaults", () => {
     toTranscriptItem({
       kind: "tool",
       name: "Read",
-      params: [
-        ["path", "src/a.ts"],
-        ["bad"],
-        [1, 2],
-        ["flag", true],
-      ],
+      params: [["path", "src/a.ts"], ["bad"], [1, 2], ["flag", true]],
       state: "weird",
       result: "done",
     }),

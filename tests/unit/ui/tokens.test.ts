@@ -258,8 +258,16 @@ test("resolved palettes contain every slot and respect the theme", () => {
     if (slot === "text.selectionBg") continue;
     assert.equal(PALETTE_DARK[slot], dark, `dark ${slot}`);
     assert.equal(PALETTE_LIGHT[slot], light, `light ${slot}`);
-    assert.equal(themeColor(slot, "factory-dark"), dark, `themeColor dark ${slot}`);
-    assert.equal(themeColor(slot, "factory-light"), light, `themeColor light ${slot}`);
+    assert.equal(
+      themeColor(slot, "factory-dark"),
+      dark,
+      `themeColor dark ${slot}`,
+    );
+    assert.equal(
+      themeColor(slot, "factory-light"),
+      light,
+      `themeColor light ${slot}`,
+    );
     assert.equal(paletteFor("factory-dark"), PALETTE_DARK);
     assert.equal(paletteFor("factory-light"), PALETTE_LIGHT);
   }
@@ -352,7 +360,8 @@ test("D11 borders and logos match the spec geometry", () => {
   });
   assert.equal(LOGO_MINI_ROWS.length, 3);
   assert.equal(LOGO_MINI_WIDTH, 21);
-  for (const row of LOGO_MINI_ROWS) assert.equal(displayWidth(row), LOGO_MINI_WIDTH);
+  for (const row of LOGO_MINI_ROWS)
+    assert.equal(displayWidth(row), LOGO_MINI_WIDTH);
   assert.equal(LOGO_FULL_ROWS.length, LOGO_FULL_HEIGHT);
   assert.equal(LOGO_FULL_HEIGHT, 6);
   for (const row of LOGO_FULL_ROWS) {

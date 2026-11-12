@@ -110,12 +110,19 @@ export function windowLines(
     windowed.push({ text: `${GLYPHS.arrowUp} ${start} more`, indicator: true });
   }
   const contentStart = start > 0 ? start + 1 : start;
-  for (let index = contentStart; index < end && index < lines.length; index += 1) {
+  for (
+    let index = contentStart;
+    index < end && index < lines.length;
+    index += 1
+  ) {
     windowed.push({ text: lines[index] ?? "", indicator: false });
   }
   const hiddenBelow = lines.length - end;
   if (hiddenBelow > 0) {
-    windowed.push({ text: `${GLYPHS.arrowDown} ${hiddenBelow} more`, indicator: true });
+    windowed.push({
+      text: `${GLYPHS.arrowDown} ${hiddenBelow} more`,
+      indicator: true,
+    });
   }
   return windowed.slice(0, rows);
 }

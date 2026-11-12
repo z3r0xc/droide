@@ -77,7 +77,11 @@ test("frame at 80×24 (compact header, empty transcript)", async () => {
   assertGolden("golden-80x24.txt", first.lines);
 
   assertWidth(first.lines, 80);
-  assert.equal(first.raw.includes("\u001B"), false, "the capture is plain text");
+  assert.equal(
+    first.raw.includes("\u001B"),
+    false,
+    "the capture is plain text",
+  );
   assert.equal(first.lines.length, 18, "12 header rows + input stack + footer");
   assert.equal(
     first.lines[0],
@@ -106,7 +110,11 @@ test("frame at 120×40 (wide header, scripted transcript)", async () => {
   assertGolden("golden-120x40.txt", first.lines);
 
   assertWidth(first.lines, 120);
-  assert.equal(first.raw.includes("\u001B"), false, "the capture is plain text");
+  assert.equal(
+    first.raw.includes("\u001B"),
+    false,
+    "the capture is plain text",
+  );
   assert.equal(first.lines[0], "", "marginTop 2 above the wide header");
   assert.equal(first.lines[1], "");
   assert.match(
@@ -163,7 +171,8 @@ test("unknown transcript kinds and malformed items render nothing", async () => 
     "the known item still renders",
   );
   assert.equal(
-    body.filter((line) => line.includes("diff") || line.includes("todo")).length,
+    body.filter((line) => line.includes("diff") || line.includes("todo"))
+      .length,
     0,
   );
 });
