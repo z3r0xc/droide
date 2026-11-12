@@ -22,7 +22,7 @@ Total: **40** markers across **34** clauses.
 | `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient FACTORY_API_KEY and reports a local identity. |
 | `src/daemon/server.ts:231` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
 | `src/daemon/web-socket.ts:574` | `B33` | the token-gated /port-proxy/<port> surface (query token, cookie exchange, traversal refusal) is not implemented, so those requests answer 404 instead of proxying or refusing with 401. |
-| `src/doctor/checks.ts:26` | `B49` | ${what} check], |
+| `src/doctor/checks.ts:33` | `B49` | ${what} check], |
 | `src/extensions/mcp/client.ts:417` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
 | `src/extensions/mcp/client.ts:428` | `B22` | image blocks are reported by type and size instead of being compressed, and an unsupported image MIME type keeps the same marker. |
 | `src/extensions/mcp/client.ts:47` | `B11` | era negotiation is not attempted — no server/discover probe, no 2026-07-28 rescue after a -32022 refusal, no legacy verdict cache; the server's chosen revision is accepted as returned. |

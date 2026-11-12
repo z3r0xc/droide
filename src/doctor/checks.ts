@@ -15,6 +15,13 @@ import { arch, platform, release, totalmem } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 
+import { McpClient } from "../extensions/mcp/client.ts";
+import {
+  enabledMcpServers,
+  loadMcpConfiguration,
+  mcpConfigFileSources,
+} from "../extensions/mcp/config.ts";
+
 import type { CheckResult, DoctorCheck, DoctorContext } from "./types.ts";
 
 const NOT_IMPLEMENTED = "not implemented in this build";
@@ -332,6 +339,77 @@ const auth: DoctorCheck = {
   },
 };
 
+const mcp: DoctorCheck = {
+  name: "mcp",
+  title: "MCP",
+  async run(context) {
+    const sources = mcpConfigFileSources(
+      context.paths["factoryDir"] ?? "",
+      context.environment.cwd,
+    );
+    const configuration = loadMcpConfiguration(sources);
+    const enabled = enabledMcpServers(configuration);
+    const broken = configuration.diagnostics.filter(
+      (diagnostic) => diagnostic.code !== "server-unavailable",
+    );
+
+    if (enabled.length === 0) {
+      const details = broken.map(
+        (diagnostic) => `${diagnostic.path}: ${diagnostic.message}`,
+      );
+      return {
+        status: broken.length > 0 ? "fail" : "skip",
+        summary:
+          broken.length > 0
+            ? "the MCP configuration could not be read"
+            : "no enabled MCP servers",
+        details,
+        ...(broken.length > 0
+          ? { fixes: ["fix the MCP configuration file named above"] }
+          : {}),
+      };
+    }
+
+    const details: string[] = [];
+    const failures: string[] = [];
+    for (const entry of enabled) {
+      const client = new McpClient({
+        server: entry.name,
+        config: entry.config,
+      });
+      try {
+        await context.withTimeout(`mcp ${entry.name}`, async (signal) => {
+          await client.connect();
+          const listing = await client.listTools({ signal });
+          details.push(
+            `${entry.name}: ${listing.tools.length} tool${listing.tools.length === 1 ? "" : "s"}`,
+          );
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push(`${entry.name}: ${message}`);
+      } finally {
+        await client.close().catch(() => undefined);
+      }
+    }
+
+    if (failures.length > 0) {
+      return {
+        status: "fail",
+        summary: `${failures.length} of ${enabled.length} MCP server${enabled.length === 1 ? "" : "s"} did not answer`,
+        details: [...details, ...failures],
+        fixes: ["check the server's command or URL, then re-run --checks mcp"],
+      };
+    }
+    return {
+      status: "ok",
+      summary: `${enabled.length} MCP server${enabled.length === 1 ? "" : "s"} answered`,
+      details,
+      metadata: { servers: enabled.length },
+    };
+  },
+};
+
 const notImplemented = (name: string): DoctorCheck => ({
   name,
   title: name,
@@ -374,6 +452,6 @@ export const BUILTIN_CHECKS: readonly DoctorCheck[] = [
   auth,
   notImplemented("daemon"),
   notImplemented("inference"),
-  notImplemented("mcp"),
+  mcp,
   notImplemented("exec"),
 ];
