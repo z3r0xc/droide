@@ -48,7 +48,7 @@ cargo test --workspace                   # native layer (CI only here)
 | `60-extensions-mcp-and-skills.md` | stable | MCP config merge, tool naming, skill discovery, plugin manifests |
 | `70-daemon-and-remote-control.md` | review | not started |
 | `80-exec-and-streaming.md` | stable | record types, writer, one-shot runner, validation |
-| `90-native-layer.md` | stable | TypeScript client + Rust helper: search, sandbox, paths, PTY quoting, DPAPI secrets |
+| `90-native-layer.md` | stable | TypeScript client with typed, validated wrappers for all nine methods; Rust helper: search, sandbox, paths, PTY quoting, DPAPI secrets; contract test runs against the compiled binary (`npm run test:native`) |
 | `95-terminal-ui.md` | review | tokens D1–D13, capability ladder, shell with header/transcript/composer/status line/footer, golden frames at 80×24 and 120×40 |
 
 ## Known gaps and their owners
