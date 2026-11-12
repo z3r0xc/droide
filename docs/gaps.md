@@ -5,11 +5,12 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **28** markers across **26** clauses.
+Total: **29** markers across **27** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
 | `src/cli/search-command.ts:196` | `B43` | the subject rebuilds its index cache here). |
+| `src/daemon/server.ts:210` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
 | `src/doctor/checks.ts:26` | `B49` | ${what} check], |
 | `src/extensions/mcp/client.ts:417` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
 | `src/extensions/mcp/client.ts:428` | `B22` | image blocks are reported by type and size instead of being compressed, and an unsupported image MIME type keeps the same marker. |

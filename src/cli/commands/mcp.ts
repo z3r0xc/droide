@@ -1,6 +1,8 @@
 /** `mcp` command group. Contract: `specs/60-extensions-mcp-and-skills.md`. */
 import { Command } from "commander";
 
+import { createAppContext } from "../../app/context.ts";
+import { runMcpList } from "../mcp-commands.ts";
 import { notImplemented } from "../not-implemented.ts";
 
 function parseRepeated(value: string, previous: string[] = []): string[] {
@@ -68,7 +70,18 @@ export function makeMcpCommand(): Command {
     .description(
       "List configured MCP servers with connection and authentication status",
     )
-    .action(() => notImplemented("mcp list"));
+    .action(() => {
+      void (async () => {
+        const context = await createAppContext();
+        await runMcpList({
+          context,
+          write: (text) => process.stdout.write(text),
+          setExitCode: (code) => {
+            process.exitCode = code;
+          },
+        });
+      })();
+    });
   mcp
     .command("auth")
     .description(
