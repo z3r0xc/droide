@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
- * Declarative CLI parity harness (see docs/adr/0004-parity-harness-with-optional-oracle.md).
+ * CLI snapshot harness (see docs/adr/0010-own-brand-and-snapshot-harness.md).
  *
- *   node tests/parity/run.mjs --check                 # ours vs recorded goldens
- *   node tests/parity/run.mjs --record --oracle PATH   # re-record goldens from the original
- *   node tests/parity/run.mjs --check --filter help   # subset by case name
+ *   node tests/parity/run.mjs --check              # our build vs recorded snapshots
+ *   node tests/parity/run.mjs --record             # re-record from our build
+ *   node tests/parity/run.mjs --check --filter help
  *
- * A case is JSON: {name, argv, stdin?, env?, files?, expect, oracle?, target?}.
- * Goldens live in tests/parity/expected/<name>.json and hold the raw exit code,
- * stdout and stderr after home-directory redaction.
+ * A case is JSON: {name, argv, stdin?, env?, files?, expect}.
+ * Snapshots live in .work/parity/expected/<name>.json and hold the exit code,
+ * stdout and stderr after home-directory redaction. They are untracked: the
+ * harness is a regression net for our own output, not a claim about anything
+ * else.
  */
 
 import { spawn } from "node:child_process";
@@ -26,28 +28,17 @@ const WORK_DIR =
   process.env.DROIDE_PARITY_DIR ?? path.join(ROOT, ".work", "parity");
 const CASES_DIR = path.join(HERE, "cases");
 const EXPECTED_DIR = path.join(WORK_DIR, "expected");
-const OURS_ENTRY = path.join(ROOT, "src/main.ts");
+const ENTRY = path.join(ROOT, "src/main.ts");
 
 function parseArgs(argv) {
-  const options = {
-    mode: "check",
-    oracle: process.env.DROID_ORACLE || null,
-    filter: null,
-  };
+  const options = { mode: "check", filter: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--check") options.mode = "check";
     else if (arg === "--record") options.mode = "record";
-    else if (arg === "--target") {
-      const value = argv[++i];
-      if (value !== "ours" && value !== "oracle")
-        throw new Error(`--target must be ours|oracle`);
-      options.target = value;
-    } else if (arg === "--oracle") options.oracle = argv[++i];
     else if (arg === "--filter") options.filter = argv[++i];
     else throw new Error(`unknown argument: ${arg}`);
   }
-  options.target ??= options.mode === "record" ? "oracle" : "ours";
   return options;
 }
 
@@ -64,7 +55,7 @@ function readCases(filter) {
 }
 
 function buildSandbox() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "droid-parity-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "droide-cli-"));
   const home = path.join(dir, "home");
   const cwd = path.join(dir, "work");
   fs.mkdirSync(home, { recursive: true });
@@ -80,22 +71,6 @@ function writeFixture(cwd, files = {}) {
   }
 }
 
-/**
- * Our binary is `droide`; the subject is `droid` (docs/adr/0005). Goldens hold
- * the subject's token, so ours is rewritten before comparison. Whole words only.
- */
-const PROGRAM_TOKENS = [
-  [/\bdroide\b/g, "droid"],
-  [/\bDroide\b/g, "Droid"],
-];
-
-function normaliseProgram(text) {
-  let out = text;
-  for (const [pattern, replacement] of PROGRAM_TOKENS)
-    out = out.replace(pattern, replacement);
-  return out;
-}
-
 function redact(text, sandbox) {
   return text
     .split(sandbox.home)
@@ -107,9 +82,9 @@ function redact(text, sandbox) {
     .replace(/\r\n/g, "\n");
 }
 
-function runTarget(options, entry, sandbox, argv, stdinText) {
+function runCli(sandbox, argv, stdinText) {
   return new Promise((resolve, reject) => {
-    const child = spawn(entry.command, [...entry.prefix, ...argv], {
+    const child = spawn(process.execPath, [ENTRY, ...argv], {
       cwd: sandbox.cwd,
       env: {
         PATH: process.env.PATH ?? "",
@@ -129,11 +104,10 @@ function runTarget(options, entry, sandbox, argv, stdinText) {
         CI: "1",
         HTTP_PROXY: "http://127.0.0.1:9",
         HTTPS_PROXY: "http://127.0.0.1:9",
-        ...entry.extraEnv,
       },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
-      timeout: entry.timeoutMs ?? 60_000,
+      timeout: 60_000,
     });
     let stdout = "";
     let stderr = "";
@@ -168,23 +142,6 @@ function digestFiles(cwd) {
   return out;
 }
 
-function pick(recorded, expect = {}) {
-  const view = {};
-  if (expect.exit_code !== undefined) view.exit_code = recorded.exit_code;
-  if (
-    expect.stdout_matches !== undefined ||
-    expect.stdout_lines !== undefined ||
-    expect.stdout_equals !== undefined
-  ) {
-    view.stdout = recorded.stdout;
-  }
-  if (expect.stderr_empty || expect.stderr_matches !== undefined)
-    view.stderr = recorded.stderr;
-  if (expect.files) view.files = recorded.files;
-  return view;
-}
-
-/** First index at which two line arrays differ, or -1. */
 function firstDifference(a, b) {
   const limit = Math.max(a.length, b.length);
   for (let i = 0; i < limit; i += 1) if (a[i] !== b[i]) return i;
@@ -198,15 +155,17 @@ function describeDiff(kind, golden, actual) {
   if (index < 0) return [];
   const out = [`${kind}: first difference at line ${index + 1}`];
   for (let i = Math.max(0, index - 2); i <= index; i += 1)
-    out.push(`    golden | ${expected[i] ?? "<eof>"}`);
+    out.push(`    snapshot | ${expected[i] ?? "<eof>"}`);
   for (let i = Math.max(0, index - 2); i <= index; i += 1)
-    out.push(`    ours   | ${got[i] ?? "<eof>"}`);
+    out.push(`    ours     | ${got[i] ?? "<eof>"}`);
   if (expected.length !== got.length)
-    out.push(`    line counts: golden ${expected.length}, ours ${got.length}`);
+    out.push(
+      `    line counts: snapshot ${expected.length}, ours ${got.length}`,
+    );
   return out;
 }
 
-function verify(recorded, expect, golden = null) {
+function verify(recorded, expect = {}, snapshot = null) {
   const problems = [];
   const stdout = recorded.stdout ?? "";
   const stderr = recorded.stderr ?? "";
@@ -218,22 +177,6 @@ function verify(recorded, expect, golden = null) {
     problems.push(
       `exit_code: want ${expect.exit_code}, got ${recorded.exit_code}`,
     );
-  }
-  if (
-    expect.stdout_equals !== undefined &&
-    stdout.trimEnd() !== expect.stdout_equals.trimEnd()
-  ) {
-    problems.push("stdout: does not equal the expected text");
-  }
-  if (golden && golden.stdout !== undefined && golden.stdout !== stdout) {
-    problems.push(...describeDiff("stdout", golden.stdout, stdout));
-  }
-  if (
-    golden &&
-    golden.stderr !== undefined &&
-    (golden.stderr ?? "") !== stderr
-  ) {
-    problems.push(...describeDiff("stderr", golden.stderr, stderr));
   }
   if (expect.stdout_lines !== undefined) {
     const lines = stdout.trimEnd() === "" ? [] : stdout.trimEnd().split("\n");
@@ -256,11 +199,11 @@ function verify(recorded, expect, golden = null) {
   ) {
     problems.push(`stderr: /${expect.stderr_matches}/ did not match`);
   }
-  if (expect.files) {
-    for (const wanted of expect.files) {
-      if (!(wanted.path in (recorded.files ?? {})))
-        problems.push(`missing file: ${wanted.path}`);
-    }
+  if (snapshot !== null) {
+    if ((snapshot.stdout ?? "") !== stdout)
+      problems.push(...describeDiff("stdout", snapshot.stdout, stdout));
+    if ((snapshot.stderr ?? "") !== stderr)
+      problems.push(...describeDiff("stderr", snapshot.stderr, stderr));
   }
   return problems;
 }
@@ -272,28 +215,8 @@ async function main() {
     console.error("no cases matched");
     return 2;
   }
-
-  if (options.oracle) options.oracle = path.resolve(options.oracle);
-
-  if (options.mode === "record") {
-    if (!options.oracle || !fs.existsSync(options.oracle)) {
-      console.error(
-        "--record needs --oracle PATH (or DROID_ORACLE) pointing at the original binary",
-      );
-      return 2;
-    }
-  }
-
-  const entry =
-    options.target === "oracle"
-      ? { command: options.oracle, prefix: [] }
-      : {
-          command: process.execPath,
-          prefix: ["--experimental-strip-types", OURS_ENTRY],
-        };
-
-  if (options.target === "ours" && !fs.existsSync(OURS_ENTRY)) {
-    console.error(`our entry point is missing: ${OURS_ENTRY}`);
+  if (!fs.existsSync(ENTRY)) {
+    console.error(`entry point is missing: ${ENTRY}`);
     return 2;
   }
 
@@ -301,68 +224,34 @@ async function main() {
   const results = [];
 
   for (const testCase of cases) {
-    if (testCase.oracle === false && options.target === "oracle") {
-      results.push({
-        name: testCase.name,
-        status: "skipped",
-        why: "case forbids the oracle",
-      });
-      continue;
-    }
     const sandbox = buildSandbox();
     try {
       writeFixture(sandbox.cwd, testCase.files);
-      const raw = await runTarget(
-        options,
-        entry,
-        sandbox,
-        testCase.argv ?? [],
-        testCase.stdin,
-      );
+      const raw = await runCli(sandbox, testCase.argv ?? [], testCase.stdin);
       const recorded = {
         exit_code: raw.code ?? (raw.signal ? `signal:${raw.signal}` : null),
-        stdout: normaliseProgram(redact(raw.stdout, sandbox)),
-        stderr: normaliseProgram(redact(raw.stderr, sandbox)),
+        stdout: redact(raw.stdout, sandbox),
+        stderr: redact(raw.stderr, sandbox),
         files: testCase.expect?.files ? digestFiles(sandbox.cwd) : undefined,
       };
-      recorded.stdout = recorded.stdout.replace(/\r\n/g, "\n");
 
       if (options.mode === "record") {
-        const golden = {
-          case: testCase.name,
-          recorded_at_target: "oracle",
-          ...recorded,
-        };
         fs.writeFileSync(
           path.join(EXPECTED_DIR, `${testCase.name}.json`),
-          `${JSON.stringify(golden, null, 1)}\n`,
+          `${JSON.stringify({ case: testCase.name, ...recorded }, null, 1)}\n`,
         );
         results.push({ name: testCase.name, status: "recorded" });
         continue;
       }
 
-      const goldenPath = path.join(EXPECTED_DIR, `${testCase.name}.json`);
-      let problems = [];
-      if (fs.existsSync(goldenPath)) {
-        const golden = JSON.parse(fs.readFileSync(goldenPath, "utf8"));
-        problems.push(
-          ...verify(
-            {
-              ...golden,
-              ...recorded,
-              stdout: recorded.stdout,
-              stderr: recorded.stderr,
-            },
-            testCase.expect ?? {},
-            testCase.expect?.stdout_exact_golden ? golden : null,
-          ),
-        );
+      const snapshotPath = path.join(EXPECTED_DIR, `${testCase.name}.json`);
+      const problems = [];
+      if (fs.existsSync(snapshotPath)) {
+        const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
+        problems.push(...verify(recorded, testCase.expect ?? {}, snapshot));
       } else {
-        // A case that forbids the oracle is verified from its own expectations.
         problems.push(...verify(recorded, testCase.expect ?? {}));
-        if (testCase.oracle !== false) {
-          problems.push("no golden recorded (run --record with the oracle)");
-        }
+        problems.push("no snapshot recorded; run --record");
       }
       results.push({
         name: testCase.name,
@@ -380,22 +269,20 @@ async function main() {
     }
   }
 
-  const failed = results.filter((r) => r.status === "failed");
+  const failed = results.filter((result) => result.status === "failed");
   for (const result of results) {
     const marker =
       result.status === "failed"
         ? "FAIL"
-        : result.status === "skipped"
-          ? "SKIP"
-          : "ok";
-    console.log(
-      `${marker.padEnd(4)} ${result.name}${result.why ? ` (${result.why})` : ""}`,
-    );
+        : result.status === "recorded"
+          ? "REC "
+          : "ok  ";
+    console.log(`${marker} ${result.name}`);
     for (const problem of result.problems ?? [])
       console.log(`     - ${problem}`);
   }
   const passed = results.filter(
-    (r) => r.status === "passed" || r.status === "recorded",
+    (result) => result.status === "passed" || result.status === "recorded",
   ).length;
   console.log(`\n${passed}/${results.length} ok, ${failed.length} failed`);
   return failed.length ? 1 : 0;

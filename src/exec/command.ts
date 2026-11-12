@@ -43,7 +43,11 @@ import { buildHeaders } from "../transport/headers.ts";
 import type { LlmDialect } from "../transport/llm.ts";
 import { joinApiPath, parseApiBaseUrl } from "../transport/urls.ts";
 import { createSessionTooling } from "../app/tooling.ts";
-import { renderToolList } from "./list-tools.ts";
+import {
+  buildToolListRows,
+  renderToolListJson,
+  renderToolListText,
+} from "./list-tools.ts";
 import type { SearchBackend } from "../tools/native-backend.ts";
 import type { AutonomyLevel } from "../tools/permissions.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
@@ -102,7 +106,7 @@ const CUSTOM_MODEL_PREFIX = "custom:";
 const DEFAULT_API_BASE_URL = "https://api.factory.ai";
 
 /** B20: the one failure prefix for a turn, in `text` mode. */
-export const EXEC_FAILURE_PREFIX = "Error during droid execution: ";
+export const EXEC_FAILURE_PREFIX = "Error during droide execution: ";
 
 /** The options Commander has already parsed, normalised for this module. */
 export interface ExecArgv {
@@ -732,14 +736,21 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
   // B9: `--list-tools` answers and exits before a prompt, a session or a
   // provider request exists.
   if (argv.listTools) {
+    // B53: `-o json` is a single-line array; every other format is the text
+    // listing. The default set is membership at the strictest autonomy.
+    const rows = buildToolListRows(
+      registry.all(),
+      new Set(allowed),
+      new Set(selectExecTools(registry, { autonomy: "off" })),
+    );
     await writeText(
       deps.stdout,
-      renderToolList(registry.all(), catalogue, {
-        model: target.wireModel,
-        autonomy: autonomy ?? "off",
-        offered: catalogue.length,
-        withheld: Math.max(0, registry.all().length - catalogue.length),
-      }),
+      outputFormat === "json"
+        ? renderToolListJson(rows)
+        : renderToolListText(rows, {
+            model: target.wireModel,
+            autonomy: autonomy ?? "off",
+          }),
     );
     return 0;
   }

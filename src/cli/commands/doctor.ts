@@ -43,16 +43,9 @@ function timeoutError(label: string, timeoutMs: number): Error {
 async function defaultContext(): Promise<DoctorContext> {
   const app = await createAppContext();
   return {
-    settings: {
-      general: {
-        theme: app.settings.theme,
-        locale: app.settings.locale,
-        worktreeDirectory: app.settings.worktreeDirectory,
-      },
-      mcp: app.settings.mcp,
-      hooks: app.settings.hooks,
-      skills: app.settings.skills,
-    },
+    // The checks read the same resolved settings a command sees; the model
+    // probes need `customModels` and `droidCoreModel`, not a summary of them.
+    settings: { ...app.settings },
     paths: { ...app.paths },
     environment: {
       platform: process.platform,

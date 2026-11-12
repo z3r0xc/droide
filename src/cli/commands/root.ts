@@ -1,7 +1,13 @@
 /** Root command. Contract: `specs/10-cli-surface.md`. */
 import { Command } from "commander";
 
-import { DISPLAY, DOCS_URL, PROGRAM, VERSION } from "../brand.ts";
+import {
+  DISPLAY,
+  DOCS_URL,
+  PRODUCT_VERSION,
+  PROGRAM,
+  TAGLINE,
+} from "../brand.ts";
 import {
   createAppContext,
   type AppContext,
@@ -173,8 +179,8 @@ export function makeRootCommand(
   program
     .name(PROGRAM)
     .usage("[options] [command] [prompt...]")
-    .description(`${DISPLAY} - Factory's AI coding agent in your terminal`)
-    .version(VERSION, "-v, --version", "output the version number")
+    .description(`${DISPLAY} - ${TAGLINE}`)
+    .version(PRODUCT_VERSION, "-v, --version", "output the version number")
     .allowUnknownOption(true)
     .allowExcessArguments(true)
     // B11: root options are read only before the first operand; from the

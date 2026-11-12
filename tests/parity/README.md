@@ -1,14 +1,13 @@
-# Parity suite
+# CLI snapshot suite
 
-Declarative CLI cases plus recorded goldens. See `docs/adr/0004-parity-harness-with-optional-oracle.md`.
+Declarative CLI cases plus snapshots recorded from **our** build. See
+`docs/adr/0010-own-brand-and-snapshot-harness.md`.
 
 ## Layout
 
 - `cases/*.json` — one case per behaviour: `argv`, optional `stdin`, `files`
-  fixture, and an `expect` block. `"oracle": true` marks a case that is safe to
-  run against the original binary.
-- `expected/<case>.json` — golden captured from the original with
-  `--record`: exit code, stdout, stderr (home/cwd paths redacted) and, when the
+  fixture, and an `expect` block. Every case runs against our build in the same hermetic sandbox.
+- `expected/<case>.json` — snapshot captured from our build with `--record`: exit code, stdout, stderr (home/cwd paths redacted) and, when the
   case asks for it, sha256 of every file the run left behind.
 
 ## Running
@@ -16,7 +15,7 @@ Declarative CLI cases plus recorded goldens. See `docs/adr/0004-parity-harness-w
 ```sh
 node tests/parity/run.mjs --check                    # our implementation
 node tests/parity/run.mjs --check --filter help      # subset
-node tests/parity/run.mjs --record --oracle raw/factory/windows-x64/droid.exe
+node tests/parity/run.mjs --record
 ```
 
 `--check` is the CI contract: it must pass with no proprietary artifact

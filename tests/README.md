@@ -7,7 +7,7 @@ clock, no dependence on the subject binary, no shared state between tests.
 |---|---|---|---|
 | Unit | `tests/unit/**/*.test.ts` | `npm test` | Pure functions and modules: parser, help rendering, config precedence, store SQL, protocol framing |
 | Integration | `tests/integration/**/*.test.ts` | `npm test` | Things that cross a process or file boundary: spawning our CLI, migrating a real database file, the native helper over stdio |
-| Parity | `tests/parity/run.mjs` | `npm run test:parity` | Compares our CLI's observable output against goldens recorded from the subject (goldens are local, in `.work/parity/`, never committed) |
+| Snapshots | `tests/parity/run.mjs` | `npm run test:parity` | Compares our CLI's observable output against snapshots recorded from this build (snapshots are local, in `.work/parity/`, never committed) |
 
 ## Conventions
 

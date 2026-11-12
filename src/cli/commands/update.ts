@@ -1,7 +1,7 @@
 /** `update` command. Contract: `specs/10-cli-surface.md`, ADR 0007, ADR 0009. */
 import { Command } from "commander";
 
-import { DISPLAY, PRODUCT_VERSION, VERSION } from "../brand.ts";
+import { DISPLAY, PRODUCT_VERSION } from "../brand.ts";
 import {
   factoryDir,
   joinPath,
@@ -35,11 +35,11 @@ export function makeUpdateCommand(): Command {
           repository: "z3r0xc/droide",
           fetch,
           installDir: installDirectory(),
-          // `--version` is pinned to the subject's version (ADR 0005), so that
-          // is the text a successful probe must see; the package release number
-          // lives in `PRODUCT_VERSION` and is compared against the feed.
+          // `--version` prints `PRODUCT_VERSION`, so that is the text a
+          // successful probe must see; the same constant is compared against
+          // the release feed.
           probe: async (input) =>
-            defaultInstallProbe({ ...input, version: VERSION }),
+            defaultInstallProbe({ ...input, version: PRODUCT_VERSION }),
           write: (text) => process.stdout.write(text),
           writeError: (text) => process.stderr.write(text),
           setExitCode: (code) => {

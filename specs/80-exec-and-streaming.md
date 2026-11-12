@@ -811,21 +811,15 @@ deprecation warning (B41).
 - Exact rendered text of provider diagnostics (provider-owned), and the
   `--list-tools` section ordering beyond the documented categories.
 
-### Recorded addition: the `--list-tools` layout
+### Recorded derivation: `--list-tools` fields
 
-The clause names the flag and says it lists the tools available to the selected
-model; it does not pin the rendering (the original's output was not recovered).
-This build defines it, and the definition is ours:
+B53 pins both renderings and the seven JSON fields. One field needs a derivation
+of ours: `defaultAllowed`. The clause names it but not its source, so this build
+defines it as **catalogue membership at the strictest autonomy (`off`)**; a row
+whose `defaultAllowed` differs from `currentlyAllowed` is printed with the
+` override` suffix.
 
-```
-Tools for model <wire model> (autonomy: <level>) — N offered, M withheld
-    Read        read-cli         Read a text file from the filesystem.
-  - Write       write-cli        Create or overwrite a file with the given content.
-```
-
-Rows are sorted by the model-facing name, then by registry id. A leading `-`
-marks a tool that is registered but not offered to this model (filtered by
-autonomy or tool selection), and the header counts both sides. Descriptions are
-collapsed to one line and cut at 96 characters with an ellipsis. The command
-answers **before** a prompt is resolved, a session is opened or a socket exists —
-that ordering is contractual, the layout is not.
+Category names were not recovered: every built-in declares `Other` until a
+category name is pinned, and `ToolDefinition.category` is optional so a real
+name is a one-line change per tool. Placement before any prompt, session or
+socket stays contractual (`TODO(spec B53)` records the one open derivation).

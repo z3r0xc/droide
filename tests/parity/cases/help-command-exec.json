@@ -1,6 +1,5 @@
 {
  "name": "help-command-exec",
- "oracle": true,
  "argv": [
   "help",
   "exec"

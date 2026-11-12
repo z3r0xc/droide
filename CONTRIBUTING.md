@@ -11,7 +11,7 @@ Every change must pass, in this order:
 npm run typecheck      # tsc --noEmit
 npm run format:check   # prettier over src/tests/json
 npm test               # unit + integration (node --test)
-npm run test:parity    # CLI parity against recorded goldens (local only)
+npm run test:parity    # CLI snapshots recorded from this build (local only)
 npm run gaps:check     # docs/gaps.md matches the TODO(spec …) markers in src/
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings

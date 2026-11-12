@@ -26,12 +26,12 @@ test(
 
         assert.equal(result.code, 0);
         assert.equal(result.stderr, "");
-        assert.match(
-          result.stdout,
-          /^Tools for model mock-1 \(autonomy: off\)/m,
-        );
-        assert.match(result.stdout, /read-cli/);
-        assert.match(result.stdout, /grep_tool_cli/);
+        assert.match(result.stdout, /^Available tools for mock-1$/m);
+        assert.match(result.stdout, /^Autonomy: off$/m);
+        // The text listing carries the model-facing name and the display name;
+        // the registry id appears only in the JSON form.
+        assert.match(result.stdout, /• Read \(Read\) - status: \w+/);
+        assert.match(result.stdout, /• Grep \(Grep\) - status: \w+/);
         // The provider was never asked for anything.
         assert.equal(server.requests.length, 0);
       },
@@ -53,7 +53,49 @@ test(
 
         assert.equal(result.code, 0);
         assert.equal(server.requests.length, 0);
-        assert.match(result.stdout, /^Tools for model/m);
+        assert.match(result.stdout, /^Available tools for/m);
+      },
+    );
+  },
+);
+
+test(
+  "--list-tools with -o json is one line of the seven documented fields",
+  { timeout: 60_000 },
+  async () => {
+    await withHarness(
+      UNUSED_SCRIPT,
+      async ({ directory, settingsPath, server }) => {
+        const result = await runCli(
+          directory,
+          execArgs(settingsPath, [
+            "-m",
+            "custom:mock",
+            "-o",
+            "json",
+            "--list-tools",
+          ]),
+        );
+
+        assert.equal(result.code, 0);
+        assert.equal(server.requests.length, 0);
+        assert.equal(result.stdout.trimEnd().split("\n").length, 1);
+        const parsed: unknown = JSON.parse(result.stdout);
+        assert.equal(Array.isArray(parsed), true);
+        const entries = parsed as Array<Record<string, unknown>>;
+        assert.equal(
+          entries.some((entry) => entry["id"] === "read-cli"),
+          true,
+        );
+        assert.deepEqual(Object.keys(entries[0] ?? {}).sort(), [
+          "category",
+          "currentlyAllowed",
+          "defaultAllowed",
+          "description",
+          "displayName",
+          "id",
+          "llmId",
+        ]);
       },
     );
   },

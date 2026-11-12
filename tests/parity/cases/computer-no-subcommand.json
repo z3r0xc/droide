@@ -1,6 +1,5 @@
 {
  "name": "computer-no-subcommand",
- "oracle": true,
  "argv": [
   "computer"
  ],

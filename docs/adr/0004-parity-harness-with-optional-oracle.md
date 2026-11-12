@@ -1,6 +1,7 @@
 # ADR 0004 — Declarative parity cases with an optional oracle
 
-- Status: accepted
+- Status: **superseded by [ADR 0010](./0010-own-brand-and-snapshot-harness.md)** (the harness now records our own snapshots)
+- Status: superseded
 - Date: 2026-11-12
 
 ## Context

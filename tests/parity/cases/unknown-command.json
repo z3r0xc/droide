@@ -3,7 +3,6 @@
  "argv": [
   "definitely-not-a-command"
  ],
- "oracle": true,
  "expect": {
   "stdout_exact_golden": true
  }

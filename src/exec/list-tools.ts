@@ -1,71 +1,97 @@
 /**
  * `exec --list-tools`.
  *
- * Contract: `specs/80-exec-and-streaming.md` §B9 (the flag exists, the catalogue
- * order is registration order) with one clean-room addition recorded in that
- * spec: the *layout* below is ours, because the subject's rendering was not
- * recovered. It prints what a user needs to pass to `--only-tools` /
- * `--add-tools`: the model-facing name, the registry id and a one-line purpose.
+ * Contract: `specs/80-exec-and-streaming.md` §B53. Two renderings:
+ *
+ *  - `-o json` → one line, a JSON array of
+ *    `{id, llmId, displayName, description, category, defaultAllowed, currentlyAllowed}`;
+ *  - any other format → `Available tools for <model>`, `Autonomy: <autonomy>`,
+ *    then category sections with
+ *    `  • <llmId> (<displayName>) - status: allowed|blocked[ override]`.
+ *
+ * `defaultAllowed` is our derivation: membership of the catalogue at the
+ * strictest autonomy (`off`). The field's presence and type are contractual;
+ * its source is not pinned by the spec, which is recorded as a
+ * `TODO(spec B53)`.
  */
 import type { ToolDefinition } from "../tools/registry.ts";
-import type { LlmToolDefinition } from "../transport/llm.ts";
+
+export interface ToolListRow {
+  readonly id: string;
+  readonly llmId: string;
+  readonly displayName: string;
+  readonly description: string;
+  readonly category: string;
+  readonly defaultAllowed: boolean;
+  readonly currentlyAllowed: boolean;
+}
 
 export interface ToolListHeader {
   readonly model: string;
   readonly autonomy: string;
-  /** Tools the model will be offered, after filtering. */
-  readonly offered: number;
-  /** Tools known to the registry but not offered this run. */
-  readonly withheld: number;
 }
 
-const MAX_DESCRIPTION = 96;
-
-function truncate(text: string): string {
-  const single = text.replace(/\s+/g, " ").trim();
-  return single.length <= MAX_DESCRIPTION
-    ? single
-    : `${single.slice(0, MAX_DESCRIPTION - 1)}…`;
-}
-
-/**
- * Render the listing from the registry (every tool, including the ones withheld
- * from this run) and the catalogue that will actually be sent to the provider.
- */
-export function renderToolList(
+/** Build the rows once, so both renderings describe the same state. */
+export function buildToolListRows(
   registry: readonly ToolDefinition[],
-  catalogue: readonly LlmToolDefinition[],
-  header: ToolListHeader,
-): string {
-  const offered = new Set(catalogue.map((tool) => tool.name));
-  const rows = registry
+  currentlyAllowed: ReadonlySet<string>,
+  defaultAllowed: ReadonlySet<string>,
+): readonly ToolListRow[] {
+  return registry
     .map((definition) => ({
-      llmId: definition.llmId,
       id: definition.id,
-      description: truncate(definition.description),
-      offered: offered.has(definition.llmId),
+      llmId: definition.llmId,
+      displayName: definition.displayName,
+      description: definition.description,
+      category: definition.category ?? "Other",
+      // TODO(spec B53): the spec does not pin the source; this build uses
+      // catalogue membership at autonomy `off`.
+      defaultAllowed: defaultAllowed.has(definition.llmId),
+      currentlyAllowed: currentlyAllowed.has(definition.llmId),
     }))
     .sort(
       (left, right) =>
-        left.llmId.localeCompare(right.llmId) ||
-        left.id.localeCompare(right.id),
+        left.category.localeCompare(right.category) ||
+        left.llmId.localeCompare(right.llmId),
     );
+}
 
-  const nameWidth = Math.max(4, ...rows.map((row) => row.llmId.length));
-  const idWidth = Math.max(2, ...rows.map((row) => row.id.length));
+/** `-o json`: one line, no trailing spaces. */
+export function renderToolListJson(rows: readonly ToolListRow[]): string {
+  return `${JSON.stringify(
+    rows.map((row) => ({
+      id: row.id,
+      llmId: row.llmId,
+      displayName: row.displayName,
+      description: row.description,
+      category: row.category,
+      defaultAllowed: row.defaultAllowed,
+      currentlyAllowed: row.currentlyAllowed,
+    })),
+  )}\n`;
+}
 
+/** The text listing used by every non-JSON format (§B53). */
+export function renderToolListText(
+  rows: readonly ToolListRow[],
+  header: ToolListHeader,
+): string {
   const lines = [
-    `Tools for model ${header.model} (autonomy: ${header.autonomy}) — ${header.offered} offered, ${header.withheld} withheld`,
+    `Available tools for ${header.model}`,
+    `Autonomy: ${header.autonomy}`,
   ];
-  for (const row of rows) {
-    const marker = row.offered ? " " : "-";
-    lines.push(
-      `  ${marker} ${row.llmId.padEnd(nameWidth)}  ${row.id.padEnd(idWidth)}  ${row.description}`,
-    );
+  const categories = [...new Set(rows.map((row) => row.category))];
+
+  for (const category of categories) {
+    lines.push("", category);
+    for (const row of rows.filter((entry) => entry.category === category)) {
+      const status = row.currentlyAllowed ? "allowed" : "blocked";
+      const override =
+        row.defaultAllowed === row.currentlyAllowed ? "" : " override";
+      lines.push(
+        `  • ${row.llmId} (${row.displayName}) - status: ${status}${override}`,
+      );
+    }
   }
-  lines.push(
-    "",
-    "A leading '-' marks a tool that is configured but not offered to this model.",
-  );
   return `${lines.join("\n")}\n`;
 }

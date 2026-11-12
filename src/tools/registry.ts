@@ -55,6 +55,11 @@ export interface ToolDefinition {
   readonly deferred?: boolean;
   /** Shown in UI tool selection (B4). */
   readonly visibleToUser?: boolean;
+  /**
+   * Grouping for `--list-tools` (spec 80 §B53). The category names are not
+   * pinned yet, so every built-in reports `Other` until one is.
+   */
+  readonly category?: string;
   /** Runs with input already validated by {@link ToolRegistry.dispatch}. */
   execute(input: unknown, context: ToolContext): Promise<unknown>;
 }
@@ -69,6 +74,7 @@ export interface ToolSpec<TInput, TContext extends ToolContext> {
   readonly requiresConfirmation?: boolean;
   readonly deferred?: boolean;
   readonly visibleToUser?: boolean;
+  readonly category?: string;
   run(input: TInput, context: TContext): Promise<unknown> | unknown;
 }
 
@@ -97,6 +103,7 @@ export function defineTool<TInput, TContext extends ToolContext>(
     ...(spec.visibleToUser === undefined
       ? {}
       : { visibleToUser: spec.visibleToUser }),
+    category: spec.category ?? "Other",
   };
 }
 

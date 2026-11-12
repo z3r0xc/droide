@@ -1,6 +1,7 @@
 # ADR 0005 — Project name is `droide`; CLI design stays identical
 
-- Status: accepted
+- Status: **superseded by [ADR 0010](./0010-own-brand-and-snapshot-harness.md)** (one identity, no cross-product normalisation)
+- Status: superseded
 - Date: 2026-11-12
 - Deciders: project owner
 
