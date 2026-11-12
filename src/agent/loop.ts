@@ -1,11 +1,19 @@
 /**
  * One turn of the agent loop.
  *
- * Contract: `specs/20-agent-loop.md` §B1–B5, B12–B20, B25–B30. The loop streams a
- * provider response, settles every tool call exactly once, and feeds one
- * request-ordered tool message back before asking again. It never throws for a
- * tool-level failure and never decides permissions itself.
+ * Contract: `specs/20-agent-loop.md` §B1–B5, B12–B20, B25–B30, B46–B49. The
+ * loop streams a provider response, settles every tool call exactly once, and
+ * feeds one request-ordered tool message back before asking again. Before a
+ * request it compacts the provider view when the threshold fires (§B47); with
+ * no `compaction` dependency that branch is skipped entirely. It never throws
+ * for a tool-level failure and never decides permissions itself.
  */
+import {
+  DEFAULT_KEEP_RECENT_TURNS,
+  compact,
+  estimateTokens,
+  shouldCompact,
+} from "./compaction.ts";
 import {
   type ContentBlock,
   type Message,
@@ -256,21 +264,86 @@ export async function runTurn(
 ): Promise<TurnOutcome> {
   const signal = request.signal ?? new AbortController().signal;
   const history: Message[] = [...request.messages];
-  const sendable = history.filter(isSendableToProvider);
+  // The provider view of the transcript: `user_only` rows are dropped once and
+  // never re-enter, so a compaction replacement cannot leak them (§B10).
+  let requestView: readonly Message[] = history.filter(isSendableToProvider);
+  // How many `history` entries `requestView` already reflects.
+  let folded = request.messages.length;
+  // B47: after a compaction that left the view over the limit, further
+  // threshold compactions are suppressed until it fits again, so a session
+  // cannot loop.
+  let compactionSuppressed = false;
 
   for (let turn = 0; turn < request.maxTurns; turn += 1) {
     if (signal.aborted) return { messages: history, reason: "cancelled" };
+
+    const pending = history.slice(folded);
+    if (pending.length > 0) {
+      requestView = [...requestView, ...pending];
+      folded = history.length;
+    }
+
+    const compaction = deps.compaction;
+    if (compaction !== undefined) {
+      const threshold =
+        compaction.ratio === undefined ? {} : { ratio: compaction.ratio };
+      const overLimit = shouldCompact(requestView, compaction.limit, threshold);
+      if (compactionSuppressed && !overLimit) compactionSuppressed = false;
+
+      // B47: before the next request, when the previous iteration left the
+      // context over the limit.
+      if (!compactionSuppressed && overLimit) {
+        const before = estimateTokens(requestView);
+        try {
+          const result = await compact(requestView, {
+            summarizer: compaction.summarizer,
+            keepRecent: compaction.keepRecent ?? DEFAULT_KEEP_RECENT_TURNS,
+            signal,
+            ...(compaction.maxSummaryTokens === undefined
+              ? {}
+              : { maxTokens: compaction.maxSummaryTokens }),
+          });
+          if (result.compacted) {
+            requestView = result.messages;
+            folded = history.length;
+          }
+          deps.emit({
+            type: "compaction",
+            before: result.beforeTokens,
+            after: result.afterTokens,
+            summarized: result.summarizedCount,
+            compacted: result.compacted,
+          });
+          compactionSuppressed = shouldCompact(
+            requestView,
+            compaction.limit,
+            threshold,
+          );
+        } catch (error) {
+          if (signal.aborted || isAbort(error))
+            return { messages: history, reason: "cancelled" };
+          // B47: a failed threshold compaction does not end the turn; the
+          // request proceeds with the uncompacted view and the error is
+          // recorded for the caller.
+          deps.emit({
+            type: "compaction",
+            before,
+            after: before,
+            summarized: 0,
+            compacted: false,
+            error: describeError(error),
+          });
+          compactionSuppressed = true;
+        }
+      }
+    }
 
     const messageId = deps.nextMessageId("assistant");
     deps.emit({ type: "turn_start", messageId });
 
     let accumulator: AssistantAccumulator;
     try {
-      accumulator = await streamResponse(
-        deps,
-        [...sendable, ...history.slice(request.messages.length)],
-        signal,
-      );
+      accumulator = await streamResponse(deps, requestView, signal);
     } catch (error) {
       if (signal.aborted || isAbort(error))
         return { messages: history, reason: "cancelled" };

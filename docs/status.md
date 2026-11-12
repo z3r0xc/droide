@@ -17,7 +17,7 @@ cargo test --workspace                   # native layer (CI only here)
 |---|---|
 | Specifications | 11 subsystem specs + shared context, ~8.2k lines, all clauses cited and mapped to tests |
 | TypeScript product layer | 75 files, ~17k lines: CLI, app, config, session, agent, transport, exec, extensions, tools, native client |
-| Tests | 901 TypeScript tests (898 pass, 3 skipped) + 57 Rust tests |
+| Tests | 989 TypeScript tests (985 pass, 4 skipped) + 57 Rust tests |
 | CLI parity | 20/20 recorded cases against the subject |
 | Native (Rust) | `crates/droide-native`: protocol (9 methods), safe paths, file search, sandbox profiles, PTY quoting, DPAPI secrets — 57 tests, clippy `-D warnings`, builds locally |
 
@@ -29,11 +29,14 @@ cargo test --workspace                   # native layer (CI only here)
 | `doctor` | **done** — nine real probes (config, environment, system, binaries, filesystem, git, proxy, certs, auth), text and `--json` reports; the remaining names report `skip` |
 | `search\|find` | **done** — store query, text and `--json` output, documented exit codes |
 | `mcp list` | **done** — merged configuration, per-server transport/state, diagnostics, exit 1 on a broken file; never starts a server |
+| `mcp add\|remove` | **done** — surgical JSONC edits that keep comments and key order, atomic write, duplicate/unknown/alias refusals, user scope only |
+| `mcp permissions list\|revoke\|clear` | **done** — persistent permissions read/validated, server revoke cascades to tools, `clear --confirm` |
 | `plugin list` | **done** — user and project registries merged (project shadows), highest version per id, enablement from settings, `--scope` |
 | `update --check` | **done** — read-only check against this repository's GitHub releases (ADR 0007); installing is refused with exit 2 |
 | `exec` | **done** for `text`/`json`/`stream-json` with custom and managed models; streaming input, mission, ACP and `--list-tools` are refused loudly |
 | `daemon` | **local transport/protocol/lifecycle done** (132 tests); Remote Control, relay and the port proxy are `TODO(spec B28/B29/B32/B33)` |
-| `resume`, `mcp add/remove/auth/permissions`, `plugin install/uninstall/update/marketplace`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
+| `resume` | **done** — lists recent sessions, accepts a UUID or session link, continues through the same path as `exec -s`, forks with `--fork`, and refuses unknown/archived/invalid ids; the interactive picker is `TODO(spec 10 B22)` |
+| `mcp auth`, `plugin install/uninstall/update/marketplace`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
 | bare `droide` | **launches the interactive shell on a TTY pair**; a prompt argument still exits 64 until the shell accepts one |
 
 ## Specs
@@ -41,14 +44,14 @@ cargo test --workspace                   # native layer (CI only here)
 | Spec | Status | Implemented |
 |---|---|---|
 | `10-cli-surface.md` | stable | yes — root, subcommands, help, refusals, exit codes |
-| `20-agent-loop.md` | review | message model, turn loop, LLM provider adapter; context assembly pending |
+| `20-agent-loop.md` | stable | message model, turn loop, provider adapter, system-prompt assembly, context compaction |
 | `30-tools-and-sandbox.md` | stable | registry, validators, permission matrix, fs/shell/todo tools |
 | `40-sessions-and-storage.md` | stable | migrations, store, transcript, search |
 | `50-transport-and-auth.md` | stable | URL/header/error/SSE/LLM delta layers |
 | `60-extensions-mcp-and-skills.md` | stable | MCP config merge, tool naming, skill discovery, plugin manifests |
 | `70-daemon-and-remote-control.md` | review | not started |
 | `80-exec-and-streaming.md` | stable | record types, writer, one-shot runner, validation |
-| `90-native-layer.md` | stable | TypeScript client + Rust helper: search, sandbox, paths, PTY quoting, DPAPI secrets |
+| `90-native-layer.md` | stable | TypeScript client with typed, validated wrappers for all nine methods; Rust helper: search, sandbox, paths, PTY quoting, DPAPI secrets; contract test runs against the compiled binary (`npm run test:native`) |
 | `95-terminal-ui.md` | review | tokens D1–D13, capability ladder, shell with header/transcript/composer/status line/footer, golden frames at 80×24 and 120×40 |
 
 ## Known gaps and their owners
@@ -59,7 +62,7 @@ cargo test --workspace                   # native layer (CI only here)
 | Bare `droide` invocation | fails loudly with exit 64 instead of starting the TUI | removes itself when M11 lands |
 | Native PTY spawn/read loop; macOS/Linux credential stores | only quoting/chunking and DPAPI exist today | next increment of M10b |
 | Session search | literal scan instead of the subject's index planner (documented deviation) | revisit with `40` §B45–B51 |
-| Context compaction | not implemented | M5 remainder (`20` §B35–B45) |
+
 | Narrower-than-spec behaviour in 20 places | each is marked `TODO(spec …)` in code | `docs/gaps.md` lists every one with its clause |
 
 ## Gates

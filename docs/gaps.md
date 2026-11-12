@@ -5,10 +5,15 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **35** markers across **32** clauses.
+Total: **40** markers across **34** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
+| `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
+| `src/cli/commands/resume.ts:67` | `10 B22` | the interactive shell cannot adopt a stored transcript yet, so the resumed session is named here but the shell still opens empty. |
+| `src/cli/mcp-mutations.ts:307` | `B7` | org MCP policy is remote-only and this build does not resolve it into AppContext, so a server the policy would block is not refused here. |
+| `src/cli/mcp-mutations.ts:410` | `B26-B30` | the interactive OAuth flow (authorization window, loopback callback, credential store) is not implemented; the command names the servers instead of pretending to authenticate them. |
+| `src/cli/resume-commands.ts:418` | `10 B22` | the interactive session picker is not implemented, so a terminal gets the same bounded list as a pipe instead of a choice; --last is the one way to select without a picker. |
 | `src/cli/search-command.ts:196` | `B43` | the subject rebuilds its index cache here). |
 | `src/cli/update-commands.ts:44` | `B75` | installing an update safely (atomic swap, rollback) is a separate slice; ADR 0007 keeps the command read-only until then. |
 | `src/daemon/client.ts:65` | `B19` | the spec pins the four budgets but not the method names that carry them; these daemon.* spellings are this build's map, and callers may replace it through methodTimeouts. |

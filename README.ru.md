@@ -41,12 +41,16 @@
 | Поверхность | Сейчас |
 | --- | --- |
 | `--version`, `--help`, help подкоманд | работает — сообщает `1.9.0`; 20/20 записанных parity-кейсов против субъекта (оригинала; goldens локальные, см. [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)) |
-| `doctor` | работает — 12 проверок за один запуск: шесть реальных проб (config, environment, system, binaries, filesystem, git), шесть имён сообщают `skip` |
+| `doctor` | работает — 16 именованных проверок; девять из них — реальные пробы (config, environment, system, binaries, filesystem, git, proxy, certs, auth), остальные сообщают `skip` с указанием причины |
 | `search` / `find` | работает — запрашивает локальное хранилище сессий, текст и `--json` |
 | `mcp list` | работает — объединяет конфигурацию MCP и печатает транспорт и состояние по каждому серверу; никогда не запускает сервер |
 | `exec` | работает для вывода `text`, `json` и `stream-json` с промптом, `-f` или stdin; `stream-jsonrpc`, ACP, `--mission` и `--list-tools` отказывают |
-| нативный хелпер | 8 JSON-lines-методов, 57 Rust-тестов — реализованы и протестированы, **но CLI их пока не вызывает** |
-| набор тестов | 891 тест в 95 файлах: 889 проходят, 2 пропущены |
+| нативный хелпер | 9 JSON-lines-методов, типизированы и валидируются на стороне TypeScript, 57 Rust-тестов, плюс контрактный тест против скомпилированного бинарника (`npm run test:native`) — **пока не подключены к исполнению инструментов** |
+| `plugin list` | работает — объединяет пользовательский и проектный реестры, новейшая версия по каждому id, включённость из настроек |
+| `update --check` | работает — читает GitHub-релизы этого репозитория; установка отклоняется с кодом выхода 2 |
+| `daemon` | работает локально — транспорт WebSocket, JSON-RPC, шлюз аутентификации, единственный экземпляр, упорядоченное завершение (132 теста); Remote Control и прокси порта заявлены, но не построены |
+| `droide` без аргументов | запускает интерактивную оболочку, когда stdin и stdout — терминал |
+| набор тестов | 906 тестов в 96 файлах: 903 проходят, 3 пропущены, плюс 57 Rust-тестов |
 
 `exec` требует учётных данных модели. Без них он отказывает, а не угадывает:
 
@@ -60,7 +64,7 @@ Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY
 | Поверхность | Состояние |
 | --- | --- |
 | интерактивный TUI | оболочка на Ink рисует заголовок, транскрипт, композер, строку статуса и футер, управляется редьюсером клавиш (`/quit` выходит с кодом 0, `Ctrl+C` — с 130) и проверяется покадрово на 80×24 и 120×40 — но цикла агента внутри пока нет: отправленная строка становится строкой транскрипта |
-| `resume`, `update`, `plugin`, `computer`, `mcp add\|remove\|auth\|permissions` | опции разбираются, help печатается, любое действие отказывает |
+| `resume`, `computer`, `plugin install\|uninstall\|update\|marketplace`, `mcp add\|remove\|auth\|permissions` | опции разбираются, help печатается, любое действие отказывает |
 | нативный запуск PTY и цикл чтения; хранилища учётных данных macOS/Linux | существуют только квотирование, нарезка на чанки и Windows DPAPI |
 | компакция контекста; индекс сессий | не реализовано; буквальный скан — записанное отклонение |
 
@@ -77,8 +81,8 @@ $ node bin/droide.mjs exec --list-tools
 
 Текущая форма дерева: 11 нумерованных документов спецификации — общий контекст
 плюс десять подсистемных спек, 9,333 строки в `specs/` — 123 TypeScript-файла
-в `src/` (33,069 строк), 8 Rust-файлов в `crates/droide-native/src/`, 6 ADR,
-891 TypeScript-тест и 57 Rust-тестов. Каждое место, где реализация покрывает
+в `src/` (33,069 строк), 8 Rust-файлов в `crates/droide-native/src/`, 7 ADR,
+906 TypeScript-тестов и 57 Rust-тестов. Каждое место, где реализация покрывает
 меньше цитируемого пункта, помечено `TODO(spec …)` в коде и посчитано в
 [`docs/gaps.md`](./docs/gaps.md), который перегенерирует `npm run gaps`.
 
@@ -90,10 +94,10 @@ Node 24 или новее и Rust-toolchain для нативного слоя.
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 12 checks, text or --json
+node bin/droide.mjs doctor      # 16 named checks (9 реальных проб), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 891 tests
+npm test                        # 906 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 57 tests
@@ -131,10 +135,12 @@ node bin/droide.mjs exec -f prompt.txt --auto low
   ищет; `sandbox.rs` описывает профили bubblewrap, seatbelt или «без изоляции»;
   `pty.rs` квотирует командную строку так, как её переразбивает субъект;
   `secrets.rs` хранит секреты через DPAPI в Windows.
-- Методов восемь: `native.version`, `search.walk`, `search.text`,
-  `path.resolve`, `sandbox.profile`, `pty.quote`, `secrets.protect`,
-  `secrets.unprotect`. Клиент и хелпер протестированы по отдельности; CLI пока
-  не диспетчеризует в хелпер.
+- Методов девять: `native.version`, `hash.sha256`, `search.walk`,
+  `search.text`, `path.resolve`, `sandbox.profile`, `pty.quote`,
+  `secrets.protect`, `secrets.unprotect`. TypeScript-клиент валидирует форму
+  каждого ответа, у хелпера свои тесты, а `npm run test:native` прогоняет
+  контракт против скомпилированного бинарника. Слой инструментов пока достигает
+  хелпера только через fake, так что подключение — следующий шаг.
 
 ## Спецификации и решения
 
@@ -169,6 +175,7 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 | [0004](./docs/adr/0004-parity-harness-with-optional-oracle.md) | декларативные parity-кейсы с опциональным оракулом |
 | [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | проект — `droide`; дизайн CLI остаётся идентичным |
 | [0006](./docs/adr/0006-terminal-ui-stack.md) | терминальный UI — React + Ink, токены из спеки |
+| [0007](./docs/adr/0007-update-channel.md) | обновления приходят из релизов этого репозитория, никогда от субъекта |
 
 ## Участие
 

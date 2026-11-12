@@ -37,7 +37,15 @@ function makeExecFixture(): ExecFixture {
       platform: platform(),
       cwd: root,
     },
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    // Windows keeps a directory handle briefly after a killed child exits;
+    // `maxRetries`/`retryDelay` exist exactly for that EPERM/EBUSY window.
+    cleanup: () =>
+      rmSync(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 50,
+      }),
   };
 }
 
