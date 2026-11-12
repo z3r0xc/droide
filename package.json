@@ -1,6 +1,6 @@
 {
   "name": "droide",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Clean-room reimplementation of the droid CLI: TypeScript product layer, Rust native helper.",

@@ -26,7 +26,7 @@ export const VERSION = "1.9.0";
  * `tests/unit/cli/product-version.test.ts` keeps it equal to `package.json`, so
  * a version bump cannot silently leave `update --check` reporting fiction.
  */
-export const PRODUCT_VERSION = "0.3.0";
+export const PRODUCT_VERSION = "0.4.0";
 
 /** Docs link printed at the end of the root help. Contract data from the spec. */
 export const DOCS_URL = "https://docs.factory.ai/cli/getting-started/overview";

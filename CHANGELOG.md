@@ -4,6 +4,38 @@ The CLI's `--version` reports the subject's version (`1.9.0`) so parity stays
 meaningful; the package version below tracks this implementation. See
 `docs/release.md`.
 
+## 0.4.0 — 2026-11-13
+
+### Added
+
+- **`mcp auth` end to end**: protected-resource and authorization-server discovery,
+  RFC 7591 dynamic registration (or a configured client id), PKCE S256, the
+  loopback callback with state validation, the code exchange, and a credential
+  written to the OS-sealed store with its issuer, client metadata and a
+  compare-and-set revision (ADR 0008). A server that needs no authentication is
+  reported and the command exits 0.
+- **Native helper behind the tool runtime**: a `native-backend` seam
+  (`search.walk`, `search.text`, `path.resolve`) beside the existing TypeScript
+  implementations, selected conservatively and degrading to `local` with a
+  diagnostic when the helper fails — proven by backend-parity tests.
+- **`update` installation** (ADR 0009): the release's assets are resolved, the
+  archive is streamed to a staging directory while being hashed and compared with
+  `timingSafeEqual`, the swap is two renames in one directory, a single probe
+  runs the new binary, and a failed probe restores `.old-<version>`. An `O_EXCL`
+  lock prevents concurrent installs; a non-writable directory is refused with the
+  exact path and no elevation.
+- `doctor --checks updates` compares the running version with the release feed.
+- A command-tree smoke net: every command group must answer `--help`, unknown
+  words are refused as prompts, and a declared-but-unbuilt mode fails loudly.
+- CI is live (the repository is public): five jobs — typescript, rust,
+  rust-windows, supply-chain, parity.
+
+### Fixed
+
+- The config-context fixture used a hard-coded platform, so it passed on Windows
+  and failed on the Linux CI runner.
+- `docs/gaps.md` is regenerated only together with the sources it describes.
+
 ## 0.3.0 — 2026-11-13
 
 ### Added
