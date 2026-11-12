@@ -2,11 +2,47 @@
 import { Command } from "commander";
 
 import { createAppContext } from "../../app/context.ts";
+import { PROGRAM } from "../brand.ts";
 import { runMcpList } from "../mcp-commands.ts";
-import { notImplemented } from "../not-implemented.ts";
+import {
+  runMcpAdd,
+  runMcpAuth,
+  runMcpPermissionsClear,
+  runMcpPermissionsList,
+  runMcpPermissionsRevoke,
+  runMcpRemove,
+} from "../mcp-mutations.ts";
+import type { McpAddOptions, McpMutationDeps } from "../mcp-mutations.ts";
 
 function parseRepeated(value: string, previous: string[] = []): string[] {
   return [...previous, value];
+}
+
+/**
+ * Build the context, run one command, and report a context failure without an
+ * unhandled rejection. The command bodies never touch `process` directly.
+ */
+function runWithContext(
+  action: (deps: McpMutationDeps) => Promise<void>,
+): void {
+  void (async () => {
+    try {
+      const context = await createAppContext();
+      await action({
+        factoryDir: context.paths.factoryDir,
+        projectRoot: context.environment.cwd,
+        write: (text) => process.stdout.write(text),
+        writeError: (text) => process.stderr.write(text),
+        setExitCode: (code) => {
+          process.exitCode = code;
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`${PROGRAM}: ${message}\n`);
+      process.exitCode = 1;
+    }
+  })();
 }
 
 function makePermissionsCommand(): Command {
@@ -16,7 +52,9 @@ function makePermissionsCommand(): Command {
   permissions
     .command("list")
     .description("List all persistent MCP permissions")
-    .action(() => notImplemented("mcp permissions list"));
+    .action(() => {
+      runWithContext((deps) => runMcpPermissionsList(deps));
+    });
   permissions
     .command("revoke")
     .description(
@@ -24,12 +62,18 @@ function makePermissionsCommand(): Command {
     )
     .argument("<server>", 'Server name (e.g., "linear")')
     .argument("[tool]", 'Optional tool name (e.g., "list_issues")')
-    .action(() => notImplemented("mcp permissions revoke"));
+    .action((server: string, tool: string | undefined) => {
+      runWithContext((deps) => runMcpPermissionsRevoke(server, tool, deps));
+    });
   permissions
     .command("clear")
     .description("Clear all persistent MCP permissions")
     .option("--confirm", "Confirm clearing all permissions")
-    .action(() => notImplemented("mcp permissions clear"));
+    .action((options: { readonly confirm?: boolean }) => {
+      runWithContext((deps) =>
+        runMcpPermissionsClear(options.confirm === true, deps),
+      );
+    });
   return permissions;
 }
 
@@ -60,11 +104,21 @@ export function makeMcpCommand(): Command {
       [],
     )
     .option("--no-oauth", "Disable OAuth for header/API-key remote servers")
-    .action(() => notImplemented("mcp add"));
+    .action(
+      (
+        name: string,
+        urlOrCommand: string[],
+        options: McpAddOptions & { readonly oauth?: boolean },
+      ) => {
+        runWithContext((deps) => runMcpAdd(name, urlOrCommand, options, deps));
+      },
+    );
   mcp
     .command("remove [name]")
     .description("Remove an MCP server")
-    .action(() => notImplemented("mcp remove"));
+    .action((name: string | undefined) => {
+      runWithContext((deps) => runMcpRemove(name, deps));
+    });
   mcp
     .command("list")
     .description(
@@ -87,7 +141,9 @@ export function makeMcpCommand(): Command {
     .description(
       "Authenticate every MCP server that needs authentication, one at a time",
     )
-    .action(() => notImplemented("mcp auth"));
+    .action(() => {
+      runWithContext((deps) => runMcpAuth(deps));
+    });
   mcp.addCommand(makePermissionsCommand());
   return mcp;
 }

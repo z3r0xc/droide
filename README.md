@@ -174,6 +174,7 @@ Decisions that shaped the build:
 | [0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)   | declarative parity cases with an optional oracle                      |
 | [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | the project is `droide`; the CLI design stays identical               |
 | [0006](./docs/adr/0006-terminal-ui-stack.md)                     | the terminal UI is React + Ink, with tokens from the spec             |
+| [0007](./docs/adr/0007-update-channel.md)                       | updates come from this repository's releases, never the subject's     |
 
 ## Contributing
 
