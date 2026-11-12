@@ -90,7 +90,9 @@ export function resolveInputPath(
   options: ResolveOptions = {},
 ): string {
   if (input.length === 0) {
-    throw new ToolFailure("file_path is required and must be a non-empty string");
+    throw new ToolFailure(
+      "file_path is required and must be a non-empty string",
+    );
   }
   const path = pathApi(context.environment);
   const expanded = expandTilde(context.environment, input);
@@ -221,13 +223,19 @@ export function isCredentialFile(
 }
 
 /** The read floor (B48/B49): credential files are never readable. */
-export function assertReadablePath(resolved: string, environment: Environment): void {
+export function assertReadablePath(
+  resolved: string,
+  environment: Environment,
+): void {
   if (isCredentialFile(resolved, environment)) {
     throw new ToolFailure(`Sandbox: read denied to ${resolved}`);
   }
 }
 
 /** Joins a path under the injected root with the platform separator. */
-export function joinUnderRoot(context: FsContext, ...segments: string[]): string {
+export function joinUnderRoot(
+  context: FsContext,
+  ...segments: string[]
+): string {
   return joinPath(context.environment.platform, context.root, ...segments);
 }

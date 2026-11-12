@@ -78,10 +78,10 @@ function detectUtf16WithoutBom(buffer: Buffer): TextEncoding | null {
   const evenRatio = evenNul / evenTotal;
   const oddRatio = oddNul / oddTotal;
   if (oddRatio >= NUL_RATIO_THRESHOLD && evenRatio <= OPPOSITE_NUL_RATIO_MAX) {
-    const sample = decodeUtf16(
-      buffer.subarray(0, sampleLength),
-      false,
-    ).slice(0, 256);
+    const sample = decodeUtf16(buffer.subarray(0, sampleLength), false).slice(
+      0,
+      256,
+    );
     return looksLikeText(sample) ? "utf-16le" : null;
   }
   if (evenRatio >= NUL_RATIO_THRESHOLD && oddRatio <= OPPOSITE_NUL_RATIO_MAX) {
@@ -168,12 +168,11 @@ export function encodeText(
   hadBom: boolean,
   lineEnding: LineEnding,
 ): Buffer {
-  const withEndings = lineEnding === "crlf" ? text.replace(/\n/g, "\r\n") : text;
+  const withEndings =
+    lineEnding === "crlf" ? text.replace(/\n/g, "\r\n") : text;
   if (encoding === "utf-16le") {
     const body = Buffer.from(withEndings, "utf16le");
-    return hadBom
-      ? Buffer.concat([Buffer.from(UTF16LE_BOM), body])
-      : body;
+    return hadBom ? Buffer.concat([Buffer.from(UTF16LE_BOM), body]) : body;
   }
   if (encoding === "utf-16be") {
     const body = Buffer.from(withEndings, "utf16le");

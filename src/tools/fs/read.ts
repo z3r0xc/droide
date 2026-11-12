@@ -114,12 +114,16 @@ function renderLines(
   programmatic: boolean,
 ): RenderedLines {
   const lines = content.split("\n");
-  const startLine = offset < 0 ? Math.max(0, totalLines + offset) : Math.max(0, offset);
+  const startLine =
+    offset < 0 ? Math.max(0, totalLines + offset) : Math.max(0, offset);
   const endLine = Math.min(
     totalLines,
     Number.isFinite(limit) ? startLine + limit : totalLines,
   );
-  const selected = lines.slice(startLine - contentOffset, endLine - contentOffset);
+  const selected = lines.slice(
+    startLine - contentOffset,
+    endLine - contentOffset,
+  );
   if (selected.length === 0) return { text: "" };
   const rendered = includeLineNumbers
     ? selected.map((line, index) => `${startLine + index + 1}→${line}`)
@@ -135,7 +139,12 @@ function renderLines(
 }
 
 function outlineLines(content: string, filePath: string): RenderedLines | null {
-  if (Object.hasOwn(OUTLINE_EXCLUDED_EXTENSIONS, nodePath.extname(filePath).toLowerCase())) {
+  if (
+    Object.hasOwn(
+      OUTLINE_EXCLUDED_EXTENSIONS,
+      nodePath.extname(filePath).toLowerCase(),
+    )
+  ) {
     return null;
   }
   const lines = content.split("\n");
@@ -146,7 +155,8 @@ function outlineLines(content: string, filePath: string): RenderedLines | null {
     const trimmed = line.trim();
     if (indentation > 8 || trimmed.length === 0) continue;
     if (OUTLINE_EXCLUDED_KEYWORDS.test(trimmed)) continue;
-    if (!OUTLINE_LINE_PATTERNS.some((pattern) => pattern.test(trimmed))) continue;
+    if (!OUTLINE_LINE_PATTERNS.some((pattern) => pattern.test(trimmed)))
+      continue;
     entries.push(`${index + 1}→${trimmed.slice(0, OUTLINE_LINE_WIDTH)}`);
   }
   if (
@@ -160,7 +170,8 @@ function outlineLines(content: string, filePath: string): RenderedLines | null {
     `[Outline: ${entries.length} declaration lines of ${lines.length}; files over ` +
     `${OUTLINE_MIN_LINES} lines open as an outline. Read with offset (and limit) for ` +
     `the lines you need]`;
-  return Buffer.byteLength(text) + Buffer.byteLength(note) > MODEL_TEXT_BUDGET_BYTES
+  return Buffer.byteLength(text) + Buffer.byteLength(note) >
+    MODEL_TEXT_BUDGET_BYTES
     ? null
     : { text, note };
 }
@@ -245,7 +256,9 @@ async function scanLineWindow(
 }
 
 function refuseMedia(filePath: string, buffer: Buffer): void {
-  const isPng = buffer.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  const isPng = buffer
+    .subarray(0, 4)
+    .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
   const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
   const isGif = buffer.subarray(0, 4).toString("latin1") === "GIF8";
   const isPdf = buffer.subarray(0, 4).toString("latin1") === "%PDF";
@@ -273,13 +286,17 @@ export async function readText(
 
   const offset = input.offset ?? 1;
   const limit = input.limit ?? DEFAULT_LIMIT;
-  if ((!Number.isFinite(limit) && options.programmatic !== true) || limit <= 0) {
+  if (
+    (!Number.isFinite(limit) && options.programmatic !== true) ||
+    limit <= 0
+  ) {
     throw new ToolFailure("limit must be a positive number");
   }
   if (!Number.isFinite(offset)) {
     throw new ToolFailure("offset must be a finite number");
   }
-  const requestedRange = input.offset !== undefined || input.limit !== undefined;
+  const requestedRange =
+    input.offset !== undefined || input.limit !== undefined;
   const includeLineNumbers = input.line_numbers === true;
   const programmatic = options.programmatic === true;
   const budget = options.budgetBytes ?? MODEL_TEXT_BUDGET_BYTES;
@@ -376,7 +393,9 @@ export async function readText(
   const totalLines = text.split("\n").length;
   const zeroBasedOffset = offset > 0 ? offset - 1 : offset;
   const startLine =
-    zeroBasedOffset < 0 ? Math.max(0, totalLines + zeroBasedOffset) : zeroBasedOffset;
+    zeroBasedOffset < 0
+      ? Math.max(0, totalLines + zeroBasedOffset)
+      : zeroBasedOffset;
   const rendered = renderLines(
     text,
     startLine,
@@ -400,7 +419,8 @@ function finish(
       : `${rendered.text}\n\n${rendered.note}`;
   // `TODO(spec B12)`: the spill file under `<factory>/tool-outputs` is not
   // written by this build; the notice names how to ask for the rest instead.
-  return boundText(text, budget, `${filePath} (read it with offset and limit)`).text;
+  return boundText(text, budget, `${filePath} (read it with offset and limit)`)
+    .text;
 }
 
 export const readTool: ToolDefinition = defineTool<ReadInput, ToolContext>({
@@ -412,5 +432,5 @@ export const readTool: ToolDefinition = defineTool<ReadInput, ToolContext>({
   sideEffects: ["filesystem-read"],
   requiresConfirmation: false,
   visibleToUser: false,
-  run: (input, context) => readText(input, context),
+  run: (input, context) => readText(input, context, { requireAbsolute: true }),
 });

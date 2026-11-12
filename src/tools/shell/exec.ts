@@ -7,11 +7,7 @@
  * non-interactive environment), B30 (timeout accounting and tree kill) and B31
  * (fire-and-forget). Spec text that this build cannot honour carries a TODO.
  */
-import {
-  spawn,
-  spawnSync,
-  type ChildProcess,
-} from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as nodePath from "node:path";
@@ -137,7 +133,9 @@ export function childEnvironment(
     if (value !== undefined) base[key] = value;
   }
   const platformEnv =
-    environment.platform === "win32" ? WINDOWS_PYTHON_UTF8_ENV : POSIX_SHELL_ENV;
+    environment.platform === "win32"
+      ? WINDOWS_PYTHON_UTF8_ENV
+      : POSIX_SHELL_ENV;
   return {
     ...base,
     PYTHONUNBUFFERED: "1",
@@ -362,7 +360,9 @@ export async function executeCommand(
     throw new ToolFailure("command is required and must be a string");
   }
   if (!isAbsolutePath(context.environment.platform, context.root)) {
-    throw new ToolFailure(`Working directory must be absolute: ${context.root}`);
+    throw new ToolFailure(
+      `Working directory must be absolute: ${context.root}`,
+    );
   }
   if (input.riskLevel === undefined) {
     // B9: an omitted risk level is denied separately, with its own guidance.
@@ -381,19 +381,20 @@ export async function executeCommand(
     : await runForeground(input, context, timeoutSeconds);
 }
 
-export const executeTool: ToolDefinition = defineTool<ExecuteInput, ToolContext>(
-  {
-    id: "execute-cli",
-    llmId: "Execute",
-    displayName: "Execute",
-    description: "Run a shell command.",
-    inputSchema: executeInputSchema,
-    sideEffects: ["process"],
-    requiresConfirmation: false,
-    visibleToUser: false,
-    run: (input, context) => executeCommand(input, context),
-  },
-);
+export const executeTool: ToolDefinition = defineTool<
+  ExecuteInput,
+  ToolContext
+>({
+  id: "execute-cli",
+  llmId: "Execute",
+  displayName: "Execute",
+  description: "Run a shell command.",
+  inputSchema: executeInputSchema,
+  sideEffects: ["process"],
+  requiresConfirmation: false,
+  visibleToUser: false,
+  run: (input, context) => executeCommand(input, context),
+});
 
 /** Exported for the background tests: the same start path, no waiting. */
 export { startChild };

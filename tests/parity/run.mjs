@@ -18,22 +18,30 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
-const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+const HERE = path.dirname(
+  new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
+);
 const ROOT = path.resolve(HERE, "../..");
-const WORK_DIR = process.env.DROIDE_PARITY_DIR ?? path.join(ROOT, ".work", "parity");
+const WORK_DIR =
+  process.env.DROIDE_PARITY_DIR ?? path.join(ROOT, ".work", "parity");
 const CASES_DIR = path.join(HERE, "cases");
 const EXPECTED_DIR = path.join(WORK_DIR, "expected");
 const OURS_ENTRY = path.join(ROOT, "src/main.ts");
 
 function parseArgs(argv) {
-  const options = { mode: "check", oracle: process.env.DROID_ORACLE || null, filter: null };
+  const options = {
+    mode: "check",
+    oracle: process.env.DROID_ORACLE || null,
+    filter: null,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--check") options.mode = "check";
     else if (arg === "--record") options.mode = "record";
     else if (arg === "--target") {
       const value = argv[++i];
-      if (value !== "ours" && value !== "oracle") throw new Error(`--target must be ours|oracle`);
+      if (value !== "ours" && value !== "oracle")
+        throw new Error(`--target must be ours|oracle`);
       options.target = value;
     } else if (arg === "--oracle") options.oracle = argv[++i];
     else if (arg === "--filter") options.filter = argv[++i];
@@ -49,7 +57,9 @@ function readCases(filter) {
     .readdirSync(CASES_DIR)
     .filter((name) => name.endsWith(".json"))
     .sort()
-    .map((name) => JSON.parse(fs.readFileSync(path.join(CASES_DIR, name), "utf8")))
+    .map((name) =>
+      JSON.parse(fs.readFileSync(path.join(CASES_DIR, name), "utf8")),
+    )
     .filter((entry) => !filter || entry.name.includes(filter));
 }
 
@@ -81,15 +91,19 @@ const PROGRAM_TOKENS = [
 
 function normaliseProgram(text) {
   let out = text;
-  for (const [pattern, replacement] of PROGRAM_TOKENS) out = out.replace(pattern, replacement);
+  for (const [pattern, replacement] of PROGRAM_TOKENS)
+    out = out.replace(pattern, replacement);
   return out;
 }
 
 function redact(text, sandbox) {
   return text
-    .split(sandbox.home).join("<HOME>")
-    .split(sandbox.cwd).join("<CWD>")
-    .split(sandbox.dir).join("<SANDBOX>")
+    .split(sandbox.home)
+    .join("<HOME>")
+    .split(sandbox.cwd)
+    .join("<CWD>")
+    .split(sandbox.dir)
+    .join("<SANDBOX>")
     .replace(/\r\n/g, "\n");
 }
 
@@ -128,7 +142,9 @@ function runTarget(options, entry, sandbox, argv, stdinText) {
     child.stdout.on("data", (chunk) => (stdout += chunk));
     child.stderr.on("data", (chunk) => (stderr += chunk));
     child.on("error", reject);
-    child.on("close", (code, signal) => resolve({ code, signal, stdout, stderr }));
+    child.on("close", (code, signal) =>
+      resolve({ code, signal, stdout, stderr }),
+    );
     if (stdinText != null) child.stdin.end(stdinText);
     else child.stdin.end();
   });
@@ -142,7 +158,9 @@ function digestFiles(cwd) {
       if (entry.isDirectory()) walk(full);
       else if (entry.isFile()) {
         const relative = path.relative(cwd, full).split(path.sep).join("/");
-        out[relative] = createHash("sha256").update(fs.readFileSync(full)).digest("hex");
+        out[relative] = createHash("sha256")
+          .update(fs.readFileSync(full))
+          .digest("hex");
       }
     }
   };
@@ -153,10 +171,15 @@ function digestFiles(cwd) {
 function pick(recorded, expect = {}) {
   const view = {};
   if (expect.exit_code !== undefined) view.exit_code = recorded.exit_code;
-  if (expect.stdout_matches !== undefined || expect.stdout_lines !== undefined || expect.stdout_equals !== undefined) {
+  if (
+    expect.stdout_matches !== undefined ||
+    expect.stdout_lines !== undefined ||
+    expect.stdout_equals !== undefined
+  ) {
     view.stdout = recorded.stdout;
   }
-  if (expect.stderr_empty || expect.stderr_matches !== undefined) view.stderr = recorded.stderr;
+  if (expect.stderr_empty || expect.stderr_matches !== undefined)
+    view.stderr = recorded.stderr;
   if (expect.files) view.files = recorded.files;
   return view;
 }
@@ -174,9 +197,12 @@ function describeDiff(kind, golden, actual) {
   const index = firstDifference(expected, got);
   if (index < 0) return [];
   const out = [`${kind}: first difference at line ${index + 1}`];
-  for (let i = Math.max(0, index - 2); i <= index; i += 1) out.push(`    golden | ${expected[i] ?? "<eof>"}`);
-  for (let i = Math.max(0, index - 2); i <= index; i += 1) out.push(`    ours   | ${got[i] ?? "<eof>"}`);
-  if (expected.length !== got.length) out.push(`    line counts: golden ${expected.length}, ours ${got.length}`);
+  for (let i = Math.max(0, index - 2); i <= index; i += 1)
+    out.push(`    golden | ${expected[i] ?? "<eof>"}`);
+  for (let i = Math.max(0, index - 2); i <= index; i += 1)
+    out.push(`    ours   | ${got[i] ?? "<eof>"}`);
+  if (expected.length !== got.length)
+    out.push(`    line counts: golden ${expected.length}, ours ${got.length}`);
   return out;
 }
 
@@ -185,32 +211,55 @@ function verify(recorded, expect, golden = null) {
   const stdout = recorded.stdout ?? "";
   const stderr = recorded.stderr ?? "";
 
-  if (expect.exit_code !== undefined && recorded.exit_code !== expect.exit_code) {
-    problems.push(`exit_code: want ${expect.exit_code}, got ${recorded.exit_code}`);
+  if (
+    expect.exit_code !== undefined &&
+    recorded.exit_code !== expect.exit_code
+  ) {
+    problems.push(
+      `exit_code: want ${expect.exit_code}, got ${recorded.exit_code}`,
+    );
   }
-  if (expect.stdout_equals !== undefined && stdout.trimEnd() !== expect.stdout_equals.trimEnd()) {
+  if (
+    expect.stdout_equals !== undefined &&
+    stdout.trimEnd() !== expect.stdout_equals.trimEnd()
+  ) {
     problems.push("stdout: does not equal the expected text");
   }
   if (golden && golden.stdout !== undefined && golden.stdout !== stdout) {
     problems.push(...describeDiff("stdout", golden.stdout, stdout));
   }
-  if (golden && golden.stderr !== undefined && (golden.stderr ?? "") !== stderr) {
+  if (
+    golden &&
+    golden.stderr !== undefined &&
+    (golden.stderr ?? "") !== stderr
+  ) {
     problems.push(...describeDiff("stderr", golden.stderr, stderr));
   }
   if (expect.stdout_lines !== undefined) {
     const lines = stdout.trimEnd() === "" ? [] : stdout.trimEnd().split("\n");
-    if (lines.length !== expect.stdout_lines) problems.push(`stdout lines: want ${expect.stdout_lines}, got ${lines.length}`);
+    if (lines.length !== expect.stdout_lines)
+      problems.push(
+        `stdout lines: want ${expect.stdout_lines}, got ${lines.length}`,
+      );
   }
-  if (expect.stdout_matches !== undefined && !new RegExp(expect.stdout_matches, "m").test(stdout)) {
+  if (
+    expect.stdout_matches !== undefined &&
+    !new RegExp(expect.stdout_matches, "m").test(stdout)
+  ) {
     problems.push(`stdout: /${expect.stdout_matches}/ did not match`);
   }
-  if (expect.stderr_empty && stderr.trim() !== "") problems.push("stderr: expected empty");
-  if (expect.stderr_matches !== undefined && !new RegExp(expect.stderr_matches, "m").test(stderr)) {
+  if (expect.stderr_empty && stderr.trim() !== "")
+    problems.push("stderr: expected empty");
+  if (
+    expect.stderr_matches !== undefined &&
+    !new RegExp(expect.stderr_matches, "m").test(stderr)
+  ) {
     problems.push(`stderr: /${expect.stderr_matches}/ did not match`);
   }
   if (expect.files) {
     for (const wanted of expect.files) {
-      if (!(wanted.path in (recorded.files ?? {}))) problems.push(`missing file: ${wanted.path}`);
+      if (!(wanted.path in (recorded.files ?? {})))
+        problems.push(`missing file: ${wanted.path}`);
     }
   }
   return problems;
@@ -228,7 +277,9 @@ async function main() {
 
   if (options.mode === "record") {
     if (!options.oracle || !fs.existsSync(options.oracle)) {
-      console.error("--record needs --oracle PATH (or DROID_ORACLE) pointing at the original binary");
+      console.error(
+        "--record needs --oracle PATH (or DROID_ORACLE) pointing at the original binary",
+      );
       return 2;
     }
   }
@@ -236,7 +287,10 @@ async function main() {
   const entry =
     options.target === "oracle"
       ? { command: options.oracle, prefix: [] }
-      : { command: process.execPath, prefix: ["--experimental-strip-types", OURS_ENTRY] };
+      : {
+          command: process.execPath,
+          prefix: ["--experimental-strip-types", OURS_ENTRY],
+        };
 
   if (options.target === "ours" && !fs.existsSync(OURS_ENTRY)) {
     console.error(`our entry point is missing: ${OURS_ENTRY}`);
@@ -248,13 +302,23 @@ async function main() {
 
   for (const testCase of cases) {
     if (testCase.oracle === false && options.target === "oracle") {
-      results.push({ name: testCase.name, status: "skipped", why: "case forbids the oracle" });
+      results.push({
+        name: testCase.name,
+        status: "skipped",
+        why: "case forbids the oracle",
+      });
       continue;
     }
     const sandbox = buildSandbox();
     try {
       writeFixture(sandbox.cwd, testCase.files);
-      const raw = await runTarget(options, entry, sandbox, testCase.argv ?? [], testCase.stdin);
+      const raw = await runTarget(
+        options,
+        entry,
+        sandbox,
+        testCase.argv ?? [],
+        testCase.stdin,
+      );
       const recorded = {
         exit_code: raw.code ?? (raw.signal ? `signal:${raw.signal}` : null),
         stdout: normaliseProgram(redact(raw.stdout, sandbox)),
@@ -264,7 +328,11 @@ async function main() {
       recorded.stdout = recorded.stdout.replace(/\r\n/g, "\n");
 
       if (options.mode === "record") {
-        const golden = { case: testCase.name, recorded_at_target: "oracle", ...recorded };
+        const golden = {
+          case: testCase.name,
+          recorded_at_target: "oracle",
+          ...recorded,
+        };
         fs.writeFileSync(
           path.join(EXPECTED_DIR, `${testCase.name}.json`),
           `${JSON.stringify(golden, null, 1)}\n`,
@@ -279,7 +347,12 @@ async function main() {
         const golden = JSON.parse(fs.readFileSync(goldenPath, "utf8"));
         problems.push(
           ...verify(
-            { ...golden, ...recorded, stdout: recorded.stdout, stderr: recorded.stderr },
+            {
+              ...golden,
+              ...recorded,
+              stdout: recorded.stdout,
+              stderr: recorded.stderr,
+            },
             testCase.expect ?? {},
             testCase.expect?.stdout_exact_golden ? golden : null,
           ),
@@ -291,9 +364,17 @@ async function main() {
           problems.push("no golden recorded (run --record with the oracle)");
         }
       }
-      results.push({ name: testCase.name, status: problems.length ? "failed" : "passed", problems });
+      results.push({
+        name: testCase.name,
+        status: problems.length ? "failed" : "passed",
+        problems,
+      });
     } catch (error) {
-      results.push({ name: testCase.name, status: "failed", problems: [String(error)] });
+      results.push({
+        name: testCase.name,
+        status: "failed",
+        problems: [String(error)],
+      });
     } finally {
       fs.rmSync(sandbox.dir, { recursive: true, force: true });
     }
@@ -301,11 +382,21 @@ async function main() {
 
   const failed = results.filter((r) => r.status === "failed");
   for (const result of results) {
-    const marker = result.status === "failed" ? "FAIL" : result.status === "skipped" ? "SKIP" : "ok";
-    console.log(`${marker.padEnd(4)} ${result.name}${result.why ? ` (${result.why})` : ""}`);
-    for (const problem of result.problems ?? []) console.log(`     - ${problem}`);
+    const marker =
+      result.status === "failed"
+        ? "FAIL"
+        : result.status === "skipped"
+          ? "SKIP"
+          : "ok";
+    console.log(
+      `${marker.padEnd(4)} ${result.name}${result.why ? ` (${result.why})` : ""}`,
+    );
+    for (const problem of result.problems ?? [])
+      console.log(`     - ${problem}`);
   }
-  const passed = results.filter((r) => r.status === "passed" || r.status === "recorded").length;
+  const passed = results.filter(
+    (r) => r.status === "passed" || r.status === "recorded",
+  ).length;
   console.log(`\n${passed}/${results.length} ok, ${failed.length} failed`);
   return failed.length ? 1 : 0;
 }

@@ -36,7 +36,8 @@ const PRIORITIES: Readonly<Record<string, TodoPriority>> = {
   low: "low",
 };
 
-const TODO_LINE = /^\s*(\d+)\.\s*\[(pending|in_progress|completed)\]\s*(.+?)\s*$/;
+const TODO_LINE =
+  /^\s*(\d+)\.\s*\[(pending|in_progress|completed)\]\s*(.+?)\s*$/;
 
 export const todoInputSchema: ObjectSchema = {
   kind: "object",
@@ -90,7 +91,8 @@ function itemFromObject(value: unknown, index: number): TodoItem {
     throw new ToolFailure(`Todo item ${index + 1} must be an object.`);
   }
   const record = value as Readonly<Record<string, unknown>>;
-  const content = typeof record.content === "string" ? record.content : undefined;
+  const content =
+    typeof record.content === "string" ? record.content : undefined;
   const status = typeof record.status === "string" ? record.status : undefined;
   if (content === undefined || content.length === 0 || status === undefined) {
     throw new ToolFailure(
@@ -160,7 +162,9 @@ function summary(items: readonly TodoItem[]): string {
 }
 
 /** Builds the tool; state is held by the supplied store. */
-export function createTodoTool(store: TodoStore = new TodoStore()): ToolDefinition {
+export function createTodoTool(
+  store: TodoStore = new TodoStore(),
+): ToolDefinition {
   return defineTool<TodoInput, ToolContext>({
     id: "todo_write",
     llmId: "TodoWrite",

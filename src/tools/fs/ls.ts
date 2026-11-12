@@ -31,7 +31,8 @@ export const lsInputSchema: ObjectSchema = {
       kind: "array",
       optional: true,
       items: { kind: "string" },
-      description: 'Glob patterns to ignore, e.g. ["node_modules/**", "*.log"].',
+      description:
+        'Glob patterns to ignore, e.g. ["node_modules/**", "*.log"].',
     },
   },
 };
@@ -98,7 +99,11 @@ export async function listDirectory(
     if (ignore.some((pattern) => matchesEntryPattern(dirent.name, pattern))) {
       continue;
     }
-    const absolute = joinPath(context.environment.platform, target, dirent.name);
+    const absolute = joinPath(
+      context.environment.platform,
+      target,
+      dirent.name,
+    );
     if (isCredentialFile(absolute, context.environment)) continue;
     try {
       const entryStats = await fs.promises.lstat(absolute);

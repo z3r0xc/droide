@@ -72,7 +72,12 @@ const RISK_NUMBER: Readonly<Record<RiskLevel, number>> = {
   high: 3,
 };
 
-const AUTONOMY_ORDER: readonly AutonomyLevel[] = ["off", "low", "medium", "high"];
+const AUTONOMY_ORDER: readonly AutonomyLevel[] = [
+  "off",
+  "low",
+  "medium",
+  "high",
+];
 
 export function autonomyToNumber(level: AutonomyLevel): number {
   return AUTONOMY_NUMBER[level];
@@ -125,6 +130,12 @@ export function decide(
     return "deny";
   }
 
+  // A user `denyWrite` entry stays promptable even when confirmations are
+  // otherwise bypassed (B50, matrix's last column), so it is checked here.
+  if (request.toolClass === "file-edit" && request.pathClass === "deny-write") {
+    return context.interactive === false ? "deny" : "ask";
+  }
+
   if (skipsConfirmations(context)) {
     return "allow";
   }
@@ -135,9 +146,6 @@ export function decide(
       return "allow";
 
     case "file-edit":
-      if (request.pathClass === "deny-write") {
-        return context.interactive === false ? "deny" : "ask";
-      }
       if (autoApprovesFileEdits(context)) return "allow";
       return "ask";
 
@@ -163,9 +171,7 @@ export function decide(
 /** B46's level-specific guidance. `TODO(spec B46)` for wording beyond the levels. */
 function guidance(context: PermissionContext): string {
   const maximum = context.maxAutonomy ?? "high";
-  if (
-    AUTONOMY_NUMBER[effectiveAutonomy(context)] < AUTONOMY_NUMBER[maximum]
-  ) {
+  if (AUTONOMY_NUMBER[effectiveAutonomy(context)] < AUTONOMY_NUMBER[maximum]) {
     return (
       `This session cannot exceed the organization's maximum autonomy level ` +
       `(${maximum}). Ask an administrator to raise it.`
@@ -227,7 +233,8 @@ export function decideWithRefusal(
   context: PermissionContext,
 ): { readonly decision: Decision; readonly message?: string } {
   const decision = decide(request, context);
-  if (decision === "deny") return { decision, message: refusal(request, context) };
+  if (decision === "deny")
+    return { decision, message: refusal(request, context) };
   if (decision === "ask" && context.interactive === false) {
     return {
       decision: "deny",

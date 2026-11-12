@@ -137,7 +137,9 @@ export async function editFile(
     throw error;
   });
   if (stats.isDirectory()) {
-    throw new ToolFailure(`Error: Cannot edit "${resolved}": it is a directory.`);
+    throw new ToolFailure(
+      `Error: Cannot edit "${resolved}": it is a directory.`,
+    );
   }
   const previous = context.reads?.check(resolved);
   if (previous === undefined) throw new ToolFailure(NOT_READ(resolved));

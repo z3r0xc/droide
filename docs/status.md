@@ -16,8 +16,8 @@ cargo test --workspace                   # native layer (CI only here)
 | Area | State |
 |---|---|
 | Specifications | 11 subsystem specs + shared context, ~8.2k lines, all clauses cited and mapped to tests |
-| TypeScript product layer | 69 files, ~16k lines: CLI, config, session, agent loop, transport, exec, extensions, tools, native client |
-| Tests | 41 test files (unit + integration) |
+| TypeScript product layer | 74 files, ~17k lines: CLI, config, session, agent loop, transport, exec, extensions, tools, native client |
+| Tests | 44 test files (unit + integration) |
 | CLI parity | 20/20 recorded cases against the subject |
 | Native (Rust) | protocol crate + tests; builds only in CI (see `docs/rust-setup.md`) |
 

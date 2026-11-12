@@ -68,7 +68,7 @@ export const grepInputSchema: ObjectSchema = {
       optional: true,
       default: "file_paths",
       description:
-        '`file_paths` lists matching files; `content` returns matching lines.',
+        "`file_paths` lists matching files; `content` returns matching lines.",
     },
     case_insensitive: {
       kind: "boolean",
@@ -274,7 +274,12 @@ export async function grepFiles(
   for (const filePath of files) {
     const buffer = await fs.promises.readFile(filePath);
     if (isBinary(buffer)) continue;
-    const found = matchLines(filePath, buffer.toString("utf8"), expression, input.multiline === true);
+    const found = matchLines(
+      filePath,
+      buffer.toString("utf8"),
+      expression,
+      input.multiline === true,
+    );
     if (found.matchedLines.length === 0) continue;
     matches.push(found);
     account(budget, filePath);

@@ -61,7 +61,9 @@ export interface GlobInput {
   readonly folder?: string;
 }
 
-function cleanPatterns(value: string | readonly string[] | undefined): string[] {
+function cleanPatterns(
+  value: string | readonly string[] | undefined,
+): string[] {
   return (parseStringList(value) ?? [])
     .map((pattern) => pattern.trim())
     .filter((pattern) => pattern.length > 0);

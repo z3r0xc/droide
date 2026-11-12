@@ -47,7 +47,11 @@ export async function walkFiles(root: string): Promise<WalkEntry[]> {
     }
   }
   entries.sort((left, right) =>
-    left.relative < right.relative ? -1 : left.relative > right.relative ? 1 : 0,
+    left.relative < right.relative
+      ? -1
+      : left.relative > right.relative
+        ? 1
+        : 0,
   );
   return entries;
 }

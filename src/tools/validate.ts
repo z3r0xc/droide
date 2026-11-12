@@ -212,7 +212,12 @@ function apply(
           issues.push(issue(joinPath(path, key), property));
           continue;
         }
-        const applied = apply(property, value[key], joinPath(path, key), issues);
+        const applied = apply(
+          property,
+          value[key],
+          joinPath(path, key),
+          issues,
+        );
         if (applied !== undefined) result[key] = applied;
       }
       return result;

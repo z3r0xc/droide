@@ -20,7 +20,9 @@ export interface CoreToolOptions {
 }
 
 /** A registry holding every built-in tool this layer implements. */
-export function createCoreRegistry(options: CoreToolOptions = {}): ToolRegistry {
+export function createCoreRegistry(
+  options: CoreToolOptions = {},
+): ToolRegistry {
   const registry = new ToolRegistry();
   registerCoreTools(registry, options);
   return registry;

@@ -8,7 +8,11 @@
  * No module here imports a tool; tools import this one.
  */
 import type { ToolContext } from "./context.ts";
-import { ToolFailure, ToolInputError, ToolRegistrationError } from "./errors.ts";
+import {
+  ToolFailure,
+  ToolInputError,
+  ToolRegistrationError,
+} from "./errors.ts";
 import {
   formatIssues,
   formatValidationFailure,
@@ -115,7 +119,8 @@ function assertSideEffects(definition: ToolDefinition): void {
     );
   }
   const invalid = sideEffects.filter(
-    (entry: unknown) => typeof entry !== "string" || !Object.hasOwn(VALID_SIDE_EFFECTS, entry),
+    (entry: unknown) =>
+      typeof entry !== "string" || !Object.hasOwn(VALID_SIDE_EFFECTS, entry),
   );
   if (invalid.length > 0) {
     throw new ToolRegistrationError(
@@ -214,7 +219,10 @@ export class ToolRegistry {
       };
     }
     try {
-      return { ok: true, value: await definition.execute(parsed.value, context) };
+      return {
+        ok: true,
+        value: await definition.execute(parsed.value, context),
+      };
     } catch (error) {
       if (error instanceof ToolInputError) {
         return { ok: false, error: error.message };
