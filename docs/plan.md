@@ -27,7 +27,7 @@ sections and ADRs.
 | M7 exec streams | **done** (protocols); end-to-end run in progress |
 | M8 extensions core | config/skills/plugins **done**; MCP client in progress |
 | M10a native contract | **done** — client with bounds, timeouts, typed failures |
-| M12 doctor | **done** — catalogue, six real probes, text/JSON reports |
+| M12 doctor | **done** — catalogue with ten real probes (config, environment, system, binaries, filesystem, git, proxy, certs, auth, mcp), text/JSON reports |
 | M10b native Rust | blocked (toolchain, `docs/rust-setup.md`) |
 | M5 agent loop, M9 daemon, M11 UI | specified, not started (specs `20`, `70`, `95`) |
 
@@ -44,10 +44,10 @@ sections and ADRs.
 | M6 | Tools: filesystem, search, shell/exec, todo/task; permission enforcement | `specs/30-tools-and-sandbox.md` | per-tool schema tests; sandbox profile assertions |
 | M7 | Non-interactive mode and stream formats (`exec`) | `specs/80-exec-and-streaming.md` | golden stdout line sequences per scripted run |
 | M8 | Extensions: MCP client, plugins, skills, ACP | `specs/60-extensions-mcp-and-skills.md` | config merge tests, collision rules, skill discovery |
-| M9 | Daemon and remote control | `specs/70-daemon-and-remote-control.md` | handshake/version negotiation, single-instance lock |
+| M9 | Daemon and remote control | `specs/70-daemon-and-remote-control.md` | local transport, protocol, auth gate, single instance, ordered shutdown **done (132 tests)**; Remote Control, relay and the port proxy are `TODO(spec B28/B29/B32/B33)` |
 | M10a | Native **contract** in TypeScript: JSON-lines client, response validation, failure mapping | `specs/90-native-layer.md` | stub-helper integration tests; no leaked child processes |
 | M10b | Native **implementation** in Rust: search, sandbox, paths, protocol (pty and secrets next) | `specs/90-native-layer.md`, `crates/` | `cargo test --workspace` locally and in CI — toolchain fixed, see `docs/rust-setup.md` |
-| M11 | Terminal UI | `specs/95-terminal-ui.md` | shell + tokens + golden frames **done**; keys, setup and CLI dispatch pending |
+| M11 | Terminal UI | `specs/95-terminal-ui.md` | shell, tokens, golden frames, keys, setup/teardown and TTY dispatch **done**; the agent turn inside the shell is in progress |
 
 ## Definition of done (each milestone)
 
