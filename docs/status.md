@@ -17,7 +17,7 @@ cargo test --workspace                   # native layer (CI only here)
 |---|---|
 | Specifications | 11 subsystem specs + shared context, ~8.2k lines, all clauses cited and mapped to tests |
 | TypeScript product layer | 75 files, ~17k lines: CLI, app, config, session, agent, transport, exec, extensions, tools, native client |
-| Tests | 989 TypeScript tests (985 pass, 4 skipped) + 57 Rust tests |
+| Tests | 1057 TypeScript tests (1053 pass, 4 skipped) + 69 Rust tests |
 | CLI parity | 20/20 recorded cases against the subject |
 | Native (Rust) | `crates/droide-native`: protocol (9 methods), safe paths, file search, sandbox profiles, PTY quoting, DPAPI secrets — 57 tests, clippy `-D warnings`, builds locally |
 
@@ -46,12 +46,12 @@ cargo test --workspace                   # native layer (CI only here)
 | `10-cli-surface.md` | stable | yes — root, subcommands, help, refusals, exit codes |
 | `20-agent-loop.md` | stable | message model, turn loop, provider adapter, system-prompt assembly, context compaction |
 | `30-tools-and-sandbox.md` | stable | registry, validators, permission matrix, fs/shell/todo tools |
-| `40-sessions-and-storage.md` | stable | migrations, store, transcript, search |
+| `40-sessions-and-storage.md` | stable | migrations 1–10, store, transcript, literal search served from a local index with a proving fallback |
 | `50-transport-and-auth.md` | stable | URL/header/error/SSE/LLM delta layers |
 | `60-extensions-mcp-and-skills.md` | stable | MCP config merge, tool naming, skill discovery, plugin manifests |
 | `70-daemon-and-remote-control.md` | review | not started |
 | `80-exec-and-streaming.md` | stable | record types, writer, one-shot runner, validation |
-| `90-native-layer.md` | stable | TypeScript client with typed, validated wrappers for all nine methods; Rust helper: search, sandbox, paths, PTY quoting, DPAPI secrets; contract test runs against the compiled binary (`npm run test:native`) |
+| `90-native-layer.md` | stable | TypeScript client with typed, validated wrappers for every method including the PTY session calls; Rust helper: search, sandbox, paths, PTY quoting, **ConPTY/openpty sessions**, DPAPI secrets (69 tests); `npm run test:native` proves all of it against the compiled binary |
 | `95-terminal-ui.md` | review | tokens D1–D13, capability ladder, shell with header/transcript/composer/status line/footer, golden frames at 80×24 and 120×40 |
 
 ## Known gaps and their owners
@@ -61,7 +61,7 @@ cargo test --workspace                   # native layer (CI only here)
 | `droid` interactive mode | Ink shell exists and is frame-tested, but has no key handling yet; dispatching to a UI that ignores input would be worse than the loud refusal, so the CLI still exits 64 | M11: keys, setup, dispatch |
 | Bare `droide` invocation | fails loudly with exit 64 instead of starting the TUI | removes itself when M11 lands |
 | Native PTY spawn/read loop; macOS/Linux credential stores | only quoting/chunking and DPAPI exist today | next increment of M10b |
-| Session search | literal scan instead of the subject's index planner (documented deviation) | revisit with `40` §B45–B51 |
+
 
 | Narrower-than-spec behaviour in 20 places | each is marked `TODO(spec …)` in code | `docs/gaps.md` lists every one with its clause |
 
