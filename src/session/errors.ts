@@ -13,6 +13,7 @@ export type SessionStoreErrorCode =
   | "migration-version-invalid"
   | "migration-version-duplicate"
   | "migration-failed"
+  | "index-shape"
   | "invalid-argument"
   | "unknown-session"
   | "duplicate-session"
@@ -131,6 +132,30 @@ export class MigrationFailedError extends SessionStoreError {
     this.name = "MigrationFailedError";
     this.version = migration.version;
     this.migrationName = migration.name;
+  }
+}
+
+export type IndexShapeState =
+  | "missing-table"
+  | "missing-column"
+  | "column-changed"
+  | "missing-index"
+  | "foreign-object";
+
+/** The file is a session index, but not the one this build's migrations describe
+ * (B12). `key` names the table, the `table.column` or the index it lacks. */
+export class IndexShapeError extends SessionStoreError {
+  readonly state: IndexShapeState;
+  readonly key: string;
+
+  constructor(state: IndexShapeState, key: string) {
+    super(
+      "index-shape",
+      `session index database is not shaped like this build (${state}: ${key})`,
+    );
+    this.name = "IndexShapeError";
+    this.state = state;
+    this.key = key;
   }
 }
 

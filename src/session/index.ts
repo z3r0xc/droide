@@ -4,6 +4,7 @@ export * from "./errors.ts";
 export * from "./ids.ts";
 export * from "./migrate.ts";
 export * from "./migrations.ts";
-export * from "./open.ts";
+export * from "./index-db.ts";
+export * from "./index-planner.ts";
 export * from "./store.ts";
 export { isJsonObject, type JsonObject, type JsonValue } from "./transcript.ts";

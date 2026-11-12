@@ -19,6 +19,8 @@ const TABLES = [
   "session_ingest",
   "session_spans",
   "session_term_filters",
+  "transcript_index",
+  "transcript_index_value",
 ];
 const INDEXES = [
   "session_spans_embedded_text_idx",
@@ -28,6 +30,9 @@ const INDEXES = [
   "sessions_parent",
   "sessions_recency",
   "sessions_subagent",
+  "transcript_index_session",
+  "transcript_index_state",
+  "transcript_index_value_kind",
 ];
 const TRIGGERS = [
   "session_spans_vector_deleted",
@@ -35,6 +40,9 @@ const TRIGGERS = [
   "session_spans_vector_updated",
   "sessions_daemon_fields_stale",
   "sessions_settings_rewritten",
+  "transcript_index_settings_seeded",
+  "transcript_index_settings_synced",
+  "transcript_index_values_cleared",
 ];
 
 function asRows(value: unknown): Record<string, unknown>[] {
@@ -82,6 +90,8 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
       "session_spans",
       "session_term_filters",
       "sessions",
+      "transcript_index",
+      "transcript_index_value",
     ].map((name) => `table:${name}`),
     ...TRIGGERS.map((name) => `trigger:${name}`),
   ]);
@@ -94,6 +104,8 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
       "session_ingest:12",
       "session_spans:12",
       "session_term_filters:2",
+      "transcript_index:12",
+      "transcript_index_value:8",
     ],
   );
 
@@ -134,6 +146,7 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
     "7:term-prefixes",
     "8:whole-transcript-records",
     "9:vector-bookkeeping",
+    "10:transcript-index",
   ]);
 
   const journal = asRows(db.prepare("PRAGMA journal_mode").all())[0];

@@ -14,12 +14,12 @@ import {
   validateMigrations,
 } from "../../../src/session/migrations.ts";
 
-test("the manifest is nine contiguous migrations with the ledger's names", () => {
-  assert.equal(CACHE_MIGRATIONS.length, 9);
-  assert.equal(CACHE_SCHEMA_VERSION, 9);
+test("the manifest is ten contiguous migrations with the ledger's names", () => {
+  assert.equal(CACHE_MIGRATIONS.length, 10);
+  assert.equal(CACHE_SCHEMA_VERSION, 10);
   assert.deepEqual(
     CACHE_MIGRATIONS.map((migration) => migration.version),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
   );
   assert.deepEqual(
     CACHE_MIGRATIONS.map((migration) => migration.name),
@@ -33,6 +33,7 @@ test("the manifest is nine contiguous migrations with the ledger's names", () =>
       "term-prefixes",
       "whole-transcript-records",
       "vector-bookkeeping",
+      "transcript-index",
     ],
   );
 });
