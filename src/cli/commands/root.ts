@@ -211,13 +211,13 @@ export function makeRootCommand(
     .option("-w, --worktree [name]", "Run in a git worktree")
     .option(
       "--worktree-dir <path>",
-      "Deprecated: set the worktree directory in the Factory desktop app instead",
+      "Deprecated: worktrees are placed under the state directory",
     )
     .option("--auto <level>", "Autonomy level: low|medium|high")
     .option("--use-spec", "Start in spec mode")
     .option(
       "--disable-builtin-skills",
-      "Disable Factory-provided builtin skills",
+      "Disable Droide-provided builtin skills",
     );
 
   program.addHelpCommand("help [command]", "display help for command");
