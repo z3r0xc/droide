@@ -19,7 +19,7 @@ cargo test --workspace                   # native layer (CI only here)
 | TypeScript product layer | 75 files, ~17k lines: CLI, app, config, session, agent, transport, exec, extensions, tools, native client |
 | Tests | 56 test files; 489 tests (488 pass, 1 skipped) |
 | CLI parity | 20/20 recorded cases against the subject |
-| Native (Rust) | `crates/droide-native`: protocol, safe paths, file search, sandbox profiles — 39 tests, clippy clean, builds locally |
+| Native (Rust) | `crates/droide-native`: protocol (9 methods), safe paths, file search, sandbox profiles, PTY quoting, DPAPI secrets — 57 tests, clippy `-D warnings`, builds locally |
 
 ## Command surface
 
@@ -28,7 +28,7 @@ cargo test --workspace                   # native layer (CI only here)
 | `--version`, `--help`, subcommand help | **done** — 20/20 parity cases, including the curated `exec --help` page |
 | `doctor` | **done** — catalogue, six real probes (config, environment, system, binaries, filesystem, git), text and `--json` reports; the other ten names report `skip` |
 | `search\|find` | **done** — store query, text and `--json` output, documented exit codes |
-| `exec` | protocols, validation and record writers **done**; end-to-end wiring in progress |
+| `exec` | **done** for `text`/`json`/`stream-json` with custom and managed models; streaming input, mission, ACP and `--list-tools` are refused loudly |
 | `resume`, `daemon`, `update`, `mcp`, `plugin`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
 | bare `droide` | refuses with exit 64 until the interactive UI lands |
 
@@ -44,7 +44,7 @@ cargo test --workspace                   # native layer (CI only here)
 | `60-extensions-mcp-and-skills.md` | stable | MCP config merge, tool naming, skill discovery, plugin manifests |
 | `70-daemon-and-remote-control.md` | review | not started |
 | `80-exec-and-streaming.md` | stable | record types, writer, one-shot runner, validation |
-| `90-native-layer.md` | stable | TypeScript client + Rust helper (search, sandbox, paths, protocol); pty/secrets next |
+| `90-native-layer.md` | stable | TypeScript client + Rust helper: search, sandbox, paths, PTY quoting, DPAPI secrets |
 | `95-terminal-ui.md` | review | tokens, frame, header/transcript/composer/status line (in progress) |
 
 ## Known gaps and their owners
@@ -53,7 +53,7 @@ cargo test --workspace                   # native layer (CI only here)
 |---|---|---|
 | `droid` interactive mode | TUI is being built on React + Ink (`docs/adr/0006`); the CLI does not dispatch to it yet | M11 |
 | Bare `droide` invocation | fails loudly with exit 64 instead of starting the TUI | removes itself when M11 lands |
-| Native helpers: pty and secrets | need audited `unsafe` FFI modules | next increment of M10b |
+| Native PTY spawn/read loop; macOS/Linux credential stores | only quoting/chunking and DPAPI exist today | next increment of M10b |
 | Session search | literal scan instead of the subject's index planner (documented deviation) | revisit with `40` §B45–B51 |
 | Context compaction | not implemented | M5 remainder (`20` §B35–B45) |
 | Narrower-than-spec behaviour in 20 places | each is marked `TODO(spec …)` in code | `docs/gaps.md` lists every one with its clause |
