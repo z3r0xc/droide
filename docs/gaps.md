@@ -5,10 +5,11 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **20** markers across **20** clauses.
+Total: **21** markers across **21** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
+| `src/doctor/checks.ts:26` | `B49` | ${what} check], |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view in the subject; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/grep.ts:24` | `B20` | for the full list. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
