@@ -31,7 +31,8 @@ test("an unknown output format is a usage error", () => {
   assert.throws(
     () => parseOutputFormat("yaml"),
     (error: unknown) =>
-      error instanceof ExecUsageError && error.message === INVALID_OUTPUT_FORMAT,
+      error instanceof ExecUsageError &&
+      error.message === INVALID_OUTPUT_FORMAT,
   );
   assert.throws(() => parseOutputFormat(""), ExecUsageError);
 });
@@ -94,7 +95,9 @@ test("streaming input refuses a prompt argument or file", () => {
 });
 
 test("streaming input formats require their matching output format", () => {
-  assert.doesNotThrow(() => assertInputOutputPair("stream-json", "stream-json"));
+  assert.doesNotThrow(() =>
+    assertInputOutputPair("stream-json", "stream-json"),
+  );
   assert.doesNotThrow(() => assertInputOutputPair("stream-json", "debug"));
   assert.throws(
     () => assertInputOutputPair("stream-json", "json"),

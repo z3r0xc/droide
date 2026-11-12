@@ -249,6 +249,9 @@ export interface SkillCandidate {
   readonly disableModelInvocation: boolean;
   readonly allowedTools: readonly string[];
   readonly version?: string;
+  readonly license?: string;
+  readonly compatibility?: string;
+  readonly metadata?: Readonly<Record<string, string>>;
   readonly pluginId?: string;
   readonly pluginScope?: string;
   readonly errors: readonly string[];
@@ -362,6 +365,8 @@ interface CandidateFields {
   readonly disableModelInvocation: boolean;
   readonly allowedTools: readonly string[];
   readonly version?: string;
+  readonly license?: string;
+  readonly compatibility?: string;
   readonly metadata?: Readonly<Record<string, string>>;
   readonly warnings: readonly string[];
 }
@@ -396,6 +401,11 @@ function buildCandidate(
     disableModelInvocation: fields.disableModelInvocation,
     allowedTools: fields.allowedTools,
     ...(fields.version !== undefined ? { version: fields.version } : {}),
+    ...(fields.license !== undefined ? { license: fields.license } : {}),
+    ...(fields.compatibility !== undefined
+      ? { compatibility: fields.compatibility }
+      : {}),
+    ...(fields.metadata !== undefined ? { metadata: fields.metadata } : {}),
     ...(context.pluginId !== undefined ? { pluginId: context.pluginId } : {}),
     ...(context.pluginScope !== undefined
       ? { pluginScope: context.pluginScope }
@@ -439,13 +449,14 @@ export function parseSkillDocument(
   const warnings: string[] = [];
   const rawName = readOptionalString(values, "name", warnings);
   const description = readOptionalString(values, "description", warnings);
-  const version = readOptionalString(values, "version", warnings);
+  const rawVersion = values.get("version");
+  const version = typeof rawVersion === "string" ? rawVersion : undefined;
   if (version !== undefined && !SEMVER.test(version)) {
     warnings.push(`Skill version "${version}" is not a semantic version.`);
   }
 
-  readOptionalString(values, "license", warnings);
-  readOptionalString(values, "compatibility", warnings);
+  const license = readOptionalString(values, "license", warnings);
+  const compatibility = readOptionalString(values, "compatibility", warnings);
   const metadata = readMetadata(values, warnings);
 
   return buildCandidate(
@@ -468,6 +479,8 @@ export function parseSkillDocument(
       ),
       allowedTools: readAllowedTools(values, warnings),
       ...(version !== undefined ? { version } : {}),
+      ...(license !== undefined ? { license } : {}),
+      ...(compatibility !== undefined ? { compatibility } : {}),
       ...(metadata !== undefined ? { metadata } : {}),
       warnings,
     },
@@ -618,6 +631,13 @@ function toEffective(
     disableModelInvocation: candidate.disableModelInvocation,
     allowedTools: candidate.allowedTools,
     ...(candidate.version !== undefined ? { version: candidate.version } : {}),
+    ...(candidate.license !== undefined ? { license: candidate.license } : {}),
+    ...(candidate.compatibility !== undefined
+      ? { compatibility: candidate.compatibility }
+      : {}),
+    ...(candidate.metadata !== undefined
+      ? { metadata: candidate.metadata }
+      : {}),
     ...(candidate.pluginId !== undefined
       ? { pluginId: candidate.pluginId }
       : {}),

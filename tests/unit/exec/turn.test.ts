@@ -64,7 +64,7 @@ test("one successful turn writes init, echo, blocks and one completion", async (
   ]);
 });
 
-test("a tool result whose call was never seen carries toolId \"\"", async () => {
+test('a tool result whose call was never seen carries toolId ""', async () => {
   const stream = new CollectingStream();
   const writer = createJsonLineWriter(stream);
   const runner = scriptedRunner(async (sink) => {
@@ -86,7 +86,9 @@ test("a tool result whose call was never seen carries toolId \"\"", async () => 
   const result = stream.lines[2];
   assert.ok(result !== undefined);
   const parsed: unknown = JSON.parse(result);
-  assert.ok(typeof parsed === "object" && parsed !== null && "toolId" in parsed);
+  assert.ok(
+    typeof parsed === "object" && parsed !== null && "toolId" in parsed,
+  );
   assert.equal(parsed.toolId, "");
 });
 

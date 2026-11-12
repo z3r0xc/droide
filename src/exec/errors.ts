@@ -62,7 +62,9 @@ export class ExecAbortedError extends ExecError {
 
   constructor(
     signal?: ExecSignal,
-    message: string = signal === undefined ? "Cancelled" : `Cancelled by ${signal}`,
+    message: string = signal === undefined
+      ? "Cancelled"
+      : `Cancelled by ${signal}`,
   ) {
     super("aborted", message);
     this.name = "ExecAbortedError";

@@ -336,7 +336,10 @@ export function buildAssistantRecords(
   timestamp: number,
 ): StreamRecord[] {
   const records: StreamRecord[] = [];
-  if (message.reasoningContent !== undefined && message.reasoningContent.trim()) {
+  if (
+    message.reasoningContent !== undefined &&
+    message.reasoningContent.trim()
+  ) {
     records.push(
       buildReasoningRecord({
         id: message.id,

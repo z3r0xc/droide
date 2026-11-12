@@ -68,7 +68,8 @@ test("a non-EPIPE write failure is an ExecStreamError", async () => {
   await assert.rejects(
     writer.write({ type: "message" }),
     (error: unknown) =>
-      error instanceof ExecStreamError && error.message === "stdout write failed",
+      error instanceof ExecStreamError &&
+      error.message === "stdout write failed",
   );
   assert.equal(writer.closed, false);
 });

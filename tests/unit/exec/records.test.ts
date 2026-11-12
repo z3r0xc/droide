@@ -240,9 +240,7 @@ test("assistant blocks expand in transcript order with one timestamp", () => {
     [undefined, undefined, "assistant", "assistant", undefined],
   );
   const texts = records.map((record) =>
-    record.type === "message" || record.type === "reasoning"
-      ? record.text
-      : "",
+    record.type === "message" || record.type === "reasoning" ? record.text : "",
   );
   assert.deepEqual(texts, [
     "provider reasoning",

@@ -2,7 +2,11 @@
  * Child process for the broken-pipe integration test: it keeps writing records
  * after the parent drops the read end, and must still exit `0`.
  */
-import { runOneShot, type TurnOutcome, type TurnRunner } from "../../../src/exec/turn.ts";
+import {
+  runOneShot,
+  type TurnOutcome,
+  type TurnRunner,
+} from "../../../src/exec/turn.ts";
 import { createJsonLineWriter } from "../../../src/exec/writer.ts";
 
 const runner: TurnRunner = {

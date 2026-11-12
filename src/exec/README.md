@@ -34,8 +34,8 @@ one `completion`; failure ends with exactly one terminal `error`
 
 ## Exit codes
 
-| Code | Meaning |
-|---|---|
-| `0` | turn completed, help/list-tools, or broken pipe after the result was chosen |
-| `1` | usage error, failed or cancelled turn, provider error |
-| `130` / `143` | SIGINT / SIGTERM; a signal outranks every turn outcome |
+| Code          | Meaning                                                                     |
+| ------------- | --------------------------------------------------------------------------- |
+| `0`           | turn completed, help/list-tools, or broken pipe after the result was chosen |
+| `1`           | usage error, failed or cancelled turn, provider error                       |
+| `130` / `143` | SIGINT / SIGTERM; a signal outranks every turn outcome                      |

@@ -21,7 +21,9 @@ export class CollectingStream extends Writable {
     _encoding: BufferEncoding,
     callback: (error?: Error | null) => void,
   ): void {
-    this.chunks.push(chunk instanceof Buffer ? chunk.toString("utf8") : String(chunk));
+    this.chunks.push(
+      chunk instanceof Buffer ? chunk.toString("utf8") : String(chunk),
+    );
     callback();
   }
 

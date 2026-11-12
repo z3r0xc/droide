@@ -43,9 +43,21 @@ export interface CustomModelSettings {
   readonly apiKey?: string;
   readonly apiKeyHelper?: string;
   readonly apiKeyHelperTtlMs?: number;
+  readonly credentialSource?: string;
+  readonly authMode?: string;
   readonly displayName?: string;
   readonly maxContextLimit?: number;
   readonly enableThinking?: boolean;
+  readonly thinkingMaxTokens?: number;
+  readonly maxOutputTokens?: number;
+  readonly reasoningEffort?: string;
+  readonly extraHeaders?: Readonly<Record<string, string>>;
+  readonly extraArgs?: JsonObject;
+  readonly noImageSupport?: boolean;
+  readonly bedrock?: JsonObject;
+  readonly azure?: JsonObject;
+  readonly baseModelId?: string;
+  readonly useInRouter?: boolean;
 }
 
 /** Settings applied at the root of a document, merged key by key. */
@@ -155,9 +167,21 @@ const CUSTOM_MODEL_KEYS: AllowedKeys = {
   apiKey: true,
   apiKeyHelper: true,
   apiKeyHelperTtlMs: true,
+  credentialSource: true,
+  authMode: true,
   displayName: true,
   maxContextLimit: true,
   enableThinking: true,
+  thinkingMaxTokens: true,
+  maxOutputTokens: true,
+  reasoningEffort: true,
+  extraHeaders: true,
+  extraArgs: true,
+  noImageSupport: true,
+  bedrock: true,
+  azure: true,
+  baseModelId: true,
+  useInRouter: true,
 };
 
 const CUSTOM_MODEL_PROVIDERS: AllowedKeys = {
@@ -574,6 +598,13 @@ function parseCustomModel(
     keyPath,
     1,
   );
+  const credentialSource = readOptionalString(
+    raw,
+    "credentialSource",
+    path,
+    keyPath,
+  );
+  const authMode = readOptionalString(raw, "authMode", path, keyPath);
   const displayName = readOptionalString(raw, "displayName", path, keyPath);
   const maxContextLimit = readOptionalInteger(
     raw,
@@ -588,6 +619,58 @@ function parseCustomModel(
     path,
     keyPath,
   );
+  const thinkingMaxTokens = readOptionalInteger(
+    raw,
+    "thinkingMaxTokens",
+    path,
+    keyPath,
+    1,
+  );
+  const maxOutputTokens = readOptionalInteger(
+    raw,
+    "maxOutputTokens",
+    path,
+    keyPath,
+    1,
+  );
+  const reasoningEffort = readOptionalString(
+    raw,
+    "reasoningEffort",
+    path,
+    keyPath,
+  );
+  const extraHeaders =
+    raw.extraHeaders === undefined
+      ? undefined
+      : expectStringRecord(
+          raw.extraHeaders,
+          path,
+          joinKeyPath(keyPath, "extraHeaders"),
+        );
+  const extraArgs =
+    raw.extraArgs === undefined
+      ? undefined
+      : expectJsonObject(
+          raw.extraArgs,
+          path,
+          joinKeyPath(keyPath, "extraArgs"),
+        );
+  const noImageSupport = readOptionalBoolean(
+    raw,
+    "noImageSupport",
+    path,
+    keyPath,
+  );
+  const bedrock =
+    raw.bedrock === undefined
+      ? undefined
+      : expectJsonObject(raw.bedrock, path, joinKeyPath(keyPath, "bedrock"));
+  const azure =
+    raw.azure === undefined
+      ? undefined
+      : expectJsonObject(raw.azure, path, joinKeyPath(keyPath, "azure"));
+  const baseModelId = readOptionalString(raw, "baseModelId", path, keyPath);
+  const useInRouter = readOptionalBoolean(raw, "useInRouter", path, keyPath);
 
   return {
     ...(id === undefined ? {} : { id }),
@@ -598,9 +681,21 @@ function parseCustomModel(
     ...(apiKey === undefined ? {} : { apiKey }),
     ...(apiKeyHelper === undefined ? {} : { apiKeyHelper }),
     ...(apiKeyHelperTtlMs === undefined ? {} : { apiKeyHelperTtlMs }),
+    ...(credentialSource === undefined ? {} : { credentialSource }),
+    ...(authMode === undefined ? {} : { authMode }),
     ...(displayName === undefined ? {} : { displayName }),
     ...(maxContextLimit === undefined ? {} : { maxContextLimit }),
     ...(enableThinking === undefined ? {} : { enableThinking }),
+    ...(thinkingMaxTokens === undefined ? {} : { thinkingMaxTokens }),
+    ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+    ...(extraHeaders === undefined ? {} : { extraHeaders }),
+    ...(extraArgs === undefined ? {} : { extraArgs }),
+    ...(noImageSupport === undefined ? {} : { noImageSupport }),
+    ...(bedrock === undefined ? {} : { bedrock }),
+    ...(azure === undefined ? {} : { azure }),
+    ...(baseModelId === undefined ? {} : { baseModelId }),
+    ...(useInRouter === undefined ? {} : { useInRouter }),
   };
 }
 

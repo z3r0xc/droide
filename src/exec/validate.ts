@@ -60,11 +60,10 @@ export const STREAM_JSON_INPUT_DEPRECATION_WARNING =
   "Warning: --input-format stream-json is deprecated. Use --input-format stream-jsonrpc for daemon-compatible JSON-RPC protocol.";
 
 /** `--output-format` defaults to `text` (B18); any other value is refused. */
-export function parseOutputFormat(
-  value: string | undefined,
-): ExecOutputFormat {
+export function parseOutputFormat(value: string | undefined): ExecOutputFormat {
   if (value === undefined) return "text";
-  if (!isExecOutputFormat(value)) throw new ExecUsageError(INVALID_OUTPUT_FORMAT);
+  if (!isExecOutputFormat(value))
+    throw new ExecUsageError(INVALID_OUTPUT_FORMAT);
   return value;
 }
 
@@ -86,9 +85,7 @@ export interface PromptSourceOptions {
 }
 
 /** B4: `--file` and a positional prompt are mutually exclusive. */
-export function assertFilePromptConflict(
-  options: PromptSourceOptions,
-): void {
+export function assertFilePromptConflict(options: PromptSourceOptions): void {
   if (options.file !== undefined && options.promptArg !== undefined) {
     throw new ExecUsageError(FILE_PROMPT_CONFLICT);
   }

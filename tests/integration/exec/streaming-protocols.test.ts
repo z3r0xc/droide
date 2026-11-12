@@ -8,7 +8,11 @@ import { test } from "node:test";
 
 import { runOneShot, runOneShotSummary } from "../../../src/exec/turn.ts";
 import { createJsonLineWriter } from "../../../src/exec/writer.ts";
-import { oneShotOptions, scriptedRunner, TEST_USAGE } from "../../unit/exec/helpers.ts";
+import {
+  oneShotOptions,
+  scriptedRunner,
+  TEST_USAGE,
+} from "../../unit/exec/helpers.ts";
 
 const REPO_ROOT = resolve(import.meta.dirname, "../../..");
 const PURITY_FIXTURE = resolve(import.meta.dirname, "fixture-purity.ts");
@@ -88,7 +92,10 @@ test("the writer flushes a real file as JSON lines", async () => {
     const stream = createWriteStream(path);
     const writer = createJsonLineWriter(stream);
     const runner = scriptedRunner(async (sink) => {
-      await sink.assistant({ id: "m1", blocks: [{ kind: "text", text: "Done." }] });
+      await sink.assistant({
+        id: "m1",
+        blocks: [{ kind: "text", text: "Done." }],
+      });
       return {
         kind: "completed",
         finalText: "Done.",
@@ -109,7 +116,9 @@ test("the writer flushes a real file as JSON lines", async () => {
     assert.deepEqual(
       lines.map((line) => {
         const parsed: unknown = JSON.parse(line);
-        assert.ok(typeof parsed === "object" && parsed !== null && "type" in parsed);
+        assert.ok(
+          typeof parsed === "object" && parsed !== null && "type" in parsed,
+        );
         return parsed.type;
       }),
       ["system", "message", "message", "completion"],

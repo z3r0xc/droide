@@ -28,7 +28,9 @@ export const SIDE_EFFECTS = [
 
 export type SideEffect = (typeof SIDE_EFFECTS)[number];
 
-const VALID_SIDE_EFFECTS: ReadonlySet<string> = new Set(SIDE_EFFECTS);
+const VALID_SIDE_EFFECTS: Readonly<Record<string, true>> = Object.fromEntries(
+  SIDE_EFFECTS.map((effect) => [effect, true]),
+);
 
 /** A tool the model can call, with everything dispatch needs. */
 export interface ToolDefinition {
@@ -113,7 +115,7 @@ function assertSideEffects(definition: ToolDefinition): void {
     );
   }
   const invalid = sideEffects.filter(
-    (entry: unknown) => typeof entry !== "string" || !VALID_SIDE_EFFECTS.has(entry),
+    (entry: unknown) => typeof entry !== "string" || !Object.hasOwn(VALID_SIDE_EFFECTS, entry),
   );
   if (invalid.length > 0) {
     throw new ToolRegistrationError(

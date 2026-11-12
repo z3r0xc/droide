@@ -76,7 +76,10 @@ function abortedExit(signal: AbortSignal | undefined): number | undefined {
   return reason instanceof ExecAbortedError ? reason.exitCode : 1;
 }
 
-function abortExitFrom(error: unknown, signal?: AbortSignal): number | undefined {
+function abortExitFrom(
+  error: unknown,
+  signal?: AbortSignal,
+): number | undefined {
   const fromSignal = abortedExit(signal);
   if (fromSignal !== undefined) return fromSignal;
   return error instanceof ExecAbortedError ? error.exitCode : undefined;
@@ -127,7 +130,8 @@ export async function runOneShot(
         options.sessionId,
         timestamp,
       )) {
-        if (record.type === "tool_call") toolNames.set(record.id, record.toolId);
+        if (record.type === "tool_call")
+          toolNames.set(record.id, record.toolId);
         if (!(await write(record))) return;
       }
     },

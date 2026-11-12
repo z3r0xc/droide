@@ -2,7 +2,11 @@
  * Child process for the stdout-purity integration test. It drives the real
  * `runOneShot` over `process.stdout` and prints nothing else.
  */
-import { runOneShot, type TurnOutcome, type TurnRunner } from "../../../src/exec/turn.ts";
+import {
+  runOneShot,
+  type TurnOutcome,
+  type TurnRunner,
+} from "../../../src/exec/turn.ts";
 import { createJsonLineWriter } from "../../../src/exec/writer.ts";
 
 const runner: TurnRunner = {
@@ -24,7 +28,10 @@ const runner: TurnRunner = {
       isError: false,
       text: "hello fixture\n",
     });
-    await sink.assistant({ id: "m2", blocks: [{ kind: "text", text: "Done." }] });
+    await sink.assistant({
+      id: "m2",
+      blocks: [{ kind: "text", text: "Done." }],
+    });
     return {
       kind: "completed",
       finalText: "Done.",
