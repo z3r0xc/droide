@@ -40,16 +40,16 @@
 | 功能面 | 当前 |
 | --- | --- |
 | `--version`、`--help`、子命令帮助 | 可用——报告 `1.9.0`；对原始程序的 20/20 条录制一致性用例通过（golden 在本地，见 [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)） |
-| `doctor` | 可用——16 项具名检查；其中九项是真实探测（config, environment, system, binaries, filesystem, git, proxy, certs, auth），其余报告 `skip` 并给出原因 |
-| `search` / `find` | 可用——查询本地会话存储，文本与 `--json` 两种输出 |
-| `mcp list` | 可用——合并 MCP 配置，按服务器打印传输方式与状态；从不启动任何服务器 |
-| `exec` | 对 `text`、`json`、`stream-json` 输出可用，输入可来自提示词参数、`-f` 或 stdin；`stream-jsonrpc`、ACP、`--mission` 与 `--list-tools` 会拒绝 |
-| 原生 helper | 9 个 JSON-line 方法，在 TypeScript 侧有类型并有校验，57 个 Rust 测试，另有针对已编译二进制的契约测试（`npm run test:native`）——**尚未接入工具执行** |
-| `plugin list` | 可用——合并用户与项目注册表，每个 id 取最新版本，启用状态取自设置 |
-| `update --check` | 可用——读取本仓库的 GitHub releases；安装会被拒绝并返回退出码 2 |
-| `daemon` | 本地可用——WebSocket 传输、JSON-RPC、鉴权闸门、单实例、有序关闭（132 个测试）；Remote Control 与端口代理已声明，尚未构建 |
-| 无参数的 `droide` | 当 stdin 与 stdout 都是终端时，启动交互式 shell |
-| 测试套件 | 96 个文件中的 906 个测试：903 通过，3 跳过，另有 57 个 Rust 测试 |
+| `doctor` | 可用——16 项具名检查；其中十项是真实探测（config, environment, system, binaries, filesystem, git, proxy, certs, auth, mcp），其余报告 `skip` 并给出原因 |
+| `search` / `find` | 可用——由本地转录索引提供，并可回退到字面扫描作为佐证；`--reindex` 会刷新它 |
+| `mcp list`、`mcp add`、`mcp remove`、`mcp permissions` | 可用——合并配置，保留注释的定点 JSONC 编辑，原子写入，权限的列出、撤销与清空 |
+| `plugin list`、`plugin marketplace`、`plugin install`、`plugin uninstall`、`plugin update` | 可用——基于 git 的 marketplace 在采纳前先校验，原子注册表合并，冲突与悬空引用会被拒绝 |
+| `exec` | 对 `text`、`json`、`stream-json` 输出可用，输入可来自提示词参数、`-f` 或 stdin，支持会话续接与流式输入；`stream-jsonrpc`、ACP、`--mission` 与 `--list-tools` 会拒绝 |
+| `resume` | 可用——列出会话，接受 UUID 或链接，通过 `exec -s` 路径继续，用 `--fork` 分叉 |
+| `daemon` | 本地可用——WebSocket 传输、JSON-RPC、鉴权闸门、单实例、有序关闭；Remote Control 与端口代理已声明，尚未构建 |
+| 无参数的 `droide` | 在 TTY 对上启动交互式 shell；输入提示词会执行一个 agent 回合，带流式行、审批与 Esc 取消 |
+| 原生 helper | 15 个 JSON-line 方法（包括 PTY 会话），在 TypeScript 侧有类型并有校验，69 个 Rust 测试，另有契约测试会通过已编译二进制启动真实进程（`npm run test:native`）——**尚未接入工具执行** |
+| 测试套件 | 116 个文件中的 1096 个测试：1090 通过，6 跳过，另有 69 个 Rust 测试 |
 
 `exec` 需要模型凭据。没有凭据时它会拒绝，而不是靠猜：
 
@@ -62,10 +62,11 @@ Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY
 
 | 功能面 | 状态 |
 | --- | --- |
-| 交互式 TUI | Ink 外壳渲染头部、转录、输入区、状态行与页脚，由按键 reducer 驱动（`/quit` 退出码 0，`Ctrl+C` 130），并在 80×24 与 120×40 下做过帧测试——但其中还没有 agent 循环：提交的一行只会变成转录中的一行 |
-| `resume`、`computer`、`plugin install\|uninstall\|update\|marketplace`、`mcp add\|remove\|auth\|permissions` | 选项可解析，帮助可打印，每个动作都会拒绝 |
-| 原生 PTY 生成与读取循环；macOS/Linux 凭据存储 | 只有引号转义、分块与 Windows DPAPI 已存在 |
-| 上下文压缩；会话索引 | 未实现；字面扫描是一处已记录的偏差 |
+| `mcp auth` | PKCE、loopback 回调、令牌交换与密封凭据存储已实现并测试；把它们接起来的命令尚未实现 |
+| `computer register\|remove\|ssh\|port-forward`、不带 `--check` 的 `update` | 选项可解析，帮助可打印，每个动作都会以退出码 1 或 2 拒绝 |
+| macOS/Linux 凭据存储 | 只有 Windows DPAPI 存在；存储会拒绝，而不是以明文写入 |
+| Remote Control、relay 与端口代理；交互式会话选择器 | 已在 `specs/70` 与 `specs/10` 中声明；`docs/gaps.md` 列出了每一条款 |
+| 工具运行时内部的 native 层 | helper 已端到端测试，但工具目前仍通过 fake 访问它 |
 
 这些失败是刻意为之，而且可观测——已写进规格但未构建的
 命令退出码为 64，不存在的选项退出码为 1：
@@ -133,12 +134,12 @@ node bin/droide.mjs exec -f prompt.txt --auto low
   描述 bubblewrap、seatbelt 或“无隔离”配置；`pty.rs` 按原始程序
   重新切分的方式对命令行加引号；`secrets.rs` 在 Windows 上用 DPAPI
   存储密钥。
-- 九个方法是 `native.version`、`hash.sha256`、`search.walk`、
-  `search.text`、`path.resolve`、`sandbox.profile`、`pty.quote`、
-  `secrets.protect`、`secrets.unprotect`。TypeScript 客户端会校验每个
-  应答的形状，helper 有自己的测试，`npm run test:native` 会针对已编译
-  二进制运行契约测试。工具层目前仍只通过 fake 访问 helper，
-  因此接线是下一步。
+- 十五个方法是 `native.version`、`hash.sha256`、`search.walk`、
+  `search.text`、`path.resolve`、`sandbox.profile`、`pty.quote`、`pty.spawn`、
+  `pty.read`、`pty.write`、`pty.resize`、`pty.kill`、`pty.close`、
+  `secrets.protect`、`secrets.unprotect`。TypeScript 客户端会校验每个应答的
+  形状，helper 有自己的测试，`npm run test:native` 会针对已编译二进制运行
+  契约测试。工具层目前仍只通过 fake 访问 helper，因此接线是下一步。
 
 ## 规格与决策
 
@@ -174,6 +175,7 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 | [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | 项目名为 `droide`；CLI 设计保持完全一致 |
 | [0006](./docs/adr/0006-terminal-ui-stack.md) | 终端 UI 是 React + Ink，token 取自规格 |
 | [0007](./docs/adr/0007-update-channel.md) | 更新取自本仓库的 releases，绝不来自原始程序 |
+| [0008](./docs/adr/0008-oauth-credential-envelope.md) | MCP OAuth 凭据由操作系统密封，绝不由密钥文件保存 |
 
 ## 参与贡献
 

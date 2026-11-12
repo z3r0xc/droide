@@ -87,6 +87,10 @@ function readString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function readParams(value: unknown): readonly ToolParam[] {
   if (!Array.isArray(value)) return [];
   const params: ToolParam[] = [];
@@ -114,10 +118,9 @@ function readOptions(value: unknown): readonly ApprovalOption[] {
   if (!Array.isArray(value)) return [];
   const options: ApprovalOption[] = [];
   for (const option of value) {
-    if (option === null || typeof option !== "object") continue;
-    const record = option as Record<string, unknown>;
-    const choice = readChoice(record["choice"]);
-    const label = readString(record["label"]);
+    if (!isRecord(option)) continue;
+    const choice = readChoice(option["choice"]);
+    const label = readString(option["label"]);
     if (choice === undefined || label === undefined) continue;
     options.push({ choice, label });
   }

@@ -30,6 +30,7 @@ import type {
   TurnEvent,
 } from "../agent/ports.ts";
 import type { Message, Role } from "../agent/messages.ts";
+import { isRecord } from "../transport/schema.ts";
 import type { PermissionRequest, ToolClass } from "../tools/permissions.ts";
 import type { KeyAction } from "../ui/keys.ts";
 import {
@@ -177,9 +178,7 @@ function isAbort(error: unknown): boolean {
 
 /** A tool call's input as `key: value` rows; values stay raw for the renderer. */
 function paramsOf(input: unknown): readonly (readonly [string, string])[] {
-  if (input === null || typeof input !== "object" || Array.isArray(input)) {
-    return [];
-  }
+  if (!isRecord(input)) return [];
   const params: Array<readonly [string, string]> = [];
   for (const [key, value] of Object.entries(input)) {
     if (typeof value === "string") {
@@ -201,12 +200,11 @@ function resultText(content: unknown): string {
   if (!Array.isArray(content)) return "";
   return content
     .map((part) => {
-      if (part === null || typeof part !== "object") return "";
-      const record = part as Record<string, unknown>;
-      if (record["type"] === "text") {
-        return typeof record["text"] === "string" ? record["text"] : "";
+      if (!isRecord(part)) return "";
+      if (part["type"] === "text") {
+        return typeof part["text"] === "string" ? part["text"] : "";
       }
-      return record["type"] === "image" ? "placeholder" : "[document]";
+      return part["type"] === "image" ? "placeholder" : "[document]";
     })
     .filter((part) => part.length > 0)
     .join("\n");
