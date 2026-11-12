@@ -178,6 +178,7 @@ Decisions that shaped the build:
 | [0006](./docs/adr/0006-terminal-ui-stack.md)                     | the terminal UI is React + Ink, with tokens from the spec             |
 | [0007](./docs/adr/0007-update-channel.md)                        | updates come from this repository's releases, never the subject's     |
 | [0008](./docs/adr/0008-oauth-credential-envelope.md)             | MCP OAuth credentials are sealed by the OS, never by a key file       |
+| [0009](./docs/adr/0009-update-installation.md)                   | updates are staged, digest-verified, swapped atomically and rolled back |
 
 ## Contributing
 
