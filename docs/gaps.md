@@ -34,7 +34,7 @@ Total: **45** markers across **37** clauses.
 | `src/extensions/plugins/install.ts:354` | `B37` | the recorded-source drift refusal and the organization policy denial are not applied: this build resolves neither configured marketplace sources nor org policy into the context. |
 | `src/extensions/plugins/install.ts:376` | `B34` | plugin sources fetched outside the marketplace (github, url, git-subdir, npm, archive) are not downloaded by this build. |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view in the subject; this build has no scrubber yet, so the raw content is matched. |
-| `src/tools/fs/grep.ts:32` | `B20` | for the full list. |
+| `src/tools/fs/grep.ts:28` | `B20` | for the full list. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
 | `src/tools/fs/read.ts:266` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
 | `src/tools/fs/read.ts:420` | `B12` | the spill file under <factory>/tool-outputs is not written by this build; the notice names how to ask for the rest instead. |
