@@ -2,9 +2,9 @@
  * `mcp` command bodies.
  *
  * Contract: `specs/60-extensions-mcp-and-skills.md` §B1–B10 (locations, merge,
- * per-name override, policy) and §B56 for the listing. The subject's exact list
- * wording was not recovered (open question 4 of that spec); the layout below is
- * ours and every row carries only facts the loader produced.
+ * per-name override, policy) and §B56 for the listing. The listing layout is
+ * ours (open question 4 of that spec), and every row carries only facts the
+ * loader produced.
  *
  * `mcp list` is read-only on purpose: it never starts a server, so it cannot
  * hang, cost money or run a stranger's command just to answer "what is

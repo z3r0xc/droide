@@ -37,4 +37,4 @@ it left absent; lists and scalars are replaced whole.
 other module takes an injected `Environment` (`env`, `home`, `platform`,
 `cwd`), so tests never touch a real home. `schema.ts` rejects a wrong type with
 `InvalidSettingsError` naming the dotted key path; unknown keys are ignored
-there because the subject's zod objects strip them.
+there because the parser strips them.

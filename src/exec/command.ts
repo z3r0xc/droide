@@ -14,7 +14,7 @@
  * 3. the app context supplies settings and the effective working directory;
  * 4. the model target supplies model, endpoint, headers and dialect. A
  *    `custom:<id>` selector reads `customModels[]`; a managed model reads
- *    `FACTORY_API_KEY`. Missing credentials fail here, before a provider
+ *    `DROIDE_API_KEY`. Missing credentials fail here, before a provider
  *    exists, so no socket is opened;
  * 5. tools are selected from the autonomy level, the provider is built, and
  *    the turn runs.
@@ -98,7 +98,7 @@ const DEFAULT_MAX_TOKENS = 8192;
 
 /** The recorded unauthenticated managed-run message. */
 export const AUTHENTICATION_REQUIRED =
-  "Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY environment variable.";
+  "Authentication failed. Please log in using /login or set a valid DROIDE_API_KEY environment variable.";
 
 const CUSTOM_MODEL_PREFIX = "custom:";
 
@@ -403,7 +403,7 @@ function managedModelTarget(
   reasoningEffort: string | undefined,
   env: Readonly<Record<string, string | undefined>>,
 ): ExecModelTarget {
-  const apiKey = env["FACTORY_API_KEY"]?.trim();
+  const apiKey = env["DROIDE_API_KEY"]?.trim();
   if (apiKey === undefined || apiKey === "") {
     throw new ExecCommandError(AUTHENTICATION_REQUIRED);
   }
@@ -436,7 +436,7 @@ function managedModelTarget(
 /**
  * Model, endpoint, headers and dialect for one run. A `custom:<id>` selector
  * resolves through `customModels[]` and uses that entry's base URL; anything
- * else is a managed model using `FACTORY_API_KEY`.
+ * else is a managed model using `DROIDE_API_KEY`.
  */
 export function resolveModelTarget(
   input: ResolveModelTargetInput,

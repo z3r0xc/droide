@@ -43,7 +43,7 @@ export class ToolInputError extends ToolFailure {
 
 /**
  * A broken tool definition (B1). Thrown at registration, before the tool is
- * reachable, with the subject's exact wording.
+ * reachable, with the wording `specs/30-tools-and-sandbox.md` pins.
  */
 export class ToolRegistrationError extends Error {
   readonly toolId: string | undefined;

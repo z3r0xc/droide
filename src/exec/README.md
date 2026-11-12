@@ -84,7 +84,7 @@ record, and exit `1`.
 
 | `-o`                                  | Behaviour                                                                                         |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `text` (default)                      | final answer + `\n` on stdout; failures write `Error during droid execution: <message>` on stderr |
+| `text` (default)                      | final answer + `\n` on stdout; failures write `Error during droide execution: <message>` on stderr |
 | `json`                                | one `result` object (`runOneShotSummary`)                                                         |
 | `stream-json`, `debug`                | one record per line (`runOneShot`)                                                                |
 | `stream-jsonrpc`, `acp`, `acp-daemon` | refused before any work: not implemented in this build                                            |

@@ -275,7 +275,7 @@ test(
         assert.equal(result.stdout, "");
         assert.match(
           result.stderr,
-          /^Error during droid execution: LLM request failed: 500/,
+          /^Error during droide execution: LLM request failed: 500/,
         );
       },
     );
@@ -303,7 +303,7 @@ test(
         assert.equal(result.stdout, "");
         assert.match(
           result.stderr,
-          /^Error during droid execution: Exec ended early: insufficient permission to proceed\./,
+          /^Error during droide execution: Exec ended early: insufficient permission to proceed\./,
         );
         assert.equal(server.requests.length, 1);
       },

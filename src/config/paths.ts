@@ -2,7 +2,7 @@
  * Filesystem locations the CLI reads and writes.
  *
  * Contract:
- * - `specs/40-sessions-and-storage.md` Terms ("Factory home", "Factory dir
+ * - `specs/40-sessions-and-storage.md` Terms ("State root", "State dir
  *   name", "Sessions dir", "Cache database") and "On-disk layout".
  * - `specs/10-cli-surface.md` B81 (`worktreeDirectory` defaults to
  *   `~/.factory/worktrees`) and B68 (launch-relative paths resolve at the
@@ -32,6 +32,11 @@ export interface Environment {
   readonly cwd: string;
 }
 
+/**
+ * The state directory names — and every `FACTORY_*` variable named below — are
+ * contract data: an existing installation keeps its state and its environment
+ * names where they are, so a rename here would move a user's files.
+ */
 export const FACTORY_DIR_PRODUCTION = ".factory";
 export const FACTORY_DIR_DEVELOPMENT = ".factory-dev";
 
@@ -80,7 +85,7 @@ export function isAbsolutePath(platform: Platform, value: string): boolean {
 
 /**
  * A leading current-user tilde expanded to the injected home. `~user` is not
- * expanded, matching the subject (`packages/runtime/shell/src/path-expansion.ts`).
+ * expanded, matching the recorded expansion (`packages/runtime/shell/src/path-expansion.ts`).
  */
 export function expandTilde(environment: Environment, value: string): string {
   if (value === "~") return environment.home;
@@ -103,7 +108,7 @@ export function resolvePath(environment: Environment, value: string): string {
 }
 
 /**
- * The Factory home: `FACTORY_HOME_OVERRIDE` when set and non-empty, else the
+ * The state root: `FACTORY_HOME_OVERRIDE` when set and non-empty, else the
  * injected home (`specs/40-sessions-and-storage.md` Terms).
  */
 export function factoryHome(environment: Environment): string {
@@ -115,9 +120,9 @@ export function factoryHome(environment: Environment): string {
 
 /**
  * `.factory` for the production tier and `.factory-dev` otherwise. The
- * recorded Windows build is production, so an absent `FACTORY_ENV` means
- * production; any other value means development (`specs/40-sessions-and-storage.md`,
- * "Factory dir name").
+ * Windows install is production, so an absent `FACTORY_ENV` means production;
+ * any other value means development (`specs/40-sessions-and-storage.md`,
+ * "State dir name").
  */
 export function factoryDirName(environment: Environment): string {
   const tier = environment.env.FACTORY_ENV?.trim();
@@ -126,7 +131,7 @@ export function factoryDirName(environment: Environment): string {
     : FACTORY_DIR_DEVELOPMENT;
 }
 
-/** `<Factory home>/<Factory dir name>`: the base every stored file lives under. */
+/** `<state root>/<state dir name>`: the base every stored file lives under. */
 export function factoryDir(environment: Environment): string {
   return joinPath(
     environment.platform,
@@ -234,7 +239,7 @@ export function tempPath(
 }
 
 /**
- * The root Factory-managed worktrees live under: the absolute
+ * The root managed worktrees live under: the absolute
  * `general.worktreeDirectory` setting, else `<base>/worktrees`. A relative
  * setting cannot name one root, so it is ignored in favour of the default
  * (`specs/10-cli-surface.md` B81).

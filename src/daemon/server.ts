@@ -12,6 +12,8 @@
 
 import type { Server } from "node:http";
 
+import { PRODUCT_VERSION } from "../cli/brand.ts";
+
 import {
   AUTHENTICATE_METHOD,
   CONNECTION_STATUS_METHOD,
@@ -72,7 +74,7 @@ import {
 } from "./web-socket.ts";
 
 /** Daemon product version carried in the ready message and banner. */
-export const DAEMON_VERSION = "1.9.0";
+export const DAEMON_VERSION = PRODUCT_VERSION;
 /** Loopback default (B1, B31). */
 export const DEFAULT_HOST = "127.0.0.1";
 
@@ -773,20 +775,20 @@ export class DaemonServer {
       if (this.remoteControl) {
         throw new DaemonStartupError(
           "--listen ipc cannot be combined with --remote-control",
-          { code: "droid.daemon.ipc-remote-access" },
+          { code: "droide.daemon.ipc-remote-access" },
         );
       }
       if (this.parentChannel === undefined) {
         throw new DaemonStartupError(
           "--listen ipc requires the daemon to be spawned with an inherited IPC channel",
-          { code: "droid.daemon.ipc-unavailable" },
+          { code: "droide.daemon.ipc-unavailable" },
         );
       }
     }
     if (this.parentChannel?.connected === false) {
       throw new DaemonStartupError(
         "The inherited IPC channel is already disconnected",
-        { code: "droid.daemon.ipc-disconnected" },
+        { code: "droide.daemon.ipc-disconnected" },
       );
     }
   }

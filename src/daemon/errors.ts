@@ -23,7 +23,7 @@ function withCause(
 /**
  * The daemon could not start (B7, B11, B32). `message` is the unadorned
  * detail the CLI prints after `Startup failed: `; `code` is the stable
- * identifier when the spec names one (`droid.daemon.*`).
+ * identifier when the spec names one (`droide.daemon.*`).
  */
 export class DaemonStartupError extends Error {
   readonly code: string | undefined;

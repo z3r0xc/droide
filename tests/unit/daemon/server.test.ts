@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { PRODUCT_VERSION } from "../../../src/cli/brand.ts";
 import { AUTHENTICATION_REQUIRED_MESSAGE } from "../../../src/daemon/auth.ts";
 import { DaemonStartupError } from "../../../src/daemon/errors.ts";
 import {
@@ -120,18 +121,18 @@ test("transport selection: ipc wins, then unix, then tcp, then none", () => {
 
 test("the readiness banner lists the endpoint and, when on, Remote Control", () => {
   const base = {
-    version: "1.9.0",
+    version: PRODUCT_VERSION,
     pid: 42,
-    logsPath: "/logs/factoryd.log",
+    logsPath: "/logs/the daemon.log",
     remoteControl: false,
   };
   assert.deepEqual(
     formatReadinessBanner({ kind: "tcp", host: "127.0.0.1", port: 1234 }, base),
     [
       "Daemon running",
-      "Version: 1.9.0",
+      `Version: ${PRODUCT_VERSION}`,
       "PID: 42",
-      "Logs: /logs/factoryd.log",
+      "Logs: /logs/the daemon.log",
       "WebSocket endpoint: ws://127.0.0.1:1234",
       "Press Ctrl+C to stop",
     ],
@@ -161,7 +162,7 @@ test("--listen ipc requires an inherited channel", async () => {
   const server = new DaemonServer(toServerOptions({ listen: "ipc" }));
   await assert.rejects(server.start(), (error: unknown) => {
     assert.ok(error instanceof DaemonStartupError);
-    assert.equal(error.code, "droid.daemon.ipc-unavailable");
+    assert.equal(error.code, "droide.daemon.ipc-unavailable");
     assert.equal(
       error.message,
       "--listen ipc requires the daemon to be spawned with an inherited IPC channel",
@@ -183,7 +184,7 @@ test("--listen ipc cannot be combined with --remote-control", async () => {
   );
   await assert.rejects(server.start(), (error: unknown) => {
     assert.ok(error instanceof DaemonStartupError);
-    assert.equal(error.code, "droid.daemon.ipc-remote-access");
+    assert.equal(error.code, "droide.daemon.ipc-remote-access");
     assert.equal(
       error.message,
       "--listen ipc cannot be combined with --remote-control",
@@ -199,7 +200,7 @@ test("an inherited channel that is already gone is refused", async () => {
   const server = new DaemonServer(toServerOptions({ parentChannel: channel }));
   await assert.rejects(server.start(), (error: unknown) => {
     assert.ok(error instanceof DaemonStartupError);
-    assert.equal(error.code, "droid.daemon.ipc-disconnected");
+    assert.equal(error.code, "droide.daemon.ipc-disconnected");
     return true;
   });
   await server.stop();
@@ -226,7 +227,7 @@ test("start on port 0 advertises the bound port and announces readiness in order
 
     assert.equal(order[0], "READY=1");
     assert.ok(order.includes("Daemon running"));
-    assert.ok(order.includes("Version: 1.9.0"));
+    assert.ok(order.includes(`Version: ${PRODUCT_VERSION}`));
     assert.ok(order.includes("PID: 4242"));
     assert.ok(
       order.includes(`WebSocket endpoint: ws://127.0.0.1:${endpoint.port}`),

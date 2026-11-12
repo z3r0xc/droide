@@ -380,7 +380,7 @@ test("an unknown, unconfigured or unsupported custom model is refused", () => {
   );
 });
 
-test("a managed model needs FACTORY_API_KEY and routes through the proxy", () => {
+test("a managed model needs DROIDE_API_KEY and routes through the proxy", () => {
   assert.throws(
     () =>
       resolveModelTarget({
@@ -399,7 +399,7 @@ test("a managed model needs FACTORY_API_KEY and routes through the proxy", () =>
     reasoningEffort: "medium",
     settings: {},
     env: {
-      FACTORY_API_KEY: "key",
+      DROIDE_API_KEY: "key",
       FACTORY_API_BASE_URL: "https://api.example.test",
     },
   });

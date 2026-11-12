@@ -14,7 +14,7 @@ strict; no build step (type stripping), no runtime dependency beyond
 | `cli/brand.ts` | Product name, version, docs link — the only place they appear | ADR 0005 |
 | `cli/help.ts` | Static help blocks (aligned examples, footers) | `10-cli-surface.md` |
 | `cli/tty.ts` | Non-interactive refusal text | `10-cli-surface.md` |
-| `cli/commands/*` | One module per command group; options mirror the subject | `10-cli-surface.md` |
+| `cli/commands/*` | One module per command group; options follow the CLI contract | `10-cli-surface.md` |
 | `cli/exec-help.ts` | The curated `exec --help` page | `80-exec-and-streaming.md` |
 | `cli/models.ts` | Model catalogue shown in help and selection | `20-agent-loop.md` |
 | `config/` | Settings schema, resolution chain, paths | `10`, `40` |

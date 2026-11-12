@@ -5,11 +5,16 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **47** markers across **39** clauses.
+Total: **53** markers across **44** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
-| `src/acp/protocol.ts:28` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
+| `src/acp/protocol.ts:1101` | `B68` | the union covers every update the clause names, but this slice's turn path emits only the two chunks, plan, tool_call and tool_call_update; session_info_update, available_commands_update, current_mode_update, config_option_update and usage_update have no producer yet. |
+| `src/acp/protocol.ts:32` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
+| `src/acp/server.ts:432` | `B61` | session/load, session/resume, session/fork and session/list are advertised by initialize but this slice does not serve them. They answer method-not-found rather than pretending to succeed. TODO(spec B70): session/set_mode, session/set_config_option and the legacy session/set_model are not served, and no current_mode_update/config_option_update is ever emitted. |
+| `src/acp/server.ts:436` | `B70` | session/set_mode, session/set_config_option and the legacy session/set_model are not served, and no current_mode_update/config_option_update is ever emitted. |
+| `src/acp/server.ts:502` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
+| `src/acp/server.ts:807` | `B60` | src/exec/command.ts still refuses -o acp before this entry is reached; connecting it is a change to that file, outside this slice. The entry itself is complete here. |
 | `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
 | `src/app/interactive-turn.ts:558` | `95 B10` | steering and the queued-message list are not implemented, so a second submit is refused with a notice instead of being queued or delivered to the running turn. |
 | `src/cli/commands/resume.ts:67` | `10 B22` | the interactive shell cannot adopt a stored transcript yet, so the resumed session is named here but the shell still opens empty. |
@@ -18,9 +23,12 @@ Total: **47** markers across **39** clauses.
 | `src/daemon/client.ts:65` | `B19` | the spec pins the four budgets but not the method names that carry them; these daemon.* spellings are this build's map, and callers may replace it through methodTimeouts. |
 | `src/daemon/command.ts:170` | `B1` | --droide-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
 | `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
-| `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient FACTORY_API_KEY and reports a local identity. |
+| `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient DROIDE_API_KEY and reports a local identity. |
 | `src/daemon/server.ts:233` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
 | `src/daemon/web-socket.ts:574` | `B33` | the token-gated /port-proxy/<port> surface (query token, cookie exchange, traversal refusal) is not implemented, so those requests answer 404 instead of proxying or refusing with 401. |
+| `src/exec/acp-runner.ts:314` | `B66` | the shared TurnOutcome has no distinct permission-rejection reason, so a call the user denied reaches this point as failed and answers with an internal error instead of end_turn. |
+| `src/exec/acp-runner.ts:377` | `B69` | the exec tool runner's confirm seam receives no tool-use id, so the permission card names the tool rather than the call ACP wants it to refer to; carrying the id is a change to src/tools/permissions.ts, outside this slice. |
+| `src/exec/acp-runner.ts:44` | `B65` | images are parsed, validated and carried here, but the shared TurnRequest has no image channel, so a plain exec runner drops them. Attaching them needs the agent loop's media port, which this slice does not own. |
 | `src/exec/list-tools.ts:15` | `B53` | . |
 | `src/exec/list-tools.ts:47` | `B53` | the spec does not pin the source; this build uses catalogue membership at autonomy off. |
 | `src/extensions/mcp/client.ts:418` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
@@ -32,9 +40,7 @@ Total: **47** markers across **39** clauses.
 | `src/extensions/mcp/oauth/flow.ts:618` | `B26` | B26 lists tokenEndpointAuthMethod without pinning the accepted values; only public auth and client_secret_basic are implemented (client_secret_post needs a form body this token client does not send). |
 | `src/extensions/mcp/tools.ts:36` | `30 B7` | arguments are not validated against the server's JSON Schema before the call. |
 | `src/extensions/mcp/transport.ts:871` | `B3` | an sse server's server-initiated event stream (a GET that stays open) is not opened, so it never delivers tools/list_changed; the POST response path is supported. |
-| `src/extensions/plugins/install.ts:299` | `B42` | the Claude Code layout translation (.claude-plugin to .factory-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
-| `src/extensions/plugins/install.ts:354` | `B37` | the recorded-source drift refusal and the organization policy denial are not applied: this build resolves neither configured marketplace sources nor org policy into the context. |
-| `src/extensions/plugins/install.ts:376` | `B34` | plugin sources fetched outside the marketplace (github, url, git-subdir, npm, archive) are not downloaded by this build. |
+| `src/extensions/plugins/install.ts:335` | `B42` | the Claude Code layout translation (.claude-plugin to .factory-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/grep.ts:28` | `B20` | for the full list. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |

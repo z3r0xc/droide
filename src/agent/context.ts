@@ -2,17 +2,16 @@
  * System-prompt assembly.
  *
  * Contract: `specs/20-agent-loop.md` §B35–B42 (block order, project
- * instructions, appended prompts, budgets) with one deliberate clean-room
- * divergence recorded in the spec's "Clean-room notes": the identity line names
- * this project, not the subject, because claiming to be built by the original
- * vendor would be a false statement, not a compatibility requirement.
+ * instructions, appended prompts, budgets). The identity line names Droide:
+ * the assistant states what it is, which is a claim we can stand behind
+ * (provenance: `docs/adr/0003`).
  */
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import { DISPLAY } from "../cli/brand.ts";
 
-/** Project instruction files, in the order the subject looks for them. */
+/** Project instruction files, in the order the contract looks for them. */
 export const PROJECT_INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md"] as const;
 
 /** Per-file and total caps for injected project instructions. */

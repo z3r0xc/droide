@@ -5,8 +5,8 @@
  * clock. Everything that varies between builds arrives as `ExecHelpModels`,
  * so the rendered text is a pure function of the catalogue.
  *
- * The subject prints its own name here; ADR 0005 routes every user-visible
- * occurrence through `brand.ts` and the parity harness substitutes it back.
+ * The program name comes from `brand.ts`, so this page never hard-codes it;
+ * the parity harness substitutes the recorded token before comparing.
  */
 import { DISPLAY, PROGRAM } from "./brand.ts";
 
@@ -70,7 +70,7 @@ Options:
   -f, --file <path>           Read prompt from file
   --auto <level>              Autonomy level: low|medium|high
   --skip-permissions-unsafe   Skip ALL permission checks - allows all permissions (unsafe)
-  --disable-builtin-skills    Disable Factory-provided builtin skills (not supported in ACP modes)
+  --disable-builtin-skills    Disable Droide-provided builtin skills (not supported in ACP modes)
   -s, --session-id <id>       Existing session to continue (requires a prompt)
   --fork <id>                 Fork an existing session into a new session (requires a prompt)
   -m, --model <id>            Model ID to use (default: ${models.defaultModelId})
@@ -84,7 +84,7 @@ Options:
   --cwd <path>                Working directory path
   --settings <path>           Path to runtime settings file merged for this process only
   -w, --worktree [name]       Run in a git worktree (name selects the branch to use or create; default: <current-branch>-<id>)
-  --worktree-dir <path>       Deprecated: set worktreeDirectory in ~/.factory/settings.json instead
+  --worktree-dir <path>       Deprecated: set worktreeDirectory in ~/.droide/settings.json instead
   --tag <spec>                Session tag (name or JSON, repeatable)
   --log-group-id <id>         Log group ID for filtering logs
   --mission                   Run in mission mode (orchestrate a multi-agent mission)
@@ -147,7 +147,7 @@ Autonomy Levels:
 Mission Mode:
   --mission                  Run in mission mode (multi-agent orchestration)
                              • Automatically upgrades session to orchestrator mode
-                             • Spawns worker sessions via factoryd to implement features
+                             • Spawns worker sessions via the daemon to implement features
                              • Uses GPT-5.2 High reasoning by default (override with --model)
                              • Missions auto-approve proposals (no interactive confirmation)
                              • Requires --auto high or --skip-permissions-unsafe
@@ -188,15 +188,15 @@ Pinning the Latest Model:
   The alias is resolved when the session starts; the session keeps that model afterwards.
 
 Authentication:
-  Create an API key: https://app.factory.ai/settings/api-keys
+  A credential is read from DROIDE_API_KEY, or configured per model in settings.
 
   Setting API key examples:
     macOS/Linux:
-      export FACTORY_API_KEY=fk-... && ${PROGRAM} exec "fix the bug"
+      export DROIDE_API_KEY=<your-key> && ${PROGRAM} exec "fix the bug"
     Windows (PowerShell):
-      $env:FACTORY_API_KEY="fk-..." ; ${PROGRAM} exec "fix the bug"
+      $env:DROIDE_API_KEY="<your-key>" ; ${PROGRAM} exec "fix the bug"
     Windows (CMD):
-      set FACTORY_API_KEY=fk-... && ${PROGRAM} exec "fix the bug"
+      set DROIDE_API_KEY=<your-key> && ${PROGRAM} exec "fix the bug"
 
   Note: Keep your API key secret. Do not commit it to source control.
 

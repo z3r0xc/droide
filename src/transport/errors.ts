@@ -88,7 +88,7 @@ export class TlsTrustError extends TransportError {
     options: TransportErrorOptions = {},
   ) {
     super(
-      `${operation}: certificate chain not trusted${code === null ? "" : `: ${code}`}. Export the appliance root CA (PEM) and point FACTORY_EXTRA_CA_CERTS at it, or delete the certificate cache under the Factory directory on Windows.`,
+      `${operation}: certificate chain not trusted${code === null ? "" : `: ${code}`}. Export the appliance root CA (PEM) and point FACTORY_EXTRA_CA_CERTS at it, or delete the certificate cache under the state directory on Windows.`,
       operation,
       options,
     );
@@ -338,14 +338,14 @@ export class ResponseError403Forbidden extends ResponseError {
 /** Copy the spec fixes verbatim (B95, B97). */
 export const AUTH_MESSAGES = {
   notAuthenticated:
-    "Not authenticated. Please log in using /login or set a valid FACTORY_API_KEY environment variable.",
+    "Not authenticated. Please log in using /login or set a valid DROIDE_API_KEY environment variable.",
   invalidApiKey:
-    "Authentication failed. FACTORY_API_KEY is set but appears to be invalid. Unset it or replace it with a valid key.",
+    "Authentication failed. DROIDE_API_KEY is set but appears to be invalid. Unset it or replace it with a valid key.",
   apiUnavailable:
-    "FACTORY_API_KEY could not be validated because the Factory API is not accessible. Check network or proxy access and try again.",
+    "DROIDE_API_KEY could not be validated because the API is not accessible. Check network or proxy access and try again.",
   validationFailed:
-    "FACTORY_API_KEY validation failed. Try again or contact support if the problem continues.",
-  apiKeyRejected: "Factory API key was rejected.",
+    "DROIDE_API_KEY validation failed. Try again or contact support if the problem continues.",
+  apiKeyRejected: "API key was rejected.",
   customerLoginRequired: "Sign in to this customer deployment.",
   customerOrganizationRequired:
     "Choose an organization for this customer deployment.",
@@ -364,7 +364,7 @@ export class AuthenticationError extends TransportError {
   }
 }
 
-/** A Factory-bound request may not leave the process in airgap (B89). */
+/** A backend-bound request may not leave the process in airgap (B89). */
 export const AIRGAP_BLOCKED_MESSAGE =
   "Outbound request blocked because Airgap Mode is enabled; only BYOK, MCP, and marketplaces are permitted.";
 
@@ -376,7 +376,7 @@ export class AirgapBlockedError extends TransportError {
 }
 
 /**
- * A route hosted by the Factory control plane was asked for on a customer
+ * A route hosted by the managed control plane was asked for on a customer
  * deployment (B30/B90). The message is contract data.
  */
 export class DeploymentUnavailableError extends TransportError {
@@ -436,7 +436,7 @@ export function apiKeyRejectionError(
 
 /** B96's three outcomes, spelled as the spec spells them. */
 export type ApiKeyValidationReason =
-  "apiKeyRejected" | "FactoryApiUnavailable" | "FactoryApiValidationFailed";
+  "apiKeyRejected" | "ApiUnavailable" | "ApiValidationFailed";
 
 export interface ApiKeyValidationFailure {
   readonly reason: ApiKeyValidationReason;
@@ -467,13 +467,13 @@ export function classifyApiKeyValidationFailure(
     error instanceof TlsTrustError
   ) {
     return {
-      reason: "FactoryApiUnavailable",
+      reason: "ApiUnavailable",
       message: AUTH_MESSAGES.apiUnavailable,
     };
   }
   if (error instanceof TransportTimeoutError) {
     return {
-      reason: "FactoryApiUnavailable",
+      reason: "ApiUnavailable",
       message: AUTH_MESSAGES.apiUnavailable,
     };
   }
@@ -486,25 +486,25 @@ export function classifyApiKeyValidationFailure(
   }
   if (status !== null && status >= 500) {
     return {
-      reason: "FactoryApiUnavailable",
+      reason: "ApiUnavailable",
       message: AUTH_MESSAGES.apiUnavailable,
     };
   }
   if (status !== null) {
     return {
-      reason: "FactoryApiValidationFailed",
+      reason: "ApiValidationFailed",
       message: AUTH_MESSAGES.validationFailed,
     };
   }
   if (error instanceof ResponseError) {
     // A `ResponseError` without a status is a malformed 2xx (B96).
     return {
-      reason: "FactoryApiValidationFailed",
+      reason: "ApiValidationFailed",
       message: AUTH_MESSAGES.validationFailed,
     };
   }
   return {
-    reason: "FactoryApiUnavailable",
+    reason: "ApiUnavailable",
     message: AUTH_MESSAGES.apiUnavailable,
   };
 }

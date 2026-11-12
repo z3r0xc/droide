@@ -2,18 +2,17 @@
  * The settings vocabulary this build understands, and the parser that enforces
  * it.
  *
- * A settings document is flat, like the subject's `settings.json`: ordinary
- * settings live at the root (`worktreeDirectory`) and the six structured
- * sections (`mcp`, `hooks`, `droids`, `skills`, `outputStyles`, `commands`)
- * are parsed separately. A `"general"` wrapper is refused for the same reason
- * the subject refuses it in a runtime overlay
+ * A settings document is flat (`settings.json`): ordinary settings live at the
+ * root (`worktreeDirectory`) and the six structured sections (`mcp`, `hooks`,
+ * `droids`, `skills`, `outputStyles`, `commands`) are parsed separately. A
+ * `"general"` wrapper is refused, including in a runtime overlay
  * (`specs/10-cli-surface.md`, "Settings files").
  *
  * Parsing validates, it never coerces: a number where a string belongs is an
  * {@link InvalidSettingsError} naming the dotted key path. Unknown keys are
- * ignored at every level, because the subject's zod objects strip them: a
- * settings file written for the original must still load here. A value under a
- * key this build validates is never silently ignored — only an unknown key is.
+ * ignored at every level, because the parser strips them: a settings file
+ * written by an earlier build must still load here. A value under a key this
+ * build validates is never silently ignored — only an unknown key is.
  */
 import { InvalidSettingsError } from "./errors.ts";
 
@@ -32,7 +31,7 @@ export type CustomModelProvider =
   "anthropic" | "openai" | "generic-chat-completion-api" | "bedrock-converse";
 
 /**
- * Persisted custom-model entry consumed by `droid exec`
+ * Persisted custom-model entry consumed by `droide exec`
  * (`specs/80-exec-and-streaming.md`, acceptance fixtures).
  */
 export interface CustomModelSettings {
@@ -61,10 +60,25 @@ export interface CustomModelSettings {
   readonly useInRouter?: boolean;
 }
 
+/**
+ * One untrusted source object from settings. The plugin layer parses it: a
+ * malformed marketplace source must reject its own entry without failing the
+ * whole settings document, because one bad allowlist row must not take the
+ * org policy down with it.
+ */
+export type MarketplaceSourceSetting = JsonObject;
+
 /** Settings applied at the root of a document, merged key by key. */
 export interface GeneralSettings {
   readonly worktreeDirectory?: string;
   readonly enabledPlugins?: Readonly<Record<string, boolean>>;
+  readonly strictEnabledPlugins?: boolean;
+  readonly extraKnownMarketplaces?: Readonly<
+    Record<string, { readonly source: MarketplaceSourceSetting }>
+  >;
+  readonly strictKnownMarketplaces?: readonly MarketplaceSourceSetting[];
+  /** Environment variable → the one host that variable may be sent to. */
+  readonly pluginTokenHosts?: Readonly<Record<string, string>>;
   readonly theme?: string;
   readonly locale?: string;
   readonly droidCoreModel?: string;
@@ -139,6 +153,10 @@ type AllowedKeys = Readonly<Record<string, true>>;
 const GENERAL_KEYS: AllowedKeys = {
   worktreeDirectory: true,
   enabledPlugins: true,
+  strictEnabledPlugins: true,
+  extraKnownMarketplaces: true,
+  strictKnownMarketplaces: true,
+  pluginTokenHosts: true,
   theme: true,
   locale: true,
   droidCoreModel: true,
@@ -391,6 +409,75 @@ function expectJsonValue(
   );
 }
 
+function parseSourceSetting(
+  value: unknown,
+  path: string,
+  keyPath: string,
+): MarketplaceSourceSetting {
+  const object = expectJsonObject(value, path, keyPath);
+  if (typeof object["source"] !== "string")
+    throw new InvalidSettingsError(
+      path,
+      joinKeyPath(keyPath, "source"),
+      'expected a plugin source object with a "source" field',
+    );
+  return object;
+}
+
+function parseExtraKnownMarketplaces(
+  raw: RawObject,
+  path: string,
+):
+  | Readonly<Record<string, { readonly source: MarketplaceSourceSetting }>>
+  | undefined {
+  if (raw.extraKnownMarketplaces === undefined) return undefined;
+  const record = expectObject(
+    raw.extraKnownMarketplaces,
+    path,
+    "extraKnownMarketplaces",
+  );
+  const result: Record<string, { readonly source: MarketplaceSourceSetting }> =
+    {};
+  for (const [name, entry] of Object.entries(record)) {
+    const keyPath = joinKeyPath("extraKnownMarketplaces", name);
+    const object = expectObject(entry, path, keyPath);
+    if (object["source"] === undefined)
+      throw new InvalidSettingsError(
+        path,
+        joinKeyPath(keyPath, "source"),
+        "expected a marketplace source",
+      );
+    result[name] = {
+      source: parseSourceSetting(
+        object["source"],
+        path,
+        joinKeyPath(keyPath, "source"),
+      ),
+    };
+  }
+  return result;
+}
+
+function parseStrictKnownMarketplaces(
+  raw: RawObject,
+  path: string,
+): readonly MarketplaceSourceSetting[] | undefined {
+  if (raw.strictKnownMarketplaces === undefined) return undefined;
+  if (!Array.isArray(raw.strictKnownMarketplaces))
+    throw new InvalidSettingsError(
+      path,
+      "strictKnownMarketplaces",
+      `expected an array of plugin sources, got ${typeName(raw.strictKnownMarketplaces)}`,
+    );
+  return raw.strictKnownMarketplaces.map((entry, index) =>
+    parseSourceSetting(
+      entry,
+      path,
+      joinKeyPath("strictKnownMarketplaces", index),
+    ),
+  );
+}
+
 function parseGeneral(raw: RawObject, path: string): GeneralSettings {
   const worktreeDirectory = readOptionalString(
     raw,
@@ -402,6 +489,18 @@ function parseGeneral(raw: RawObject, path: string): GeneralSettings {
     raw.enabledPlugins === undefined
       ? undefined
       : expectBooleanRecord(raw.enabledPlugins, path, "enabledPlugins");
+  const strictEnabledPlugins = readOptionalBoolean(
+    raw,
+    "strictEnabledPlugins",
+    path,
+    "",
+  );
+  const extraKnownMarketplaces = parseExtraKnownMarketplaces(raw, path);
+  const strictKnownMarketplaces = parseStrictKnownMarketplaces(raw, path);
+  const pluginTokenHosts =
+    raw.pluginTokenHosts === undefined
+      ? undefined
+      : expectStringRecord(raw.pluginTokenHosts, path, "pluginTokenHosts");
   const theme = readOptionalString(raw, "theme", path, "");
   const locale = readOptionalString(raw, "locale", path, "");
   const droidCoreModel = readOptionalString(raw, "droidCoreModel", path, "");
@@ -439,6 +538,12 @@ function parseGeneral(raw: RawObject, path: string): GeneralSettings {
   return {
     ...(worktreeDirectory === undefined ? {} : { worktreeDirectory }),
     ...(enabledPlugins === undefined ? {} : { enabledPlugins }),
+    ...(strictEnabledPlugins === undefined ? {} : { strictEnabledPlugins }),
+    ...(extraKnownMarketplaces === undefined ? {} : { extraKnownMarketplaces }),
+    ...(strictKnownMarketplaces === undefined
+      ? {}
+      : { strictKnownMarketplaces }),
+    ...(pluginTokenHosts === undefined ? {} : { pluginTokenHosts }),
     ...(theme === undefined ? {} : { theme }),
     ...(locale === undefined ? {} : { locale }),
     ...(droidCoreModel === undefined ? {} : { droidCoreModel }),

@@ -22,7 +22,7 @@ export const HEADER_SHORTCUTS = [
   "ctrl+L for autonomy · tab for reasoning",
 ] as const;
 
-/** B3 — version row prefix (`v1.9.0`). */
+/** B3 — version row prefix (`v`, as in `v0.4.0`). */
 export const VERSION_PREFIX = "v";
 
 /** B3 — tip row prefix. */
@@ -73,7 +73,7 @@ export const APPROVAL_TITLE = "Approval";
 /** R11 — the one-row help line under the options. */
 export const APPROVAL_HELP = `${GLYPHS.arrowUp}${GLYPHS.arrowDown} navigate ${GLYPHS.separator} Enter select ${GLYPHS.separator} Esc cancel`;
 
-/** R11 — the three options, in the order the subject lists them. */
+/** R11 — the three options, in the recorded order. */
 export const APPROVAL_OPTION_LABELS = {
   once: "Yes, allow",
   session: "Yes, and always allow this session",

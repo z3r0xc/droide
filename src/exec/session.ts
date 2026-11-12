@@ -1,5 +1,5 @@
 /**
- * Session lifecycle for `droid exec`.
+ * Session lifecycle for `droide exec`.
  *
  * Contract: `specs/80-exec-and-streaming.md` B35-B40 (continue, fork, streaming
  * session reuse) and `specs/40-sessions-and-storage.md` (transcript layout and
@@ -94,9 +94,9 @@ function isRole(value: string): value is Role {
 
 /**
  * `specs/40-sessions-and-storage.md` "On-disk layout": the transcript's
- * directory is derived from the run's working directory. Mirrors the subject's
- * `sanitizePathToDirectoryName`: resolve, canonicalise when the directory
- * exists, drop trailing separators, then prefix `-` and flatten separators.
+ * directory is derived from the run's working directory: resolve, canonicalise
+ * when the directory exists, drop trailing separators, then prefix `-` and
+ * flatten separators.
  */
 export function projectKeyFor(cwd: string, platform: Platform): string {
   const path = platform === "win32" ? nodePath.win32 : nodePath.posix;

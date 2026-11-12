@@ -39,6 +39,7 @@ import {
   type McpTimers,
   type McpTransport,
 } from "./transport.ts";
+import { PROGRAM, PRODUCT_VERSION } from "../../cli/brand.ts";
 import { boundText, MODEL_RESULT_BUDGET_BYTES } from "../../tools/result.ts";
 
 /**
@@ -58,8 +59,8 @@ export interface McpClientInfo {
 
 /** Default identity; the CLI passes its brand values through instead. */
 export const DEFAULT_MCP_CLIENT_INFO: McpClientInfo = {
-  name: "droide",
-  version: "1.9.0",
+  name: PROGRAM,
+  version: PRODUCT_VERSION,
 };
 
 /** Default `tools/list` budget (B13). */

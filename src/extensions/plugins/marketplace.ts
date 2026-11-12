@@ -16,7 +16,7 @@
  * same directory, so a failure leaves the previous bytes in place.
  */
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -37,6 +37,17 @@ import {
 import { isRecord } from "../guards.ts";
 import { JsoncParseError, parseJsonc } from "../jsonc.ts";
 import type { PluginDiagnostic } from "./installed.ts";
+import {
+  gitUrlForPluginSource,
+  isSourceAllowed,
+  materializeSource,
+  parsePluginSource,
+  pluginSourceHash,
+  sourcesEqual,
+  type PluginPolicy,
+  type PluginSource,
+  type SourceDeps,
+} from "./sources.ts";
 
 /** `plugins/` under a scope root (B31). */
 export const PLUGINS_DIR = "plugins";
@@ -49,6 +60,10 @@ export const MARKETPLACE_MANIFEST_PATHS = [
   ".factory-plugin/marketplace.json",
   ".claude-plugin/marketplace.json",
 ] as const;
+
+/** Refusal for a source the organization's allowlist does not admit (B36). */
+export const MARKETPLACE_NOT_APPROVED_ERROR =
+  "This marketplace is not approved by your organization. Ask an administrator to approve it.";
 
 /** Default wall-clock budget for one git invocation. */
 export const DEFAULT_GIT_TIMEOUT_MS = 120_000;
@@ -69,6 +84,11 @@ export type PluginOperationErrorCode =
   | "source-unsupported"
   | "source-invalid"
   | "source-missing"
+  | "source-denied"
+  | "source-mismatch"
+  | "source-fetch-failed"
+  | "checksum-mismatch"
+  | "archive-limit"
   | "registry-invalid"
   | "settings-invalid"
   | "git-missing"
@@ -227,6 +247,13 @@ export type MarketplaceSource =
       readonly url: string;
       readonly ref?: string;
       readonly sha?: string;
+    }
+  | {
+      readonly source: "git-subdir";
+      readonly url: string;
+      readonly path: string;
+      readonly ref?: string;
+      readonly sha?: string;
     };
 
 export interface ParseMarketplaceSourceOptions {
@@ -359,10 +386,8 @@ export function parseMarketplaceSource(
 
 /** The clone URL for a git source; local sources are registered in place. */
 export function gitUrlForSource(source: MarketplaceSource): string {
-  if (source.source === "github")
-    return `https://github.com/${source.repo}.git`;
-  if (source.source === "url") return source.url;
-  return source.path;
+  if (source.source === "local") return source.path;
+  return gitUrlForPluginSource(source);
 }
 
 function nameFromUrl(raw: string): string {
@@ -400,6 +425,8 @@ export function marketplaceNameForSource(source: MarketplaceSource): string {
       source.repo.split("/").filter(Boolean).at(-1) ?? "unknown-marketplace";
   } else {
     base = nameFromUrl(source.url);
+    if (source.source === "git-subdir" && source.path !== ".")
+      base = `${base}-${basename(source.path)}`;
   }
   const pinned =
     source.source === "local"
@@ -431,6 +458,8 @@ export function formatMarketplaceSource(source: MarketplaceSource): string {
   let shown: string;
   if (source.source === "github") shown = `github:${source.repo}`;
   else if (source.source === "local") shown = `local:${source.path}`;
+  else if (source.source === "git-subdir")
+    shown = `${redactUrl(source.url)}#${source.path}`;
   else shown = redactUrl(source.url);
   if (source.source === "local") return terminalSafe(shown);
   if (source.sha !== undefined) return `${terminalSafe(shown)}@${source.sha}`;
@@ -457,11 +486,12 @@ function redactUrl(raw: string): string {
 
 /**
  * A plugin's source within a marketplace: a path relative to the marketplace
- * root, or an external source kind this build registers but does not fetch.
+ * root, or one of the external source kinds from B34, already parsed so the
+ * install path never re-reads the manifest's untrusted fields.
  */
 export type MarketplacePluginSource =
   | { readonly kind: "path"; readonly path: string }
-  | { readonly kind: "external"; readonly type: string };
+  | { readonly kind: "external"; readonly source: PluginSource };
 
 export interface MarketplacePluginEntry {
   readonly name: string;
@@ -530,32 +560,16 @@ function readPluginSource(
         path,
         `has an unknown source kind "${type}" for "${pluginName}".`,
       );
-    if (type === "local" || type === "git-subdir") {
-      if (typeof value["path"] !== "string" || value["path"] === "")
+    try {
+      return { kind: "external", source: parsePluginSource(value) };
+    } catch (error) {
+      if (error instanceof PluginOperationError)
         throw invalidManifest(
           path,
-          `has a "${type}" source for "${pluginName}" without a path.`,
+          `has a malformed "${type}" source for "${pluginName}": ${error.message}`,
         );
+      throw error;
     }
-    if (type === "github" && typeof value["repo"] !== "string")
-      throw invalidManifest(
-        path,
-        `has a "github" source for "${pluginName}" without a repo.`,
-      );
-    if (
-      (type === "url" || type === "archive") &&
-      typeof value["url"] !== "string"
-    )
-      throw invalidManifest(
-        path,
-        `has a "${type}" source for "${pluginName}" without a url.`,
-      );
-    if (type === "npm" && typeof value["package"] !== "string")
-      throw invalidManifest(
-        path,
-        `has an "npm" source for "${pluginName}" without a package.`,
-      );
-    return { kind: "external", type };
   }
   throw invalidManifest(path, `has an unsupported source for "${pluginName}".`);
 }
@@ -713,6 +727,18 @@ function readSource(value: unknown): MarketplaceSource | undefined {
       ...(ref === undefined ? {} : { ref }),
       ...(sha === undefined ? {} : { sha }),
     };
+  if (
+    kind === "git-subdir" &&
+    typeof value["url"] === "string" &&
+    typeof value["path"] === "string"
+  )
+    return {
+      source: "git-subdir",
+      url: value["url"],
+      path: value["path"],
+      ...(ref === undefined ? {} : { ref }),
+      ...(sha === undefined ? {} : { sha }),
+    };
   return undefined;
 }
 
@@ -736,22 +762,32 @@ function readEntry(value: unknown): MarketplaceEntry | undefined {
   };
 }
 
+/**
+ * The persisted shape of a marketplace source. `sources.ts` owns the canonical
+ * key order so the provenance hash an install records and the hash the load
+ * path recomputes are the same number.
+ */
 function serialiseSource(source: MarketplaceSource): Record<string, unknown> {
   if (source.source === "local") return { source: "local", path: source.path };
   const pinned = {
     ...(source.ref === undefined ? {} : { ref: source.ref }),
     ...(source.sha === undefined ? {} : { sha: source.sha }),
   };
-  return source.source === "github"
-    ? { source: "github", repo: source.repo, ...pinned }
-    : { source: "url", url: source.url, ...pinned };
+  if (source.source === "github")
+    return { source: "github", repo: source.repo, ...pinned };
+  if (source.source === "git-subdir")
+    return {
+      source: "git-subdir",
+      url: source.url,
+      path: source.path,
+      ...pinned,
+    };
+  return { source: "url", url: source.url, ...pinned };
 }
 
 /** SHA-256 of a source's canonical form, recorded on each installed entry. */
 export function hashMarketplaceSource(source: MarketplaceSource): string {
-  return createHash("sha256")
-    .update(JSON.stringify(serialiseSource(source)), "utf8")
-    .digest("hex");
+  return pluginSourceHash(source);
 }
 
 function serialiseEntry(entry: MarketplaceEntry): Record<string, unknown> {
@@ -958,6 +994,10 @@ export interface MarketplaceDeps {
   readonly runGit?: GitRunner;
   readonly now?: () => Date;
   readonly timeoutMs?: number;
+  /** `strictKnownMarketplaces` (B36): what `marketplace add` may register. */
+  readonly policy?: Pick<PluginPolicy, "allowedSources">;
+  /** Fetch/fs surface for the source kinds that download or extract. */
+  readonly sourceDeps?: SourceDeps;
 }
 
 export interface MarketplaceInfo {
@@ -1004,96 +1044,57 @@ async function readCommit(
   return /^[0-9a-f]{7,64}$/iu.test(commit) ? commit : undefined;
 }
 
-async function cloneSource(
+/**
+ * Check a git source out at `directory`, returning the commit it landed on.
+ * `git-subdir` clones the repository into a scratch directory and publishes
+ * only the named subdirectory, so a marketplace's manifest sits at the target
+ * root exactly as it does for every other git source.
+ */
+async function checkOutSource(
   source: MarketplaceSource,
   directory: string,
   deps: MarketplaceDeps,
-): Promise<void> {
+): Promise<string> {
   if (source.source === "local") {
     throw new PluginOperationError(
       "source-unsupported",
       `A local marketplace is registered in place; ${source.path} is not cloned.`,
     );
   }
-  const runner = deps.runGit ?? defaultGitRunner;
-  const options: GitRunOptions = {
-    cwd: dirname(directory),
-    timeoutMs: deps.timeoutMs ?? DEFAULT_GIT_TIMEOUT_MS,
-  };
   (deps.io ?? defaultPluginIo).makeDirectory(dirname(directory));
-  await runGitChecked(
-    runner,
-    [
-      "clone",
-      "--depth=1",
-      "--no-tags",
-      ...(source.ref === undefined ? [] : ["--branch", source.ref]),
-      "--",
-      gitUrlForSource(source),
-      directory,
-    ],
-    options,
-  );
-  if (source.sha !== undefined) {
-    // A commit that no branch advertises still has to be fetched by name.
-    await runGitChecked(
-      runner,
-      [
-        "fetch",
-        "--depth=1",
-        "--no-tags",
-        "--",
-        gitUrlForSource(source),
-        source.sha,
-      ],
-      { cwd: directory, timeoutMs: deps.timeoutMs ?? DEFAULT_GIT_TIMEOUT_MS },
-    );
-    await runGitChecked(runner, ["reset", "--hard", "FETCH_HEAD"], {
-      cwd: directory,
-      timeoutMs: deps.timeoutMs ?? DEFAULT_GIT_TIMEOUT_MS,
-    });
-  }
-}
-
-async function requiredCommit(
-  directory: string,
-  deps: MarketplaceDeps,
-): Promise<string> {
-  const commit = await readCommit(directory, deps);
-  if (commit === undefined) {
+  const materialized = await materializeSource(source, {
+    target: directory,
+    deps: {
+      ...(deps.sourceDeps ?? {}),
+      ...(deps.runGit === undefined ? {} : { runGit: deps.runGit }),
+      ...(deps.timeoutMs === undefined ? {} : { timeoutMs: deps.timeoutMs }),
+    },
+  });
+  if (materialized.commit === undefined) {
     throw new PluginOperationError(
       "git-failed",
       `The marketplace checkout at ${directory} has no commit.`,
     );
   }
-  return commit;
+  return materialized.commit;
 }
 
 /**
- * `marketplace add <url> [--branch]` (B40). The manifest is validated before
- * the checkout is adopted, and an existing name is refused — never replaced.
+ * Check a source out and validate its manifest, returning the registry entry
+ * without writing anything. `add` and auto-registration share this so a
+ * configured marketplace is adopted exactly like a typed one.
  */
-export async function addMarketplace(
-  rawSource: string,
-  options: AddMarketplaceOptions,
+async function createMarketplaceEntry(
+  name: string,
+  source: MarketplaceSource,
   deps: MarketplaceDeps,
-): Promise<MarketplaceInfo> {
+): Promise<{
+  readonly entry: MarketplaceEntry;
+  readonly pluginCount: number;
+  readonly displayName: string;
+}> {
   const io = deps.io ?? defaultPluginIo;
-  const source = parseMarketplaceSource(rawSource, options);
-  const name = marketplaceNameForSource(source);
-  const registry = readKnownMarketplaces(deps.scopeRoot, io);
-  if (registry.entries.has(name)) {
-    throw new PluginOperationError(
-      "marketplace-exists",
-      `Marketplace "${name}" is already registered. Run \`plugin marketplace remove ${name}\` before adding it again.`,
-    );
-  }
-
   const lastUpdated = (deps.now ?? (() => new Date()))().toISOString();
-  let entry: MarketplaceEntry;
-  let pluginCount: number;
-  let displayName: string;
-
   if (source.source === "local") {
     if (!io.exists(source.path)) {
       throw new PluginOperationError(
@@ -1103,49 +1104,130 @@ export async function addMarketplace(
     }
     const manifest = loadMarketplaceManifest(source.path, io);
     const commit = await readCommit(source.path, deps);
-    pluginCount = manifest.plugins.length;
-    displayName = manifest.name;
-    entry = {
-      source,
-      installLocation: source.path,
-      lastUpdated,
-      autoUpdate: true,
-      ...(commit === undefined ? {} : { commit }),
+    return {
+      pluginCount: manifest.plugins.length,
+      displayName: manifest.name,
+      entry: {
+        source,
+        installLocation: source.path,
+        lastUpdated,
+        autoUpdate: true,
+        ...(commit === undefined ? {} : { commit }),
+      },
     };
-  } else {
-    const staging = join(
-      marketplacesDirectory(deps.scopeRoot),
-      `.staging-${randomUUID().replace(/-/g, "")}`,
-    );
-    try {
-      await cloneSource(source, staging, deps);
-      const manifest = loadMarketplaceManifest(staging, io);
-      const commit = await requiredCommit(staging, deps);
-      const target = join(marketplacesDirectory(deps.scopeRoot), name);
-      adoptDirectory(staging, target, io);
-      pluginCount = manifest.plugins.length;
-      displayName = manifest.name;
-      entry = {
+  }
+
+  const staging = join(
+    marketplacesDirectory(deps.scopeRoot),
+    `.staging-${randomUUID().replace(/-/g, "")}`,
+  );
+  try {
+    const commit = await checkOutSource(source, staging, deps);
+    const manifest = loadMarketplaceManifest(staging, io);
+    const target = join(marketplacesDirectory(deps.scopeRoot), name);
+    adoptDirectory(staging, target, io);
+    return {
+      pluginCount: manifest.plugins.length,
+      displayName: manifest.name,
+      entry: {
         source,
         installLocation: target,
         lastUpdated,
         autoUpdate: true,
         commit,
-      };
-    } catch (error) {
-      try {
-        io.remove(staging);
-      } catch {
-        // A leftover staging directory is inert.
-      }
-      throw error;
+      },
+    };
+  } catch (error) {
+    try {
+      io.remove(staging);
+    } catch {
+      // A leftover staging directory is inert.
     }
+    throw error;
+  }
+}
+
+/**
+ * `marketplace add <url> [--branch]` (B40). The manifest is validated before
+ * the checkout is adopted, an existing name is refused — never replaced — and
+ * a source the organization's allowlist does not admit is refused up front.
+ */
+export async function addMarketplace(
+  rawSource: string,
+  options: AddMarketplaceOptions,
+  deps: MarketplaceDeps,
+): Promise<MarketplaceInfo> {
+  const io = deps.io ?? defaultPluginIo;
+  const source = parseMarketplaceSource(rawSource, options);
+  if (!isSourceAllowed(deps.policy?.allowedSources, source)) {
+    throw new PluginOperationError(
+      "source-denied",
+      MARKETPLACE_NOT_APPROVED_ERROR,
+    );
+  }
+  const name = marketplaceNameForSource(source);
+  const registry = readKnownMarketplaces(deps.scopeRoot, io);
+  if (registry.entries.has(name)) {
+    throw new PluginOperationError(
+      "marketplace-exists",
+      `Marketplace "${name}" is already registered. Run \`plugin marketplace remove ${name}\` before adding it again.`,
+    );
   }
 
+  const created = await createMarketplaceEntry(name, source, deps);
   const entries = new Map(registry.entries);
-  entries.set(name, entry);
+  entries.set(name, created.entry);
   writeKnownMarketplaces(deps.scopeRoot, entries, io);
-  return { name, entry, pluginCount, displayName };
+  return { name, ...created };
+}
+
+/**
+ * Resolve a marketplace that `extraKnownMarketplaces` declares (B36): reuse
+ * the registration when it matches, refuse a drifted one with the documented
+ * message, and register a missing one immediately if policy admits it.
+ */
+export async function ensureConfiguredMarketplace(
+  name: string,
+  source: PluginSource,
+  deps: MarketplaceDeps,
+): Promise<MarketplaceEntry> {
+  const io = deps.io ?? defaultPluginIo;
+  const registry = readKnownMarketplaces(deps.scopeRoot, io);
+  const existing = registry.entries.get(name);
+  if (existing !== undefined) {
+    if (!sourcesEqual(existing.source, source))
+      throw new PluginOperationError(
+        "source-mismatch",
+        `Marketplace "${name}" does not match its configured source`,
+      );
+    return existing;
+  }
+  if (!isSourceAllowed(deps.policy?.allowedSources, source))
+    throw new PluginOperationError(
+      "source-denied",
+      MARKETPLACE_NOT_APPROVED_ERROR,
+    );
+  if (!isMarketplaceSourceKind(source))
+    throw new PluginOperationError(
+      "source-invalid",
+      `An extraKnownMarketplaces entry must name a marketplace repository, not a "${source.source}" source.`,
+    );
+  const created = await createMarketplaceEntry(name, source, deps);
+  const entries = new Map(registry.entries);
+  entries.set(name, created.entry);
+  writeKnownMarketplaces(deps.scopeRoot, entries, io);
+  return created.entry;
+}
+
+function isMarketplaceSourceKind(
+  source: PluginSource,
+): source is MarketplaceSource {
+  return (
+    source.source === "local" ||
+    source.source === "github" ||
+    source.source === "url" ||
+    source.source === "git-subdir"
+  );
 }
 
 async function refreshMarketplace(
@@ -1171,9 +1253,8 @@ async function refreshMarketplace(
     `.staging-${randomUUID().replace(/-/g, "")}`,
   );
   try {
-    await cloneSource(entry.source, staging, deps);
+    const commit = await checkOutSource(entry.source, staging, deps);
     loadMarketplaceManifest(staging, io);
-    const commit = await requiredCommit(staging, deps);
     adoptDirectory(staging, entry.installLocation, io);
     return { ...entry, lastUpdated, commit };
   } catch (error) {

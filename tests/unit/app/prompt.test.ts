@@ -129,7 +129,7 @@ test("an oversized append file is cut at the documented budget", async () => {
 
 test("the environment block names the platform and cwd without secrets", () => {
   const context = {
-    environment: { cwd: "/work/p", env: { FACTORY_API_KEY: "sk-secret" } },
+    environment: { cwd: "/work/p", env: { DROIDE_API_KEY: "sk-secret" } },
   };
   const block = environmentBlock(context as never, "2026-02-02");
   assert.match(block, /platform="/);

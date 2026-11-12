@@ -33,6 +33,12 @@ import {
   type MarketplaceDeps,
   type PluginIo,
 } from "../extensions/plugins/marketplace.ts";
+import {
+  resolvePluginPolicy,
+  type PluginPolicy,
+  type PluginSource,
+  type SourceDeps,
+} from "../extensions/plugins/sources.ts";
 
 export interface PluginListOptions {
   readonly scope?: string;
@@ -73,12 +79,23 @@ function report(deps: PluginListDeps, error: unknown): void {
   deps.setExitCode(1);
 }
 
+/** Enablement policy (B36); throws when a project names a token host. */
+function pluginPolicy(deps: PluginListDeps): PluginPolicy {
+  return resolvePluginPolicy(deps.context.settings, deps.context.layers);
+}
+
+function sourceDeps(deps: PluginListDeps): SourceDeps {
+  return { env: deps.context.environment.env };
+}
+
 function marketplaceDeps(deps: PluginCommandDeps): MarketplaceDeps {
   return {
     scopeRoot: deps.context.paths.factoryDir,
     ...(deps.io === undefined ? {} : { io: deps.io }),
     ...(deps.runGit === undefined ? {} : { runGit: deps.runGit }),
     ...(deps.now === undefined ? {} : { now: deps.now }),
+    policy: pluginPolicy(deps),
+    sourceDeps: sourceDeps(deps),
   };
 }
 
@@ -92,6 +109,9 @@ function installDeps(deps: PluginCommandDeps): PluginInstallDeps {
     ...(deps.io === undefined ? {} : { io: deps.io }),
     ...(deps.runGit === undefined ? {} : { runGit: deps.runGit }),
     ...(deps.now === undefined ? {} : { now: deps.now }),
+    policy: pluginPolicy(deps),
+    sourceDeps: sourceDeps(deps),
+    env: deps.context.environment.env,
   };
 }
 
@@ -302,12 +322,20 @@ export async function runPluginList(
   const scope = scopeOf(deps, options.scope);
   if (scope === null) return;
 
+  let allowedSources: readonly PluginSource[] | undefined;
+  try {
+    allowedSources = pluginPolicy(deps).allowedSources;
+  } catch (error) {
+    report(deps, error);
+    return;
+  }
   const result: InstalledPluginsResult = loadInstalledPlugins({
     factoryDir: deps.context.paths.factoryDir,
     projectDir: deps.context.paths.projectDir,
     ...(deps.context.settings.enabledPlugins === undefined
       ? {}
       : { enabledPlugins: deps.context.settings.enabledPlugins }),
+    ...(allowedSources === undefined ? {} : { allowedSources }),
   });
 
   deps.write(renderPluginList(result, scope === undefined ? {} : { scope }));

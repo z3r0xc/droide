@@ -284,7 +284,7 @@ test("a bare uuid, an app link and a deep link all name the session", () => {
     parseSessionArgument(`  https://app.factory.ai/sessions/${ID_A}  `),
     ID_A,
   );
-  assert.equal(parseSessionArgument(`factory://sessions/${ID_A}`), ID_A);
+  assert.equal(parseSessionArgument(`droide://sessions/${ID_A}`), ID_A);
   assert.equal(parseSessionArgument(ID_A.toUpperCase()), null);
   assert.equal(parseSessionArgument("not-a-session"), null);
   assert.equal(

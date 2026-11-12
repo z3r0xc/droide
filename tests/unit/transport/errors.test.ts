@@ -50,32 +50,32 @@ test("HTTP status to classification table (B95/B96)", () => {
     },
     {
       error: new FetchError(500, "boom", "verify"),
-      reason: "FactoryApiUnavailable",
+      reason: "ApiUnavailable",
       message: AUTH_MESSAGES.apiUnavailable,
     },
     {
       error: new FetchError(418, "teapot", "verify"),
-      reason: "FactoryApiValidationFailed",
+      reason: "ApiValidationFailed",
       message: AUTH_MESSAGES.validationFailed,
     },
     {
       error: new ResponseError("malformed", null, "verify"),
-      reason: "FactoryApiValidationFailed",
+      reason: "ApiValidationFailed",
       message: AUTH_MESSAGES.validationFailed,
     },
     {
       error: new TypeError("fetch failed"),
-      reason: "FactoryApiUnavailable",
+      reason: "ApiUnavailable",
       message: AUTH_MESSAGES.apiUnavailable,
     },
     {
       error: new TransportNetworkError("verify", "ECONNREFUSED"),
-      reason: "FactoryApiUnavailable",
+      reason: "ApiUnavailable",
       message: AUTH_MESSAGES.apiUnavailable,
     },
     {
       error: new TlsTrustError("verify", "SELF_SIGNED_CERT_IN_CHAIN"),
-      reason: "FactoryApiUnavailable",
+      reason: "ApiUnavailable",
       message: AUTH_MESSAGES.apiUnavailable,
     },
   ];
@@ -92,9 +92,9 @@ test("the response error classes carry the spec's fixed copy", () => {
     "verify",
   );
   assert.equal(unauthorized.statusCode, 401);
-  assert.equal(unauthorized.message, "Factory API key was rejected.");
+  assert.equal(unauthorized.message, "API key was rejected.");
   assert.deepEqual(unauthorized.toPublicObject(), {
-    detail: "Factory API key was rejected.",
+    detail: "API key was rejected.",
     status: 401,
     title: "Unauthorized",
   });
@@ -108,7 +108,7 @@ test("the response error classes carry the spec's fixed copy", () => {
 test("a rejected verification maps to a typed 400/401/403 error", () => {
   const badRequest = apiKeyRejectionError(400, "verify");
   assert.ok(badRequest instanceof ResponseError400BadRequest);
-  assert.equal(badRequest.message, "Factory API key was rejected.");
+  assert.equal(badRequest.message, "API key was rejected.");
   assert.ok(
     apiKeyRejectionError(401, "verify") instanceof ResponseError401Unauthorized,
   );
@@ -155,7 +155,7 @@ test("deployment refusals use the exact spec messages", () => {
 test("absent credentials use the fixed not-authenticated copy", () => {
   assert.equal(
     new AuthenticationError("verify").message,
-    "Not authenticated. Please log in using /login or set a valid FACTORY_API_KEY environment variable.",
+    "Not authenticated. Please log in using /login or set a valid DROIDE_API_KEY environment variable.",
   );
   assert.equal(
     new AuthenticationError("prem", AUTH_MESSAGES.customerLoginRequired)

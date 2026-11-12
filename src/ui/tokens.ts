@@ -387,8 +387,8 @@ export const BORDERS = {
 } as const;
 
 /**
- * D11 — Mini logo (3 rows, 21 columns, `D R O I D` in the subject).
- * The letters are the parity-normalised program name; shape and width stay.
+ * D11 — Mini logo (3 rows, 21 columns, the program name letterspaced).
+ * Shape and width are fixed; the letters come from the product name.
  */
 export const LOGO_MINI_ROWS = [
   "╔═══════════════════╗",
@@ -404,7 +404,7 @@ export const LOGO_FULL_HEIGHT = 6;
 
 /**
  * D11 — Full logo (6 rows, block letters, 52 columns).
- * The subject spells its own name; the glyph shape and centring rule stay.
+ * The block glyphs spell the product name; shape and centring rule stay.
  */
 export const LOGO_FULL_ROWS = [
   "██████   ██████   █████    ███████  ██████   ███████",

@@ -3,8 +3,8 @@
  *
  * Contract: `specs/40-sessions-and-storage.md` §B43–B56. Option parsing lives in
  * the Commander definition; this module validates, runs the store query and
- * renders. The human wording is ours (the subject's i18n literals were not
- * recovered — open question 1 of that spec); the `--json` shape is contractual.
+ * renders. The human wording is ours (open question 1 of that spec); the
+ * `--json` shape is contractual.
  */
 import type {
   SearchHit,

@@ -88,7 +88,7 @@ test("frame at 80×24 (compact header, empty transcript)", async () => {
     `${" ".repeat(29)}╔═══════════════════╗`,
     "mini logo is centred in 80 columns",
   );
-  assert.equal(first.lines[4], `${" ".repeat(36)}v1.9.0`);
+  assert.equal(first.lines[4], `${" ".repeat(36)}v0.4.0`);
   assert.match(first.lines[11] ?? "", /^Skills \(0\) ✗ {2}MCPs \(0\) ✗/u);
   assert.equal(first.lines[12], "", "idle status-banner row is reserved");
   assert.match(

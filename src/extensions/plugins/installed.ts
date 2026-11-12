@@ -14,6 +14,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { isRecord } from "../guards.ts";
+import {
+  isSourceAllowed,
+  parsePluginSource,
+  pluginSourceHash,
+  type PluginSource,
+} from "./sources.ts";
 
 export type PluginScope = "user" | "project";
 
@@ -42,6 +48,45 @@ export interface LoadInstalledPluginsOptions {
   readonly factoryDir: string;
   readonly projectDir: string;
   readonly enabledPlugins?: Readonly<Record<string, boolean>>;
+  /** `strictKnownMarketplaces` (B36): what an external source must satisfy. */
+  readonly allowedSources?: readonly PluginSource[];
+}
+
+/**
+ * The marketplace sources registered at one scope, used to re-authorize an
+ * installed entry's recorded provenance (B35). A document this code cannot
+ * read yields nothing: without a source there is no hash to compare, so a
+ * hash-bearing entry is refused rather than trusted.
+ */
+function readRegisteredSources(
+  root: string,
+): ReadonlyMap<string, PluginSource> {
+  let document: string;
+  try {
+    document = readFileSync(
+      join(root, "plugins", "known_marketplaces.json"),
+      "utf8",
+    );
+  } catch {
+    return new Map();
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(document);
+  } catch {
+    return new Map();
+  }
+  const result = new Map<string, PluginSource>();
+  if (!isRecord(parsed)) return result;
+  for (const [name, entry] of Object.entries(parsed)) {
+    if (!isRecord(entry) || !isRecord(entry["source"])) continue;
+    try {
+      result.set(name, parsePluginSource(entry["source"]));
+    } catch {
+      // An entry this code cannot name cannot authorize anything.
+    }
+  }
+  return result;
 }
 
 function readString(
@@ -80,7 +125,7 @@ export function compareVersions(
 function readOneScope(
   root: string,
   scope: PluginScope,
-  enabledPlugins: Readonly<Record<string, boolean>> | undefined,
+  options: LoadInstalledPluginsOptions,
   diagnostics: PluginDiagnostic[],
 ): InstalledPluginRecord[] {
   const path = join(root, "plugins", "installed_plugins.json");
@@ -111,6 +156,7 @@ function readOneScope(
   }
 
   const records: InstalledPluginRecord[] = [];
+  const registered = readRegisteredSources(root);
   for (const [id, rawEntries] of Object.entries(parsed["plugins"])) {
     if (!Array.isArray(rawEntries)) {
       diagnostics.push({
@@ -138,6 +184,47 @@ function readOneScope(
         ? candidate
         : chosen,
     );
+    const recordedHash = readString(best, "marketplaceSourceHash");
+    if (recordedHash !== undefined) {
+      const marketplaceName = readString(best, "source");
+      const registeredSource =
+        marketplaceName === undefined
+          ? undefined
+          : registered.get(marketplaceName);
+      if (
+        registeredSource === undefined ||
+        pluginSourceHash(registeredSource) !== recordedHash
+      ) {
+        diagnostics.push({
+          path,
+          message: `plugin "${id}" was installed from a marketplace source that no longer matches; refusing to load it`,
+        });
+        continue;
+      }
+    }
+    if (best["externalSource"] !== undefined) {
+      let externalSource: PluginSource | undefined;
+      try {
+        externalSource = parsePluginSource(best["externalSource"]);
+      } catch {
+        externalSource = undefined;
+      }
+      if (externalSource === undefined) {
+        if (options.allowedSources !== undefined) {
+          diagnostics.push({
+            path,
+            message: `plugin "${id}" has an unreadable external source; refusing to load it`,
+          });
+          continue;
+        }
+      } else if (!isSourceAllowed(options.allowedSources, externalSource)) {
+        diagnostics.push({
+          path,
+          message: `plugin "${id}" comes from an external source the policy does not allow; refusing to load it`,
+        });
+        continue;
+      }
+    }
     const installPath = readString(best, "installPath");
     if (installPath === undefined) continue;
     const version = readString(best, "version");
@@ -150,7 +237,7 @@ function readOneScope(
       ...(version === undefined ? {} : { version }),
       ...(installedAt === undefined ? {} : { installedAt }),
       ...(lastUpdated === undefined ? {} : { lastUpdated }),
-      enabled: enabledPlugins?.[id] !== false,
+      enabled: options.enabledPlugins?.[id] !== false,
     });
   }
   return records;
@@ -161,16 +248,11 @@ export function loadInstalledPlugins(
   options: LoadInstalledPluginsOptions,
 ): InstalledPluginsResult {
   const diagnostics: PluginDiagnostic[] = [];
-  const user = readOneScope(
-    options.factoryDir,
-    "user",
-    options.enabledPlugins,
-    diagnostics,
-  );
+  const user = readOneScope(options.factoryDir, "user", options, diagnostics);
   const project = readOneScope(
     options.projectDir,
     "project",
-    options.enabledPlugins,
+    options,
     diagnostics,
   );
 

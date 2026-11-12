@@ -1,10 +1,10 @@
 /**
  * The model catalogue `exec --help` renders.
  *
- * The subject computes both the model list and the per-model reasoning table
- * from one catalogue in availability order, so the two sections can never
- * disagree. This table transcribes the catalogue the recorded build shows
- * (specs/10-cli-surface.md B28); adding a model means adding one row here.
+ * The model list and the per-model reasoning table come from one catalogue in
+ * availability order, so the two sections can never disagree. This table is
+ * that catalogue (specs/10-cli-surface.md B28); adding a model means adding one
+ * row here.
  */
 
 import type { ExecHelpModels } from "./exec-help.ts";

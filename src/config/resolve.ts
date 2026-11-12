@@ -127,7 +127,7 @@ export function resolveSettingsPath(
   return trimmed === "" ? undefined : resolvePath(environment, trimmed);
 }
 
-/** `FACTORY_RUNTIME_SETTINGS_PATH` as the subject reads it: trimmed, or none. */
+/** `FACTORY_RUNTIME_SETTINGS_PATH` as the contract reads it: trimmed, or none. */
 export function runtimeSettingsPathFromEnvironment(
   environment: Environment,
 ): string | undefined {
@@ -139,8 +139,8 @@ export function runtimeSettingsPathFromEnvironment(
 
 /**
  * The overlay path this process uses: the `--settings` flag, then the
- * inherited environment variable (B77). A blank flag falls through, exactly as
- * the subject's `readTrimmedHomePath` returns no path for it.
+ * inherited environment variable (B77). A blank flag falls through: a blank
+ * value is no path at all.
  */
 export function runtimeSettingsPath(
   environment: Environment,
@@ -180,7 +180,7 @@ async function resolveOverlay(
 
 /**
  * Merge two settings objects. `higher` wins. Records merge per key (a server,
- * hook event or droid definition replaces the lower one whole); arrays and
+ * hook event or agent definition replaces the lower one whole); arrays and
  * scalars replace. Merging is shallow on purpose: a higher layer's MCP server
  * must not inherit the lower layer's `command` when it defines a `url`.
  */

@@ -227,7 +227,7 @@ function startChild(
       shell: "bash",
       windowsHide: true,
       // A detached leader owns its process group, which is what the tree kill
-      // signals. `TODO(spec B28)`: the subject keeps `detached:false` on POSIX.
+      // signals. `TODO(spec B28)`: the contract keeps `detached:false` on POSIX.
       detached: true,
     });
   } finally {
@@ -331,7 +331,7 @@ async function runBackground(
   const tmpDir = options.tmpDir ?? os.tmpdir();
   const outputFile = nodePath.join(
     tmpDir,
-    `droid-bg-${now()}-${randomUUID()}.out`,
+    `droide-bg-${now()}-${randomUUID()}.out`,
   );
   const child = startChild(input, context, outputFile);
   child.unref();
@@ -371,7 +371,7 @@ export async function executeCommand(
   }
   if (input.riskLevel === undefined) {
     // B9: an omitted risk level is denied separately, with its own guidance.
-    // `TODO(spec B9)`: the subject's exact wording is not quoted by the spec.
+    // `TODO(spec B9)`: the exact wording is not quoted by the spec.
     throw new ToolFailure(
       'Execute call rejected: missing required parameter "riskLevel". ' +
         "Declare the command's impact as low, medium or high.",
