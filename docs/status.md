@@ -16,8 +16,8 @@ cargo test --workspace                   # native layer (CI only here)
 | Area | State |
 |---|---|
 | Specifications | 11 subsystem specs + shared context, ~8.2k lines, all clauses cited and mapped to tests |
-| TypeScript product layer | 61 files, ~14.3k lines: CLI, config, session, agent loop, transport, exec, extensions, tools, native client |
-| Tests | 338 tests across 38 files (unit + integration) |
+| TypeScript product layer | 69 files, ~16k lines: CLI, config, session, agent loop, transport, exec, extensions, tools, native client |
+| Tests | 41 test files (unit + integration) |
 | CLI parity | 20/20 recorded cases against the subject |
 | Native (Rust) | protocol crate + tests; builds only in CI (see `docs/rust-setup.md`) |
 
@@ -34,7 +34,7 @@ cargo test --workspace                   # native layer (CI only here)
 | `70-daemon-and-remote-control.md` | review | not started |
 | `80-exec-and-streaming.md` | review | record types, writer, one-shot runner, validation |
 | `90-native-layer.md` | review | TypeScript client + fake-helper tests; Rust helpers pending |
-| `95-terminal-ui.md` | draft | not started |
+| `95-terminal-ui.md` | review | not started |
 
 ## Known gaps and their owners
 

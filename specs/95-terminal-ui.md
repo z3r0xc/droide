@@ -175,8 +175,9 @@ Preview caps: 4 lines / 1024 chars; the detailed view caps at 200 lines / 16 KiB
 
 ### B8 — Diffs
 
-A diff row is a 10-column line-number gutter (4 right-aligned old + 1 space + 4 right-aligned new
-+ 1 space of margin) followed by one space of indent then the content; added lines use
+A diff row is an 11-column line-number gutter — a 10-column box holding 4 right-aligned old, one
+space, 4 right-aligned new (so one pad column), plus 1 column of right margin — followed by one
+space of indent, then the content; added lines use
 `diff.added` on `diff.addedBg`, removed `diff.removed` on `diff.removedBg`, unchanged
 `diff.unchanged`/`diff.dimUnchanged`, and the "unchanged lines" separator prints as its own
 dimmed row with one blank row above and below
@@ -629,7 +630,7 @@ status-line output and the unfocused composer frame.
 | help segment separator | 3 spaces | footer/help bars `[src/components/common/StyledHelpText.tsx:11-13]` |
 | markdown list marker | 3 (`LIST_MARKER_WIDTH`), tail indent 2 | markdown `[src/components/renderMarkdown.tsx:64-65]` |
 | markdown code inset | 2 (`CODE_TEXT_INSET`) | fenced code `[src/components/renderMarkdown.tsx:71]` |
-| diff gutter | 10 (4+1+4+1) | diffs `[src/components/DiffRenderer.tsx:195-220]` |
+| diff gutter | 10-column box (4+1+4+1 pad) + 1 margin | diffs `[src/components/DiffRenderer.tsx:195-220]` |
 | approval prompt indent | 2 (options), 2 (sections) | `[src/components/BatchToolConfirmationMessage.tsx:1225-1240]` |
 
 ### D11 — Borders and box characters
@@ -772,7 +773,7 @@ horizontally clip); every renderer sanitises its text (B20).
 | R3 | **Thinking block** | indent 3 columns, width `contentWidth - 3`; label `Thinking:` (or `Thinking (i/n):`, `Reasoning Summary:` / `Reasoning Summary (i/n):`) in `text.muted` italic, then the reasoning text as *italic* markdown in `text.muted` `[src/components/ThinkingDisplay.tsx:100-150]`, `en:thinking.*` | hidden unless `showThinking` is on; when hidden the block occupies no rows | unbounded |
 | R4 | **Tool call** | 3-column margin; header = bold tool display name in `toolName` + `, `-joined params in `toolParam` (margin-left 1) + optional right-aligned suffix in `text.muted`; params are `key: "value"` with values truncated at 50 chars to `…`; pending names shimmer `[src/components/tools/ToolHeader.tsx:120-250]`, `[src/components/tools/implementations/DefaultTool.tsx:170-215]` | result body collapsed to the preview caps (B7) | header 1 row (+1 per wrapped param set); preview 4 rows |
 | R5 | **Tool result** | inner margin 1 under the header: `↳ ` + text (`text.muted`), or markdown when it fits, or `error` text on failure `[src/components/tools/implementations/DefaultTool.tsx:141-165]` | yes — 4 lines / 1024 chars in the normal view | 200 lines / 16 KiB in Ctrl+O view |
-| R6 | **Diff** | 10-column gutter (`old` 4 + space + `new` 4 + space) then a space then the line, backgrounds per D3; hunk context separators as their own dimmed row with one blank row above and below `[src/components/DiffRenderer.tsx:195-220]`, `[src/components/DiffRenderer.tsx:436-475]` | yes — 20 lines inline (`MAX_DIFF_LINES`), 500 rows detailed (`DETAILED_MAX_DIFF_ROWS`) | 20 / 500 |
+| R6 | **Diff** | 11-column gutter (10-column box: `old` 4 + space + `new` 4; + 1 margin) then a space then the line, backgrounds per D3; hunk context separators as their own dimmed row with one blank row above and below `[src/components/DiffRenderer.tsx:195-220]`, `[src/components/DiffRenderer.tsx:436-475]` | yes — 20 lines inline (`MAX_DIFF_LINES`), 500 rows detailed (`DETAILED_MAX_DIFF_ROWS`) | 20 / 500 |
 | R7 | **Error** | ordinary message row: marker `●` in `error`, body in `error`; tool errors render `↳ <text>` in `error` with the `(error)` suffix in collapsed groups `[src/components/MessageItem.tsx:520-560]`, `en:toolDisplay.errorSuffix` | never | unbounded |
 | R8 | **Todo list** | pinned panel (B9): `Plan · C/T` then border column then `✓/●/○ <content>` rows | yes — window anchored on the last completed item, overflow `... N more, Alt/Option+P to view all` | `maxVisibleRows` |
 | R9 | **Subagent / task row** | header = badge (`Worker`, `Explorer`, `···` placeholder; `Resume <badge>` for resumes) + bold description in quotes `"<description>"` with ` - <complexity>` appended when present; then exactly 2 lines tall (header + status) to prevent jitter; status line `↳ Done (N tool uses · 1.2s)` or `↳ <progress label ≤80 chars>` or `⚠ Task failed` in `error` `[src/components/ToolExecutionItem.tsx:96-104]`, `[src/components/tools/implementations/TaskTool.tsx:229-400]`, `en:toolDisplay.task.*` | result body hidden; only the 2 header/status rows | 2 |

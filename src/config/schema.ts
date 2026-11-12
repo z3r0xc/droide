@@ -10,15 +10,12 @@
  * (`specs/10-cli-surface.md`, "Settings files").
  *
  * Parsing validates, it never coerces: a number where a string belongs is an
- * {@link InvalidSettingsError} naming the dotted key path, and a key outside
- * the vocabulary is an {@link UnknownSettingError}. Both errors carry the file
- * that produced them.
- *
- * The vocabulary is closed on purpose: this build refuses a key it cannot
- * honour instead of silently applying a subset of the file. Adding a setting
- * is therefore a spec change, never a parser relaxation.
+ * {@link InvalidSettingsError} naming the dotted key path. Unknown keys are
+ * ignored at every level, because the subject's zod objects strip them: a
+ * settings file written for the original must still load here. A value under a
+ * key this build validates is never silently ignored — only an unknown key is.
  */
-import { InvalidSettingsError, UnknownSettingError } from "./errors.ts";
+import { InvalidSettingsError } from "./errors.ts";
 
 export type JsonValue =
   | string
@@ -152,42 +149,6 @@ const GENERAL_KEYS: AllowedKeys = {
   customModels: true,
 };
 
-const SETTINGS_KEYS: AllowedKeys = {
-  ...GENERAL_KEYS,
-  mcp: true,
-  hooks: true,
-  droids: true,
-  skills: true,
-  outputStyles: true,
-  commands: true,
-};
-
-const CUSTOM_MODEL_KEYS: AllowedKeys = {
-  id: true,
-  index: true,
-  model: true,
-  provider: true,
-  baseUrl: true,
-  apiKey: true,
-  apiKeyHelper: true,
-  apiKeyHelperTtlMs: true,
-  credentialSource: true,
-  authMode: true,
-  displayName: true,
-  maxContextLimit: true,
-  enableThinking: true,
-  thinkingMaxTokens: true,
-  maxOutputTokens: true,
-  reasoningEffort: true,
-  extraHeaders: true,
-  extraArgs: true,
-  noImageSupport: true,
-  bedrock: true,
-  azure: true,
-  baseModelId: true,
-  useInRouter: true,
-};
-
 const CUSTOM_MODEL_PROVIDERS: AllowedKeys = {
   anthropic: true,
   openai: true,
@@ -196,20 +157,6 @@ const CUSTOM_MODEL_PROVIDERS: AllowedKeys = {
 };
 
 const HTTP_URL = /^https?:\/\//i;
-
-const MCP_STDIO_KEYS: AllowedKeys = {
-  type: true,
-  command: true,
-  args: true,
-  env: true,
-  disabled: true,
-};
-const MCP_REMOTE_KEYS: AllowedKeys = {
-  type: true,
-  url: true,
-  headers: true,
-  disabled: true,
-};
 
 const HOOK_EVENT_NAMES = [
   "PreToolUse",
@@ -222,36 +169,6 @@ const HOOK_EVENT_NAMES = [
   "SessionStart",
   "SessionEnd",
 ] as const;
-
-const HOOK_EVENT_KEYS: AllowedKeys = {
-  PreToolUse: true,
-  PostToolUse: true,
-  Notification: true,
-  UserPromptSubmit: true,
-  Stop: true,
-  SubagentStop: true,
-  PreCompact: true,
-  SessionStart: true,
-  SessionEnd: true,
-};
-
-const HOOK_SECTION_KEYS: AllowedKeys = {
-  ...HOOK_EVENT_KEYS,
-  hooksDisabled: true,
-  showHookOutput: true,
-};
-
-const HOOK_KEYS: AllowedKeys = {
-  matcher: true,
-  commandRegex: true,
-  hooks: true,
-};
-const HOOK_COMMAND_KEYS: AllowedKeys = {
-  type: true,
-  command: true,
-  timeout: true,
-  preserveRiskLevel: true,
-};
 
 function isObject(value: unknown): value is RawObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);

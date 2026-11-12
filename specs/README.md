@@ -46,7 +46,7 @@ before it is specified.**
 | `40-sessions-and-storage.md` | review | SQLite schema and migrations, transcript records, ordering, on-disk layout, search |
 | `80-exec-and-streaming.md` | review | Non-interactive mode, stream formats, exit codes |
 | `90-native-layer.md` | review | Native helpers (pty, search, secrets, sqlite, browser), framing and contracts |
-| `95-terminal-ui.md` | draft | Design tokens, layout, transcript renderers, keys, capability handling |
+| `95-terminal-ui.md` | review | Design tokens, layout, transcript renderers, keys, capability handling |
 | `20-agent-loop.md` | review | Provider message model, tool-call cycle, context assembly, model catalogue |
 | `30-tools-and-sandbox.md` | review | Tool registry, permission matrix, filesystem and shell models, sandbox |
 | `50-transport-and-auth.md` | review | Backend routes, auth flows, error taxonomy, LLM transport |
