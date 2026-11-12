@@ -21,6 +21,17 @@ cargo test --workspace                   # native layer (CI only here)
 | CLI parity | 20/20 recorded cases against the subject |
 | Native (Rust) | protocol crate + tests; builds only in CI (see `docs/rust-setup.md`) |
 
+## Command surface
+
+| Command | State |
+|---|---|
+| `--version`, `--help`, subcommand help | **done** — 20/20 parity cases, including the curated `exec --help` page |
+| `doctor` | **done** — catalogue, six real probes (config, environment, system, binaries, filesystem, git), text and `--json` reports; the other ten names report `skip` |
+| `search\|find` | **done** — store query, text and `--json` output, documented exit codes |
+| `exec` | protocols, validation and record writers **done**; end-to-end wiring in progress |
+| `resume`, `daemon`, `update`, `mcp`, `plugin`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
+| bare `droide` | refuses with exit 64 until the interactive UI lands |
+
 ## Specs
 
 | Spec | Status | Implemented |
