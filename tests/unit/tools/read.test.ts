@@ -273,7 +273,7 @@ test("a credential file under the Factory dir is never readable", async () => {
     writeText(file, "{}");
     await assert.rejects(
       readText({ file_path: file }, fixture.context),
-      new RegExp(`^Sandbox: read denied to `),
+      { message: /^Sandbox: read denied to / },
     );
   } finally {
     fixture.cleanup();

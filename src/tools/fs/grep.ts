@@ -216,7 +216,6 @@ function searchExpression(
 
 interface FileMatches {
   readonly path: string;
-  readonly text: string;
   readonly lines: readonly string[];
   /** 1-based line numbers that matched. */
   readonly matchedLines: readonly number[];
@@ -238,12 +237,12 @@ function matchLines(
       if (!matchedLines.includes(line)) matchedLines.push(line);
       if (match[0].length === 0) global.lastIndex += 1;
     }
-    return { path: filePath, text: content, lines, matchedLines };
+    return { path: filePath, lines, matchedLines };
   }
   for (const [index, line] of lines.entries()) {
     if (expression.test(line)) matchedLines.push(index + 1);
   }
-  return { path: filePath, text: content, lines, matchedLines };
+  return { path: filePath, lines, matchedLines };
 }
 
 function account(budget: { used: number }, text: string): void {

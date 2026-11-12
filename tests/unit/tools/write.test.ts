@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import { ToolFailure } from "../../../src/tools/errors.ts";
@@ -67,9 +68,9 @@ test("creating at an existing directory is refused with the documented text", as
 test("a protected write is refused and nothing is created", async () => {
   const fixture = makeToolFixture();
   try {
-    const factory = `${fixture.home}/.factory`;
+    const factory = join(fixture.home, ".factory");
     mkdirSync(factory, { recursive: true });
-    const target = `${factory}/settings.json`;
+    const target = join(factory, "settings.json");
     await assert.rejects(
       createFile({ file_path: target, content: "{}" }, fixture.context),
       (error: unknown) =>

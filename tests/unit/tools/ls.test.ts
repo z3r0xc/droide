@@ -79,7 +79,7 @@ test("a non-directory target is refused", async () => {
     writeFileSync(file, "");
     await assert.rejects(
       listDirectory({ directory_path: file }, fixture.context),
-      new RegExp(`^Not a directory: `),
+      { message: /^Not a directory: / },
     );
   } finally {
     fixture.cleanup();
@@ -91,7 +91,7 @@ test("a missing directory is refused", async () => {
   try {
     await assert.rejects(
       listDirectory({ directory_path: fixture.path("absent") }, fixture.context),
-      new RegExp(`^Directory does not exist: `),
+      { message: /^Directory does not exist: / },
     );
   } finally {
     fixture.cleanup();

@@ -130,6 +130,11 @@ export function decide(
     return "deny";
   }
 
+  // A blocked command can never run, bypass or not (B43, matrix, Errors).
+  if (request.commandPolicy?.decision === "block") {
+    return "deny";
+  }
+
   // A user `denyWrite` entry stays promptable even when confirmations are
   // otherwise bypassed (B50, matrix's last column), so it is checked here.
   if (request.toolClass === "file-edit" && request.pathClass === "deny-write") {
@@ -155,9 +160,7 @@ export function decide(
     case "execute": {
       const policy = request.commandPolicy;
       if (policy !== undefined) {
-        if (policy.decision === "block") return "deny";
-        if (policy.decision === "allow") return "allow";
-        return "ask";
+        return policy.decision === "allow" ? "allow" : "ask";
       }
       if (request.readOnlySearch === true) return "allow";
       const risk = parseRiskLevel(request.riskLevel);

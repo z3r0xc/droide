@@ -86,7 +86,7 @@ test("enum, boolean and array item errors keep their paths", () => {
   if (result.ok) return;
   assert.deepEqual(
     result.issues.map((entry) => entry.path),
-    ["input.mode", "input.enabled", "input.tags.1"],
+    ["input.mode", "input.tags.1", "input.enabled"],
   );
   assert.match(result.issues[0]?.message ?? "", /expected one of fast, slow/);
 });

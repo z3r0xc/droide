@@ -204,11 +204,11 @@ function apply(
       for (const [key, property] of Object.entries(schema.properties)) {
         const present = Object.hasOwn(value, key) && value[key] !== undefined;
         if (!present) {
-          if (property.optional === true) continue;
           if ("default" in property && property.default !== undefined) {
             result[key] = structuredClone(property.default);
             continue;
           }
+          if (property.optional === true) continue;
           issues.push(issue(joinPath(path, key), property));
           continue;
         }

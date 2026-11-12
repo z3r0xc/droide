@@ -110,7 +110,7 @@ test("dispatch validates input before the executor runs", async () => {
   assert.equal(outcome.ok, false);
   assert.match(
     outcome.ok ? "" : outcome.error,
-    /accepted the following parameters/,
+    /accepts the following parameters/,
   );
 });
 

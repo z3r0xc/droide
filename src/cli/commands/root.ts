@@ -2,6 +2,8 @@
 import { Command } from "commander";
 
 import { DISPLAY, DOCS_URL, PROGRAM, VERSION } from "../brand.ts";
+import { createAppContext } from "../../app/context.ts";
+import { ConfigError } from "../../config/errors.ts";
 import { addRuntimeOptions, examplesBlock } from "../help.ts";
 import { notImplemented } from "../not-implemented.ts";
 import { writeRefusal } from "../tty.ts";
@@ -85,7 +87,7 @@ export function makeRootCommand(program: Command): Command {
   program.addCommand(makeComputerCommand());
   program.addCommand(makeDoctorCommand());
 
-  program.action((_options: unknown, command: Command) => {
+  program.action(async (options: { readonly settings?: string; readonly cwd?: string }, command: Command) => {
     // The root declares no arguments on purpose: `[prompt...]` lives in the
     // usage string, and every operand stays available as excess arguments.
     const promptParts = command.args;
@@ -103,6 +105,21 @@ export function makeRootCommand(program: Command): Command {
         (text) => process.stderr.write(text),
       );
       process.exit(1);
+    }
+    // Startup is where configuration becomes real: a malformed settings file
+    // must fail the run before any command does work (spec 10 §B79).
+    try {
+      const context = await createAppContext({
+        ...(options.settings === undefined ? {} : { settingsFlag: options.settings }),
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      });
+      void context;
+    } catch (error) {
+      if (error instanceof ConfigError) {
+        process.stderr.write(`${PROGRAM}: ${error.message}\n`);
+        process.exit(1);
+      }
+      throw error;
     }
     notImplemented("interactive");
   });
