@@ -14,6 +14,7 @@ import { existsSync, truncateSync } from "node:fs";
 
 import {
   CorruptSessionRowError,
+  DuplicateSessionError,
   InvalidArgumentError,
   InvalidSessionIdError,
   MissingIngestRowError,
