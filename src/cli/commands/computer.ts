@@ -1,6 +1,8 @@
 /** `computer` command group. Contract: `specs/70-daemon-and-remote-control.md`. */
 import { Command } from "commander";
 
+import { createAppContext } from "../../app/context.ts";
+import { runComputerList } from "../computer-commands.ts";
 import { notImplemented } from "../not-implemented.ts";
 
 export function makeComputerCommand(): Command {
@@ -27,7 +29,18 @@ export function makeComputerCommand(): Command {
   computer
     .command("list")
     .description("List computers registered for Remote Control")
-    .action(() => notImplemented("computer list"));
+    .action(() => {
+      void (async () => {
+        const context = await createAppContext();
+        await runComputerList({
+          context,
+          write: (text) => process.stdout.write(text),
+          setExitCode: (code) => {
+            process.exitCode = code;
+          },
+        });
+      })();
+    });
 
   computer
     .command("ssh")
