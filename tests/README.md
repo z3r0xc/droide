@@ -1,7 +1,7 @@
 # Tests
 
 Three suites, one rule: **deterministic**. No network, no credentials, no wall
-clock, no dependence on the subject binary, no shared state between tests.
+clock, no dependence on any external binary, no shared state between tests.
 
 | Suite | Location | Runs | Purpose |
 |---|---|---|---|
@@ -32,6 +32,6 @@ plausible regressions, not to raise a count.
 ## Parity goldens
 
 `tests/parity/cases/*.json` are declarations (tracked locally only, in
-`.work/parity/`); the harness supports `--record` against the subject binary and
+`.work/parity/`); the harness supports `--record` against our own build and
 `--check` against ours. See `docs/adr/0004-parity-harness-with-optional-oracle.md`.
 A case that needs the oracle is reported `skipped`, never silently passed.

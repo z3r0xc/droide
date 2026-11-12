@@ -45,7 +45,7 @@ async function startServer(
   mode: string,
   options: StartOptions = {},
 ): Promise<RunningServer> {
-  const dir = mkdtempSync(join(tmpdir(), "droid-mcp-client-"));
+  const dir = mkdtempSync(join(tmpdir(), "droide-mcp-client-"));
   const pidFile = join(dir, "server.pid");
   const config: McpStdioServerConfig = {
     type: "stdio",

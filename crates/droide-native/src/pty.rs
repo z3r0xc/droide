@@ -1,6 +1,6 @@
 //! PTY framing helpers.
 //!
-//! Contract: `specs/90-native-layer.md` §"PTY (`rust_pty`)". The subject passes
+//! Contract: `specs/90-native-layer.md` §"PTY (`rust_pty`)". The reference build passes
 //! the command line as one quoted string and re-splits it with shell-word rules,
 //! reads raw chunks of 4096 bytes, and reports `-2` for "child exited".
 //!

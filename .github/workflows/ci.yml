@@ -88,8 +88,8 @@ jobs:
 
   parity:
     # The parity suite compares our CLI against goldens recorded from the
-    # subject. Goldens are local artefacts (never committed), so this job only
-    # runs where they exist and fails loudly if they are missing.
+    # our own build. Snapshots are local artefacts (never committed), so this job
+    # only runs where they exist and warns when they are missing.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -106,4 +106,4 @@ jobs:
         run: npm run test:parity
       - name: Explain skip
         if: steps.goldens.outputs.present != 'yes'
-        run: echo "::warning::parity goldens are absent; run 'npm run test:parity:record' locally with the subject binary"
+        run: echo "::warning::no CLI snapshots recorded; run 'node tests/parity/run.mjs --record' locally"

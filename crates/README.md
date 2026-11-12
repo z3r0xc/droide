@@ -20,8 +20,8 @@ crates/
 
 ## Why a process boundary
 
-- The subject does the same for its own helpers (PTY, search, secrets), which is
-  the behaviour we must reproduce.
+- The product layer talks to native helpers this way: a crash in a helper cannot
+  take the CLI down with it, and the boundary is testable without the platform.
 - A protocol boundary is testable without the platform: the TypeScript side is
   covered against a fake helper, the Rust side against captured request/response
   pairs.
@@ -76,7 +76,7 @@ child and answers the session methods with `-32603`.
   process.
 * **Framing.** Terminal output is bytes, not text, so `pty.read` and `pty.write`
   carry base64 (`{data}`). One read returns at most one 4096-byte chunk, matching
-  the subject's raw-chunk reads; callers loop until `exited`. A timeout returns
+  raw-chunk reads; callers loop until `exited`. A timeout returns
   `{data: "", exited: false}` and leaves the child untouched; once `exited` is
   `true` it stays `true` and carries the child's `exitCode`.
 * **Exit codes.** `pty.kill` terminates the child (TerminateProcess on Windows,

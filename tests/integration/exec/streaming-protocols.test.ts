@@ -86,7 +86,7 @@ test(
 );
 
 test("the writer flushes a real file as JSON lines", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "droid-exec-"));
+  const directory = await mkdtemp(join(tmpdir(), "droide-exec-"));
   try {
     const path = join(directory, "stream.jsonl");
     const stream = createWriteStream(path);
@@ -129,7 +129,7 @@ test("the writer flushes a real file as JSON lines", async () => {
 });
 
 test("the json summary flushes one object to a real file", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "droid-exec-"));
+  const directory = await mkdtemp(join(tmpdir(), "droide-exec-"));
   try {
     const path = join(directory, "summary.jsonl");
     const stream = createWriteStream(path);

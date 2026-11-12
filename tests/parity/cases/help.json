@@ -5,7 +5,7 @@
  ],
  "expect": {
   "exit_code": 0,
-  "stdout_matches": "Usage: droid",
+  "stdout_matches": "Usage: droide",
   "stderr_empty": true,
   "stdout_exact_golden": true
  }

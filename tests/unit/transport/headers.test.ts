@@ -128,8 +128,8 @@ test("an injected trace context is sent as traceparent (B18)", () => {
 });
 
 test("a supplied user agent is sent (B17)", () => {
-  const headers = buildHeaders(snapshot(), { userAgent: "droid/1.9.0" });
-  assert.equal(headers[USER_AGENT_HEADER], "droid/1.9.0");
+  const headers = buildHeaders(snapshot(), { userAgent: "droide/0.5.0" });
+  assert.equal(headers[USER_AGENT_HEADER], "droide/0.5.0");
   assert.equal("User-Agent" in buildHeaders(snapshot()), false);
   assert.equal(USER_AGENT_HEADER, "User-Agent");
 });

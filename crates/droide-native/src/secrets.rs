@@ -235,9 +235,9 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn round_trips_a_secret() {
-        let sealed = protect(b"api-key-123", b"factory-cli").expect("seal");
+        let sealed = protect(b"api-key-123", b"droide-cli").expect("seal");
         assert_ne!(sealed, b"api-key-123");
-        let opened = unprotect(&sealed, b"factory-cli").expect("unseal");
+        let opened = unprotect(&sealed, b"droide-cli").expect("unseal");
         assert_eq!(opened, b"api-key-123");
     }
 

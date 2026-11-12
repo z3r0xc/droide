@@ -11,7 +11,7 @@ import { resolve } from "node:path";
 /** Repository root, three levels above `tests/unit/cli`. */
 export const REPO_ROOT = resolve(import.meta.dirname, "../../..");
 
-/** The entry point under test; the same file `bin/droid-re.mjs` runs. */
+/** The entry point under test; the same file `bin/droide.mjs` runs. */
 export const MAIN_ENTRY = resolve(REPO_ROOT, "src/main.ts");
 
 export interface CliResult {

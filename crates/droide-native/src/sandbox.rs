@@ -162,7 +162,7 @@ fn escape_seatbelt(path: &str) -> String {
     path.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-/// Windows: the subject confines the network only, and filesystem enforcement is
+/// Windows: this platform confines the network only, and filesystem enforcement is
 /// the application's job. Report that rather than implying a jail.
 pub fn windows(_request: &SandboxRequest) -> Result<SandboxProfile, SandboxError> {
     Ok(SandboxProfile::Unconfined {

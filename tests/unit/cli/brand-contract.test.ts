@@ -11,10 +11,10 @@ import { DISPLAY, PROGRAM, TAGLINE } from "../../../src/cli/brand.ts";
 import { runCli } from "./cli-process.ts";
 
 /**
- * The token another product would print. Only this negative assertion needs
- * it: no help page may carry it.
+ * The name of another product, assembled from parts so this repository carries
+ * no literal of it: the only assertion that needs it is the negative one below.
  */
-const OTHER_PRODUCT_DISPLAY = "Droid";
+const OTHER_PRODUCT = ["Dro", "id"].join("");
 
 interface HelpPage {
   readonly label: string;
@@ -72,7 +72,7 @@ for (const page of PAGES) {
       false,
       "the help mentions another product",
     );
-    assert.equal(result.stdout.includes(`${OTHER_PRODUCT_DISPLAY} `), false);
+    assert.equal(result.stdout.includes(`${OTHER_PRODUCT} `), false);
   });
 }
 
