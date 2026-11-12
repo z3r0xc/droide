@@ -1,0 +1,30 @@
+{
+  "name": "droid-re-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Clean-room reimplementation of the droid CLI, built from specs/ (see docs/adr/0003).",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "droid-re": "./bin/droid-re.mjs"
+  },
+  "scripts": {
+    "cli": "node src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/unit/ tests/integration/",
+    "test:parity": "node tests/parity/run.mjs --check",
+    "test:rust": "cargo test --workspace",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.{mjs,ts}\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.{mjs,ts}\" \"*.{json,md}\""
+  },
+  "dependencies": {
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "prettier": "^3.10.1",
+    "typescript": "^7.0.2"
+  }
+}

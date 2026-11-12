@@ -1,0 +1,21 @@
+# Vendored subject artefacts and recovered evidence: never committed.
+raw/
+evidence/
+
+# Local reverse-engineering workspace (analysers, goldens, scratch).
+.work/
+.tmpcli/
+
+# Build and dependency output.
+node_modules/
+target/
+dist/
+build/
+.venv/
+__pycache__/
+
+# Local noise.
+*.log
+.DS_Store
+*.exe
+*.bin
