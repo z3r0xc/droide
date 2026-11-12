@@ -55,6 +55,7 @@ spec pins only the primitive (`MenuContainer`, `SelectableList`).
 | **OSC palette override** | Writing `ESC ] 4;n;#rrggbb BEL` etc. so the terminal's own ANSI 0–15 slots take the theme's colours `[src/theme/ThemeEngine.ts:403-441]`. |
 | **marker** | The one-column bold glyph that starts a transcript row (`⛬`, `>`, `●`). |
 | **clamp** | Truncation at a display-width boundary, by grapheme cluster, never mid-cluster. |
+| **`${PROGRAM}`** | The subject's own program token. Strings are quoted exactly as the subject prints them; wherever the program names itself the token is written `${PROGRAM}`, per `docs/adr/0005-project-name-and-parity-normalisation.md` §2. |
 
 ## Observable behaviour
 
@@ -99,7 +100,7 @@ Row budget: `logoLines + 2 + (dev?1:0) + (version?2:0) + 5`
 `[src/components/HeaderFrame.ts:407-408]`, with:
 
 - `marginTop = 2`, `marginBottom = 1` normally; **both 0 when `height <= 24`**
-  (`COMPACT_HEADER_MAX_HEIGHT = 24`) `[src/components/HeaderFrame.ts:61-63]`, `[src/components/HeaderFrame.ts:583-587]`.
+  (`COMPACT_HEADER_MAX_HEIGHT = 24`) `[src/components/HeaderFrame.ts:59]`, `[src/components/HeaderFrame.ts:583-587]`.
 - logo = the 6-row block-letter `DROID_HEADER_LOGO` when `!isHeightCompact && leftColWidth >= 58`,
   else the 3-row `DROID_HEADER_LOGO_MINI` `[src/components/HeaderFrame.ts:399-402]`,
   `[src/components/chat/constants.ts:153-166]`.
@@ -225,7 +226,7 @@ continuation rows two spaces, spec mode `> ` `[src/components/chat/ChatInput.tsx
 
 Placeholder precedence (first match wins): bash executing → `Executing command...`; session running
 and not bash → `Enter to steer · Ctrl+Enter to queue`; Mission 2.0 → `Message the workstream lead`
-/ `Message this agent`; not the first message → empty; spec mode → `Droid will research and plan
+/ `Message this agent`; not the first message → empty; spec mode → `${PROGRAM} will research and plan
 before making changes`; mission mode → `Mission control for huge projects`; else the startup
 placeholder `Try "…"` chosen uniformly from 13 prompts
 `[src/components/chat/ChatInput.tsx:240-290]`, `en:chatInput.*`, `en:placeholders.prompt0..12`.
@@ -484,6 +485,12 @@ carries an ANSI-256 index comment, it is reproduced; the light theme does not us
 
 Sources: `[src/theme/themes/factory-dark.ts:16-62]`, `[src/theme/themes/factory-light.ts:16-62]`.
 
+Mode-row strings (exact): `Auto (Low) · edits and read-only commands`,
+`Auto (Med) · allow reversible commands`, `Auto (High) · allow all commands`,
+`Auto (Off) · all actions require approval` (label `Auto (Off)` plus description
+` · all actions require approval`), `Bash mode active • Esc to exit`, ` Executing command...`,
+`auto-compress off` `en:statusBar.*` `[src/app.tsx:10063-10155]`.
+
 ### D2 — Text palette
 
 | Slot | Dark | Light | Role |
@@ -623,8 +630,8 @@ status-line output and the unfocused composer frame.
 | composer inner text width | `max(width - 10, 1)` | wrapping `[src/components/chat/viewportBudget.ts:136-140]` |
 | menu padding | border 1 + x 1 | menus `[src/components/common/MenuContainer.tsx:44-55]` |
 | menu min width | 78 | `MenuContainer` default `[src/components/common/MenuContainer.tsx:60-64]` |
-| header left margin | 2 (`LEFT_MARGIN`) | header grid `[src/components/HeaderFrame.ts:57]` |
-| status item gap | 2 | header status row `[src/components/HeaderFrame.ts:64]` |
+| header left margin | 2 (`LEFT_MARGIN`) | header grid `[src/components/HeaderFrame.ts:53]` |
+| status item gap | 2 | header status row `[src/components/HeaderFrame.ts:67]` |
 | footer status separator | `" | "` (3) | footer `[src/components/FooterStatusRow.tsx:87-88]` |
 | footer row gap | 1 | footer `[src/components/FooterStatusRow.tsx:88]` |
 | help segment separator | 3 spaces | footer/help bars `[src/components/common/StyledHelpText.tsx:11-13]` |
@@ -648,7 +655,7 @@ status-line output and the unfocused composer frame.
 | Diff line-number divider | `│` (documented position) | `[src/components/DiffRenderer.tsx:195-205]` |
 | Header changelog divider | `│` in `asciiArt` | `[src/components/HeaderFrame.ts:578-581]` |
 | Mini logo | `╔═══╗ / ║ D R O I D ║ / ╚═══╝` (21 columns) | `[src/components/chat/constants.ts:159-164]` |
-| Full logo | 6-row block-letter `D R O I D` in `█` (see `DROID_ASCII`) | `[src/components/chat/constants.ts:133-153]` |
+| Full logo | 6-row block-letter word (the subject spells `${PROGRAM}`) in `█`, 59 columns wide for the subject, exact shape at `DROID_ASCII` | `[src/components/chat/constants.ts:133-153]` |
 
 ### D12 — Glyph and icon set
 
@@ -681,7 +688,8 @@ status-line output and the unfocused composer frame.
 Spinner presets (all shipped, selectable): `Arrow ←↖↑↗→↘↓↙` (100 ms), `Arc ◜◠◝◞◡◟` (100),
 `Balloon .oOo.` (120), `Bounce ⠁⠂⠄⡀⠄⠂` (120), `Breathe` (17 frames, 100), `CircleHalves ◐◓◑◒` (50),
 `Dots ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏` (80, default), `Dots2 ⣾⣽⣻⢿⡿⣟⣯⣷` (80), `Dots3` (10 frames, 80),
-…, `Speaker 🔈🔉🔊🔉` (160), `SquareCorners ◰◳◲◱` (180), `Toggle ⊶⊷` (250),
+(remaining presets at `[src/utils/tuiSpinner/constants.ts:80-160]`), `Speaker 🔈🔉🔊🔉` (160),
+`SquareCorners ◰◳◲◱` (180), `Toggle ⊶⊷` (250),
 `Triangle ◢◣◤◥` (50), `Weather ☀️🌤⛅️🌥☁️🌧🌨⛈` (100)
 `[src/utils/tuiSpinner/constants.ts:1-200]`.
 
@@ -700,7 +708,7 @@ Spinner presets (all shipped, selectable): `Arrow ←↖↑↗→↘↓↙` (100
 | repeated-key reset | 200 ms (no tmux) / 700 ms (tmux) | `[src/hooks/repeatedKeySequence.ts:3-14]` |
 | paste key guard | 100 ms | `[src/components/chat/constants.ts:55]` |
 | double Ctrl+C exit window | 2000 ms | `[src/app.tsx:2544]` |
-| file-suggestion debounce / loading delay | 100 ms / 200 ms | `[src/components/chat/constants.ts:105-112]` |
+| file-suggestion debounce / loading delay | 100 ms / 200 ms | `[src/components/chat/constants.ts:104-110]` |
 | truecolour probe / appearance probe | 500 ms each | `[src/utils/trueColorDetector/index.ts:22]`, `[src/utils/terminalAppearanceDetector/index.ts:21]` |
 | status-line config poll | 1000 ms | `[src/components/StatusLine.tsx:120-127]` |
 
@@ -726,14 +734,16 @@ row 10  ctrl+L for autonomy · tab for reasoning
 row 11  (blank)
 row 12  Skills (0) ✗  MCPs (0) ✗  Connectors (0) ✗  AGENTS.md ✗
 row 13  (reserved blank row for the idle status banner)
-row 14  Auto (Med) · allow reversible commands                              <model label>
+row 14  Auto (Off) · all actions require approval                     <model label>
 row 15  (composer padding, Windows) / ╭────…────╮ (elsewhere)
 row 16  > Try "How do I handle errors in async functions?"
 row 17  (composer padding, Windows) / ╰────…────╯ (elsewhere)
 row 18  ? for help
 ```
 
-Notes: the header is not padded right; no row carries trailing spaces except inside the composer
+Notes: the status row's labels/counts are fixture-pinned (a fresh HOME with no skills, MCP
+servers or connectors shows `0` and `✗`; `Connectors` is omitted entirely when the count is
+unknown `[src/components/HeaderFrame.ts:480-520]`). The header is not padded right; no row carries trailing spaces except inside the composer
 frame. On non-Windows the composer occupies `╭─╮`, `> …`, `╰─╯` (three rows) and a fourth row appears
 only for the hint. With the status banner active, row 13 becomes
 `<spinner> Thinking...  (Press ESC to stop)` with `paddingLeft 1`.
@@ -778,7 +788,7 @@ horizontally clip); every renderer sanitises its text (B20).
 | R8 | **Todo list** | pinned panel (B9): `Plan · C/T` then border column then `✓/●/○ <content>` rows | yes — window anchored on the last completed item, overflow `... N more, Alt/Option+P to view all` | `maxVisibleRows` |
 | R9 | **Subagent / task row** | header = badge (`Worker`, `Explorer`, `···` placeholder; `Resume <badge>` for resumes) + bold description in quotes `"<description>"` with ` - <complexity>` appended when present; then exactly 2 lines tall (header + status) to prevent jitter; status line `↳ Done (N tool uses · 1.2s)` or `↳ <progress label ≤80 chars>` or `⚠ Task failed` in `error` `[src/components/ToolExecutionItem.tsx:96-104]`, `[src/components/tools/implementations/TaskTool.tsx:229-400]`, `en:toolDisplay.task.*` | result body hidden; only the 2 header/status rows | 2 |
 | R10 | **Plan / spec card** | header row only in the live region; the proposal body (plan or mission proposal) renders once in the static region via `ProposalDisplay`; approval/plan screens (`PlanDetailsScreen`, `ApprovalDetailsScreen`) replace the whole surface `[src/components/UnifiedToolDisplay.tsx:455-470]`, `[src/app.tsx:10880-10895]` | body outside the dynamic region | body unbounded in the full-screen view |
-| R11 | **Approval prompt** | rounded `border` box, min width 78, 1 column padding: queue position `Approval N of M` (muted), section headers (`Commands (N): <risk>`, `File Edits (N):`, `File Creations (N):`, `Patches (N):`, `MCP tool to approve · <impact>`), bodies indented 2, then the options list (2-space indent, selected bold in `text.primary`, unselected `text.muted`) and a one-row help line `↑↓ navigate · Enter select · Esc cancel` (+ ` · Ctrl+O expand diff` / ` · Ctrl+O collapse` + ` · Alt/Option+E to inspect approval details`) `[src/components/BatchToolConfirmationMessage.tsx:820-870]`, `[src/components/BatchToolConfirmationMessage.tsx:1220-1240]`, `en:batchConfirmation.*` | diff detail collapsed | help line 1 row, variants as above |
+| R11 | **Approval prompt** | rounded `border` box, min width 78, 1 column padding: queue position `Approval N of M` (muted), section headers (`Commands (N): <risk>`, `File Edits (N):`, `File Creations (N):`, `Patches (N):`, `MCP tool to approve · <impact>`), bodies indented 2, then the options list (2-space indent, selected bold in `text.primary`, unselected `text.muted`) and a one-row help line `↑↓ navigate · Enter select · Esc cancel` (plus ` · Ctrl+O expand diff` or ` · Ctrl+O collapse`, then ` · Alt/Option+E to inspect approval details`) `[src/components/BatchToolConfirmationMessage.tsx:820-870]`, `[src/components/BatchToolConfirmationMessage.tsx:1220-1240]`, `en:batchConfirmation.*` | diff detail collapsed | help line 1 row, variants as above |
 | R12 | **System notice** | marker `●` in `text.muted`, body in `text.muted`; warnings prefix in `warning`; abort notice `⎿ Interrupted` `[src/components/MessageItem.tsx:520-560]`, `[src/components/chat/constants.ts:44]` | never | unbounded |
 | R13 | **Collapsed tool group** | header `<Tool name> <N> <noun>` (noun: file/search/pattern/directory/URL/agent/item; plural per rules) + ` (<K> failed)` in `error`, then `↳ <subtitle>` for the first and two spaces for the rest, sliding window of the last 8 entries, overflow `Ctrl+O to view all` `[src/components/CollapsedToolGroup.tsx:470-640]`, `en:toolDisplay.countFailed`, `en:toolDisplay.ctrlOToViewAll` | compact mode collapses to header + one active subtitle | 1 + 8 |
 
@@ -799,17 +809,17 @@ Two spelling systems exist and both are contractual: the **footer/help** spellin
 | close menus | `Esc` | menu open | `[src/hooks/useChatKeyboardInput.ts:2066-2085]` |
 | cancel / exit bash mode | `Esc` | — | `[src/hooks/useChatKeyboardInput.ts:2066-2085]` |
 | clear draft → restore → rewind | `Esc` ×1 / ×2 / ×3 | ×2 needs a non-empty draft | `[src/hooks/useChatKeyboardInput.ts:1138-1180]` |
-| cycle interaction mode | `Shift+Tab` (`Ctrl+T` on Windows-like) | menus closed | `[src/hooks/useChatKeyboardInput.ts:2103-2125]`, `[src/components/HelpPopup.tsx:390-400]` |
+| cycle interaction mode | `Shift+Tab` (Windows help pane prints `Ctrl + T` — inconsistent with the binding; see Open question 8) | menus closed | `[src/hooks/useChatKeyboardInput.ts:2103-2125]`, `[src/components/HelpPopup.tsx:390-400]` |
 | cycle reasoning effort | `Tab` | menus closed | `[src/hooks/useChatKeyboardInput.ts:2127-2145]` |
-| cycle model | `Ctrl+N` | menus closed | `[src/hooks/useChatKeyboardInput.ts:2200-2215]` |
+| cycle model | `Ctrl+N` | menus closed | `[src/hooks/useChatKeyboardInput.ts:2196-2206]` |
 | cycle autonomy level | `Ctrl+L` | — | `[src/keyboard/keyboardChords.ts:390-395]` |
 | toggle detailed transcript | `Ctrl+O` | not in a blocking overlay | `[src/app.tsx:6097-6110]` |
 | toggle plan screen | `Alt/Option+P` | — | `[src/keyboard/keyboardChords.ts:470-476]` |
-| open help | `?` on empty input, `Ctrl+/` | — | `[src/hooks/useChatKeyboardInput.ts:2362-2366]`, `[src/hooks/useChatKeyboardInput.ts:2210-2220]` |
+| open help | `?` on empty input, `Ctrl+/` | — | `[src/hooks/useChatKeyboardInput.ts:2362-2366]`, `[src/hooks/useChatKeyboardInput.ts:2184-2188]` |
 | toggle bash mode | `!` on empty input | — | `[src/hooks/useChatKeyboardInput.ts:2362-2370]`, `en:chatInput.bash*` |
-| open editor with draft | `Ctrl+P` | — | `[src/hooks/useChatKeyboardInput.ts:2200-2210]`, `en:chatInput.editorOverflowHint` |
+| open editor with draft | `Ctrl+P` | — | `[src/hooks/useChatKeyboardInput.ts:2170-2176]`, `en:chatInput.editorOverflowHint` |
 | copy input | `Ctrl+Shift+C` | — | `[src/keyboard/keyboardChords.ts:430-440]` |
-| paste text or image | `Ctrl+V` / `Cmd+V` | — | `[src/hooks/useChatKeyboardInput.ts:2220-2230]` |
+| paste text or image | `Ctrl+V` / `Cmd+V` | — | `[src/hooks/useChatKeyboardInput.ts:2190-2194]` |
 | expand pasted block | `Alt+Shift+V` | placeholder present | `[src/keyboard/keyboardChords.ts:445-450]` |
 | delete draft attachments (fallback: forward delete) | `Ctrl+D` | attachments present | `[src/hooks/useChatKeyboardInput.ts:2506-2520]` |
 | review queued messages | `Ctrl+R` | queued messages exist | `[src/hooks/useChatKeyboardInput.ts:2150-2160]` |
@@ -839,7 +849,7 @@ rows including loading/notice rows; `Tab`/`Enter` accept, `Esc` cancels; while t
 footer row is replaced by the menu `[src/components/chat/ChatInput.tsx:600-700]`,
 `[src/components/chat/CommandSuggestions.tsx:200-260]`, `[src/app.tsx:10905-10908]`.
 File completion: `@` opens a debounced (100 ms) search; results list up to 6 rows with
-`filename  path`, hidden files included `[src/components/chat/constants.ts:93-112]`,
+`filename  path`, hidden files included `[src/components/chat/constants.ts:90-110]`,
 `[src/components/chat/ChatInput.tsx:780-800]`.
 
 ## Errors
@@ -896,8 +906,8 @@ in index order. Failure message names the slot and both values.
 header rows identical to the row list in "Screen layout"; the user row starts with one
 `text.userBg`-coloured column then two spaces; the assistant row starts `⛬ `; the tool header row
 starts with three spaces then `Read`; the tool result row starts with four spaces then `↳ `; the
-todo panel row starts `Plan · 1/2`; the composer row starts `> `; the last row equals
-`? for help` when the terminal is Windows-like, else `<hints>            <statuses>`.
+todo panel row starts `Plan · 1/2`; the composer row starts `> `; the last row starts with `? for help` and, on a non-Windows-like
+host with no PR/sandbox/MCP/IDE state, is exactly `? for help`.
 
 **T3 — `test_golden_frame_120x40`.** Same fixture at 120×40, wide header (changelog column present
 with a fixed fixture changelog). Expected: `fixtures/ui/golden-120x40.txt`. Additional assertions:
@@ -922,7 +932,7 @@ cursor, expected side effect)`. Mandatory cases:
 | K11 | `abc`, `Ctrl+C` | buffer ``, cursor 0, ephemeral message `Press Ctrl+C again to exit.` |
 | K12 | `abc`, `Ctrl+C` twice inside 2000 ms | process exits, trigger `CtrlC` |
 | K13 | any, `Ctrl+V` | paste path invoked once (text or image) |
-| K14 | 500-char single-line paste | buffer contains `[<50 chars>... 7 lines]` at width 80 and the map holds the original |
+| K14 | 500-char single-line paste, width 80 | buffer holds `[<first 50 chars>... <N> lines]` where `N` = visual rows at `width - 10` columns; the stored original is the unsanitised text |
 | K15 | 9-line paste | placeholder created (line count > 8) |
 | K16 | 400-char paste | not wrapped (threshold is strictly greater) |
 | K17 | paste then `Enter` within 100 ms, unframed | Enter dropped, no submit |
@@ -961,7 +971,7 @@ All `src/…` and `packages/…` paths below resolve under `evidence/original/wi
 | `src/components/chat/viewportBudget.ts:1-260` | B10, B19, D10 | reading |
 | `src/components/chat/wrapText.ts:1-120` | B19 | reading |
 | `src/components/chat/CommandSuggestions.tsx:200-318` | B11 | reading |
-| `src/components/HeaderFrame.ts:55-588` | B3, D11 | reading |
+| `src/components/HeaderFrame.ts:53-588` | B3, D11 | reading |
 | `src/components/Header.tsx:1-35` | B3, B19 | reading |
 | `src/components/MessageItem.tsx:400-609` | R1, R2, R7, R12 | reading |
 | `src/components/ThinkingDisplay.tsx:1-152` | R3 | reading |
@@ -1030,7 +1040,12 @@ All `src/…` and `packages/…` paths below resolve under `evidence/original/wi
 6. **Header on resize.** Assumed static (documented at `[src/components/Header.tsx:1-35]`); whether
    a `redrawSession()` triggered by other events repaints the header at the new width is not
    established.
-7. **Diff `+`/`-` prefixes.** Line prefixes come from the unified-diff text generated upstream
+7. **Help pane's Windows mode chord.** `HelpPopup` prints `Ctrl + T` for "Change modes"
+   on Windows-like hosts `[src/components/HelpPopup.tsx:388-400]`, while the binding is
+   `Shift+Tab` `[src/hooks/useChatKeyboardInput.ts:2103-2125]` and `Ctrl+T` opens Mission
+   Control `[src/app.tsx:6345-6352]`. Which one the reference actually honours on Windows is
+   unverified; the spec treats `Shift+Tab` as the binding and the help text as shipped copy.
+8. **Diff `+`/`-` prefixes.** Line prefixes come from the unified-diff text generated upstream
    (`generateUnifiedDiff`), not from the renderer; the renderer's own contribution is the gutter,
    one leading space and the background. Settled by inspecting `utils/diff-utils.ts` output, owned by
    the exec/diff slice.

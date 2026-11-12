@@ -899,30 +899,38 @@ export function activateSkill(
   requestedName: string,
 ): SkillActivationResult {
   const name = sanitizeSkillName(requestedName);
-  const skill = skills.find(
-    (entry) => entry.name === name && entry.status !== "shadowed",
+  // A claimed name (active or disabled) always answers first; an unrelated
+  // invalid document that happens to sanitize to the same name never masks it.
+  const claimed = skills.find(
+    (entry) =>
+      entry.name === name &&
+      (entry.status === "active" || entry.status === "disabled"),
   );
-  if (skill === undefined) {
+  if (claimed?.status === "disabled") {
+    return {
+      ok: false,
+      code: "skillDisabled",
+      message: `Skill "${claimed.name}" is disabled.`,
+    };
+  }
+  if (claimed === undefined) {
+    const invalid = skills.find(
+      (entry) => entry.name === name && entry.status === "invalid",
+    );
+    if (invalid !== undefined) {
+      return {
+        ok: false,
+        code: "skillInvalid",
+        message: `Skill "${invalid.name}" is invalid: ${invalid.errors.join("; ")}`,
+      };
+    }
     return {
       ok: false,
       code: "skillNotFound",
       message: `No skill named "${requestedName}" is available.`,
     };
   }
-  if (skill.status === "invalid") {
-    return {
-      ok: false,
-      code: "skillInvalid",
-      message: `Skill "${skill.name}" is invalid: ${skill.errors.join("; ")}`,
-    };
-  }
-  if (skill.status === "disabled") {
-    return {
-      ok: false,
-      code: "skillDisabled",
-      message: `Skill "${skill.name}" is disabled.`,
-    };
-  }
+  const skill = claimed;
   return {
     ok: true,
     text: [

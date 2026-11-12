@@ -41,6 +41,28 @@ test("test_mcp_config_merge_precedence: the higher level wins the whole entry", 
   assert.equal(entry.config.timeout, undefined);
 });
 
+test("test_mcp_config_merge_precedence: all documented levels take part in the order", () => {
+  const merged = mergeMcpServers([
+    { level: "org-settings", servers: { only: { command: "org" } } },
+    { level: "settings-overlay", servers: { only: { command: "overlay" } } },
+    { level: "dynamic", servers: { only: { command: "dynamic" } } },
+    { level: "builtin-defaults", servers: { only: { command: "builtin" } } },
+  ]);
+  const entry = merged.servers.get("only");
+  assert.equal(entry?.level, "org-settings");
+  assert.equal(entry?.config.type, "stdio");
+  if (entry?.config.type !== "stdio") return;
+  assert.equal(entry.config.command, "org");
+
+  // Removing the org entry promotes the next level in the same list.
+  const promoted = mergeMcpServers([
+    { level: "settings-overlay", servers: { only: { command: "overlay" } } },
+    { level: "dynamic", servers: { only: { command: "dynamic" } } },
+    { level: "builtin-defaults", servers: { only: { command: "builtin" } } },
+  ]);
+  assert.equal(promoted.servers.get("only")?.level, "settings-overlay");
+});
+
 test("test_mcp_config_merge_precedence: aliases canonicalize with the higher level winning", () => {
   const merged = mergeMcpServers([
     {
@@ -196,6 +218,21 @@ test("test_mcp_config_discovery_and_tolerance: a missing file is not an error", 
   } finally {
     temp.cleanup();
   }
+});
+
+test("test_mcp_config_discovery_and_tolerance: an unreadable file contributes nothing and is reported", () => {
+  const configuration = loadMcpConfiguration(
+    [{ level: "user-settings", path: "C:/factory/mcp.json" }],
+    {
+      readFile: () => {
+        const error = new Error("permission denied");
+        Object.defineProperty(error, "code", { value: "EACCES" });
+        throw error;
+      },
+    },
+  );
+  assert.equal(configuration.servers.size, 0);
+  assert.equal(configuration.diagnostics[0]?.code, "unreadable-file");
 });
 
 test("test_mcp_config_discovery_and_tolerance: a non-object document contributes nothing", () => {

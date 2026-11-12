@@ -96,11 +96,7 @@ export interface McpValidationIssue {
 }
 
 export type McpServerParseResult =
-  | {
-      readonly ok: true;
-      readonly config: McpServerConfig;
-      readonly warnings: readonly string[];
-    }
+  | { readonly ok: true; readonly config: McpServerConfig }
   | { readonly ok: false; readonly issues: readonly McpValidationIssue[] };
 
 function fail(issues: readonly McpValidationIssue[]): McpServerParseResult {
@@ -328,7 +324,6 @@ export function parseMcpServerConfig(raw: unknown): McpServerParseResult {
   }
 
   const issues: McpValidationIssue[] = [];
-  const warnings: string[] = [];
   const type = readTransportType(raw["type"], issues);
   if (type === undefined) return fail(issues);
 
@@ -382,7 +377,6 @@ export function parseMcpServerConfig(raw: unknown): McpServerParseResult {
     if (issues.length > 0) return fail(issues);
     return {
       ok: true,
-      warnings,
       config: {
         type: "stdio",
         command: command ?? "",
@@ -406,7 +400,6 @@ export function parseMcpServerConfig(raw: unknown): McpServerParseResult {
   if (issues.length > 0) return fail(issues);
   return {
     ok: true,
-    warnings,
     config: {
       type,
       url: url ?? "",

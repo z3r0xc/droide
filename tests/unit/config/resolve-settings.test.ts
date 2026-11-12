@@ -7,7 +7,6 @@ import * as path from "node:path";
 import {
   InvalidSettingsError,
   UnreadableSettingsError,
-  UnknownSettingError,
 } from "../../../src/config/errors.ts";
 import type { Environment, Platform } from "../../../src/config/paths.ts";
 import { resolveSettings } from "../../../src/config/resolve.ts";
@@ -256,18 +255,16 @@ test("a settings path that is a directory is unreadable", async () => {
   });
 });
 
-test("an unknown key in a settings file is refused", async () => {
+test("an unknown key in a settings file is ignored", async () => {
   await withFixture(async (fixture) => {
-    await writeJson(fixture.projectSettings, { notASetting: true });
+    await writeJson(fixture.projectSettings, {
+      notASetting: true,
+      theme: "dark",
+    });
 
-    await assert.rejects(
-      resolveSettings(fixture.environment),
-      (error: unknown) => {
-        assert.ok(error instanceof UnknownSettingError);
-        assert.equal(error.keyPath, "notASetting");
-        return true;
-      },
-    );
+    const resolved = await resolveSettings(fixture.environment);
+
+    assert.deepEqual(resolved.settings, { general: { theme: "dark" } });
   });
 });
 

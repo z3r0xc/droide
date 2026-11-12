@@ -4,6 +4,8 @@ import { test } from "node:test";
 import {
   HEADER_NAMES,
   REDACTED,
+  USER_AGENT_HEADER,
+  buildCustomerPremAuthHeaders,
   buildHeaders,
   buildWhoamiHeaders,
   headerValue,
@@ -114,6 +116,38 @@ test("usage-route attribution supplied by a caller is stripped", () => {
   assert.equal(stripped.Authorization, "Bearer t");
 });
 
+test("an injected trace context is sent as traceparent (B18)", () => {
+  const headers = buildHeaders(snapshot(), {
+    traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  });
+  assert.equal(
+    headers.traceparent,
+    "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  );
+  assert.equal("traceparent" in buildHeaders(snapshot()), false);
+});
+
+test("a supplied user agent is sent (B17)", () => {
+  const headers = buildHeaders(snapshot(), { userAgent: "droid/1.9.0" });
+  assert.equal(headers[USER_AGENT_HEADER], "droid/1.9.0");
+  assert.equal("User-Agent" in buildHeaders(snapshot()), false);
+  assert.equal(USER_AGENT_HEADER, "User-Agent");
+});
+
+test("customer Prem auth headers carry only auth, organization and content type (B22)", () => {
+  assert.deepEqual(buildCustomerPremAuthHeaders(snapshot(), true), {
+    Authorization: "Bearer t",
+    "X-Factory-Org-Id": "o",
+    "Content-Type": "application/json",
+  });
+  assert.deepEqual(
+    buildCustomerPremAuthHeaders(snapshot({ token: null }), false),
+    {
+      "X-Factory-Org-Id": "o",
+    },
+  );
+});
+
 test("whoami headers always ask for the extended answer", () => {
   const headers = buildWhoamiHeaders(snapshot(), {}, "attribution-1");
   assert.equal(headers["X-Factory-Whoami-Extended"], "true");
@@ -177,5 +211,6 @@ test("the literal header names match the spec table", () => {
     whoamiExtended: "X-Factory-Whoami-Extended",
     sessionAttribution: "X-Factory-Session-Attribution",
     contentType: "Content-Type",
+    traceparent: "traceparent",
   });
 });

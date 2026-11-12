@@ -84,19 +84,16 @@ export const grepInputSchema: ObjectSchema = {
     context_before: {
       kind: "number",
       optional: true,
-      integer: true,
       description: "Context lines before each match (content mode).",
     },
     context_after: {
       kind: "number",
       optional: true,
-      integer: true,
       description: "Context lines after each match (content mode).",
     },
     context: {
       kind: "number",
       optional: true,
-      integer: true,
       description: "Context lines before and after each match (content mode).",
     },
     line_numbers: {
@@ -108,7 +105,6 @@ export const grepInputSchema: ObjectSchema = {
     head_limit: {
       kind: "number",
       optional: true,
-      integer: true,
       description:
         "Limit entries; in content mode it caps matches per file (default 500).",
     },
@@ -250,10 +246,6 @@ function matchLines(
   return { path: filePath, text: content, lines, matchedLines };
 }
 
-function byteBudget(): { used: number } {
-  return { used: 0 };
-}
-
 function account(budget: { used: number }, text: string): void {
   budget.used += Buffer.byteLength(text, "utf8");
   if (budget.used > MAX_GREP_RESULT_BYTES) {
@@ -276,7 +268,7 @@ export async function grepFiles(
     input.multiline === true,
     input.fixed_string === true,
   );
-  const budget = byteBudget();
+  const budget = { used: 0 };
   const files = await candidateFiles(input, context);
   const matches: FileMatches[] = [];
   for (const filePath of files) {
@@ -305,8 +297,8 @@ export async function grepFiles(
       : input.head_limit <= 0
         ? 1
         : input.head_limit;
-  const before = input.context ?? input.context_before ?? 0;
-  const after = input.context ?? input.context_after ?? 0;
+  const before = Math.max(0, input.context ?? input.context_before ?? 0);
+  const after = Math.max(0, input.context ?? input.context_after ?? 0);
   const records: GrepContentLine[] = [];
   for (const match of matches) {
     const selected = new Set<number>();

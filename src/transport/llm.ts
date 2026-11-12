@@ -312,6 +312,9 @@ function applyAnthropicUsage(
     usage.thinkingTokens = thinking;
   }
   usage.seen = true;
+  // TODO(spec B121): thinking tokens are also estimated from the streamed
+  // character count before the provider breakdown arrives; the spec does not
+  // give the estimate's ratio, so only the provider field is used here.
 }
 
 function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
@@ -720,8 +723,8 @@ function createChatMapper(options: LlmStreamOptions): LlmStreamMapper {
       const choices = readArray(payload, "choices");
       if (choices !== null) {
         for (const raw of choices) {
-          if (!isRecord(raw)) {
-            continue;
+          if (finished || !isRecord(raw)) {
+            break;
           }
           const delta = readRecord(raw, "delta");
           if (delta !== null) {

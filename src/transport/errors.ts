@@ -396,6 +396,44 @@ export class DeploymentUnavailableError extends TransportError {
   }
 }
 
+/**
+ * B95: the status-to-class table for a rejected verification. 400, 401 and 403
+ * are the three rejection identities; any other status is not a key rejection
+ * and returns `null` so the caller applies B96's classification.
+ */
+export function apiKeyRejectionError(
+  status: number,
+  operation: Operation,
+  options: ResponseErrorOptions = {},
+):
+  | ResponseError400BadRequest
+  | ResponseError401Unauthorized
+  | ResponseError403Forbidden
+  | null {
+  switch (status) {
+    case 400:
+      return new ResponseError400BadRequest(
+        AUTH_MESSAGES.apiKeyRejected,
+        operation,
+        options,
+      );
+    case 401:
+      return new ResponseError401Unauthorized(
+        AUTH_MESSAGES.apiKeyRejected,
+        operation,
+        options,
+      );
+    case 403:
+      return new ResponseError403Forbidden(
+        AUTH_MESSAGES.apiKeyRejected,
+        operation,
+        options,
+      );
+    default:
+      return null;
+  }
+}
+
 /** B96's three outcomes, spelled as the spec spells them. */
 export type ApiKeyValidationReason =
   "apiKeyRejected" | "FactoryApiUnavailable" | "FactoryApiValidationFailed";

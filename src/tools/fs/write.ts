@@ -71,11 +71,9 @@ export async function writeFileAtomic(
     directory,
     `.${nodePath.basename(target)}.${process.pid}.${temporaryCounter}.tmp`,
   );
-  const options =
-    mode === undefined ? { flag: "wx" as const } : { flag: "wx" as const, mode };
   let handle: fs.promises.FileHandle | undefined;
   try {
-    handle = await fs.promises.open(temporary, options);
+    handle = await fs.promises.open(temporary, "wx", mode);
     await handle.writeFile(data);
     await handle.sync();
     await handle.close();

@@ -227,3 +227,17 @@ test("test_skill_tool_activation_payload: refusals carry the documented identiti
   const winner = activateSkill(skills, "winner");
   assert.equal(winner.ok, true);
 });
+
+test("test_skill_tool_activation_payload: an invalid document never masks the active winner", () => {
+  const skills = [
+    makeSkill("demo", {
+      status: "invalid",
+      errors: [
+        "Skill name must contain only lowercase letters, numbers, and hyphens",
+      ],
+    }),
+    makeSkill("demo"),
+  ];
+  const result = activateSkill(skills, "demo");
+  assert.equal(result.ok, true);
+});

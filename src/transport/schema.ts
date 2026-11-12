@@ -31,14 +31,6 @@ export function readNumber(
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-export function readBoolean(
-  source: Readonly<Record<string, unknown>>,
-  key: string,
-): boolean | null {
-  const value = source[key];
-  return typeof value === "boolean" ? value : null;
-}
-
 export function readRecord(
   source: Readonly<Record<string, unknown>>,
   key: string,

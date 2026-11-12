@@ -21,6 +21,7 @@ import {
   ResponseError403Forbidden,
   TransportNetworkError,
   TlsTrustError,
+  apiKeyRejectionError,
   classifyApiKeyValidationFailure,
   classifyModelFailure,
   isRetryableLlmReason,
@@ -102,6 +103,20 @@ test("the response error classes carry the spec's fixed copy", () => {
   });
   assert.equal(new ResponseError400BadRequest("x", "op").statusCode, 400);
   assert.equal(new ResponseError403Forbidden("x", "op").statusCode, 403);
+});
+
+test("a rejected verification maps to a typed 400/401/403 error", () => {
+  const badRequest = apiKeyRejectionError(400, "verify");
+  assert.ok(badRequest instanceof ResponseError400BadRequest);
+  assert.equal(badRequest.message, "Factory API key was rejected.");
+  assert.ok(
+    apiKeyRejectionError(401, "verify") instanceof ResponseError401Unauthorized,
+  );
+  assert.ok(
+    apiKeyRejectionError(403, "verify") instanceof ResponseError403Forbidden,
+  );
+  assert.equal(apiKeyRejectionError(500, "verify"), null);
+  assert.equal(apiKeyRejectionError(418, "verify"), null);
 });
 
 test("a public code and retry-after survive the public object", () => {

@@ -150,6 +150,14 @@ export class ToolRegistry {
     this.mutationCount += 1;
   }
 
+  private removeFromLlmIndex(definition: ToolDefinition): void {
+    const ids = this.idsByLlmId.get(definition.llmId);
+    if (ids === undefined) return;
+    const index = ids.indexOf(definition.id);
+    if (index !== -1) ids.splice(index, 1);
+    if (ids.length === 0) this.idsByLlmId.delete(definition.llmId);
+  }
+
   remove(toolId: string): boolean {
     const previous = this.tools.get(toolId);
     if (previous === undefined) return false;

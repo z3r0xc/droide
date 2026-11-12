@@ -2,7 +2,7 @@
 
 Reads and resolves the extension configuration a session sees. Contract:
 `specs/60-extensions-mcp-and-skills.md`. Nothing here connects to a server,
-runs a plugin or spawns a process: paths, file readers and clocks are injected,
+runs a plugin or spawns a process: paths and file readers are injected,
 and every name is derived deterministically.
 
 | Mechanism | Config and assets                                                                                | Merge direction                                                                                                                                                                   |

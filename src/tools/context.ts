@@ -29,3 +29,15 @@ export interface ReadTracker {
   record(path: string, record: ReadRecord): void;
   check(path: string): ReadRecord | undefined;
 }
+/** The default tracker: one record per path, replaced by each read. */
+export class FileReadTracker implements ReadTracker {
+  private readonly records = new Map<string, ReadRecord>();
+
+  record(path: string, record: ReadRecord): void {
+    this.records.set(path, record);
+  }
+
+  check(path: string): ReadRecord | undefined {
+    return this.records.get(path);
+  }
+}

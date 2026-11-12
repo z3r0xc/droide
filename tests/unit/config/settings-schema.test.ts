@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  InvalidSettingsError,
-  UnknownSettingError,
-} from "../../../src/config/errors.ts";
+import { InvalidSettingsError } from "../../../src/config/errors.ts";
 import {
   parseSettingsDocument,
   parseSettingsText,
@@ -103,31 +100,25 @@ test("a string is never coerced into a number", () => {
   );
 });
 
-test("an unknown top-level key is refused", () => {
-  assert.throws(
-    () => parseSettingsDocument({ notASetting: true }, SOURCE),
-    (error: unknown) => {
-      assert.ok(error instanceof UnknownSettingError);
-      assert.equal(error.keyPath, "notASetting");
-      assert.match(error.message, /Unknown setting "notASetting"/);
-      return true;
-    },
+test("an unknown top-level key is ignored", () => {
+  const settings = parseSettingsDocument(
+    { notASetting: true, theme: "dark" },
+    SOURCE,
   );
+
+  assert.deepEqual(settings, { general: { theme: "dark" } });
 });
 
-test("an unknown key inside a structured section is refused", () => {
-  assert.throws(
-    () =>
-      parseSettingsDocument(
-        { mcp: { context7: { command: "npx", nope: true } } },
-        SOURCE,
-      ),
-    (error: unknown) => {
-      assert.ok(error instanceof UnknownSettingError);
-      assert.equal(error.keyPath, "mcp.context7.nope");
-      return true;
-    },
+test("an unknown key inside a structured section is ignored", () => {
+  const settings = parseSettingsDocument(
+    { mcp: { context7: { command: "npx", nope: true } } },
+    SOURCE,
   );
+
+  const server = settings.mcp?.["context7"];
+  assert.ok(server !== undefined && "command" in server);
+  assert.equal(server.command, "npx");
+  assert.equal("nope" in server, false);
 });
 
 test('the "general" wrapper is refused, as the subject refuses it', () => {
@@ -176,14 +167,16 @@ test("comment markers inside strings survive JSONC stripping", () => {
   assert.equal(settings.general?.theme, "a//b/*c*/");
 });
 
-test("an unknown hook event is refused", () => {
-  assert.throws(
-    () => parseSettingsDocument({ hooks: { NotAnEvent: [] } }, SOURCE),
-    (error: unknown) => {
-      assert.ok(error instanceof UnknownSettingError);
-      assert.equal(error.keyPath, "hooks.NotAnEvent");
-      return true;
-    },
+test("an unknown hook event is ignored", () => {
+  const settings = parseSettingsDocument(
+    { hooks: { NotAnEvent: [], Stop: [] } },
+    SOURCE,
+  );
+
+  assert.deepEqual(settings.hooks?.Stop, []);
+  assert.equal(
+    settings.hooks !== undefined && "NotAnEvent" in settings.hooks,
+    false,
   );
 });
 

@@ -57,22 +57,6 @@ export class InvalidSettingsError extends ConfigError {
 }
 
 /**
- * A key this build does not know. Rejecting it keeps a typo from being silently
- * ignored; the settings vocabulary is closed until a spec adds a key.
- */
-export class UnknownSettingError extends ConfigError {
-  readonly path: string;
-  readonly keyPath: string;
-
-  constructor(path: string, keyPath: string) {
-    super(`Unknown setting "${keyPath}" in ${path}`);
-    this.name = "UnknownSettingError";
-    this.path = path;
-    this.keyPath = keyPath;
-  }
-}
-
-/**
  * `paths.ts` only models the three operating systems the CLI ships for. Any
  * other `process.platform` is refused rather than guessed at.
  */

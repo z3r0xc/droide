@@ -296,19 +296,6 @@ function expectBooleanRecord(
   return result;
 }
 
-function rejectUnknownKeys(
-  raw: RawObject,
-  allowed: AllowedKeys,
-  path: string,
-  keyPath: string,
-): void {
-  for (const key of Object.keys(raw)) {
-    if (allowed[key] !== true) {
-      throw new UnknownSettingError(path, joinKeyPath(keyPath, key));
-    }
-  }
-}
-
 function readOptionalString(
   raw: RawObject,
   key: string,
@@ -469,7 +456,6 @@ function parseCustomModel(
   keyPath: string,
 ): CustomModelSettings {
   const raw = expectObject(value, path, keyPath);
-  rejectUnknownKeys(raw, CUSTOM_MODEL_KEYS, path, keyPath);
 
   const model = expectString(raw.model, path, joinKeyPath(keyPath, "model"));
   if (model.trim() === "") {
@@ -632,7 +618,6 @@ function parseMcpServer(
       : expectString(raw.type, path, joinKeyPath(keyPath, "type"));
 
   if (type === undefined || type === "stdio") {
-    rejectUnknownKeys(raw, MCP_STDIO_KEYS, path, keyPath);
     const command = expectString(
       raw.command,
       path,
@@ -657,7 +642,6 @@ function parseMcpServer(
   }
 
   if (type === "http" || type === "sse") {
-    rejectUnknownKeys(raw, MCP_REMOTE_KEYS, path, keyPath);
     const url = expectString(raw.url, path, joinKeyPath(keyPath, "url"));
     if (!HTTP_URL.test(url)) {
       throw new InvalidSettingsError(
@@ -708,7 +692,6 @@ function parseHookCommand(
   keyPath: string,
 ): HookCommandSettings {
   const raw = expectObject(value, path, keyPath);
-  rejectUnknownKeys(raw, HOOK_COMMAND_KEYS, path, keyPath);
   const type = expectString(raw.type, path, joinKeyPath(keyPath, "type"));
   if (type !== "command") {
     throw new InvalidSettingsError(
@@ -743,7 +726,6 @@ function parseHookConfig(
   keyPath: string,
 ): HookConfigSettings {
   const raw = expectObject(value, path, keyPath);
-  rejectUnknownKeys(raw, HOOK_KEYS, path, keyPath);
   const matcher = readOptionalString(raw, "matcher", path, keyPath);
   const commandRegex = readOptionalString(raw, "commandRegex", path, keyPath);
   if (!Array.isArray(raw.hooks)) {
@@ -769,7 +751,6 @@ function parseHookConfig(
 
 function parseHooksSection(value: unknown, path: string): HooksSettings {
   const raw = expectObject(value, path, "hooks");
-  rejectUnknownKeys(raw, HOOK_SECTION_KEYS, path, "hooks");
 
   const events: { [Event in HookEvent]?: readonly HookConfigSettings[] } = {};
   for (const event of HOOK_EVENT_NAMES) {
@@ -836,7 +817,6 @@ export function parseSettingsDocument(raw: unknown, source: string): Settings {
       'general settings belong at the root of the document; the "general" wrapper is not supported',
     );
   }
-  rejectUnknownKeys(root, SETTINGS_KEYS, source, "");
 
   const hasGeneral = Object.keys(root).some(
     (key) => GENERAL_KEYS[key] === true,

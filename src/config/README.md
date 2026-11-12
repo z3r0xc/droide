@@ -5,15 +5,15 @@ Contract: `specs/10-cli-surface.md` B77-B79 and "Settings files";
 
 ## Precedence
 
-Highest priority first. A lower layer fills only keys the layers above it left
-absent; lists and scalars are replaced whole.
+Highest priority first; org policy sits above the runtime overlay
+(`specs/10-cli-surface.md` B78). A lower layer fills only keys the layers above
+it left absent; lists and scalars are replaced whole.
 
 1. **org policy** — remote; injected as `orgSettings`.
 2. **runtime overlay** — `--settings <path>`, else
-   `FACTORY_RUNTIME_SETTINGS_PATH`. The path is trimmed, `~` expanded and
-   anchored at the launch directory (B65/B68); a blank flag falls through to
-   the variable. An unreadable path is _dropped_ and recorded (B79), never
-   fatal; invalid content throws.
+   `FACTORY_RUNTIME_SETTINGS_PATH`; trimmed, `~` expanded, anchored at the
+   launch dir (B65/B68), blank flag falls through. Unreadable paths are
+   _dropped_ and recorded (B79); invalid content throws.
 3. **project** — `<cwd>/.factory/settings.json`.
 4. **user** — `<base>/settings.json`.
 
@@ -36,5 +36,5 @@ absent; lists and scalars are replaced whole.
 `paths.ts` is the only module that reads `process.*` / `os.homedir()`; every
 other module takes an injected `Environment` (`env`, `home`, `platform`,
 `cwd`), so tests never touch a real home. `schema.ts` rejects a wrong type with
-`InvalidSettingsError` naming the dotted key path and an unknown key with
-`UnknownSettingError`.
+`InvalidSettingsError` naming the dotted key path; unknown keys are ignored
+there because the subject's zod objects strip them.

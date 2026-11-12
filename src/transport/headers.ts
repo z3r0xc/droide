@@ -22,7 +22,15 @@ export const HEADER_NAMES = {
   whoamiExtended: "X-Factory-Whoami-Extended",
   sessionAttribution: "X-Factory-Session-Attribution",
   contentType: "Content-Type",
+  traceparent: "traceparent",
 } as const;
+
+/**
+ * B17: managed model requests to the proxy carry a `User-Agent`. The name is
+ * not in the spec's literal header table, which lists protocol headers only,
+ * so it is exported separately.
+ */
+export const USER_AGENT_HEADER = "User-Agent";
 
 /** `usage` is a managed-LLM proxy route; `operational` is everything else. */
 export type HeaderPurpose = "operational" | "usage";
@@ -54,6 +62,8 @@ export interface HeaderContext {
   readonly contentType?: string | null;
   /** W3C trace context, already injected by the tracing boundary (B18). */
   readonly traceparent?: string | null;
+  /** B17: the caller product's user agent, sent only when it supplies one. */
+  readonly userAgent?: string | null;
 }
 
 /** A header group; values may be absent and are then skipped. */
@@ -117,6 +127,37 @@ export function buildHeaders(
     headers[HEADER_NAMES.contentType] = context.contentType;
   }
 
+  if (context.traceparent !== undefined && context.traceparent !== null) {
+    headers[HEADER_NAMES.traceparent] = context.traceparent;
+  }
+
+  if (context.userAgent !== undefined && context.userAgent !== null) {
+    headers[USER_AGENT_HEADER] = context.userAgent;
+  }
+
+  return headers;
+}
+
+/**
+ * B22: a customer-Prem authentication request carries exactly the bearer
+ * credential, the selected organization and a JSON content type when a body is
+ * present. It is deliberately not `buildHeaders`: the Factory client
+ * attribution and version headers do not belong on the Prem authority.
+ */
+export function buildCustomerPremAuthHeaders(
+  snapshot: CredentialSnapshot,
+  hasBody: boolean,
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (snapshot.token !== null && snapshot.token !== "") {
+    headers[HEADER_NAMES.authorization] = `Bearer ${snapshot.token}`;
+  }
+  if (snapshot.organization !== null && snapshot.organization !== "") {
+    headers[HEADER_NAMES.organization] = snapshot.organization;
+  }
+  if (hasBody) {
+    headers[HEADER_NAMES.contentType] = "application/json";
+  }
   return headers;
 }
 
