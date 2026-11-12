@@ -6,12 +6,13 @@ runs `.ts` but not `.tsx`; there is no build step.
 
 ## Token model
 
-`tokens.ts` transcribes D1–D13 as `readonly` data: the eight theme tables
-(`CORE`, `TEXT`, `DIFF`, `MARKDOWN`, `MISSION_CONTROL`, `SYNTAX`, `ANSI`)
-compose into `PALETTE_DARK` / `PALETTE_LIGHT`, plus `GLYPHS`, `SPACING`,
-`BORDERS`, the logo rows, `SPINNERS` and `TIMINGS`. Components never declare a colour
-or glyph literal; they read a slot and pass it through `foreground()` /
-`background()`. D5 and D7 publish no light values, so those slots inherit dark.
+`tokens.ts` transcribes D1–D13 as `readonly` data: seven theme tables (`CORE`,
+`TEXT`, `DIFF`, `MARKDOWN`, `MISSION_CONTROL`, `SYNTAX`, `ANSI`), the D6 badge
+slot order, and `GLYPHS`, `SPACING`, `BORDERS`, the logo rows, `SPINNERS` and
+`TIMINGS`. The tables compose into `PALETTE_DARK` / `PALETTE_LIGHT`; components
+never declare a colour or glyph literal, and pass slots through
+`foreground()` / `background()`. D5 and D7 publish no light values, so those
+slots inherit dark.
 
 ## Capability ladder
 
@@ -35,7 +36,6 @@ live in `tests/unit/ui/frames/`; re-record deliberately with
 unmounted in `finally`, and the frame tests render twice to prove determinism.
 
 Deferred to later slices: the static/dynamic split and live-tail budget (B4),
-thinking/diff/todo/approval/plan renderers (R3, R6, R8–R13), markdown (R2
-plain text here), key handling and paste (B15, B16), the status banner (B12),
-the full footer composition (B13), theme switching/OSC overrides (B17), probe
-execution, sanitisation (B20) and animation (B21).
+the remaining renderers (R3, R6, R8–R13), markdown, keys and paste (B15, B16),
+the status banner (B12), the full footer (B13), theme switching and OSC (B17),
+probe execution, sanitisation (B20) and animation (B21).

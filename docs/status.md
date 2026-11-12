@@ -45,13 +45,13 @@ cargo test --workspace                   # native layer (CI only here)
 | `70-daemon-and-remote-control.md` | review | not started |
 | `80-exec-and-streaming.md` | stable | record types, writer, one-shot runner, validation |
 | `90-native-layer.md` | stable | TypeScript client + Rust helper: search, sandbox, paths, PTY quoting, DPAPI secrets |
-| `95-terminal-ui.md` | review | tokens, frame, header/transcript/composer/status line (in progress) |
+| `95-terminal-ui.md` | review | tokens D1–D13, capability ladder, shell with header/transcript/composer/status line/footer, golden frames at 80×24 and 120×40 |
 
 ## Known gaps and their owners
 
 | Gap | Why | Next step |
 |---|---|---|
-| `droid` interactive mode | TUI is being built on React + Ink (`docs/adr/0006`); the CLI does not dispatch to it yet | M11 |
+| `droid` interactive mode | Ink shell exists and is frame-tested; the CLI does not dispatch to it yet (setup, keys and the remaining renderers are later slices) | M11 |
 | Bare `droide` invocation | fails loudly with exit 64 instead of starting the TUI | removes itself when M11 lands |
 | Native PTY spawn/read loop; macOS/Linux credential stores | only quoting/chunking and DPAPI exist today | next increment of M10b |
 | Session search | literal scan instead of the subject's index planner (documented deviation) | revisit with `40` §B45–B51 |
