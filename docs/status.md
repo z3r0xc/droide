@@ -45,6 +45,7 @@ cargo test --workspace                   # native layer (CI only here)
 | Native helpers (pty/search/secrets/sandbox) | local Rust linker broken (`docs/rust-setup.md`) | repair toolchain, then M10b |
 | Session search | literal scan instead of the subject's index planner (documented deviation) | revisit with `40` §B45–B51 |
 | Context compaction | not implemented | M5 remainder (`20` §B35–B45) |
+| Narrower-than-spec behaviour in 20 places | each is marked `TODO(spec …)` in code | `docs/gaps.md` lists every one with its clause |
 
 ## Gates
 

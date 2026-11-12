@@ -22,6 +22,8 @@ jobs:
         run: npm run typecheck
       - name: Format check
         run: npm run format:check
+      - name: Specification gaps are current
+        run: npm run gaps:check
       - name: Unit and integration tests
         run: npm test
 
