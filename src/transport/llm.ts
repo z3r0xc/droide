@@ -20,6 +20,13 @@ import {
   LlmStreamError,
   type LlmFailureReason,
 } from "./errors.ts";
+import {
+  isRecord,
+  readArray,
+  readNumber,
+  readRecord,
+  readString,
+} from "./schema.ts";
 import type { SseEvent } from "./sse.ts";
 
 /* -------------------------------------------------------------------------- */
@@ -230,42 +237,6 @@ export interface LlmStreamMapper {
 /* Untrusted payload parsing                                                  */
 /* -------------------------------------------------------------------------- */
 
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readString(
-  source: Readonly<Record<string, unknown>>,
-  key: string,
-): string | null {
-  const value = source[key];
-  return typeof value === "string" ? value : null;
-}
-
-function readNumber(
-  source: Readonly<Record<string, unknown>>,
-  key: string,
-): number | null {
-  const value = source[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function readRecord(
-  source: Readonly<Record<string, unknown>>,
-  key: string,
-): Readonly<Record<string, unknown>> | null {
-  const value = source[key];
-  return isRecord(value) ? value : null;
-}
-
-function readArray(
-  source: Readonly<Record<string, unknown>>,
-  key: string,
-): readonly unknown[] | null {
-  const value = source[key];
-  return Array.isArray(value) ? value : null;
-}
-
 /**
  * Decode one `data:` payload. A payload that is not JSON, or not a JSON
  * object, fails without quoting the payload (B111's rule).
@@ -363,7 +334,9 @@ function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
       if (payload === null || finished) {
         return [];
       }
-      const type = readString(payload, "type") ?? event.kind === "data" ? event.event : null;
+      const type =
+        readString(payload, "type") ??
+        (event.kind === "data" ? event.event : null);
       const deltas: LlmStreamDelta[] = [];
 
       switch (type) {
@@ -508,3 +481,488 @@ function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
   };
 }
 "
+/* -------------------------------------------------------------------------- */
+/* Chat Completions (B113, B118, B123)                                        */
+/* -------------------------------------------------------------------------- */
+
+const CHAT_STOP_REASONS: Readonly<Record<string, LlmStopReason>> = {
+  stop: "stop",
+  tool_calls: "tool-use",
+  function_call: "tool-use",
+  length: "length",
+  content_filter: "content-filter",
+};
+
+interface ChatCall {
+  readonly index: number;
+  readonly id: string;
+  readonly name: string;
+  input: string;
+  ended: boolean;
+}
+
+/**
+ * B120/B123: OpenAI's `input_tokens`/`prompt_tokens` is inclusive, so the two
+ * cache buckets are subtracted. `fallbackCached` is the
+ * `fireworks-cached-prompt-tokens` header value.
+ *
+ * TODO(spec B120): the spec names the buckets but not every wire field; both
+ * `input_tokens_details` and `prompt_tokens_details` spellings are accepted.
+ */
+function applyOpenAiUsage(
+  usage: MutableUsage,
+  source: Readonly<Record<string, unknown>>,
+  fallbackCached: number | null,
+): void {
+  const details =
+    readRecord(source, "input_tokens_details") ??
+    readRecord(source, "prompt_tokens_details");
+  const cached =
+    readNumber(source, "cached_tokens") ??
+    (details === null ? null : readNumber(details, "cached_tokens")) ??
+    fallbackCached;
+  const cacheWrite =
+    readNumber(source, "cache_write_tokens") ??
+    (details === null ? null : readNumber(details, "cache_write_tokens")) ??
+    readNumber(source, "cache_creation_tokens");
+  const inclusiveInput =
+    readNumber(source, "input_tokens") ?? readNumber(source, "prompt_tokens");
+  const output =
+    readNumber(source, "output_tokens") ?? readNumber(source, "completion_tokens");
+  const thinking =
+    details === null
+      ? readNumber(source, "reasoning_tokens")
+      : readNumber(details, "reasoning_tokens");
+
+  if (inclusiveInput !== null) {
+    usage.inputTokens = Math.max(
+      0,
+      inclusiveInput - (cached ?? 0) - (cacheWrite ?? 0),
+    );
+  }
+  if (cached !== null) {
+    usage.cacheReadTokens = cached;
+  }
+  if (cacheWrite !== null) {
+    usage.cacheCreationTokens = cacheWrite;
+  }
+  if (output !== null) {
+    usage.outputTokens = output;
+  }
+  if (thinking !== null) {
+    usage.thinkingTokens = thinking;
+  }
+  usage.seen = true;
+}
+
+function createChatMapper(options: LlmStreamOptions): LlmStreamMapper {
+  const { operation } = options;
+  const callsByIndex = new Map<number, ChatCall>();
+  const callsById = new Map<string, ChatCall>();
+  const usage = emptyMutableUsage();
+  let usageEmitted = false;
+  let finished = false;
+  let syntheticIndex = 0;
+
+  const emitUsage = (deltas: LlmStreamDelta[]): void => {
+    if (!usageEmitted && usage.seen) {
+      usageEmitted = true;
+      deltas.push({ kind: "usage", usage: snapshotUsage(usage) });
+    }
+  };
+
+  const endOpenCalls = (deltas: LlmStreamDelta[]): void => {
+    for (const call of callsByIndex.values()) {
+      if (!call.ended) {
+        call.ended = true;
+        deltas.push({
+          kind: "tool-call-end",
+          index: call.index,
+          id: call.id,
+          input: call.input,
+        });
+      }
+    }
+  };
+
+  const newCall = (
+    deltas: LlmStreamDelta[],
+    providerIndex: number | null,
+    id: string | null,
+    name: string | null,
+  ): ChatCall => {
+    const index = providerIndex ?? syntheticIndex++;
+    // B118: a delta may carry only an id; the client id is otherwise derived
+    // from the stream position.
+    // TODO(spec B118): the derived id's exact spelling is not stated.
+    const callId = id === null || id === "" ? `${operation}-${index}` : id;
+    const call: ChatCall = {
+      index,
+      id: callId,
+      name: name ?? "",
+      input: "",
+      ended: false,
+    };
+    callsByIndex.set(index, call);
+    callsById.set(callId, call);
+    deltas.push({ kind: "tool-call-start", index, id: callId, name: call.name });
+    return call;
+  };
+
+  const pushToolCalls = (
+    delta: Readonly<Record<string, unknown>>,
+    deltas: LlmStreamDelta[],
+  ): void => {
+    const toolCalls = readArray(delta, "tool_calls");
+    if (toolCalls === null) {
+      return;
+    }
+    for (const raw of toolCalls) {
+      if (!isRecord(raw)) {
+        continue;
+      }
+      const providerIndex = readNumber(raw, "index");
+      const id = readString(raw, "id");
+      const fn = readRecord(raw, "function");
+      const name = fn === null ? null : readString(fn, "name");
+      const args = fn === null ? null : readString(fn, "arguments");
+
+      let call: ChatCall | undefined;
+      if (providerIndex !== null) {
+        const occupant = callsByIndex.get(providerIndex);
+        if (
+          occupant !== undefined &&
+          id !== null &&
+          id !== "" &&
+          occupant.id !== id
+        ) {
+          // B118: a different non-empty id at an occupied index is a new call;
+          // the earlier call is kept, not concatenated into.
+          call = undefined;
+        } else {
+          call = occupant;
+        }
+      } else if (id !== null && id !== "") {
+        call = callsById.get(id);
+      }
+
+      if (call === undefined) {
+        call = newCall(deltas, providerIndex, id, name);
+      } else if (call.name === "" && name !== null) {
+        call.name = name;
+      }
+
+      if (args !== null && args !== "") {
+        call.input += args;
+        deltas.push({
+          kind: "tool-call-args",
+          index: call.index,
+          id: call.id,
+          delta: args,
+        });
+      }
+    }
+  };
+
+  return {
+    push(event: SseEvent): LlmStreamDelta[] {
+      const payload = parseStreamPayload(event, operation);
+      if (payload === null || finished) {
+        return [];
+      }
+      const deltas: LlmStreamDelta[] = [];
+
+      const usageRecord = readRecord(payload, "usage");
+      if (usageRecord !== null) {
+        applyOpenAiUsage(
+          usage,
+          usageRecord,
+          options.cachedPromptTokensHeader ?? null,
+        );
+        emitUsage(deltas);
+      }
+
+      // B113: a chunk without `choices` (reasoning-only, or a usage tail) is
+      // tolerated.
+      const choices = readArray(payload, "choices");
+      if (choices !== null) {
+        for (const raw of choices) {
+          if (!isRecord(raw)) {
+            continue;
+          }
+          const delta = readRecord(raw, "delta");
+          if (delta !== null) {
+            const text = readString(delta, "content");
+            if (text !== null && text !== "") {
+              deltas.push({ kind: "text", text });
+            }
+            pushToolCalls(delta, deltas);
+          }
+          const finish = readString(raw, "finish_reason");
+          if (finish !== null) {
+            // B113: `finish_reason` is terminal.
+            endOpenCalls(deltas);
+            emitUsage(deltas);
+            deltas.push({
+              kind: "completed",
+              stopReason: CHAT_STOP_REASONS[finish] ?? "unknown",
+            });
+            finished = true;
+          }
+        }
+      }
+      return deltas;
+    },
+    finish(): LlmStreamDelta[] {
+      if (finished) {
+        return [];
+      }
+      const deltas: LlmStreamDelta[] = [];
+      endOpenCalls(deltas);
+      emitUsage(deltas);
+      deltas.push({ kind: "completed", stopReason: "unknown" });
+      finished = true;
+      return deltas;
+    },
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responses (B116, B119)                                                     */
+/* -------------------------------------------------------------------------- */
+
+interface ResponseCall {
+  readonly index: number;
+  readonly id: string;
+  readonly name: string;
+  input: string;
+  ended: boolean;
+}
+
+const RESPONSE_FUNCTION_ITEMS: Readonly<Record<string, true>> = {
+  function_call: true,
+  custom_tool_call: true,
+};
+
+function createResponsesMapper(options: LlmStreamOptions): LlmStreamMapper {
+  const { operation } = options;
+  const callsById = new Map<string, ResponseCall>();
+  const usage = emptyMutableUsage();
+  let usageEmitted = false;
+  let finished = false;
+  let syntheticIndex = 0;
+
+  const emitUsage = (deltas: LlmStreamDelta[]): void => {
+    if (!usageEmitted && usage.seen) {
+      usageEmitted = true;
+      deltas.push({ kind: "usage", usage: snapshotUsage(usage) });
+    }
+  };
+
+  const endCall = (call: ResponseCall, deltas: LlmStreamDelta[]): void => {
+    if (call.ended) {
+      return;
+    }
+    call.ended = true;
+    deltas.push({
+      kind: "tool-call-end",
+      index: call.index,
+      id: call.id,
+      input: call.input,
+    });
+  };
+
+  const callFor = (itemId: string | null): ResponseCall | undefined =>
+    itemId === null ? undefined : callsById.get(itemId);
+
+  const addItem = (
+    item: Readonly<Record<string, unknown>>,
+    outputIndex: number | null,
+    deltas: LlmStreamDelta[],
+  ): void => {
+    const itemType = readString(item, "type");
+    if (itemType === null || RESPONSE_FUNCTION_ITEMS[itemType] !== true) {
+      return;
+    }
+    const id = readString(item, "call_id") ?? readString(item, "id");
+    if (id === null || id === "") {
+      return;
+    }
+    const index = outputIndex ?? syntheticIndex++;
+    const call: ResponseCall = {
+      index,
+      id,
+      name: readString(item, "name") ?? "",
+      input: readString(item, "arguments") ?? readString(item, "input") ?? "",
+      ended: false,
+    };
+    callsById.set(id, call);
+    deltas.push({ kind: "tool-call-start", index, id, name: call.name });
+  };
+
+  return {
+    push(event: SseEvent): LlmStreamDelta[] {
+      const payload = parseStreamPayload(event, operation);
+      if (payload === null || finished) {
+        return [];
+      }
+      const deltas: LlmStreamDelta[] = [];
+      const type = readString(payload, "type");
+
+      switch (type) {
+        case "response.output_text.delta": {
+          const delta = readString(payload, "delta");
+          if (delta !== null && delta !== "") {
+            deltas.push({ kind: "text", text: delta });
+          }
+          return deltas;
+        }
+        case "response.reasoning_summary_text.delta":
+        case "response.reasoning_text.delta": {
+          const delta = readString(payload, "delta");
+          if (delta !== null && delta !== "") {
+            deltas.push({ kind: "thinking", text: delta });
+          }
+          return deltas;
+        }
+        case "response.output_item.added": {
+          const item = readRecord(payload, "item");
+          if (item !== null) {
+            addItem(item, readNumber(payload, "output_index"), deltas);
+          }
+          return deltas;
+        }
+        case "response.function_call_arguments.delta":
+        case "response.custom_tool_call_input.delta": {
+          const call = callFor(readString(payload, "item_id"));
+          const delta = readString(payload, "delta");
+          if (call !== undefined && delta !== null && delta !== "") {
+            call.input += delta;
+            deltas.push({
+              kind: "tool-call-args",
+              index: call.index,
+              id: call.id,
+              delta,
+            });
+          }
+          return deltas;
+        }
+        case "response.function_call_arguments.done":
+        case "response.custom_tool_call_input.done": {
+          const call = callFor(readString(payload, "item_id"));
+          if (call === undefined) {
+            return deltas;
+          }
+          // B119: a non-empty done payload replaces the buffered deltas; an
+          // empty one does not erase them.
+          const done =
+            readString(payload, "arguments") ?? readString(payload, "input");
+          if (done !== null && done !== "") {
+            call.input = done;
+          }
+          endCall(call, deltas);
+          return deltas;
+        }
+        case "response.output_item.done": {
+          const item = readRecord(payload, "item");
+          if (item !== null) {
+            const id = readString(item, "call_id") ?? readString(item, "id");
+            const call = callFor(id);
+            if (call !== undefined && call.input === "") {
+              const final =
+                readString(item, "arguments") ?? readString(item, "input");
+              if (final !== null && final !== "") {
+                call.input = final;
+              }
+            }
+            if (call !== undefined) {
+              endCall(call, deltas);
+            }
+          }
+          return deltas;
+        }
+        case "response.completed":
+        case "response.incomplete": {
+          const response = readRecord(payload, "response");
+          const usageRecord = response === null ? null : readRecord(response, "usage");
+          if (usageRecord !== null) {
+            applyOpenAiUsage(usage, usageRecord, null);
+          }
+          emitUsage(deltas);
+          endAll(deltas);
+          deltas.push({
+            kind: "completed",
+            stopReason: type === "response.incomplete" ? "length" : "stop",
+          });
+          finished = true;
+          return deltas;
+        }
+        case "response.failed":
+        case "error": {
+          deltas.push({
+            kind: "failed",
+            reason: "unknown",
+            message: LLM_FAILURE_MESSAGES.unknown,
+          });
+          finished = true;
+          return deltas;
+        }
+        default:
+          return deltas;
+      }
+    },
+    finish(): LlmStreamDelta[] {
+      if (finished) {
+        return [];
+      }
+      const deltas: LlmStreamDelta[] = [];
+      emitUsage(deltas);
+      endAll(deltas);
+      deltas.push({ kind: "completed", stopReason: "unknown" });
+      finished = true;
+      return deltas;
+    },
+  };
+
+  function endAll(deltas: LlmStreamDelta[]): void {
+    for (const call of callsById.values()) {
+      endCall(call, deltas);
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Entry points                                                               */
+/* -------------------------------------------------------------------------- */
+
+/** One mapper per dialect; no other branch reads a provider name. */
+export function createStreamMapper(
+  dialect: LlmDialect,
+  options: LlmStreamOptions,
+): LlmStreamMapper {
+  switch (dialect) {
+    case "anthropic":
+      return createAnthropicMapper(options);
+    case "responses":
+      return createResponsesMapper(options);
+    case "chat":
+      return createChatMapper(options);
+  }
+}
+
+/** Map a whole parsed stream, finalizing a stream that never terminated. */
+export async function* mapStream(
+  events: AsyncIterable<SseEvent>,
+  dialect: LlmDialect,
+  options: LlmStreamOptions,
+): AsyncGenerator<LlmStreamDelta, void, void> {
+  const mapper = createStreamMapper(dialect, options);
+  for await (const event of events) {
+    for (const delta of mapper.push(event)) {
+      yield delta;
+    }
+  }
+  for (const delta of mapper.finish()) {
+    yield delta;
+  }
+}

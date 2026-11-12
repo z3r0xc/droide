@@ -2,13 +2,11 @@
 
 Contract: `specs/80-exec-and-streaming.md` (B18-B34, B54-B57).
 
-| Module | Responsibility |
-|---|---|
-| `records.ts` | The seven stream-json records, the `-o json` summary, their builders, and the `--input-format stream-json` line validator |
-| `writer.ts` | One JSON object per `\n`-terminated line over an injected `Writable`; flushes; tolerates a broken pipe |
-| `turn.ts` | `TurnRunner` seam and `runOneShot` / `runOneShotSummary` orchestration |
-| `validate.ts` | Option validation that throws `ExecUsageError` before any session work |
-| `errors.ts` | `ExecUsageError`, `ExecStreamError`, `ExecAbortedError` |
+`records.ts` builds the seven stream-json records and the `-o json` summary and
+validates `--input-format stream-json` lines. `writer.ts` writes one JSON object
+per `\n`-terminated line to an injected `Writable`. `turn.ts` owns the
+`TurnRunner` seam plus `runOneShot`/`runOneShotSummary`. `validate.ts` throws
+`ExecUsageError` before session work; `errors.ts` defines the typed failures.
 
 ## Record kinds (`-o stream-json`)
 
@@ -31,16 +29,13 @@ content). Then one record per non-empty content block, in block order; all
 blocks of one message share its `id` and `timestamp`. A `progressUpdate`
 thinking block is an assistant `message`, not `reasoning`. `tool_result.toolId`
 resolves from calls seen in this process, else `""`. Success ends with exactly
-one `completion`; failure ends with exactly one terminal `error` (`source:"cli"`)
-and no `completion`. Stdout carries records only; diagnostics go to stderr.
+one `completion`; failure ends with exactly one terminal `error`
+(`source:"cli"`) and no `completion`. Stdout carries records only.
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
-| `0` | turn completed (or completed stream), help/list-tools |
+| `0` | turn completed, help/list-tools, or broken pipe after the result was chosen |
 | `1` | usage error, failed or cancelled turn, provider error |
 | `130` / `143` | SIGINT / SIGTERM; a signal outranks every turn outcome |
-
-A broken stdout pipe closes the writer and still exits `0` once the result was
-chosen.
