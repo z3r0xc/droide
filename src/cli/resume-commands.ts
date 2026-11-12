@@ -216,6 +216,7 @@ export function execArgvFor(
     fork: undefined,
     mission: false,
     useSpec: false,
+    disableBuiltinSkills: false,
     specModel: undefined,
     listTools: false,
     onlyTools: [],

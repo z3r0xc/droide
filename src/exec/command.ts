@@ -118,6 +118,7 @@ export interface ExecArgv {
   readonly fork: string | undefined;
   readonly mission: boolean;
   readonly useSpec: boolean;
+  readonly disableBuiltinSkills: boolean;
   readonly specModel: string | undefined;
   readonly listTools: boolean;
   readonly onlyTools: readonly string[];
@@ -519,15 +520,6 @@ function assertImplemented(
         "not implemented in this build.",
     );
   }
-  if (
-    argv.appendSystemPrompt !== undefined ||
-    argv.appendSystemPromptFile !== undefined
-  ) {
-    throw new ExecCommandError(
-      "--append-system-prompt and --append-system-prompt-file are not " +
-        "implemented in this build.",
-    );
-  }
   if (argv.worktree !== undefined || argv.worktreeDir !== undefined) {
     throw new ExecCommandError(
       "Worktree options are not implemented in this build.",
@@ -752,7 +744,16 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
 
   // B14/20 B35: the prompt is composed by the one builder that owns identity,
   // environment, the skills listing and project instructions.
-  const systemPrompt = await buildStartupPrompt({ context });
+  const systemPrompt = await buildStartupPrompt({
+    context,
+    ...(argv.appendSystemPrompt === undefined
+      ? {}
+      : { appendSystemPrompt: argv.appendSystemPrompt }),
+    ...(argv.appendSystemPromptFile === undefined
+      ? {}
+      : { appendSystemPromptFile: argv.appendSystemPromptFile }),
+    ...(argv.disableBuiltinSkills ? { disableBuiltinSkills: true } : {}),
+  });
 
   const provider = createLlmProvider({
     url: target.url,
