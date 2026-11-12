@@ -51,7 +51,7 @@ cargo test --workspace                   # native layer (CI only here)
 
 | Gap | Why | Next step |
 |---|---|---|
-| `droid` interactive mode | Ink shell exists and is frame-tested; the CLI does not dispatch to it yet (setup, keys and the remaining renderers are later slices) | M11 |
+| `droid` interactive mode | Ink shell exists and is frame-tested, but has no key handling yet; dispatching to a UI that ignores input would be worse than the loud refusal, so the CLI still exits 64 | M11: keys, setup, dispatch |
 | Bare `droide` invocation | fails loudly with exit 64 instead of starting the TUI | removes itself when M11 lands |
 | Native PTY spawn/read loop; macOS/Linux credential stores | only quoting/chunking and DPAPI exist today | next increment of M10b |
 | Session search | literal scan instead of the subject's index planner (documented deviation) | revisit with `40` §B45–B51 |

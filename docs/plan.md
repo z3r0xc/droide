@@ -47,7 +47,7 @@ sections and ADRs.
 | M9 | Daemon and remote control | `specs/70-daemon-and-remote-control.md` | handshake/version negotiation, single-instance lock |
 | M10a | Native **contract** in TypeScript: JSON-lines client, response validation, failure mapping | `specs/90-native-layer.md` | stub-helper integration tests; no leaked child processes |
 | M10b | Native **implementation** in Rust: search, sandbox, paths, protocol (pty and secrets next) | `specs/90-native-layer.md`, `crates/` | `cargo test --workspace` locally and in CI — toolchain fixed, see `docs/rust-setup.md` |
-| M11 | Terminal UI | `specs/95-terminal-ui.md` | frame tests for a fixed terminal size; no flake on time |
+| M11 | Terminal UI | `specs/95-terminal-ui.md` | shell + tokens + golden frames **done**; keys, setup and CLI dispatch pending |
 
 ## Definition of done (each milestone)
 
