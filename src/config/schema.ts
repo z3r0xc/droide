@@ -849,7 +849,7 @@ export function parseSettingsDocument(raw: unknown, source: string): Settings {
       : expectStringArray(root.commands, source, "commands");
 
   return {
-    ...(general === undefined ? {} : { general }),
+    ...(general === undefined ? {} : general),
     ...(mcp === undefined ? {} : { mcp }),
     ...(hooks === undefined ? {} : { hooks }),
     ...(droids === undefined ? {} : { droids }),

@@ -68,12 +68,9 @@ test("resolves the on-disk layers for an isolated home and project", async () =>
       flagSettings: overlayFile,
     });
 
-    assert.equal(resolved.settings.general?.theme, "light");
-    assert.equal(resolved.settings.general?.locale, "en-GB");
-    assert.equal(
-      resolved.settings.general?.worktreeDirectory,
-      "/runtime-worktrees",
-    );
+    assert.equal(resolved.settings.theme, "light");
+    assert.equal(resolved.settings.locale, "en-GB");
+    assert.equal(resolved.settings.worktreeDirectory, "/runtime-worktrees");
     assert.deepEqual(resolved.settings.skills, ["user-skill"]);
     assert.deepEqual(
       resolved.layers.map((layer) => layer.source),
@@ -102,7 +99,7 @@ test("an explicit user settings path is anchored at the launch directory", async
       userSettingsFile: "alt/settings.json",
     });
 
-    assert.equal(resolved.settings.general?.theme, "alt");
+    assert.equal(resolved.settings.theme, "alt");
     assert.deepEqual(
       resolved.layers.map((layer) => layer.level),
       ["user"],

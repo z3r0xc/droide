@@ -51,9 +51,9 @@ test("a complete document validates into the typed settings shape", () => {
     SOURCE,
   );
 
-  assert.equal(settings.general?.worktreeDirectory, "~/worktrees");
-  assert.equal(settings.general?.enabledPlugins?.["acme@tools"], true);
-  assert.equal(settings.general?.customModels?.[0]?.provider, "openai");
+  assert.equal(settings.worktreeDirectory, "~/worktrees");
+  assert.equal(settings.enabledPlugins?.["acme@tools"], true);
+  assert.equal(settings.customModels?.[0]?.provider, "openai");
   const context7 = settings.mcp?.["context7"];
   assert.ok(context7 !== undefined && "command" in context7);
   assert.equal(context7.command, "npx");
@@ -63,6 +63,12 @@ test("a complete document validates into the typed settings shape", () => {
   assert.deepEqual(settings.droids?.reviewer, { description: "Reviews code" });
   assert.deepEqual(settings.skills, ["custom-skill"]);
   assert.deepEqual(settings.commands, ["lint"]);
+});
+
+test("a root-level locale round-trips to settings.locale", () => {
+  const settings = parseSettingsDocument({ locale: "ja-JP" }, SOURCE);
+
+  assert.equal(settings.locale, "ja-JP");
 });
 
 test("a wrong type names the offending key path", () => {
@@ -106,7 +112,7 @@ test("an unknown top-level key is ignored", () => {
     SOURCE,
   );
 
-  assert.deepEqual(settings, { general: { theme: "dark" } });
+  assert.deepEqual(settings, { theme: "dark" });
 });
 
 test("an unknown key inside a structured section is ignored", () => {
@@ -155,7 +161,7 @@ test("JSONC comments and trailing commas are accepted", () => {
     }`,
     SOURCE,
   );
-  assert.equal(settings.general?.theme, "dark");
+  assert.equal(settings.theme, "dark");
   assert.deepEqual(settings.skills, ["one", "two"]);
 });
 
@@ -164,7 +170,7 @@ test("comment markers inside strings survive JSONC stripping", () => {
     '{ "theme": "a//b/*c*/", "worktreeDirectory": "C:/x", }',
     SOURCE,
   );
-  assert.equal(settings.general?.theme, "a//b/*c*/");
+  assert.equal(settings.theme, "a//b/*c*/");
 });
 
 test("an unknown hook event is ignored", () => {

@@ -70,7 +70,7 @@ test("a user settings file applies when it is the only layer", async () => {
 
     const resolved = await resolveSettings(fixture.environment);
 
-    assert.equal(resolved.settings.general?.worktreeDirectory, "/user");
+    assert.equal(resolved.settings.worktreeDirectory, "/user");
     assert.deepEqual(
       resolved.layers.map((layer) => layer.level),
       ["user"],
@@ -89,8 +89,8 @@ test("project settings override user settings", async () => {
 
     const resolved = await resolveSettings(fixture.environment);
 
-    assert.equal(resolved.settings.general?.worktreeDirectory, "/project");
-    assert.equal(resolved.settings.general?.theme, "dark");
+    assert.equal(resolved.settings.worktreeDirectory, "/project");
+    assert.equal(resolved.settings.theme, "dark");
     assert.deepEqual(
       resolved.layers.map((layer) => layer.level),
       ["project", "user"],
@@ -107,7 +107,7 @@ test("the runtime overlay overrides project settings", async () => {
       flagSettings: fixture.overlay,
     });
 
-    assert.equal(resolved.settings.general?.worktreeDirectory, "/runtime");
+    assert.equal(resolved.settings.worktreeDirectory, "/runtime");
     assert.equal(resolved.overlay.kind, "loaded");
     assert.deepEqual(
       resolved.layers.map((layer) => layer.level),
@@ -123,10 +123,10 @@ test("org policy outranks the runtime overlay", async () => {
 
     const resolved = await resolveSettings(fixture.environment, {
       flagSettings: fixture.overlay,
-      orgSettings: { general: { worktreeDirectory: "/org" } },
+      orgSettings: { worktreeDirectory: "/org" },
     });
 
-    assert.equal(resolved.settings.general?.worktreeDirectory, "/org");
+    assert.equal(resolved.settings.worktreeDirectory, "/org");
     assert.deepEqual(
       resolved.layers.map((layer) => layer.level),
       ["org", "runtime", "project"],
@@ -141,8 +141,8 @@ test("a key absent from every layer stays absent", async () => {
 
     const resolved = await resolveSettings(fixture.environment);
 
-    assert.equal(resolved.settings.general?.worktreeDirectory, undefined);
-    assert.equal(resolved.settings.general?.theme, "light");
+    assert.equal(resolved.settings.worktreeDirectory, undefined);
+    assert.equal(resolved.settings.theme, "light");
   });
 });
 
@@ -161,7 +161,7 @@ test("the --settings flag wins over FACTORY_RUNTIME_SETTINGS_PATH", async () => 
       },
       { flagSettings: fixture.overlay },
     );
-    assert.equal(withFlag.settings.general?.theme, "from-flag");
+    assert.equal(withFlag.settings.theme, "from-flag");
 
     const fromEnv = await resolveSettings({
       ...fixture.environment,
@@ -170,7 +170,7 @@ test("the --settings flag wins over FACTORY_RUNTIME_SETTINGS_PATH", async () => 
         FACTORY_RUNTIME_SETTINGS_PATH: fixture.overlayFromEnv,
       },
     });
-    assert.equal(fromEnv.settings.general?.theme, "from-env");
+    assert.equal(fromEnv.settings.theme, "from-env");
 
     const blankFlag = await resolveSettings(
       {
@@ -182,7 +182,7 @@ test("the --settings flag wins over FACTORY_RUNTIME_SETTINGS_PATH", async () => 
       },
       { flagSettings: "   " },
     );
-    assert.equal(blankFlag.settings.general?.theme, "from-env");
+    assert.equal(blankFlag.settings.theme, "from-env");
   });
 });
 
@@ -264,7 +264,7 @@ test("an unknown key in a settings file is ignored", async () => {
 
     const resolved = await resolveSettings(fixture.environment);
 
-    assert.deepEqual(resolved.settings, { general: { theme: "dark" } });
+    assert.deepEqual(resolved.settings, { theme: "dark" });
   });
 });
 

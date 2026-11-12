@@ -7,7 +7,11 @@
  * non-interactive environment), B30 (timeout accounting and tree kill) and B31
  * (fire-and-forget). Spec text that this build cannot honour carries a TODO.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import {
+  spawn,
+  spawnSync,
+  type ChildProcess,
+} from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as nodePath from "node:path";
@@ -119,6 +123,11 @@ function executablePath(environment: Environment): string {
   );
 }
 
+function taskkillPath(environment: Environment): string {
+  const root = environment.env.SystemRoot ?? "C:\\Windows";
+  return nodePath.win32.join(root, "System32", "taskkill.exe");
+}
+
 /** B28/B29: the environment the child receives. */
 export function childEnvironment(
   environment: Environment,
@@ -141,11 +150,18 @@ function killTree(child: ChildProcess, environment: Environment): boolean {
   const pid = child.pid;
   if (pid === undefined) return false;
   if (environment.platform === "win32") {
-    spawn("taskkill.exe", ["/PID", String(pid), "/T", "/F"], {
+    // Synchronous so the whole tree is gone before the caller treats the call
+    // as finished; a surviving grandchild would keep the output pipe open.
+    spawnSync(taskkillPath(environment), ["/PID", String(pid), "/T", "/F"], {
       stdio: "ignore",
       windowsHide: true,
-    }).on("error", () => undefined);
-    child.kill();
+      timeout: 10_000,
+    });
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      // Already gone.
+    }
     return true;
   }
   try {
@@ -173,41 +189,47 @@ function startChild(
 ): ChildProcess {
   const environment = context.environment;
   const env = childEnvironment(environment);
+  const outputHandle =
+    outputFile === undefined ? undefined : fs.openSync(outputFile, "a");
   const stdio: Array<"ignore" | "pipe" | number> =
-    outputFile === undefined
+    outputHandle === undefined
       ? ["ignore", "pipe", "pipe"]
-      : ["ignore", fs.openSync(outputFile, "a"), fs.openSync(outputFile, "a")];
-  if (environment.platform === "win32") {
-    return spawn(
-      executablePath(environment),
-      [
-        "-NoLogo",
-        "-NonInteractive",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-Command",
-        input.command,
-      ],
-      {
-        cwd: context.root,
-        env,
-        stdio,
-        shell: false,
-        windowsHide: true,
-        detached: outputFile !== undefined,
-      },
-    );
+      : ["ignore", outputHandle, outputHandle];
+  try {
+    if (environment.platform === "win32") {
+      return spawn(
+        executablePath(environment),
+        [
+          "-NoLogo",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-Command",
+          input.command,
+        ],
+        {
+          cwd: context.root,
+          env,
+          stdio,
+          shell: false,
+          windowsHide: true,
+          detached: outputFile !== undefined,
+        },
+      );
+    }
+    return spawn(input.command, [], {
+      cwd: context.root,
+      env,
+      stdio,
+      shell: "bash",
+      windowsHide: true,
+      // A detached leader owns its process group, which is what the tree kill
+      // signals. `TODO(spec B28)`: the subject keeps `detached:false` on POSIX.
+      detached: true,
+    });
+  } finally {
+    if (outputHandle !== undefined) fs.closeSync(outputHandle);
   }
-  return spawn(input.command, [], {
-    cwd: context.root,
-    env,
-    stdio,
-    shell: "bash",
-    windowsHide: true,
-    // A detached leader owns its process group, which is what the tree kill
-    // signals. `TODO(spec B28)`: the subject keeps `detached:false` on POSIX.
-    detached: true,
-  });
 }
 
 async function runForeground(
@@ -259,6 +281,27 @@ async function runForeground(
     settled = true;
     if (timer !== undefined) clearTimeout(timer);
     reject(new ToolFailure(`Failed to start command: ${error.message}`));
+  });
+  child.once("exit", (code, signal) => {
+    // A killed tree can leave a descendant holding the output pipe; once the
+    // leader is gone the call is over, so do not wait for stdio to drain.
+    if (settled || !timedOut) return;
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      resolve({
+        output,
+        exitCode: null,
+        signal: signal ?? "SIGKILL",
+        stoppedProcesses,
+        timedOut,
+        ...(pid === undefined ? {} : { pid }),
+      });
+    }, 100).unref();
+    void code;
   });
   child.once("close", (code, signal) => {
     if (settled) return;

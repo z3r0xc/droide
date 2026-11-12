@@ -28,7 +28,7 @@ it left absent; lists and scalars are replaced whole.
 | `<cwd>/.factory/settings.json`        | project settings                                |
 | `<base>/sessions/`                    | transcripts, `<project key>/<session id>.jsonl` |
 | `<base>/cache/session-index/index.db` | session index                                   |
-| `<base>/worktrees/`                   | default `general.worktreeDirectory` root        |
+| `<base>/worktrees/`                   | default `worktreeDirectory` root                |
 | `<base>/temp/`, `<base>/logs/`        | scratch and logs                                |
 
 ## Boundaries

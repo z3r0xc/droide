@@ -185,13 +185,6 @@ async function resolveOverlay(
  * must not inherit the lower layer's `command` when it defines a `url`.
  */
 export function mergeSettings(lower: Settings, higher: Settings): Settings {
-  const general =
-    lower.general === undefined
-      ? higher.general
-      : higher.general === undefined
-        ? lower.general
-        : { ...lower.general, ...higher.general };
-
   const mcp =
     lower.mcp === undefined
       ? higher.mcp
@@ -220,19 +213,15 @@ export function mergeSettings(lower: Settings, higher: Settings): Settings {
         ? lower.outputStyles
         : { ...lower.outputStyles, ...higher.outputStyles };
 
-  // `skills` and `commands` are lists: a higher layer replaces the list.
-  const skills = higher.skills === undefined ? lower.skills : higher.skills;
-  const commands =
-    higher.commands === undefined ? lower.commands : higher.commands;
-
+  // General keys, `skills` and `commands` are scalars or lists: `higher`
+  // replaces them, and an absent property in `higher` leaves `lower`'s.
   return {
-    ...(general === undefined ? {} : { general }),
+    ...lower,
+    ...higher,
     ...(mcp === undefined ? {} : { mcp }),
     ...(hooks === undefined ? {} : { hooks }),
     ...(droids === undefined ? {} : { droids }),
-    ...(skills === undefined ? {} : { skills }),
     ...(outputStyles === undefined ? {} : { outputStyles }),
-    ...(commands === undefined ? {} : { commands }),
   };
 }
 
