@@ -43,6 +43,7 @@ import { buildHeaders } from "../transport/headers.ts";
 import type { LlmDialect } from "../transport/llm.ts";
 import { joinApiPath, parseApiBaseUrl } from "../transport/urls.ts";
 import { createSessionTooling } from "../app/tooling.ts";
+import { renderToolList } from "./list-tools.ts";
 import type { SearchBackend } from "../tools/native-backend.ts";
 import type { AutonomyLevel } from "../tools/permissions.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
@@ -506,11 +507,6 @@ function assertImplemented(
       "--use-spec and --spec-model are not implemented in this build.",
     );
   }
-  if (argv.listTools) {
-    throw new ExecCommandError(
-      "--list-tools is not implemented in this build.",
-    );
-  }
   if (
     argv.onlyTools.length > 0 ||
     argv.addTools.length > 0 ||
@@ -693,7 +689,8 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
   });
 
   let prompt = "";
-  if (inputFormat !== "stream-json") {
+  // B9: `--list-tools` answers without a prompt, a session or a socket.
+  if (inputFormat !== "stream-json" && !argv.listTools) {
     prompt = await resolvePrompt({
       program: deps.program,
       promptArg: argv.prompt,
@@ -731,6 +728,21 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     skipPermissionsUnsafe: argv.skipPermissionsUnsafe,
   });
   const catalogue = createToolCatalogue(registry, allowed);
+
+  // B9: `--list-tools` answers and exits before a prompt, a session or a
+  // provider request exists.
+  if (argv.listTools) {
+    await writeText(
+      deps.stdout,
+      renderToolList(registry.all(), catalogue, {
+        model: target.wireModel,
+        autonomy: autonomy ?? "off",
+        offered: catalogue.length,
+        withheld: Math.max(0, registry.all().length - catalogue.length),
+      }),
+    );
+    return 0;
+  }
 
   const toolRunner = createExecToolRunner({
     registry,

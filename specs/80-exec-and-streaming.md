@@ -810,3 +810,22 @@ deprecation warning (B41).
 - The hidden internal flags beyond their validation effects.
 - Exact rendered text of provider diagnostics (provider-owned), and the
   `--list-tools` section ordering beyond the documented categories.
+
+### Recorded addition: the `--list-tools` layout
+
+The clause names the flag and says it lists the tools available to the selected
+model; it does not pin the rendering (the original's output was not recovered).
+This build defines it, and the definition is ours:
+
+```
+Tools for model <wire model> (autonomy: <level>) — N offered, M withheld
+    Read        read-cli         Read a text file from the filesystem.
+  - Write       write-cli        Create or overwrite a file with the given content.
+```
+
+Rows are sorted by the model-facing name, then by registry id. A leading `-`
+marks a tool that is registered but not offered to this model (filtered by
+autonomy or tool selection), and the header counts both sides. Descriptions are
+collapsed to one line and cut at 96 characters with an ellipsis. The command
+answers **before** a prompt is resolved, a session is opened or a socket exists —
+that ordering is contractual, the layout is not.
