@@ -17,7 +17,7 @@ cargo test --workspace                   # native layer (CI only here)
 |---|---|
 | Specifications | 11 subsystem specs + shared context, ~8.2k lines, all clauses cited and mapped to tests |
 | TypeScript product layer | 75 files, ~17k lines: CLI, app, config, session, agent, transport, exec, extensions, tools, native client |
-| Tests | 856 TypeScript tests (854 pass, 2 skipped) + 57 Rust tests |
+| Tests | 901 TypeScript tests (898 pass, 3 skipped) + 57 Rust tests |
 | CLI parity | 20/20 recorded cases against the subject |
 | Native (Rust) | `crates/droide-native`: protocol (9 methods), safe paths, file search, sandbox profiles, PTY quoting, DPAPI secrets — 57 tests, clippy `-D warnings`, builds locally |
 
@@ -30,8 +30,9 @@ cargo test --workspace                   # native layer (CI only here)
 | `search\|find` | **done** — store query, text and `--json` output, documented exit codes |
 | `mcp list` | **done** — merged configuration, per-server transport/state, diagnostics, exit 1 on a broken file; never starts a server |
 | `plugin list` | **done** — user and project registries merged (project shadows), highest version per id, enablement from settings, `--scope` |
+| `update --check` | **done** — read-only check against this repository's GitHub releases (ADR 0007); installing is refused with exit 2 |
 | `exec` | **done** for `text`/`json`/`stream-json` with custom and managed models; streaming input, mission, ACP and `--list-tools` are refused loudly |
-| `resume`, `daemon`, `update`, `mcp add/remove/auth/permissions`, `plugin install/uninstall/update/marketplace`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
+| `resume`, `mcp add/remove/auth/permissions`, `plugin install/uninstall/update/marketplace`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
 | bare `droide` | refuses with exit 64 until the interactive UI lands |
 
 ## Specs
