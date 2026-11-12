@@ -1,0 +1,25 @@
+name: Specification gap
+description: A clause is missing, ambiguous, or cannot be implemented as written.
+labels: ["spec"]
+body:
+  - type: input
+    id: clause
+    attributes:
+      label: Clause
+      description: File and clause id (`specs/30-tools-and-sandbox.md` §B23).
+    validations:
+      required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: What is wrong
+      description: Ambiguous wording, missing evidence, or a behaviour the clause cannot express.
+    validations:
+      required: true
+  - type: textarea
+    id: settle
+    attributes:
+      label: What would settle it
+      description: A file to read, a probe to run, or a decision to make.
+    validations:
+      required: true

@@ -1,64 +1,197 @@
-# Droide
+<p align="center"><a href="./README.md">English</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.zh-CN.md">中文</a></p>
 
-A clean-room reimplementation of the `droid` CLI v1.9.0 — same observable
-behaviour and the same terminal design, built from a written specification
-instead of the original source.
+<div align="center">
+  <img src="./docs/assets/hero.svg" width="100%"
+       alt="Droide — a terminal coding agent rebuilt from its specification; one real chain from the repository, spec to code to test">
+</div>
 
-**TypeScript** is the product layer (CLI, agent loop, tools, sessions,
-transport). **Rust** is the native layer (pty, search, secrets, sandbox), behind
-one JSON-lines helper process. Both live in one tree and share one contract:
-`specs/`.
+**Droide** is a clean-room reimplementation of the `droid` CLI v1.9.0: the same
+command surface, help pages, refusals and exit codes, rebuilt from a written
+specification instead of copied source.
 
-## Layout
+The product layer is TypeScript — Node 24, ESM, types stripped at load, no build
+step. The native layer is Rust, behind one JSON-lines child process. Both are
+written against a single contract: [`specs/`](./specs/README.md).
 
+## Why this exists
+
+The specification is the deliverable. The reimplementation is the check that the
+specification is complete and unambiguous enough to build from.
+
+- **SDD — spec first.** Every subsystem has one document under `specs/`, and
+  nothing is implemented before it is specified. Clauses are labelled
+  `[observed]`, `[derived]` or `[inferred]`, and each carries a citation — a
+  recovered file and line, or a recorded golden.
+- **ADD — decisions as records.** Anything that constrains structure is an ADR
+  in [`docs/adr/`](./docs/adr/0000-template.md), written when the decision is
+  made. The split into two runtimes is
+  [ADR 0002](./docs/adr/0002-hybrid-rust-typescript-layers.md); the rule that no
+  subject code is copied is
+  [ADR 0003](./docs/adr/0003-evidence-first-clean-room-policy.md).
+- **TDD — clauses compile to tests.** Every behavioural clause names at least one
+  deterministic test: no network, no credentials, no wall clock. Where the build
+  is narrower than its clause, the code says so with a `TODO(spec …)` marker and
+  [`docs/gaps.md`](./docs/gaps.md) lists it.
+
+## Status
+
+What runs today, run against this tree:
+
+| Surface | Today |
+| --- | --- |
+| `--version`, `--help`, subcommand help | works — reports `1.9.0`; 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)) |
+| `doctor` | works — 12 checks in one run: six real probes (config, environment, system, binaries, filesystem, git), six names report `skip` |
+| `search` / `find` | works — queries the local session store, text and `--json` |
+| `mcp list` | works — merges the MCP configuration and prints transport and state per server; never starts one |
+| `exec` | works for `text`, `json` and `stream-json` output with a prompt, `-f` or stdin; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` refuse |
+| native helper | 8 JSON-line methods, 57 Rust tests — implemented and tested, **not yet called by the CLI** |
+| test suite | 891 tests in 95 files: 889 pass, 2 skipped |
+
+`exec` needs a model credential. Without one it refuses instead of guessing:
+
+```console
+$ node bin/droide.mjs exec -o json "hi"
+Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY environment variable.
 ```
-.
-├── src/                     TypeScript product layer (Node 24, ESM, type-stripped)
-│   ├── main.ts              process entry
-│   └── cli/                 argument parsing, help, branding, refusals
-│       └── commands/        one module per command group
-├── crates/                  Rust native layer (Cargo workspace)
-│   └── droide-native/       JSON-lines helper: version, hashing, (later) pty/search/secrets/sandbox
-├── specs/                   clean-room specifications — the source of truth
-├── docs/
-│   ├── adr/                 architecture decisions
-│   ├── architecture/        evidence-derived map of the subject
-│   └── plan.md              milestones, gates, definition of done
-├── tests/
-│   ├── parity/              declarative CLI harness (goldens are local)
-│   ├── unit/                fast, hermetic unit tests
-│   └── integration/         tests that cross a process boundary
-└── tools/                   notes on the local (untracked) analysis workspace
+
+Declared, in flight:
+
+| Surface | State |
+| --- | --- |
+| interactive TUI | the Ink shell renders header, transcript, composer, status line and footer, is driven by a key reducer (`/quit` exits 0, `Ctrl+C` 130) and is frame-tested at 80×24 and 120×40 — but there is no agent loop inside it yet: a submitted line becomes a transcript row |
+| `resume`, `update`, `plugin`, `computer`, `mcp add\|remove\|auth\|permissions` | options parse, help prints, every action refuses |
+| native PTY spawn and read loop; macOS/Linux credential stores | only quoting, chunking and Windows DPAPI exist |
+| context compaction; session index | not implemented; the literal scan is a recorded deviation |
+
+The failure is deliberate, and it is observable — exit 64 for a command that is
+specified but not built, exit 1 for an option that is not:
+
+```console
+$ node bin/droide.mjs update
+droide: the "update" command is specified but not implemented in this build.
+
+$ node bin/droide.mjs exec --list-tools
+--list-tools is not implemented in this build.
 ```
 
-Untracked by design: `raw/` (vendored binaries), `evidence/` (recovered code and
-extracted bundles), `.work/` (analysers, recorded goldens, scratch).
+Current shape of the tree: 11 numbered specification documents — shared context
+plus ten subsystem specs, 9,333 lines under `specs/` — 123 TypeScript files
+under `src/` (33,069 lines), 8 Rust files under `crates/droide-native/src/`,
+6 ADRs, 891 TypeScript tests and 57 Rust tests. Every place where the build is
+narrower than the clause it cites is marked `TODO(spec …)` in the code and
+counted in [`docs/gaps.md`](./docs/gaps.md), which `npm run gaps` regenerates.
 
 ## Quick start
 
+Node 24 or newer, and a Rust toolchain for the native layer.
+
 ```sh
-npm ci
-npm run cli -- --help          # or: node src/main.ts --help
+npm ci                          # install once; there is no build step
+node bin/droide.mjs --version   # 1.9.0
+node bin/droide.mjs --help
+node bin/droide.mjs doctor      # 12 checks, text or --json
+node bin/droide.mjs mcp list
+node bin/droide.mjs search x --json
+npm test                        # 891 tests
 npm run typecheck
-npm test                       # unit + integration
-npm run test:parity            # needs .work/parity goldens (local only)
-cargo test --workspace         # native layer
+npm run test:parity             # 20/20
+cargo test --workspace          # 57 tests
 ```
 
-## Method
+`exec` is the machine-facing surface (`text`, `json`, `stream-json`):
 
-- **SDD.** `specs/` states observable behaviour, each claim labelled
-  `[observed]`, `[derived]` or `[inferred]`, with a citation. Nothing is
-  implemented before it is specified.
-- **ADD.** Every structural choice is an ADR under `docs/adr/`.
-- **TDD.** Each acceptance criterion in a spec maps to a deterministic test that
-  runs without network, credentials or wall-clock dependence.
+```sh
+node bin/droide.mjs exec "review app.tsx"
+node bin/droide.mjs exec -o json "review app.tsx"
+node bin/droide.mjs exec -f prompt.txt --auto low
+```
 
-See `docs/plan.md` for milestones and their gates, and `docs/status.md` for the
-current dashboard.
+## Architecture
 
-## Licensing
+<div align="center">
+  <img src="./docs/assets/architecture.svg" width="100%"
+       alt="Architecture: the TypeScript product layer under src/ calls one Rust helper process over UTF-8 JSON lines, protocol version 1">
+</div>
 
-The reimplementation is original work written from the specification. No code
-from the subject is copied, and no proprietary artefact is tracked in this
-repository (see `docs/adr/0003-evidence-first-clean-room-policy.md`).
+- **`src/` — product layer, TypeScript.** `cli/` parses arguments and owns help
+  and refusals; `agent/` the turn loop and message model; `tools/` the registry,
+  validators, permission matrix and fs/shell/todo tools; `session/` the store,
+  migrations, transcript and search; `transport/` SSE, LLM deltas and error
+  identity; `ui/` the token tables, components and frame renderer; `app/` the
+  wiring between them.
+- **The boundary is one child process and one line per message.** Requests are
+  `{"id","method","params"}`, answers are `{"id","result"}` or
+  `{"id","error":{"code","message"}}`, UTF-8, protocol version 1, request lines
+  capped at 1 MiB. The client (`src/native/client.ts`) matches answers by id and
+  treats every answer as untrusted input.
+- **`crates/droide-native/` — native layer, Rust.** `main.rs` is a stdio loop
+  that flushes one frame per request; `protocol.rs` frames and dispatches;
+  `paths.rs` enforces containment; `search.rs` walks and searches; `sandbox.rs`
+  describes bubblewrap, seatbelt or "no confinement" profiles; `pty.rs` quotes
+  the command line the way the subject re-splits it; `secrets.rs` stores secrets
+  with DPAPI on Windows.
+- The eight methods are `native.version`, `search.walk`, `search.text`,
+  `path.resolve`, `sandbox.profile`, `pty.quote`, `secrets.protect`,
+  `secrets.unprotect`. The client and the helper are each tested; the CLI does
+  not dispatch to the helper yet.
+
+## Specifications and decisions
+
+| Document | Subject |
+| --- | --- |
+| [`00-context.md`](./specs/00-context.md) | shared context: the subject, its evidence and vocabulary |
+| [`10-cli-surface.md`](./specs/10-cli-surface.md) | commands, options, help, refusals, exit codes |
+| [`20-agent-loop.md`](./specs/20-agent-loop.md) | message model, turn loop, provider adapter |
+| [`30-tools-and-sandbox.md`](./specs/30-tools-and-sandbox.md) | tool registry, validators, permissions, sandbox |
+| [`40-sessions-and-storage.md`](./specs/40-sessions-and-storage.md) | session files, migrations, transcript, search |
+| [`50-transport-and-auth.md`](./specs/50-transport-and-auth.md) | URLs, headers, SSE, error identity, auth |
+| [`60-extensions-mcp-and-skills.md`](./specs/60-extensions-mcp-and-skills.md) | MCP servers, tool naming, skills, plugins |
+| [`70-daemon-and-remote-control.md`](./specs/70-daemon-and-remote-control.md) | daemon RPC surface and remote control |
+| [`80-exec-and-streaming.md`](./specs/80-exec-and-streaming.md) | non-interactive runs and stream formats |
+| [`90-native-layer.md`](./specs/90-native-layer.md) | the helper process and its methods |
+| [`95-terminal-ui.md`](./specs/95-terminal-ui.md) | tokens, capabilities, shell layout, frames |
+
+Status vocabulary — `draft`, `review`, `stable`, `blocked` — is defined in
+[`specs/README.md`](./specs/README.md); per-spec state lives in
+[`docs/status.md`](./docs/status.md), and the milestones and their gates in
+[`docs/plan.md`](./docs/plan.md). How each part of the subject was recovered is
+mapped in [`docs/architecture/README.md`](./docs/architecture/README.md) and the
+[`evidence/`](./evidence/README.md) ledger.
+
+Decisions that shaped the build:
+
+| ADR | Decision |
+| --- | --- |
+| [0001](./docs/adr/0001-bun-standalone-extraction.md) | recover the embedded JavaScript bundle before decompiling native code |
+| [0002](./docs/adr/0002-hybrid-rust-typescript-layers.md) | Rust for the native layer, TypeScript for the product layer |
+| [0003](./docs/adr/0003-evidence-first-clean-room-policy.md) | evidence-first clean-room policy |
+| [0004](./docs/adr/0004-parity-harness-with-optional-oracle.md) | declarative parity cases with an optional oracle |
+| [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | the project is `droide`; the CLI design stays identical |
+| [0006](./docs/adr/0006-terminal-ui-stack.md) | the terminal UI is React + Ink, with tokens from the spec |
+
+## Contributing
+
+Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) first. A change is mergeable when
+these gates pass:
+
+1. `npm run typecheck`
+2. `npm run format:check`
+3. `npm test`
+4. `npm run test:parity` (needs the local goldens under `.work/parity`)
+5. `cargo test --workspace`
+6. `npm run gaps:check`
+7. the spec clause it implements is cited in the commit message or PR body
+
+Two rules keep the method intact: nothing is implemented before it is specified,
+and no behaviour is smoothed over with a guess. Where the build is narrower than
+its clause, mark it `TODO(spec …)`; `npm run gaps` regenerates
+[`docs/gaps.md`](./docs/gaps.md) and `npm run gaps:check` fails when it is stale.
+
+Tests live in [`tests/`](./tests/README.md): `unit/` is fast and hermetic,
+`integration/` crosses a process boundary, `parity/` replays recorded CLI cases.
+
+## Licence
+
+MIT — see [`LICENSE`](./LICENSE). No code from the subject is copied, and no
+proprietary artefact is tracked here
+([ADR 0003](./docs/adr/0003-evidence-first-clean-room-policy.md)).

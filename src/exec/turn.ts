@@ -8,6 +8,7 @@
  * on failure, and the exit-code mapping with signal precedence.
  */
 
+import type { Message } from "../agent/messages.ts";
 import { ExecAbortedError } from "./errors.ts";
 import {
   buildAssistantRecords,
@@ -32,6 +33,15 @@ export interface TurnRequest {
   readonly model: string;
   readonly reasoningEffort: string;
   readonly tools: readonly string[];
+  /**
+   * B35: messages already in the session's transcript. They are sent to the
+   * provider but never echoed on stdout, and this turn appends after them.
+   */
+  readonly history?: readonly Message[];
+  /** The user message id; absent means the runner asks `nextMessageId`. */
+  readonly messageId?: string;
+  /** B46: an outer cancellation, e.g. SIGINT during streaming input. */
+  readonly signal?: AbortSignal;
 }
 
 /** Where a runner reports transcript content as it happens. */
@@ -93,6 +103,9 @@ function requestOf(options: OneShotOptions): TurnRequest {
     model: options.model,
     reasoningEffort: options.reasoningEffort,
     tools: options.tools,
+    messageId: options.messageId,
+    ...(options.history === undefined ? {} : { history: options.history }),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
   };
 }
 
@@ -102,27 +115,19 @@ const SILENT_SINK: TurnEventSink = {
   agentError: async () => {},
 };
 
-/**
- * Runs one turn in `stream-json`. Returns the process exit code and never
- * throws for a turn failure, a cancellation or a broken pipe.
- */
-export async function runOneShot(
-  runner: TurnRunner,
-  options: OneShotOptions,
-  writer: JsonLineWriter,
-): Promise<number> {
-  const startedAt = options.clock();
-  const toolNames = new Map<string, string>();
-  let pipeClosed = false;
+/** One record per transcript event, in the order the loop settled it (B26-B31). */
+export interface EventSinkOptions {
+  readonly sessionId: string;
+  readonly clock: () => number;
+  /** Resolves `false` once stdout is gone; no further record is attempted. */
+  readonly write: (record: StreamRecord) => Promise<boolean>;
+  /** Tool ids learned from calls emitted in this process (B30). */
+  readonly toolNames?: Map<string, string>;
+}
 
-  const write = async (record: StreamRecord): Promise<boolean> => {
-    if (pipeClosed) return false;
-    const accepted = await writer.write(record);
-    if (!accepted) pipeClosed = true;
-    return accepted;
-  };
-
-  const sink: TurnEventSink = {
+export function createEventSink(options: EventSinkOptions): TurnEventSink {
+  const toolNames = options.toolNames ?? new Map<string, string>();
+  return {
     async assistant(message) {
       const timestamp = options.clock();
       for (const record of buildAssistantRecords(
@@ -132,11 +137,11 @@ export async function runOneShot(
       )) {
         if (record.type === "tool_call")
           toolNames.set(record.id, record.toolId);
-        if (!(await write(record))) return;
+        if (!(await options.write(record))) return;
       }
     },
     async toolResult(result) {
-      await write(
+      await options.write(
         buildToolResultRecord({
           id: result.toolUseId,
           messageId: result.messageId,
@@ -149,7 +154,7 @@ export async function runOneShot(
       );
     },
     async agentError(message) {
-      await write(
+      await options.write(
         buildErrorRecord({
           source: "agent_loop",
           message,
@@ -159,6 +164,32 @@ export async function runOneShot(
       );
     },
   };
+}
+
+/**
+ * Runs one turn in `stream-json`. Returns the process exit code and never
+ * throws for a turn failure, a cancellation or a broken pipe.
+ */
+export async function runOneShot(
+  runner: TurnRunner,
+  options: OneShotOptions,
+  writer: JsonLineWriter,
+): Promise<number> {
+  const startedAt = options.clock();
+  let pipeClosed = false;
+
+  const write = async (record: StreamRecord): Promise<boolean> => {
+    if (pipeClosed) return false;
+    const accepted = await writer.write(record);
+    if (!accepted) pipeClosed = true;
+    return accepted;
+  };
+
+  const sink = createEventSink({
+    sessionId: options.sessionId,
+    clock: options.clock,
+    write,
+  });
 
   const init = buildSystemInitRecord({
     cwd: options.cwd,

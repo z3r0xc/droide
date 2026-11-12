@@ -176,8 +176,11 @@ test("a timeout kills the whole tree, leaving no survivor", async () => {
           ].join("\n"),
         ),
         riskLevel: "low",
-        // Long enough for a loaded runner to start the helper and print.
-        timeout: 3,
+        // Headroom matters more than speed: under a loaded full-suite run,
+        // node startup plus the first two writes can exceed three seconds on
+        // Windows, which made this test flaky. The helper prints its pids
+        // immediately, so a longer timeout does not weaken the assertion.
+        timeout: 8,
       },
       contextFor(fixture),
     );

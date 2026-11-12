@@ -430,6 +430,9 @@ export function mcpConfigFileSources(
 }
 
 export type McpConfigDiagnosticCode =
+  // Raised by the tooling layer, not the loader: the entry is valid but the
+  // server could not be started or did not answer `tools/list`.
+  | "server-unavailable"
   | "jsonc-parse-error"
   | "unreadable-file"
   | "invalid-document"

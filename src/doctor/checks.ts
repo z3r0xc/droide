@@ -211,6 +211,127 @@ const git: DoctorCheck = {
   },
 };
 
+const proxy: DoctorCheck = {
+  name: "proxy",
+  title: "Proxy",
+  async run(context) {
+    const names = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"];
+    const details: string[] = [];
+    const problems: string[] = [];
+    let configured = 0;
+
+    for (const name of names) {
+      const value =
+        context.environment.env[name] ??
+        context.environment.env[name.toLowerCase()];
+      if (value === undefined || value.length === 0) {
+        details.push(`${name}: (unset)`);
+        continue;
+      }
+      configured += 1;
+      if (name === "NO_PROXY") {
+        details.push(`${name}: ${value}`);
+        continue;
+      }
+      // A proxy value is a URL with a scheme; a bare host:port is a typo that
+      // fails much later, inside a request, so catch it here.
+      try {
+        const url = new URL(value);
+        details.push(`${name}: ${url.protocol}//${url.host}`);
+        if (url.protocol !== "http:" && url.protocol !== "https:") {
+          problems.push(`${name} must be an http(s) URL`);
+        }
+      } catch {
+        problems.push(`${name} is not a valid URL`);
+        details.push(`${name}: (invalid)`);
+      }
+    }
+
+    if (problems.length > 0) {
+      return {
+        status: "fail",
+        summary: problems.join("; "),
+        details,
+        fixes: ["fix or unset the proxy variables"],
+      };
+    }
+    return {
+      status: "ok",
+      summary:
+        configured === 0
+          ? "no proxy configured"
+          : `${configured} proxy variable${configured === 1 ? "" : "s"} configured`,
+      details,
+      metadata: { configured },
+    };
+  },
+};
+
+const certs: DoctorCheck = {
+  name: "certs",
+  title: "Certificates",
+  async run(context) {
+    const extra = context.environment.env["NODE_EXTRA_CA_CERTS"];
+    if (extra === undefined || extra.length === 0) {
+      return {
+        status: "ok",
+        summary: "system trust store (NODE_EXTRA_CA_CERTS is unset)",
+        details:
+          context.environment.env["NODE_TLS_REJECT_UNAUTHORIZED"] === "0"
+            ? [
+                "NODE_TLS_REJECT_UNAUTHORIZED=0 disables verification — do not use this outside tests",
+              ]
+            : [],
+      };
+    }
+    try {
+      await access(extra, constants.R_OK);
+      return {
+        status: "ok",
+        summary: "extra CA bundle is readable",
+        details: [extra],
+      };
+    } catch {
+      return {
+        status: "fail",
+        summary: "NODE_EXTRA_CA_CERTS points at an unreadable file",
+        details: [extra],
+        fixes: [
+          "point NODE_EXTRA_CA_CERTS at a readable PEM bundle, or unset it",
+        ],
+      };
+    }
+  },
+};
+
+const auth: DoctorCheck = {
+  name: "auth",
+  title: "Authentication",
+  async run(context) {
+    const apiKey = context.environment.env["FACTORY_API_KEY"];
+    if (apiKey !== undefined && apiKey.trim().length > 0) {
+      // Never print the key: length is enough to prove presence.
+      return {
+        status: "ok",
+        summary: "API key from the environment",
+        details: [`FACTORY_API_KEY: (set, ${apiKey.length} chars)`],
+        metadata: { source: "env", length: apiKey.length },
+      };
+    }
+    return {
+      status: "warn",
+      summary: "no credential found",
+      details: [
+        "FACTORY_API_KEY: (unset)",
+        "the OS credential store is not consulted by this build yet",
+      ],
+      fixes: [
+        "export FACTORY_API_KEY, or run `droide auth` once it is implemented",
+      ],
+    };
+  },
+};
+
 const notImplemented = (name: string): DoctorCheck => ({
   name,
   title: name,
@@ -247,10 +368,10 @@ export const BUILTIN_CHECKS: readonly DoctorCheck[] = [
   filesystem,
   git,
   notImplemented("custom-models"),
-  notImplemented("proxy"),
-  notImplemented("certs"),
+  proxy,
+  certs,
   notImplemented("connectivity"),
-  notImplemented("auth"),
+  auth,
   notImplemented("daemon"),
   notImplemented("inference"),
   notImplemented("mcp"),

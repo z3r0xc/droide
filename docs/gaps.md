@@ -5,11 +5,18 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **28** markers across **26** clauses.
+Total: **35** markers across **32** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
 | `src/cli/search-command.ts:196` | `B43` | the subject rebuilds its index cache here). |
+| `src/cli/update-commands.ts:44` | `B75` | installing an update safely (atomic swap, rollback) is a separate slice; ADR 0007 keeps the command read-only until then. |
+| `src/daemon/client.ts:65` | `B19` | the spec pins the four budgets but not the method names that carry them; these daemon.* spellings are this build's map, and callers may replace it through methodTimeouts. |
+| `src/daemon/command.ts:170` | `B1` | --droid-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
+| `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
+| `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient FACTORY_API_KEY and reports a local identity. |
+| `src/daemon/server.ts:231` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
+| `src/daemon/web-socket.ts:574` | `B33` | the token-gated /port-proxy/<port> surface (query token, cookie exchange, traversal refusal) is not implemented, so those requests answer 404 instead of proxying or refusing with 401. |
 | `src/doctor/checks.ts:26` | `B49` | ${what} check], |
 | `src/extensions/mcp/client.ts:417` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
 | `src/extensions/mcp/client.ts:428` | `B22` | image blocks are reported by type and size instead of being compressed, and an unsupported image MIME type keeps the same marker. |

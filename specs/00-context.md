@@ -5,7 +5,7 @@ duplicate it inside spec files.
 
 ## Repo
 
-`C:/Users/handona/Documents/AI/Harnesses/droid-re`, branch `re/factory-droid-v1.9.0`.
+`C:/Users/handona/Documents/AI/Harnesses/droid-re` (GitHub `z3r0xc/droide`), branch `feat/production-wave-1`.
 **Never run git commands** — the orchestrator commits.
 
 ## Subject
