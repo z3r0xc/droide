@@ -82,8 +82,8 @@ $ node bin/droide.mjs exec --list-tools
 
 Текущая форма дерева: 11 нумерованных документов спецификации — общий контекст
 плюс десять подсистемных спек, 9,333 строки в `specs/` — 123 TypeScript-файла
-в `src/` (33,069 строк), 8 Rust-файлов в `crates/droide-native/src/`, 7 ADR,
-906 TypeScript-тестов и 57 Rust-тестов. Каждое место, где реализация покрывает
+в `src/` (33,069 строк), 8 Rust-файлов в `crates/droide-native/src/`, 8 ADR,
+1096 TypeScript-тестов и 69 Rust-тестов. Каждое место, где реализация покрывает
 меньше цитируемого пункта, помечено `TODO(spec …)` в коде и посчитано в
 [`docs/gaps.md`](./docs/gaps.md), который перегенерирует `npm run gaps`.
 
@@ -95,7 +95,7 @@ Node 24 или новее и Rust-toolchain для нативного слоя.
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 16 named checks (9 реальных проб), text or --json
+node bin/droide.mjs doctor      # 16 named checks (10 реальных проб), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
 npm test                        # 906 tests

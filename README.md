@@ -82,7 +82,7 @@ $ node bin/droide.mjs exec --list-tools
 Current shape of the tree: 11 numbered specification documents — shared context
 plus ten subsystem specs, 9,333 lines under `specs/` — 123 TypeScript files
 under `src/` (33,069 lines), 8 Rust files under `crates/droide-native/src/`,
-7 ADRs, 906 TypeScript tests and 57 Rust tests. Every place where the build is
+8 ADRs, 1096 TypeScript tests and 69 Rust tests. Every place where the build is
 narrower than the clause it cites is marked `TODO(spec …)` in the code and
 counted in [`docs/gaps.md`](./docs/gaps.md), which `npm run gaps` regenerates.
 
@@ -94,7 +94,7 @@ Node 24 or newer, and a Rust toolchain for the native layer.
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 16 named checks (9 real probes), text or --json
+node bin/droide.mjs doctor      # 16 named checks (10 real probes), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
 npm test                        # 906 tests

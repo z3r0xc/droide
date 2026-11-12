@@ -81,8 +81,8 @@ $ node bin/droide.mjs exec --list-tools
 
 当前代码树的形态：11 份编号规格文档——共享上下文加十份子系统规格，
 `specs/` 下共 9,333 行——`src/` 下 123 个 TypeScript 文件（33,069 行），
-`crates/droide-native/src/` 下 8 个 Rust 文件，7 份 ADR，906 个 TypeScript
-测试与 57 个 Rust 测试。凡是实现窄于其所引用条款之处，代码中都标有
+`crates/droide-native/src/` 下 8 个 Rust 文件，8 份 ADR，1096 个 TypeScript
+测试与 69 个 Rust 测试。凡是实现窄于其所引用条款之处，代码中都标有
 `TODO(spec …)`，并计入 [`docs/gaps.md`](./docs/gaps.md)，该文件由
 `npm run gaps` 重新生成。
 
@@ -94,7 +94,7 @@ $ node bin/droide.mjs exec --list-tools
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 16 named checks (9 个真实探测), text or --json
+node bin/droide.mjs doctor      # 16 named checks (10 个真实探测), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
 npm test                        # 906 tests
