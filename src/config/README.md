@@ -18,6 +18,7 @@ absent; lists and scalars are replaced whole.
 4. **user** — `<base>/settings.json`.
 
 ## Files
+
 `<base>` is `<home>/.factory` in production, `<home>/.factory-dev` otherwise
 (`FACTORY_ENV`), with `<home>` from `FACTORY_HOME_OVERRIDE` else the OS home.
 
@@ -34,7 +35,6 @@ absent; lists and scalars are replaced whole.
 
 `paths.ts` is the only module that reads `process.*` / `os.homedir()`; every
 other module takes an injected `Environment` (`env`, `home`, `platform`,
-`cwd`), so tests never touch the real home. `schema.ts` validates without
-coercion: a wrong type is `InvalidSettingsError` naming the dotted key path, an
-unknown key is `UnknownSettingError`. A `settings.local.json` beside either
-level's file is a separate local source and is not part of this chain.
+`cwd`), so tests never touch a real home. `schema.ts` rejects a wrong type with
+`InvalidSettingsError` naming the dotted key path and an unknown key with
+`UnknownSettingError`.

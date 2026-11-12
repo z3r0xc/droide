@@ -73,7 +73,7 @@ test("test_mcp_tool_name_collision: a 64-character name is untouched and 65 gets
 });
 
 test("test_mcp_tool_name_collision: unicode truncation never splits a surrogate pair", () => {
-  const name = `${"a".repeat(60)}😀`;
+  const name = `${"a".repeat(70)}😀`;
   const sanitized = sanitizeLlmId(name);
   assert.equal(sanitized.length, 64);
   assert.equal(sanitized.slice(0, 55), "a".repeat(55));

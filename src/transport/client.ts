@@ -152,7 +152,7 @@ export interface HttpRequest {
   readonly redirects?: "same-origin" | "refuse";
   /** B93: a customer-deployment failure quotes the status only, never the body. */
   readonly customerDeployment?: boolean;
-  readonly credentials?: RequestCredentials;
+  readonly credentials?: "omit" | "same-origin" | "include";
   readonly signal?: AbortSignal;
 }
 

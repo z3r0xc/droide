@@ -155,7 +155,9 @@ export function parseResponseLine(
     return { kind: "error", id: rawId, code, message };
   }
 
-  return { kind: "result", id: rawId as number, result: payload["result"] };
+  if (rawId === null) fail("result response has a null id", context);
+
+  return { kind: "result", id: rawId, result: payload["result"] };
 }
 
 /**

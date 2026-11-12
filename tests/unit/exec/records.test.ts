@@ -239,14 +239,24 @@ test("assistant blocks expand in transcript order with one timestamp", () => {
     records.map((record) => ("role" in record ? record.role : undefined)),
     [undefined, undefined, "assistant", "assistant", undefined],
   );
-  assert.equal(records[0]?.type === "reasoning" ? records[0].text : "", "provider reasoning");
-  assert.equal(records[1]?.type === "reasoning" ? records[1].text : "", "thinking text");
-  assert.equal(records[2]?.type === "message" ? records[2].text : "", "progress note");
-  assert.equal(records[3]?.type === "message" ? records[3].text : "", "visible answer");
+  const texts = records.map((record) =>
+    record.type === "message" || record.type === "reasoning"
+      ? record.text
+      : "",
+  );
+  assert.deepEqual(texts, [
+    "provider reasoning",
+    "thinking text",
+    "progress note",
+    "visible answer",
+    "",
+  ]);
   for (const record of records) {
-    assert.equal(record.type === "tool_call" ? record.timestamp : record.timestamp, 77);
+    if (record.type === "system") continue;
+    assert.equal(record.timestamp, 77);
     if (record.type === "tool_call") assert.equal(record.messageId, "m1");
-    else assert.equal(record.id, "m1");
+    else if (record.type !== "completion" && record.type !== "error")
+      assert.equal(record.id, "m1");
   }
 });
 

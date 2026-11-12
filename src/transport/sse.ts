@@ -183,8 +183,9 @@ export async function* parseSse(
     }
 
     pending += decoder.decode();
-    if (options.signal?.aborted === true) {
-      throw abortReason(options.signal, operation);
+    const finalSignal: AbortSignal | undefined = options.signal;
+    if (finalSignal?.aborted === true) {
+      throw abortReason(finalSignal, operation);
     }
     if (pending !== "") {
       throw new SseProtocolError(

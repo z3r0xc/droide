@@ -120,6 +120,10 @@ test("a missing or mistyped id is refused", () => {
   rejects('{"id":1.5,"result":{}}', /response id/);
 });
 
+test("a result response with a null id is refused", () => {
+  rejects('{"id":null,"result":{}}', /result response has a null id/);
+});
+
 test("an envelope with both or neither payload is refused", () => {
   rejects(
     '{"id":1,"result":{},"error":{"code":0,"message":"x"}}',

@@ -480,7 +480,6 @@ function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
     },
   };
 }
-"
 /* -------------------------------------------------------------------------- */
 /* Chat Completions (B113, B118, B123)                                        */
 /* -------------------------------------------------------------------------- */
@@ -496,7 +495,7 @@ const CHAT_STOP_REASONS: Readonly<Record<string, LlmStopReason>> = {
 interface ChatCall {
   readonly index: number;
   readonly id: string;
-  readonly name: string;
+  name: string;
   input: string;
   ended: boolean;
 }
@@ -573,16 +572,33 @@ function createChatMapper(options: LlmStreamOptions): LlmStreamMapper {
 
   const endOpenCalls = (deltas: LlmStreamDelta[]): void => {
     for (const call of callsByIndex.values()) {
-      if (!call.ended) {
-        call.ended = true;
-        deltas.push({
-          kind: "tool-call-end",
-          index: call.index,
-          id: call.id,
-          input: call.input,
-        });
-      }
+      endCall(call, deltas);
     }
+  };
+
+  const allocateIndex = (preferred: number | null): number => {
+    if (preferred !== null) {
+      return preferred;
+    }
+    let index = syntheticIndex;
+    while (callsByIndex.has(index)) {
+      index += 1;
+    }
+    syntheticIndex = index + 1;
+    return index;
+  };
+
+  const endCall = (call: ChatCall, deltas: LlmStreamDelta[]): void => {
+    if (call.ended) {
+      return;
+    }
+    call.ended = true;
+    deltas.push({
+      kind: "tool-call-end",
+      index: call.index,
+      id: call.id,
+      input: call.input,
+    });
   };
 
   const newCall = (
@@ -591,7 +607,7 @@ function createChatMapper(options: LlmStreamOptions): LlmStreamMapper {
     id: string | null,
     name: string | null,
   ): ChatCall => {
-    const index = providerIndex ?? syntheticIndex++;
+    const index = allocateIndex(providerIndex);
     // B118: a delta may carry only an id; the client id is otherwise derived
     // from the stream position.
     // TODO(spec B118): the derived id's exact spelling is not stated.
@@ -637,7 +653,8 @@ function createChatMapper(options: LlmStreamOptions): LlmStreamMapper {
           occupant.id !== id
         ) {
           // B118: a different non-empty id at an occupied index is a new call;
-          // the earlier call is kept, not concatenated into.
+          // the earlier call is kept (closed here), not concatenated into.
+          endCall(occupant, deltas);
           call = undefined;
         } else {
           call = occupant;
@@ -775,6 +792,22 @@ function createResponsesMapper(options: LlmStreamOptions): LlmStreamMapper {
   const callFor = (itemId: string | null): ResponseCall | undefined =>
     itemId === null ? undefined : callsById.get(itemId);
 
+  const callIndexes = new Set<number>();
+
+  const allocateIndex = (preferred: number | null): number => {
+    if (preferred !== null) {
+      callIndexes.add(preferred);
+      return preferred;
+    }
+    let index = syntheticIndex;
+    while (callIndexes.has(index)) {
+      index += 1;
+    }
+    syntheticIndex = index + 1;
+    callIndexes.add(index);
+    return index;
+  };
+
   const addItem = (
     item: Readonly<Record<string, unknown>>,
     outputIndex: number | null,
@@ -788,7 +821,7 @@ function createResponsesMapper(options: LlmStreamOptions): LlmStreamMapper {
     if (id === null || id === "") {
       return;
     }
-    const index = outputIndex ?? syntheticIndex++;
+    const index = allocateIndex(outputIndex);
     const call: ResponseCall = {
       index,
       id,

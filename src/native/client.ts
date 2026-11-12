@@ -81,7 +81,6 @@ interface ResolvedOptions {
   readonly helperPath: string;
   readonly helperArgs: readonly string[];
   readonly requestTimeoutMs: number;
-  readonly handshakeTimeoutMs: number;
   readonly closeGraceMs: number;
   readonly timers: NativeTimers;
   readonly env: NodeJS.ProcessEnv | undefined;
@@ -92,8 +91,6 @@ function resolveOptions(options: NativeClientOptions): ResolvedOptions {
     helperPath: options.helperPath,
     helperArgs: options.helperArgs ?? [],
     requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
-    handshakeTimeoutMs:
-      options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS,
     closeGraceMs: options.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS,
     timers: options.timers ?? systemTimers,
     env: options.env,
@@ -107,7 +104,7 @@ function messageOf(error: unknown): string {
 /**
  * One helper process. Construct it through `createNativeClient`, which also
  * performs the protocol handshake; constructing directly skips the version
- * check and exists only for tests of the boundary itself.
+ * check, so prefer the factory.
  */
 export class NativeClient {
   readonly helperPath: string;
@@ -457,7 +454,7 @@ export class NativeClient {
     const detail = `exited ${this.exitDescription}${tail === "" ? "" : `, stderr: ${tail}`}`;
     this.failWith(
       (method) =>
-        new NativeUnavailableError(`the client is closed: helper ${detail}`, {
+        new NativeUnavailableError(detail, {
           helperPath: this.helperPath,
           method,
         }),

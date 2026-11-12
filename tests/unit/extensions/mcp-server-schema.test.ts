@@ -72,7 +72,10 @@ test("test_mcp_server_schema_by_transport: unknown types and wrong field types a
   assert.equal(parseMcpServerConfig({ type: "ws", url: "x" }).ok, false);
   assert.equal(parseMcpServerConfig({ command: "x", args: "a" }).ok, false);
   assert.equal(parseMcpServerConfig({ command: "x", env: { A: 1 } }).ok, false);
-  assert.equal(parseMcpServerConfig({ command: "x", disabled: "no" }).ok, false);
+  assert.equal(
+    parseMcpServerConfig({ command: "x", disabled: "no" }).ok,
+    false,
+  );
   assert.equal(
     parseMcpServerConfig({ command: "x", enabledTools: [1] }).ok,
     false,
@@ -80,14 +83,8 @@ test("test_mcp_server_schema_by_transport: unknown types and wrong field types a
 });
 
 test("test_mcp_server_schema_by_transport: limits are positive integers up to the int32 maximum", () => {
-  assert.equal(
-    parseMcpServerConfig({ command: "x", timeout: 0 }).ok,
-    false,
-  );
-  assert.equal(
-    parseMcpServerConfig({ command: "x", timeout: -1 }).ok,
-    false,
-  );
+  assert.equal(parseMcpServerConfig({ command: "x", timeout: 0 }).ok, false);
+  assert.equal(parseMcpServerConfig({ command: "x", timeout: -1 }).ok, false);
   assert.equal(
     parseMcpServerConfig({ command: "x", connectTimeout: 1.5 }).ok,
     false,

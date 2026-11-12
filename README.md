@@ -54,7 +54,8 @@ cargo test --workspace         # native layer
 - **TDD.** Each acceptance criterion in a spec maps to a deterministic test that
   runs without network, credentials or wall-clock dependence.
 
-See `docs/plan.md` for milestones and their gates.
+See `docs/plan.md` for milestones and their gates, and `docs/status.md` for the
+current dashboard.
 
 ## Licensing
 

@@ -525,7 +525,7 @@ export const LLM_FAILURE_MESSAGES: Readonly<Record<LlmFailureReason, string>> = 
 };
 
 /** B103: retryability is part of the class, not a caller decision. */
-const RETRYABLE_REASONS: Readonly<Record<LlmFailureReason, true | undefined>> = {
+const RETRYABLE_REASONS: Readonly<Partial<Record<LlmFailureReason, true>>> = {
   throttling: true,
   overloaded: true,
   network: true,

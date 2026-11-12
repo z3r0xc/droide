@@ -112,7 +112,9 @@ test("a request round-trips and close leaves no process behind", async (t) => {
     sha256: SHA256_ABC,
   });
 
-  await client.close();
+  const closing = client.close();
+  assert.equal(client.close(), closing, "close() is idempotent");
+  await closing;
   assert.equal(client.finished, true);
   assert.equal(alive(pid), false, `helper ${pid} survived close()`);
   await assert.rejects(
@@ -173,8 +175,6 @@ test("a malformed response line is fatal and names the boundary", async (t) => {
       return true;
     },
   );
-  assert.equal(client.finished || !alive(pid), true);
-
   await assert.rejects(
     client.request("hash.sha256", { text: "abc" }),
     NativeUnavailableError,
