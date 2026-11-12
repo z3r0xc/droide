@@ -844,33 +844,39 @@ markers and the settings schema). B67's stale-request rule is `[observed]` in co
 ## Open questions
 
 1. **`SkillBucket` / `SkillStatus` literal values.** `src/skills/enums.ts` is imported by
-   `constants.ts` and `resolveEffectiveSkills.ts` but is absent from the recovered tree (elided
-   type/barrel module). Only the ordering identifiers are observable. Settling it needs the enum module
+   `evidence/original/windows-x64/src/skills/constants.ts:1` and
+   `evidence/original/windows-x64/src/skills/resolveEffectiveSkills.ts:13`, but no such file exists under
+   `evidence/original/windows-x64/src/skills/` (elided type/barrel module). Only the ordering identifiers are observable. Settling it needs the enum module
    or an observed serialized skill record. Blocks nothing: B46/B50/B51 are stated in terms of ordering
    and status names, not enum values. `[inferred]`
 2. **`McpServerConfig.plugin` field shape.** The `plugin` binding on a server config is used
-   (`resolveMcpSecretReferences.ts:64-73`, `McpSettingsManager.ts:36-66`) but its type is elided. What is
+   (`evidence/original/windows-x64/src/mcp/resolveMcpSecretReferences.ts:64-73`,
+   `evidence/original/windows-x64/packages/runtime/settings/src/McpSettingsManager.ts:36-66`) but its type
+   is elided. What is
    known: it carries a `root`, an optional `data` directory, and path variables resolve from it.
    Blocks B43's exact key names.
 3. **`.factory-plugin/plugin.json` full schema.** Only `hooks` is read and only a `$schema` prefix is
    sniffed; no schema exists for `name`, `version`, `description`. Whether other keys are validated,
    ignored, or rejected on install is unknown; `manifest-invalid` (`PluginFailureReason`) names a
-   failure class but its trigger site is not in the recovered tree. Blocks a claim that a manifest
-   without `name` is accepted or rejected.
+   failure class (`evidence/original/windows-x64/packages/runtime/plugins/src/enums.ts:39-58`) but its
+   trigger site is not in the recovered tree. Blocks a claim that a manifest without `name` is accepted or
+   rejected.
 4. **`droid mcp list` exact output.** The command's rendering (table columns, auth-status wording) lives in
    the 593-line `src/commands/mcp/utils.ts`, which was only skimmed; B25 pins the command set only, not
    the text. Settling it needs the renderer plus a recorded golden.
-5. **Stdio command resolution on Windows.** `spawnStdioFamily` / `windowsJobFamily` implement process
-   trees and a job object; whether `command` is resolved through `PATH`, `cmd.exe`, or a shell is not
-   established here. Blocks any claim about how a config command string with shell metacharacters runs.
+5. **Stdio command resolution on Windows.** `spawnStdioFamily`
+   (`evidence/original/windows-x64/src/mcp/clients/stdioFamily.ts`) and `windowsJobFamily`
+   (`evidence/original/windows-x64/src/mcp/clients/windowsJobFamily.ts`) implement process trees and a job
+   object; whether `command` is resolved through `PATH`, `cmd.exe`, or a shell is not established here. Blocks any claim about how a config command string with shell metacharacters runs.
 6. **Protocol era for SSE servers.** Comments state SSE predates 2026-07-28 (`legacy_only`), but the connect
    path for `sse` was not read line by line. B11 states the plan source; whether a configured SSE server
    with modern negotiation on is ever probed is unverified.
 7. **`FACTORY_MCP_LIST_TOOLS_TIMEOUT_MS` / `FACTORY_MCP_BLOCKING_LOAD_TIMEOUT_MS` bounds.** The resolver is
-   in `src/environment.ts:405-420`; the accepted range and fallback for malformed values were not read.
-8. **MCP catalog prewarming preconditions.** `src/mcp/prewarmMcpCatalogs.ts` skips servers for reasons
-   including sandbox, org-policy authority and folder trust; the daemon-side trigger is out of this
-   slice. It affects only latency, not the session contract.
+   at `evidence/original/windows-x64/src/environment.ts:405-420`; the accepted range and the fallback for a
+   malformed value were not read.
+8. **MCP catalog prewarming preconditions.**
+   `evidence/original/windows-x64/src/mcp/prewarmMcpCatalogs.ts` skips servers for reasons including
+   sandbox, org-policy authority and folder trust; the daemon-side trigger is out of this slice. It affects only latency, not the session contract.
 
 ## Clean-room notes
 
@@ -914,8 +920,8 @@ markers and the settings schema). B67's stale-request rule is `[observed]` in co
 - The set of bundled skills is a *release* property: a reimplementation must keep the mechanism and the
   inventory of the release it targets, but adding or removing a skill is not a behaviour change of this
   subsystem.
-- Internal implementation choices: the `codegraph`-style private helpers, the stdio process-family/job-object
-  machinery, catalog prewarming, metrics names, and the exact hashing of internal cache filenames beyond
-  the directory layout stated above.
+- Internal implementation choices: the stdio process-family/job-object machinery, catalog prewarming,
+  metrics names, and the exact hashing of internal cache filenames beyond the directory layout stated
+  above.
 - Feature-flag gating of individual builtins and plugins (which of them a given org sees) is a policy
   concern owned elsewhere; this spec pins that gating *exists* and where it is applied.

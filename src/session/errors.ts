@@ -24,7 +24,12 @@ export type SessionStoreErrorCode =
   | "transcript-unavailable"
   | "missing-ingest-row"
   | "corrupt-session-row"
+  | "nested-transaction"
   | "store-closed";
+
+function errorOptions(cause: unknown): { cause: unknown } | undefined {
+  return cause === undefined ? undefined : { cause };
+}
 
 export class SessionStoreError extends Error {
   readonly code: SessionStoreErrorCode;
@@ -128,7 +133,7 @@ export class DuplicateSessionError extends SessionStoreError {
   readonly sessionId: string;
 
   constructor(sessionId: string, cause?: unknown) {
-    super("duplicate-session", `session ${sessionId} is already indexed`, { cause });
+    super("duplicate-session", `session ${sessionId} is already indexed`, errorOptions(cause));
     this.name = "DuplicateSessionError";
     this.sessionId = sessionId;
   }
@@ -158,7 +163,11 @@ export class OutsideSessionsDirError extends SessionStoreError {
 
 export class InvalidTranscriptRecordError extends SessionStoreError {
   constructor(detail: string, cause?: unknown) {
-    super("invalid-transcript-record", `transcript record is not a JSON object: ${detail}`, { cause });
+    super(
+      "invalid-transcript-record",
+      `transcript record is not a JSON object: ${detail}`,
+      errorOptions(cause),
+    );
     this.name = "InvalidTranscriptRecordError";
   }
 }
@@ -167,7 +176,11 @@ export class TranscriptCorruptError extends SessionStoreError {
   readonly line: number;
 
   constructor(line: number, cause: unknown) {
-    super("transcript-corrupt", `transcript line ${line} is not a JSON object`, { cause });
+    super(
+      "transcript-corrupt",
+      `transcript line ${line} is not a JSON object`,
+      errorOptions(cause),
+    );
     this.name = "TranscriptCorruptError";
     this.line = line;
   }
@@ -197,6 +210,13 @@ export class CorruptSessionRowError extends SessionStoreError {
   constructor(sessionId: string, detail: string) {
     super("corrupt-session-row", `session ${sessionId} row is corrupt: ${detail}`);
     this.name = "CorruptSessionRowError";
+  }
+}
+
+export class NestedTransactionError extends SessionStoreError {
+  constructor() {
+    super("nested-transaction", "nested session-index transaction");
+    this.name = "NestedTransactionError";
   }
 }
 

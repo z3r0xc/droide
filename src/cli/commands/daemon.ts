@@ -1,6 +1,7 @@
 /** `daemon` command. Contract: `specs/70-daemon-and-remote-control.md`. */
 import { Command, Option } from "commander";
 
+import { PROGRAM } from "../brand.ts";
 import { notImplemented } from "../not-implemented.ts";
 
 export function makeDaemonCommand(): Command {
@@ -15,7 +16,7 @@ export function makeDaemonCommand(): Command {
         .choices(["websocket", "ipc"])
         .default("websocket"),
     )
-    .option("--droid-path <path>", "Path to droid executable for spawning sessions")
+    .option("--droid-path <path>", `Path to ${PROGRAM} executable for spawning sessions`)
     .option("--liveness-fd <fd>", "Monitor parent process liveness via inherited pipe")
     .option("--parent-pid <pid>", "Monitor parent process")
     .option("--remote-control", "Enable Remote Control")

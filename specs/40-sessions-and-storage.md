@@ -479,6 +479,25 @@ prints the search-failed message and sets 1 (`run.ts:160-173`). `[observed]`
 (`constants.ts:9-22`); created with `IF NOT EXISTS` on every open, unlike
 migration SQL, which never uses `IF NOT EXISTS` (`0001_baseline*.sql:19-21`).
 
+The nine migrations, and what each is *for* (a reimplementation must produce the
+same head shape; only a migration's identity and effect are contract, not its
+wording):
+
+| v | ledger name | intent |
+|---|---|---|
+| 1 | `baseline` | The whole initial cache: `meta`, `sessions` (with `org_id`, `owner`, `parent`, `calling_session_id`, `calling_tool_use_id`, `mission`, `tags`, tri-state `has_user_visible_messages`), its five indexes, and `session_ingest` kept in its own table because its write class differs. **Frozen**: every later change is an appended migration, and a change that alters what a row *means* invalidates the bookkeeping so the refresh rewrites the rows (`0001_baseline*.sql:1-21`) |
+| 2 | `transcript-summary-fingerprint` | Detect first-line rewrites whose writers preserve mtime (`0002_transcript_summary_fingerprint*.sql:1-4`) |
+| 3 | `tags_role_key` | `tags` now carries a derived `mission-session:role` key; mark every row's settings unread with `-1` (not `0`, which is a real "no settings file"), drop `last_full_refresh_at` so readers fall back until a covering refresh, and add `sessions_settings_rewritten` for older builds' writes (`0003_tags_role_key*.sql:1-38`) |
+| 4 | `daemon-session-fields` | Let the daemon list from the index alone: `host_id`, `worktree`, `artifacts`, and `settings_write_seq` (NULL = needs re-reading) with the `sessions_daemon_fields_stale` trigger (`0004_daemon_session_fields*.sql:1-33`) |
+| 5 | `schema-version` | Per-row `schema_version`, so a backfill is named by a migration instead of a cleared marker; every row is NULL here, so the next refresh reads every summary line once (`0005_schema_version*.sql:1-20`) |
+| 6 | `spans-and-search` | Everything retrieval stores: span-tail columns, `session_spans`, `session_term_filters`; additive, no backfill (`0006_spans_and_search*.sql:1-28`) |
+| 7 | `term-prefixes` | Record the word-prefix rule for term filters. It shipped as `TERM_FILTER_SCHEMA_VERSION = 7` with no file, so the ledger takes the entry; the SQL is a no-op because a migration must contain a statement (`0007_term_prefixes*.sql:1-15`) |
+| 8 | `whole-transcript-records` | Stop dropping over-long transcript records: rows stamped 7 that skipped nothing move to 8, rows that skipped a record are re-read from their start by the next refresh (`0008_whole_transcript_records*.sql:1-21`) |
+| 9 | `vector-bookkeeping` | `meta.vector_epoch` plus the three `session_spans` triggers and the unembedded-span index, so semantic search can reuse its matrix (`0009_vector_bookkeeping*.sql:1-54`) |
+
+Backfills are declared in code, not SQL: version 5 names the summary-line source
+and version 8 the transcript source (`src/migrations.ts:28-38`).
+
 `meta` — `key TEXT PRIMARY KEY`, `value TEXT NOT NULL`
 (`0001_baseline*.sql:23-26`). Known keys: `last_full_refresh_at`,
 `last_full_refresh_schema_version`, `last_integrity_check_at`,
