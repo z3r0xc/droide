@@ -35,12 +35,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/z3r0xc/droid-re.git"
+    "url": "git+https://github.com/z3r0xc/droide.git"
   },
   "bugs": {
-    "url": "https://github.com/z3r0xc/droid-re/issues"
+    "url": "https://github.com/z3r0xc/droide/issues"
   },
-  "homepage": "https://github.com/z3r0xc/droid-re#readme",
+  "homepage": "https://github.com/z3r0xc/droide#readme",
   "keywords": [
     "cli",
     "agent",

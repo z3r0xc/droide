@@ -1,4 +1,4 @@
-# droid-re
+# droide
 
 A specification-first reverse engineering of the Factory AI `droid` CLI, version
 1.9.0, followed by a clean-room reimplementation with tests.

@@ -1,7 +1,9 @@
-<p align="center">
+<p align="center"><a href="./README.md">English</a> · <a href="./README.ru.md">Русский</a> · <a href="./README.zh-CN.md">中文</a></p>
+
+<div align="center">
   <img src="./docs/assets/hero.svg" width="100%"
-       alt="Droide — a terminal coding agent rebuilt from its specification: TypeScript product layer, Rust native helper, spec-first method">
-</p>
+       alt="Droide — a terminal coding agent rebuilt from its specification; one real chain from the repository, spec to code to test">
+</div>
 
 **Droide** is a clean-room reimplementation of the `droid` CLI v1.9.0: the same
 command surface, help pages, refusals and exit codes, rebuilt from a written
@@ -31,45 +33,53 @@ specification is complete and unambiguous enough to build from.
   is narrower than its clause, the code says so with a `TODO(spec …)` marker and
   [`docs/gaps.md`](./docs/gaps.md) lists it.
 
-`docs/status.md` is the live dashboard; `docs/plan.md` holds the milestones and
-their gates.
-
 ## Status
 
-What actually runs today, verified by running it:
+What runs today, run against this tree:
 
 | Surface | Today |
 | --- | --- |
-| `--version`, `--help`, subcommand help | works — 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)) |
-| `doctor` | works — 12 checks: six real probes (config, environment, system, binaries, filesystem, git), six names still report `skip` |
-| `search` / `find` | works — queries the local session store, text and `--json`, documented exit codes |
-| `exec` | works for `text`, `json` and `stream-json` output, with a prompt or `--input-format stream-json` on stdin; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` are refused |
-| native helper | 8 JSON-line methods, 57 Rust tests — implemented and tested, **not yet dispatched from the CLI** |
-| `npm test` | 653 tests: 652 pass, 1 skipped |
+| `--version`, `--help`, subcommand help | works — reports `1.9.0`; 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)) |
+| `doctor` | works — 12 checks in one run: six real probes (config, environment, system, binaries, filesystem, git), six names report `skip` |
+| `search` / `find` | works — queries the local session store, text and `--json` |
+| `mcp list` | works — merges the MCP configuration and prints transport and state per server; never starts one |
+| `exec` | works for `text`, `json` and `stream-json` output with a prompt, `-f` or stdin; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` refuse |
+| native helper | 8 JSON-line methods, 57 Rust tests — implemented and tested, **not yet called by the CLI** |
+| test suite | 891 tests in 95 files: 889 pass, 2 skipped |
+
+`exec` needs a model credential. Without one it refuses instead of guessing:
+
+```console
+$ node bin/droide.mjs exec -o json "hi"
+Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY environment variable.
+```
 
 Declared, in flight:
 
 | Surface | State |
 | --- | --- |
-| bare `droide` (interactive TUI) | the Ink shell renders header, transcript, composer, status line and footer and is frame-tested at 80×24 and 120×40 — but it has no key handling, so the command exits 64 rather than pretend |
-| `resume`, `daemon`, `update`, `mcp`, `plugin`, `computer` | options parse, help prints, every action fails loudly |
+| interactive TUI | the Ink shell renders header, transcript, composer, status line and footer, is driven by a key reducer (`/quit` exits 0, `Ctrl+C` 130) and is frame-tested at 80×24 and 120×40 — but there is no agent loop inside it yet: a submitted line becomes a transcript row |
+| `resume`, `update`, `plugin`, `computer`, `mcp add\|remove\|auth\|permissions` | options parse, help prints, every action refuses |
 | native PTY spawn and read loop; macOS/Linux credential stores | only quoting, chunking and Windows DPAPI exist |
-| context compaction; session index | not implemented; the literal scan is recorded as a deviation |
+| context compaction; session index | not implemented; the literal scan is a recorded deviation |
 
 The failure is deliberate, and it is observable — exit 64 for a command that is
-specified but not built, exit 1 for an option:
+specified but not built, exit 1 for an option that is not:
 
 ```console
-$ node bin/droide.mjs
-droide: the "interactive" command is specified but not implemented in this build.
+$ node bin/droide.mjs update
+droide: the "update" command is specified but not implemented in this build.
 
 $ node bin/droide.mjs exec --list-tools
 --list-tools is not implemented in this build.
 ```
 
-Current shape of the tree: 11 numbered specification documents (9,181 lines),
-102 TypeScript files under `src/` (25,062 lines), 8 Rust files under
-`crates/droide-native/`, 6 ADRs, 653 TypeScript tests and 57 Rust tests.
+Current shape of the tree: 11 numbered specification documents — shared context
+plus ten subsystem specs, 9,333 lines under `specs/` — 123 TypeScript files
+under `src/` (33,069 lines), 8 Rust files under `crates/droide-native/src/`,
+6 ADRs, 891 TypeScript tests and 57 Rust tests. Every place where the build is
+narrower than the clause it cites is marked `TODO(spec …)` in the code and
+counted in [`docs/gaps.md`](./docs/gaps.md), which `npm run gaps` regenerates.
 
 ## Quick start
 
@@ -80,37 +90,35 @@ npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 1.9.0
 node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 12 checks, text or --json
-npm test                        # 653 tests
+node bin/droide.mjs mcp list
+node bin/droide.mjs search x --json
+npm test                        # 891 tests
+npm run typecheck
+npm run test:parity             # 20/20
 cargo test --workspace          # 57 tests
 ```
 
-That is the real version output:
+`exec` is the machine-facing surface (`text`, `json`, `stream-json`):
 
-```console
-$ node bin/droide.mjs --version
-1.9.0
-```
-
-`exec` is the machine-facing surface (`text`, `json`, `stream-json`). It needs a
-model credential, and without one it refuses instead of guessing:
-
-```console
-$ node bin/droide.mjs exec -o json "hi"
-Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY environment variable.
+```sh
+node bin/droide.mjs exec "review app.tsx"
+node bin/droide.mjs exec -o json "review app.tsx"
+node bin/droide.mjs exec -f prompt.txt --auto low
 ```
 
 ## Architecture
 
-<p align="center">
+<div align="center">
   <img src="./docs/assets/architecture.svg" width="100%"
-       alt="Architecture: TypeScript product layer under src/ calls one Rust helper process over JSON lines, protocol version 1">
-</p>
+       alt="Architecture: the TypeScript product layer under src/ calls one Rust helper process over UTF-8 JSON lines, protocol version 1">
+</div>
 
 - **`src/` — product layer, TypeScript.** `cli/` parses arguments and owns help
   and refusals; `agent/` the turn loop and message model; `tools/` the registry,
   validators, permission matrix and fs/shell/todo tools; `session/` the store,
   migrations, transcript and search; `transport/` SSE, LLM deltas and error
-  identity; `ui/` the token tables, components and frame renderer.
+  identity; `ui/` the token tables, components and frame renderer; `app/` the
+  wiring between them.
 - **The boundary is one child process and one line per message.** Requests are
   `{"id","method","params"}`, answers are `{"id","result"}` or
   `{"id","error":{"code","message"}}`, UTF-8, protocol version 1, request lines
@@ -145,9 +153,10 @@ Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY
 
 Status vocabulary — `draft`, `review`, `stable`, `blocked` — is defined in
 [`specs/README.md`](./specs/README.md); per-spec state lives in
-[`docs/status.md`](./docs/status.md). How each part of the subject was recovered
-is mapped in [`docs/architecture/README.md`](./docs/architecture/README.md) and
-the [`evidence/`](./evidence/README.md) ledger.
+[`docs/status.md`](./docs/status.md), and the milestones and their gates in
+[`docs/plan.md`](./docs/plan.md). How each part of the subject was recovered is
+mapped in [`docs/architecture/README.md`](./docs/architecture/README.md) and the
+[`evidence/`](./evidence/README.md) ledger.
 
 Decisions that shaped the build:
 
@@ -163,14 +172,15 @@ Decisions that shaped the build:
 ## Contributing
 
 Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) first. A change is mergeable when
-the gates in [`docs/status.md`](./docs/status.md) pass:
+these gates pass:
 
 1. `npm run typecheck`
 2. `npm run format:check`
 3. `npm test`
 4. `npm run test:parity` (needs the local goldens under `.work/parity`)
 5. `cargo test --workspace`
-6. the spec clause it implements is cited in the commit message or PR body
+6. `npm run gaps:check`
+7. the spec clause it implements is cited in the commit message or PR body
 
 Two rules keep the method intact: nothing is implemented before it is specified,
 and no behaviour is smoothed over with a guess. Where the build is narrower than
