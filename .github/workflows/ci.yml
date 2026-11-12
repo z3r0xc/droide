@@ -28,6 +28,21 @@ jobs:
       - name: Unit and integration tests
         run: npm test
 
+  typescript-windows:
+    # The suite runs where most development happens; the config-context fixture
+    # once passed here and failed on Linux, and path rules are per platform.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Unit and integration tests
+        run: npm test
+
   rust:
     runs-on: ubuntu-latest
     steps:
