@@ -2,7 +2,13 @@
 
 The Rust helper (`crates/droide-native`) is one process behind JSON lines:
 `{"id","method","params"}` in; `{"id","result"}` or `{"id","error":{"code","message"}}`
-out. Not wired into the CLI yet.
+out.
+
+`Glob` and `Grep` reach it through `src/tools/native-backend.ts`: the binary is
+used only when the session asks for `nativeBackend: "helper"` **and** the file
+exists (the factory `bin/`, or `DROIDE_NATIVE_BIN`). Every helper failure
+degrades that session to the TypeScript walk and is recorded as a diagnostic,
+so a missing or broken helper never fails a tool call.
 
 ```ts
 const native = await createNativeClient({ helperPath: "/abs/droide-native" });

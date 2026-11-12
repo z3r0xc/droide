@@ -38,7 +38,8 @@ cargo test --workspace                   # native layer (CI only here)
 | `exec` | **done** for `text`/`json`/`stream-json` with custom and managed models; streaming input, mission, ACP and `--list-tools` are refused loudly |
 | `daemon` | **local transport/protocol/lifecycle done** (132 tests); Remote Control, relay and the port proxy are `TODO(spec B28/B29/B32/B33)` |
 | `resume` | **done** — lists recent sessions, accepts a UUID or session link, continues through the same path as `exec -s`, forks with `--fork`, and refuses unknown/archived/invalid ids; the interactive picker is `TODO(spec 10 B22)` |
-| `mcp auth`, `computer register\|remove\|ssh\|port-forward` | help and option parsing only; actions fail loudly (no silent success) |
+| `mcp auth` | **done** — resource/issuer discovery, dynamic registration or a configured client, PKCE, loopback callback, token exchange and a sealed credential with a compare-and-set revision; nothing to authenticate exits 0 |
+| `computer register\|remove\|ssh\|port-forward` | help and option parsing only; actions fail loudly (no silent success) |
 | bare `droide` | **launches the interactive shell on a TTY pair and runs turns**; a prompt argument still exits 64 |
 
 ## Specs

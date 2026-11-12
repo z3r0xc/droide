@@ -10,6 +10,7 @@
  * write. Every write is atomic and refuses a document it cannot parse, so a
  * command cannot truncate someone's configuration.
  */
+import { spawn } from "node:child_process";
 import { join } from "node:path";
 
 import { PROGRAM } from "./brand.ts";
@@ -38,6 +39,19 @@ import type {
   McpPersistentPermissions,
 } from "../extensions/mcp/edit.ts";
 import { normalizeServerName } from "../extensions/mcp/naming.ts";
+import { authorizeServer } from "../extensions/mcp/oauth/flow.ts";
+import type { CallbackRunOptions } from "../extensions/mcp/oauth/flow.ts";
+import { readCredentials } from "../extensions/mcp/oauth/store.ts";
+import type {
+  CredentialDocument,
+  CredentialSealer,
+} from "../extensions/mcp/oauth/store.ts";
+import type { RandomSource } from "../extensions/mcp/oauth/pkce.ts";
+import {
+  SealerUnavailableError,
+  createNativeSealer,
+} from "../native/sealer.ts";
+import type { ClosableCredentialSealer } from "../native/sealer.ts";
 
 /** Where the command reads and writes; `io` is injected in tests. */
 export interface McpMutationDeps {
@@ -384,20 +398,119 @@ export async function runMcpRemove(
   }
 }
 
-function needsAuthentication(entry: McpServerEntry): boolean {
+/**
+ * A remote server needs authentication when it has not opted out and has no
+ * unexpired credential (§B26, §B29). A credential without `expiresAt` counts as
+ * valid: the authority never said it lapses.
+ */
+function needsAuthentication(
+  entry: McpServerEntry,
+  credentials: CredentialDocument,
+  now: number,
+): boolean {
   if (entry.config.type === "stdio") return false;
-  return entry.config.oauth !== false;
+  if (entry.config.oauth === false) return false;
+  const credential = credentials.servers[entry.name];
+  if (credential === undefined) return true;
+  const expiresAt = credential.tokens.expiresAt;
+  return expiresAt !== undefined && expiresAt <= now;
 }
 
-export async function runMcpAuth(deps: McpMutationDeps): Promise<void> {
+/** Injected seams for `mcp auth`; the CLI supplies none of them. */
+export interface McpAuthInjection {
+  /** Defaults to the deps' factory dir; tests point it at a temp directory. */
+  readonly store?: { readonly factoryDir: string };
+  readonly sealer?: CredentialSealer;
+  /** Absolute helper path; defaults to `DROIDE_NATIVE_BIN`. */
+  readonly nativeHelperPath?: string;
+  readonly openBrowser?: (url: string) => Promise<void>;
+  readonly fetch?: typeof fetch;
+  readonly now?: () => number;
+  readonly random?: RandomSource;
+  readonly signal?: AbortSignal;
+  readonly callbackPortStart?: number;
+  readonly callbackAttempts?: number;
+  readonly authorizationTimeoutMs?: number;
+}
+
+/**
+ * The platform's URL opener, started detached from a fresh window. The child is
+ * only a courier: its exit status says nothing about whether the user finished
+ * the flow, which the callback server decides.
+ */
+function openInBrowser(url: string): Promise<void> {
+  const launcher =
+    process.platform === "win32"
+      ? { command: "cmd", args: ["/c", "start", "", url] }
+      : process.platform === "darwin"
+        ? { command: "open", args: [url] }
+        : { command: "xdg-open", args: [url] };
+
+  const launched = Promise.withResolvers<void>();
+  const child = spawn(launcher.command, launcher.args, {
+    stdio: "ignore",
+    detached: true,
+    windowsHide: true,
+  });
+  child.once("error", launched.reject);
+  child.once("spawn", () => {
+    child.unref();
+    launched.resolve();
+  });
+  return launched.promise;
+}
+
+/**
+ * The sealer `mcp auth` uses in production. There is no fallback: without the
+ * helper the credential store cannot be opened or written, and the ADR forbids
+ * a plaintext substitute.
+ */
+function resolveSealer(injection: McpAuthInjection): ClosableCredentialSealer {
+  const helperPath =
+    injection.nativeHelperPath ?? process.env["DROIDE_NATIVE_BIN"];
+  if (helperPath === undefined || helperPath.trim() === "") {
+    throw new SealerUnavailableError(
+      "helper-unavailable",
+      process.platform,
+      "set DROIDE_NATIVE_BIN to the droide-native helper, which seals the credential store",
+    );
+  }
+  return createNativeSealer({ helperPath });
+}
+
+export async function runMcpAuth(
+  deps: McpMutationDeps,
+  injection: McpAuthInjection = {},
+): Promise<void> {
+  const now = injection.now ?? (() => Date.now());
+  const factoryDir = injection.store?.factoryDir ?? deps.factoryDir;
+  let owned: ClosableCredentialSealer | undefined;
   try {
     const configuration = loadMcpConfiguration(
       mcpConfigFileSources(deps.factoryDir, deps.projectRoot),
     );
-    const candidates = enabledMcpServers(configuration)
-      .filter(needsAuthentication)
-      .map((entry) => entry.name)
-      .sort((left, right) => left.localeCompare(right));
+    // A server that opted out of OAuth, or a stdio server, is never a
+    // candidate: deciding that needs no credential store, so a run with
+    // nothing to do never asks for the sealer.
+    const oauthServers = enabledMcpServers(configuration).filter(
+      (entry) => entry.config.type !== "stdio" && entry.config.oauth !== false,
+    );
+    if (oauthServers.length === 0) {
+      deps.write("No MCP servers require authentication.\n");
+      deps.setExitCode(0);
+      return;
+    }
+
+    const sealer = injection.sealer ?? (owned = resolveSealer(injection));
+    const credentials = await readCredentials({
+      factoryDir,
+      sealer,
+      now,
+    });
+    const candidates = oauthServers
+      .filter((entry) => needsAuthentication(entry, credentials, now()))
+      .sort((left, right) => left.name.localeCompare(right.name));
+
     if (candidates.length === 0) {
       deps.write("No MCP servers require authentication.\n");
       deps.setExitCode(0);
@@ -406,16 +519,65 @@ export async function runMcpAuth(deps: McpMutationDeps): Promise<void> {
     deps.write(
       `${candidates.length} MCP server${candidates.length === 1 ? "" : "s"} need${candidates.length === 1 ? "s" : ""} authentication:\n`,
     );
-    for (const candidate of candidates) deps.write(`  • ${candidate}\n`);
-    // TODO(spec B26-B30): the interactive OAuth flow (authorization window,
-    // loopback callback, credential store) is not implemented; the command
-    // names the servers instead of pretending to authenticate them.
-    deps.writeError(
-      `${PROGRAM}: interactive MCP OAuth is not implemented in this build (spec 60 B26-B30).\n`,
-    );
-    deps.setExitCode(1);
+    for (const candidate of candidates) deps.write(`  • ${candidate.name}\n`);
+
+    const callback: CallbackRunOptions = {
+      ...(injection.callbackPortStart === undefined
+        ? {}
+        : { portStart: injection.callbackPortStart }),
+      ...(injection.callbackAttempts === undefined
+        ? {}
+        : { attempts: injection.callbackAttempts }),
+      ...(injection.authorizationTimeoutMs === undefined
+        ? {}
+        : { timeoutMs: injection.authorizationTimeoutMs }),
+    };
+
+    let failed = 0;
+    for (const candidate of candidates) {
+      const config = candidate.config;
+      if (config.type === "stdio") continue;
+      deps.write(`\nAuthenticating "${candidate.name}"\n`);
+      try {
+        const stored = await authorizeServer({
+          server: {
+            name: candidate.name,
+            allowedByPolicy: candidate.allowedByPolicy,
+          },
+          config,
+          store: { factoryDir },
+          sealer,
+          openBrowser: injection.openBrowser ?? openInBrowser,
+          fetch: injection.fetch ?? globalThis.fetch,
+          clock: now,
+          ...(injection.signal === undefined
+            ? {}
+            : { signal: injection.signal }),
+          onStatus: (message) => {
+            deps.write(`${message}\n`);
+          },
+          ...(injection.random === undefined
+            ? {}
+            : { random: injection.random }),
+          ...(Object.keys(callback).length === 0 ? {} : { callback }),
+        });
+        deps.write(
+          `Authenticated "${candidate.name}" (revision ${stored.revision})\n`,
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : `Unexpected error: ${String(error)}`;
+        deps.writeError(`${PROGRAM}: ${message}\n`);
+        failed += 1;
+      }
+    }
+    deps.setExitCode(failed === 0 ? 0 : 1);
   } catch (error) {
     report(deps, error);
+  } finally {
+    if (owned !== undefined) await owned.close();
   }
 }
 
