@@ -8,7 +8,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { REQUIRES_TERMINAL, refusalLines, writeRefusal } from "../../../src/cli/tty.ts";
+import {
+  REQUIRES_TERMINAL,
+  refusalLines,
+  writeRefusal,
+} from "../../../src/cli/tty.ts";
 
 test("a bare refusal is the terminal block alone", () => {
   const lines = refusalLines({});
@@ -21,7 +25,10 @@ test("the terminal block carries the ssh and exec hints in that order", () => {
 
   assert.equal(REQUIRES_TERMINAL.split("\n").length, 3);
   assert.match(block ?? "", /requires a terminal for interactive mode/);
-  assert.ok(REQUIRES_TERMINAL.indexOf("ssh -t <host>") < REQUIRES_TERMINAL.indexOf("exec"));
+  assert.ok(
+    REQUIRES_TERMINAL.indexOf("ssh -t <host>") <
+      REQUIRES_TERMINAL.indexOf("exec"),
+  );
 });
 
 test("a prompt word adds one final hint naming it", () => {
@@ -52,7 +59,9 @@ test("the mintty hint precedes the prompt-word hint", () => {
 });
 
 test("any other terminal program adds no hint", () => {
-  assert.deepEqual(refusalLines({ termProgram: "Apple_Terminal" }), [REQUIRES_TERMINAL]);
+  assert.deepEqual(refusalLines({ termProgram: "Apple_Terminal" }), [
+    REQUIRES_TERMINAL,
+  ]);
 });
 
 test("writeRefusal writes the joined lines once, ending in exactly one newline", () => {
@@ -60,7 +69,9 @@ test("writeRefusal writes the joined lines once, ending in exactly one newline",
 
   writeRefusal({ promptWord: "hi" }, (text) => chunks.push(text));
 
-  assert.deepEqual(chunks, [`${refusalLines({ promptWord: "hi" }).join("\n")}\n`]);
+  assert.deepEqual(chunks, [
+    `${refusalLines({ promptWord: "hi" }).join("\n")}\n`,
+  ]);
 
   const written = chunks[0] ?? "";
   assert.ok(written.endsWith("\n"));

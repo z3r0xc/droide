@@ -12,7 +12,9 @@ import { pathToFileURL } from "node:url";
 
 import { REPO_ROOT, runNode } from "./cli-process.ts";
 
-const MODULE_URL = pathToFileURL(resolve(REPO_ROOT, "src/cli/not-implemented.ts")).href;
+const MODULE_URL = pathToFileURL(
+  resolve(REPO_ROOT, "src/cli/not-implemented.ts"),
+).href;
 
 function invokeNotImplemented(command: string) {
   const source =

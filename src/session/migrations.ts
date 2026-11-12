@@ -12,7 +12,10 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-import { DuplicateMigrationVersionError, InvalidMigrationVersionError } from "./errors.ts";
+import {
+  DuplicateMigrationVersionError,
+  InvalidMigrationVersionError,
+} from "./errors.ts";
 
 export interface SessionMigration {
   readonly version: number;
@@ -45,7 +48,10 @@ function loadSources(): readonly MigrationSource[] {
   return MIGRATION_FILES.map((filename, index) => ({
     version: index + 1,
     filename,
-    sql: readFileSync(new URL(`./migrations/${filename}`, import.meta.url), "utf8"),
+    sql: readFileSync(
+      new URL(`./migrations/${filename}`, import.meta.url),
+      "utf8",
+    ),
   }));
 }
 
@@ -55,7 +61,11 @@ export function migrationNameFromFilename(filename: string): string {
   return stem.replace(/_/g, "-");
 }
 
-export function migrationChecksum(version: number, name: string, sql: string): string {
+export function migrationChecksum(
+  version: number,
+  name: string,
+  sql: string,
+): string {
   const identity = `${version}\u0000${name}\u0000${normalizeMigrationSql(sql)}`;
   return createHash("sha256").update(identity).digest("hex").slice(0, 16);
 }
@@ -77,7 +87,7 @@ export function normalizeMigrationSql(sql: string): string {
     }
   };
 
-  for (let index = 0; index < sql.length; ) {
+  for (let index = 0; index < sql.length;) {
     const char = sql[index];
     const next = sql[index + 1];
 
@@ -90,7 +100,11 @@ export function normalizeMigrationSql(sql: string): string {
 
     if (char === "/" && next === "*") {
       index += 2;
-      while (index < sql.length && !(sql[index] === "*" && sql[index + 1] === "/")) index += 1;
+      while (
+        index < sql.length &&
+        !(sql[index] === "*" && sql[index + 1] === "/")
+      )
+        index += 1;
       index += 2;
       text += " ";
       continue;
@@ -125,7 +139,9 @@ export function normalizeMigrationSql(sql: string): string {
 
   return parts
     .map((part) =>
-      part.literal ? part.value : part.value.replace(/\s+/g, " ").replace(/ ?([(),;]) ?/g, "$1"),
+      part.literal
+        ? part.value
+        : part.value.replace(/\s+/g, " ").replace(/ ?([(),;]) ?/g, "$1"),
     )
     .join("")
     .trim();
@@ -137,7 +153,10 @@ export function validateMigrations(
   const seen = new Set<number>();
   for (const migration of migrations) {
     if (!Number.isInteger(migration.version) || migration.version < 1) {
-      throw new InvalidMigrationVersionError(migration.version, "version must be a positive integer");
+      throw new InvalidMigrationVersionError(
+        migration.version,
+        "version must be a positive integer",
+      );
     }
     if (seen.has(migration.version)) {
       throw new DuplicateMigrationVersionError(migration.version);
@@ -146,7 +165,10 @@ export function validateMigrations(
   }
   for (let version = 1; version <= migrations.length; version += 1) {
     if (!seen.has(version)) {
-      throw new InvalidMigrationVersionError(version, "versions must be contiguous from 1; missing");
+      throw new InvalidMigrationVersionError(
+        version,
+        "versions must be contiguous from 1; missing",
+      );
     }
   }
 }
@@ -168,4 +190,5 @@ function loadMigrations(): readonly SessionMigration[] {
 
 export const CACHE_MIGRATIONS: readonly SessionMigration[] = loadMigrations();
 
-export const CACHE_SCHEMA_VERSION: number = CACHE_MIGRATIONS.at(-1)?.version ?? 0;
+export const CACHE_SCHEMA_VERSION: number =
+  CACHE_MIGRATIONS.at(-1)?.version ?? 0;

@@ -29,7 +29,9 @@ function applyPragmas(db: DatabaseSync): void {
   // database, and a redundant write is a page of churn.
   const autoVacuum = db.prepare("PRAGMA auto_vacuum").get();
   const mode =
-    autoVacuum !== null && typeof autoVacuum === "object" && "auto_vacuum" in autoVacuum
+    autoVacuum !== null &&
+    typeof autoVacuum === "object" &&
+    "auto_vacuum" in autoVacuum
       ? autoVacuum.auto_vacuum
       : undefined;
   if (typeof mode !== "number" || mode !== 2) {
@@ -44,7 +46,9 @@ function applyPragmas(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys = ON");
 }
 
-export function openSessionIndexDatabase(options: OpenSessionIndexOptions): OpenedSessionIndex {
+export function openSessionIndexDatabase(
+  options: OpenSessionIndexOptions,
+): OpenedSessionIndex {
   const directory = dirname(options.dbPath);
   mkdirSync(directory, { recursive: true });
   try {

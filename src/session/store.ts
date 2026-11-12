@@ -22,7 +22,12 @@ import {
   StoreClosedError,
   UnknownSessionError,
 } from "./errors.ts";
-import { createSessionIdFactory, isSessionId, type SessionClock, type SessionIdFactory } from "./ids.ts";
+import {
+  createSessionIdFactory,
+  isSessionId,
+  type SessionClock,
+  type SessionIdFactory,
+} from "./ids.ts";
 import { openSessionIndexDatabase } from "./open.ts";
 import {
   appendTranscriptLine,
@@ -53,11 +58,15 @@ const RESTING_BUSY_TIMEOUT_MS = 0;
 const MAX_SNIPPETS_PER_HIT = 3;
 const MAX_JSON_DEPTH = 32;
 
-export type SessionKind = "message_text" | "document" | "tool_use" | "tool_result";
+export type SessionKind =
+  "message_text" | "document" | "tool_use" | "tool_result";
 
 export function isSessionKind(value: string): value is SessionKind {
   return (
-    value === "message_text" || value === "document" || value === "tool_use" || value === "tool_result"
+    value === "message_text" ||
+    value === "document" ||
+    value === "tool_use" ||
+    value === "tool_result"
   );
 }
 
@@ -207,13 +216,19 @@ function readInt(row: Record<string, unknown>, key: string): number | null {
   return null;
 }
 
-function readBooleanish(row: Record<string, unknown>, key: string): boolean | null {
+function readBooleanish(
+  row: Record<string, unknown>,
+  key: string,
+): boolean | null {
   const value = readInt(row, key);
   if (value === null) return null;
   return value !== 0;
 }
 
-function parseTags(sessionId: string, row: Record<string, unknown>): Record<string, JsonValue> {
+function parseTags(
+  sessionId: string,
+  row: Record<string, unknown>,
+): Record<string, JsonValue> {
   const raw = row["tags_json"];
   if (typeof raw !== "string") {
     throw new CorruptSessionRowError(sessionId, "tags are not JSON text");
@@ -222,7 +237,10 @@ function parseTags(sessionId: string, row: Record<string, unknown>): Record<stri
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new CorruptSessionRowError(sessionId, `tags are not JSON (${String(error)})`);
+    throw new CorruptSessionRowError(
+      sessionId,
+      `tags are not JSON (${String(error)})`,
+    );
   }
   if (!isJsonObject(parsed)) {
     throw new CorruptSessionRowError(sessionId, "tags are not a JSON object");
@@ -234,7 +252,10 @@ function rowToSession(row: Record<string, unknown>): SessionRow {
   const sessionId = readString(row, "session_id");
   const projectKey = readString(row, "project_key");
   if (sessionId === null || projectKey === null) {
-    throw new CorruptSessionRowError(sessionId ?? "<unknown>", "missing identity columns");
+    throw new CorruptSessionRowError(
+      sessionId ?? "<unknown>",
+      "missing identity columns",
+    );
   }
   return {
     sessionId,
@@ -269,7 +290,12 @@ function isConstraintError(error: unknown): boolean {
   return /constraint failed/i.test(error.message);
 }
 
-function boundedInteger(value: number, minimum: number, maximum: number, name: string): number {
+function boundedInteger(
+  value: number,
+  minimum: number,
+  maximum: number,
+  name: string,
+): number {
   if (!Number.isInteger(value) || value < minimum || value > maximum) {
     throw new InvalidArgumentError(
       `${name} must be an integer between ${minimum} and ${maximum}, got ${String(value)}`,
@@ -281,7 +307,9 @@ function boundedInteger(value: number, minimum: number, maximum: number, name: s
 function optionalEpoch(value: number | undefined, name: string): number | null {
   if (value === undefined) return null;
   if (!Number.isFinite(value) || value < 0) {
-    throw new InvalidArgumentError(`${name} must be a non-negative epoch millisecond, got ${value}`);
+    throw new InvalidArgumentError(
+      `${name} must be a non-negative epoch millisecond, got ${value}`,
+    );
   }
   return value;
 }
@@ -298,17 +326,22 @@ function isUserVisibleRecord(record: JsonObject): boolean {
   return isJsonObject(message) && message["role"] === "user";
 }
 
-function collectStrings(value: JsonValue | undefined, depth = 0): readonly string[] {
+function collectStrings(
+  value: JsonValue | undefined,
+  depth = 0,
+): readonly string[] {
   if (depth > MAX_JSON_DEPTH) return [];
   if (typeof value === "string") return [value];
   if (Array.isArray(value)) {
     const collected: string[] = [];
-    for (const item of value) collected.push(...collectStrings(item, depth + 1));
+    for (const item of value)
+      collected.push(...collectStrings(item, depth + 1));
     return collected;
   }
   if (isJsonObject(value)) {
     const collected: string[] = [];
-    for (const key of Object.keys(value)) collected.push(...collectStrings(value[key], depth + 1));
+    for (const key of Object.keys(value))
+      collected.push(...collectStrings(value[key], depth + 1));
     return collected;
   }
   return [];
@@ -322,11 +355,21 @@ function pushValue(
 ): void {
   if (value === null || value.length === 0) return;
   const base = { kind, value };
-  const withRole = extra?.messageRole === undefined ? base : { ...base, messageRole: extra.messageRole };
-  values.push(extra?.toolName === undefined ? withRole : { ...withRole, toolName: extra.toolName });
+  const withRole =
+    extra?.messageRole === undefined
+      ? base
+      : { ...base, messageRole: extra.messageRole };
+  values.push(
+    extra?.toolName === undefined
+      ? withRole
+      : { ...withRole, toolName: extra.toolName },
+  );
 }
 
-function blockValues(block: JsonObject, role: string | undefined): readonly SearchValue[] {
+function blockValues(
+  block: JsonObject,
+  role: string | undefined,
+): readonly SearchValue[] {
   const values: SearchValue[] = [];
   const type = block["type"];
   const extra = role === undefined ? undefined : { messageRole: role };
@@ -370,7 +413,10 @@ function blockValues(block: JsonObject, role: string | undefined): readonly Sear
   return values;
 }
 
-function searchableValues(record: JsonObject, line: number): readonly SearchValue[] {
+function searchableValues(
+  record: JsonObject,
+  line: number,
+): readonly SearchValue[] {
   const values: SearchValue[] = [];
 
   // The summary line's title and cwd are searchable, but a `--kind` filter
@@ -378,7 +424,8 @@ function searchableValues(record: JsonObject, line: number): readonly SearchValu
   if (line === 1) {
     for (const key of ["title", "cwd"]) {
       const value = readString(record, key);
-      if (value !== null) values.push({ kind: "message_text", summary: true, value });
+      if (value !== null)
+        values.push({ kind: "message_text", summary: true, value });
     }
   }
 
@@ -399,7 +446,12 @@ function searchableValues(record: JsonObject, line: number): readonly SearchValu
   return values;
 }
 
-function makeSnippet(value: string, matchIndex: number, matchLength: number, radius: number): string {
+function makeSnippet(
+  value: string,
+  matchIndex: number,
+  matchLength: number,
+  radius: number,
+): string {
   const start = Math.max(0, matchIndex - radius);
   const end = Math.min(value.length, matchIndex + matchLength + radius);
   const body = value.slice(start, end).replace(/\s+/g, " ").trim();
@@ -429,15 +481,22 @@ function collectHits(
     >();
 
     for (const value of searchableValues(record, line)) {
-      if (kind !== "all" && (value.kind !== kind || value.summary === true)) continue;
+      if (kind !== "all" && (value.kind !== kind || value.summary === true))
+        continue;
       const matchIndex = value.value.toLowerCase().indexOf(needle);
       if (matchIndex < 0) continue;
 
       const key = `${value.kind}\u0000${value.toolName ?? ""}`;
-      const snippet = makeSnippet(value.value, matchIndex, needle.length, contextChars);
+      const snippet = makeSnippet(
+        value.value,
+        matchIndex,
+        needle.length,
+        contextChars,
+      );
       const group = groups.get(key);
       if (group !== undefined) {
-        if (group.snippets.length < MAX_SNIPPETS_PER_HIT) group.snippets.push(snippet);
+        if (group.snippets.length < MAX_SNIPPETS_PER_HIT)
+          group.snippets.push(snippet);
         continue;
       }
       const created: {
@@ -447,7 +506,8 @@ function collectHits(
         snippets: string[];
       } = { kind: value.kind, snippets: [snippet] };
       if (value.toolName !== undefined) created.toolName = value.toolName;
-      if (value.messageRole !== undefined) created.messageRole = value.messageRole;
+      if (value.messageRole !== undefined)
+        created.messageRole = value.messageRole;
       groups.set(key, created);
     }
 
@@ -476,15 +536,25 @@ function titleTier(title: string | null, needle: string): number {
 }
 
 function hasUserTextHit(hits: readonly SearchHit[]): boolean {
-  return hits.some((hit) => hit.kind === "message_text" && hit.messageRole === "user");
+  return hits.some(
+    (hit) => hit.kind === "message_text" && hit.messageRole === "user",
+  );
 }
 
-function compareMatches(left: MatchedSession, right: MatchedSession, needle: string): number {
-  const tier = titleTier(left.candidate.title, needle) - titleTier(right.candidate.title, needle);
+function compareMatches(
+  left: MatchedSession,
+  right: MatchedSession,
+  needle: string,
+): number {
+  const tier =
+    titleTier(left.candidate.title, needle) -
+    titleTier(right.candidate.title, needle);
   if (tier !== 0) return tier;
-  const user = Number(hasUserTextHit(right.hits)) - Number(hasUserTextHit(left.hits));
+  const user =
+    Number(hasUserTextHit(right.hits)) - Number(hasUserTextHit(left.hits));
   if (user !== 0) return user;
-  const recency = (right.candidate.lastEventAt ?? 0) - (left.candidate.lastEventAt ?? 0);
+  const recency =
+    (right.candidate.lastEventAt ?? 0) - (left.candidate.lastEventAt ?? 0);
   if (recency !== 0) return recency;
   return right.candidate.sessionId.localeCompare(left.candidate.sessionId);
 }
@@ -558,10 +628,13 @@ export class SessionStore {
             input.firstEventAt ?? null,
             input.hostId ?? null,
           );
-        this.#db.prepare("INSERT INTO session_ingest (session_id) VALUES (?)").run(sessionId);
+        this.#db
+          .prepare("INSERT INTO session_ingest (session_id) VALUES (?)")
+          .run(sessionId);
       });
     } catch (error) {
-      if (isConstraintError(error)) throw new DuplicateSessionError(sessionId, error);
+      if (isConstraintError(error))
+        throw new DuplicateSessionError(sessionId, error);
       throw error;
     }
 
@@ -574,14 +647,20 @@ export class SessionStore {
 
   deleteSession(sessionId: string): boolean {
     this.#ensureOpen();
-    const result = this.#db.prepare("DELETE FROM sessions WHERE session_id = ?").run(sessionId);
+    const result = this.#db
+      .prepare("DELETE FROM sessions WHERE session_id = ?")
+      .run(sessionId);
     return Number(result.changes) > 0;
   }
 
   appendTranscriptRecord(sessionId: string, record: JsonObject): AppendResult {
     this.#ensureOpen();
     const session = this.#requireSession(sessionId);
-    const path = transcriptPathFor(this.#sessionsDir, session.projectKey, sessionId);
+    const path = transcriptPathFor(
+      this.#sessionsDir,
+      session.projectKey,
+      sessionId,
+    );
     const line = serializeTranscriptRecord(record);
     const beforeSize = transcriptSize(path);
 
@@ -589,7 +668,9 @@ export class SessionStore {
     try {
       return this.#transaction(() => {
         const ingest = this.#db
-          .prepare("SELECT transcript_offset FROM session_ingest WHERE session_id = ?")
+          .prepare(
+            "SELECT transcript_offset FROM session_ingest WHERE session_id = ?",
+          )
           .get(sessionId);
         if (!isSqlRow(ingest)) throw new MissingIngestRowError(sessionId);
         const offset = readInt(ingest, "transcript_offset") ?? 0;
@@ -646,14 +727,28 @@ export class SessionStore {
   readSession(sessionId: string): readonly JsonObject[] {
     this.#ensureOpen();
     const session = this.#requireSession(sessionId);
-    const path = transcriptPathFor(this.#sessionsDir, session.projectKey, sessionId);
+    const path = transcriptPathFor(
+      this.#sessionsDir,
+      session.projectKey,
+      sessionId,
+    );
     return readTranscriptFile(path, sessionId);
   }
 
   listSessions(options: ListSessionsOptions = {}): readonly SessionListItem[] {
     this.#ensureOpen();
-    const limit = boundedInteger(options.limit ?? DEFAULT_LIST_LIMIT, 0, MAX_LIST_LIMIT, "limit");
-    const offset = boundedInteger(options.offset ?? 0, 0, MAX_LIST_OFFSET, "offset");
+    const limit = boundedInteger(
+      options.limit ?? DEFAULT_LIST_LIMIT,
+      0,
+      MAX_LIST_LIMIT,
+      "limit",
+    );
+    const offset = boundedInteger(
+      options.offset ?? 0,
+      0,
+      MAX_LIST_OFFSET,
+      "offset",
+    );
     const cwd = options.cwd ?? null;
     const includeArchived = options.includeArchived === true ? 1 : 0;
 
@@ -762,7 +857,11 @@ export class SessionStore {
     const matched: MatchedSession[] = [];
     let complete = true;
     for (const candidate of candidates) {
-      const path = transcriptPathFor(this.#sessionsDir, candidate.projectKey, candidate.sessionId);
+      const path = transcriptPathFor(
+        this.#sessionsDir,
+        candidate.projectKey,
+        candidate.sessionId,
+      );
       if (!existsSync(path)) {
         // A row whose file vanished is a coverage gap, not a crash: the next
         // refresh prunes it (B30). The result says so instead of guessing.
@@ -785,7 +884,8 @@ export class SessionStore {
         hits: readonly SearchHit[];
       } = { sessionId: match.candidate.sessionId, hits: match.hits };
       if (match.candidate.title !== null) session.title = match.candidate.title;
-      if (match.candidate.lastEventAt !== null) session.updatedAt = match.candidate.lastEventAt;
+      if (match.candidate.lastEventAt !== null)
+        session.updatedAt = match.candidate.lastEventAt;
       sessions.push(session);
     }
 
@@ -838,7 +938,11 @@ export class SessionStore {
   }
 
   #readTags(sessionId: string): Readonly<Record<string, JsonValue>> {
-    const row = this.#db.prepare("SELECT json(tags) AS tags_json FROM sessions WHERE session_id = ?").get(sessionId);
+    const row = this.#db
+      .prepare(
+        "SELECT json(tags) AS tags_json FROM sessions WHERE session_id = ?",
+      )
+      .get(sessionId);
     if (!isSqlRow(row)) throw new UnknownSessionError(sessionId);
     return parseTags(sessionId, row);
   }
@@ -907,9 +1011,12 @@ export class SessionStore {
 
 function normalizeQuery(query: string): string {
   const trimmed = query.trim().toLowerCase();
-  if (trimmed.length === 0) throw new InvalidArgumentError("search query is empty");
+  if (trimmed.length === 0)
+    throw new InvalidArgumentError("search query is empty");
   if (trimmed.length > MAX_QUERY_CHARS) {
-    throw new InvalidArgumentError(`search query is longer than ${MAX_QUERY_CHARS} characters`);
+    throw new InvalidArgumentError(
+      `search query is longer than ${MAX_QUERY_CHARS} characters`,
+    );
   }
   return trimmed;
 }
@@ -924,11 +1031,16 @@ function serializeTags(tags: Readonly<Record<string, JsonValue>>): string {
   try {
     return JSON.stringify(tags);
   } catch (error) {
-    throw new InvalidArgumentError(`tag value is not JSON-serialisable: ${String(error)}`);
+    throw new InvalidArgumentError(
+      `tag value is not JSON-serialisable: ${String(error)}`,
+    );
   }
 }
 
 export function openSessionStore(options: SessionStoreOptions): SessionStore {
-  const opened = openSessionIndexDatabase({ dbPath: options.dbPath, clock: options.clock });
+  const opened = openSessionIndexDatabase({
+    dbPath: options.dbPath,
+    clock: options.clock,
+  });
   return new SessionStore(opened.db, options);
 }

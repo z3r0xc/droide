@@ -10,8 +10,9 @@ clock, no shared mutable state, and a process is always spawned from an argument
 array with a pinned environment (`NO_COLOR=1`, `TERM=dumb`, `COLUMNS=80`).
 
 Run everything with `npm test` (that is
-`node --test tests/unit/ tests/integration/`), one area with
-`node --test tests/unit/cli/`, or a single file with
-`node --test tests/unit/cli/refusal-lines.test.ts`. Shared, non-test helpers sit
-beside the tests and are excluded by the runner because their names lack the
-`.test.ts` suffix.
+`node --test "tests/unit/**/*.test.ts" "tests/integration/**/*.test.ts"`), one
+area with `node --test "tests/unit/cli/*.test.ts"`, or a single file with
+`node --test tests/unit/cli/refusal-lines.test.ts`. Paths are globs because this
+Node treats a bare directory argument as a test file, not a directory to search.
+Shared, non-test helpers sit beside the tests and are excluded by the runner
+because their names lack the `.test.ts` suffix.

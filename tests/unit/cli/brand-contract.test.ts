@@ -62,7 +62,10 @@ for (const page of PAGES) {
     assert.equal(result.status, 0);
     assert.equal(result.stderr, "");
     for (const expected of page.expected) {
-      assert.ok(result.stdout.includes(expected), `help page is missing: ${expected}`);
+      assert.ok(
+        result.stdout.includes(expected),
+        `help page is missing: ${expected}`,
+      );
     }
     assert.equal(result.stdout.includes(`${SUBJECT_PROGRAM} `), false);
     assert.equal(result.stdout.includes(`${SUBJECT_DISPLAY} `), false);

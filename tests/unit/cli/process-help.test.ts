@@ -47,7 +47,10 @@ test("--help exits 0 with the usage line, the section headings and the docs link
   const examples = lines.indexOf("Examples:");
   assert.ok(options > 0, "Options: heading is missing");
   assert.ok(commands > options, "Commands: heading is missing or out of order");
-  assert.ok(examples > commands, "Examples: heading is missing or out of order");
+  assert.ok(
+    examples > commands,
+    "Examples: heading is missing or out of order",
+  );
 
   const docsLine = `For more details, see: ${DOCS_URL}`;
   assert.ok(result.stdout.endsWith(`${docsLine}\n`));
@@ -95,5 +98,7 @@ test("exec --help exits 0 and prints its own usage line", () => {
 
   assert.equal(result.status, 0);
   assert.equal(result.stderr, "");
-  assert.ok(result.stdout.startsWith(`Usage: ${PROGRAM} exec [options] [prompt]\n`));
+  assert.ok(
+    result.stdout.startsWith(`Usage: ${PROGRAM} exec [options] [prompt]\n`),
+  );
 });

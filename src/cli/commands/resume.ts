@@ -10,7 +10,10 @@ export function makeResumeCommand(): Command {
     .argument("[sessionId]", "Session id or session link to resume directly")
     .argument("[prompt...]", "Prompt to send to the resumed session")
     .option("--fork", "Fork the selected session and resume the fork")
-    .option("--last", "Skip the picker and resume the most recent session in the current folder");
+    .option(
+      "--last",
+      "Skip the picker and resume the most recent session in the current folder",
+    );
 
   addRuntimeOptions(command);
   command.action(() => notImplemented("resume"));

@@ -12,9 +12,14 @@ const DEFAULT_NOTE = [
 
 export function makeDoctorCommand(): Command {
   return new Command("doctor")
-    .description("Diagnose configuration, connectivity, certificate, proxy, auth, and daemon issues")
+    .description(
+      "Diagnose configuration, connectivity, certificate, proxy, auth, and daemon issues",
+    )
     .option("--json", "Output results as JSON")
-    .option("--verbose", "Expand all checks with details, fixes, timings, and metadata")
+    .option(
+      "--verbose",
+      "Expand all checks with details, fixes, timings, and metadata",
+    )
     .option(
       "--timeout <ms>",
       "Per-probe timeout in milliseconds, cleanup included (default: 10000; MCP server: 36000; exec full turn: 60000)",

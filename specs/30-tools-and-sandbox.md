@@ -69,6 +69,72 @@ registry (`@`McpService` and `src/tools/tui.ts` are the CLI's complete set).
 - **`@path:line` citation** — shorthand in this spec for
   `evidence/original/windows-x64/<path>:<line>`.
 
+## Tool inventory
+
+`advertised` = reachable by the model in a normal session (`deferred` = only after
+`ToolSearch`); `user` = offered in UI tool selection; `confirm` = declared
+`requiresConfirmation` (metadata, see B41); effects per B1. Output is the declared
+result schema unless noted.
+
+| llmId | id | advertised | user | confirm | effects | output |
+|---|---|---|---|---|---|---|
+| `Read` | `read-cli` | yes | no | no | fs-read | string \| ImageBlock \| blocks |
+| `LS` | `ls-cli` | yes | no | no | fs-read | `{name,type,size}[]` |
+| `Glob` | `glob-search-cli` | yes | yes | no | fs-read | absolute paths |
+| `Grep` | `grep_tool_cli` | yes | yes | no | fs-read | paths \| `{path,line,text,kind}[]` |
+| `Create` | `create-cli` | yes | no | no | fs-write | `{success,file_path}` \| diff |
+| `Edit` | `edit-cli` | yes | no | no | fs-read, fs-write | line diff |
+| `ApplyPatch` | `apply-patch-cli` | yes | no | no | fs-read, fs-write | string |
+| `Execute` | `execute-cli` | yes | no | no | process | `{output,exitCode,signal,stoppedProcesses,pid?,outputFile?}` |
+| `Script` | `script-cli` | yes | no | no | process | `ScriptRunResult` |
+| `WaitForScript` | `wait-for-script-cli` | yes | no | no | process | `ScriptWaitResult` |
+| `TodoWrite` | `todo_write` | yes | no | no | — | string |
+| `Task` | `task-cli` | yes (read-only exec: no) | no | no | process | string |
+| `TaskOutput` | `task-output-cli` | yes | no | no | persistent-settings | string |
+| `TaskStop` | `task-stop-cli` | yes | no | no | process | string |
+| `Skill` | `SKILL_CLI_TOOL_ID` | yes | no | no | fs-read | string |
+| `ToolSearch` | `tool-search-cli` | yes | no | no | — | string |
+| `StructuredOutput` | `structured-output-cli` | gated | no | no | — | string |
+| `AskUser` | ask-user id | yes | yes | yes | — | answers |
+| `ExitSpecMode` | `exit-spec-mode` | spec mode | yes | yes | fs-write | `{approved}` |
+| `WebSearch` | `web_search` | deferred | yes | no | network | provider result union |
+| `FetchUrl` | `fetch_url` | deferred | yes | no | network | `{markdown,title,effectiveUrl,metadata,linkedUrls?}` |
+| `GenerateImage` | `generate-image` | gated (image models) | no | no | network | image result |
+| `DecisionModel` | `decision-model` | flag `DecisionModels` | yes | no | network | decision result |
+| `ListSettings` | `list_settings` | deferred | yes | no | — | operation catalog |
+| `StageSettingsChanges` | `stage_settings_changes` | deferred | yes | no | — | staged-change result |
+| `SearchSessions` | `search-sessions-cli` | flagged | yes | no | fs-read, network | string |
+| `UpgradeSessionModel` | `upgrade-session-model-cli` | yes | no | no | persistent-settings | string |
+| `ConnectApp` | connect-app id | not airgapped, deferred | yes | no | external-service | connect result |
+| `SlackPostFile` | slack id | explicit selection | yes | no | fs-read, external-service | string |
+| `SlackPostMessage` | slack id | explicit selection | yes | no | external-service | string |
+| `SlackCreateOrUpdateCodeChannel` | slack id | explicit selection | yes | no | external-service | string |
+| `SlackArchiveCodeChannel` | slack id | explicit selection | yes | no | external-service | string |
+| `SlackListChannels` | slack id | explicit selection | yes | no | external-service | string |
+| `ListComputers` / `ListServiceAccounts` | computers ids | yes | yes | no | — | list |
+| `CreateAutomation` | automation id | not airgapped | yes | yes | external-service | automation |
+| `ListAutomations` / `ReadAutomation` / `ListAutomationTemplates` | automation ids | not airgapped | yes | no | external-service | list/record |
+| `EditAutomation` / `DeleteAutomation` / `RunAutomation` | automation ids | not airgapped | yes | see definition | external-service | record |
+| `ReadAutomationFiles` / `EditAutomationFiles` | automation-file ids | not airgapped | yes | no | fs-read(+write) | file view / edit |
+| `SetAutomationRunOutcome` | automation outcome id | not airgapped | yes | no | external-service | string |
+| `LinkWorkItem` | link-work id | yes | yes | no | external-service | string |
+| `SendInboxMessage` | inbox id | yes | yes | yes | external-service | string |
+| `Loop` | loop id | schedulable hosts | yes | no | external-service | loop record |
+| `ProposeMission` / `StartMissionRun` / `EndFeatureRun` / `DismissHandoffItems` | mission ids | mission mode | yes | ProposeMission yes | fs/process per definition | result |
+| `SpawnAgent` / `ListAgents` / `SendMessage` / `InterruptAgent` / `RenameAgent` / `ArchiveAgent` / `CreateListener` | mission-v2 ids | flag `MissionsV2` | yes | no | external-service | result |
+| `GenerateDroid` | `generate-droid-cli` | yes | no | no | external-service | string |
+| `GetAgentEffectivenessUsage` / `StoreAgentReadinessReport` / `RenderAgentEffectivenessReport` | ids | command-gated | no | no | external-service / fs-write | report |
+| `ListEvalRuns` / `ListDatasets` / `ReadDataset` / `ReadEvalRun` / `CreateEvalRun` / `ListEvalPresets` / `SaveEvalPreset` / `CreateDataset` | eval ids | flag `AutoEvalPipeline` | yes | no (create/run yes) | network/fs per definition | eval records |
+| `<server>___<tool>` | `mcp_<server>_<tool>` | per server, maybe deferred | yes | yes | external-service | stringified result |
+
+Definitions: `@packages/droid-core/src/tools/definitions/**`, registration
+`@src/tools/tui.ts:200-570`, automation/mission/inbox ids
+`@packages/droid-core/src/tools/definitions/cli/automationCli.ts:29-35`,
+`@packages/droid-core/src/tools/definitions/cli/computersCli.ts:11-34`,
+`@packages/droid-core/src/tools/definitions/cli/linkWorkCli.ts:10`,
+`@packages/droid-core/src/tools/definitions/cli/sendInboxMessageCli.ts:11`,
+`@packages/droid-core/src/tools/definitions/cli/loopCli.ts:10`.
+
 ## Observable behaviour
 
 ### Registry and catalog
@@ -659,7 +725,7 @@ with `vendor:` (then `evidence/original-vendor/windows-x64/`).
 | `packages/droid-core/src/tools/utils/large-output.ts:40-220` | B12, B13 | read |
 | `packages/droid-core/src/tools/definitions/cli/schema.ts:81-111` | B14 | read |
 | `src/utils/truncate.ts:19-137` | B15 | read |
-| `packages/droid-core/src/tools/utils/file-encoding.ts:1-200` | B16, B31 | read |
+| `packages/droid-core/src/tools/utils/file-encoding.ts:1-200` | B16, B22 | read |
 | `src/tools/executors/client/read-cli.ts:72-800` | B16, B17 | read |
 | `packages/droid-core/src/tools/definitions/cli/schema.ts:827-980` | B18–B20 | read |
 | `src/tools/executors/client/ls-cli.ts:140-250` | B18 | read |

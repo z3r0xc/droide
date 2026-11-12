@@ -16,11 +16,20 @@ export function makeDaemonCommand(): Command {
         .choices(["websocket", "ipc"])
         .default("websocket"),
     )
-    .option("--droid-path <path>", `Path to ${PROGRAM} executable for spawning sessions`)
-    .option("--liveness-fd <fd>", "Monitor parent process liveness via inherited pipe")
+    .option(
+      "--droid-path <path>",
+      `Path to ${PROGRAM} executable for spawning sessions`,
+    )
+    .option(
+      "--liveness-fd <fd>",
+      "Monitor parent process liveness via inherited pipe",
+    )
     .option("--parent-pid <pid>", "Monitor parent process")
     .option("--remote-control", "Enable Remote Control")
     .option("--remote-access", "Alias for --remote-control", false)
-    .option("--settings <path>", "Path to runtime settings file merged for this process only")
+    .option(
+      "--settings <path>",
+      "Path to runtime settings file merged for this process only",
+    )
     .action(() => notImplemented("daemon"));
 }

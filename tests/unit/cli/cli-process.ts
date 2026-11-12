@@ -56,9 +56,15 @@ export function runNode(args: readonly string[]): CliResult {
   });
   if (result.error !== undefined) throw result.error;
   if (result.status === null) {
-    throw new Error(`node exited by signal ${String(result.signal)} for ${args.join(" ")}`);
+    throw new Error(
+      `node exited by signal ${String(result.signal)} for ${args.join(" ")}`,
+    );
   }
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 /** Run the CLI entry point with the given arguments. */

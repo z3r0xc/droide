@@ -14,7 +14,11 @@ import {
   MigrationFailedError,
   SchemaTooNewError,
 } from "./errors.ts";
-import { CACHE_MIGRATIONS, CACHE_SCHEMA_VERSION, type SessionMigration } from "./migrations.ts";
+import {
+  CACHE_MIGRATIONS,
+  CACHE_SCHEMA_VERSION,
+  type SessionMigration,
+} from "./migrations.ts";
 
 export interface MigrateOptions {
   readonly clock: SessionClock;
@@ -71,7 +75,9 @@ export function ensureLedger(db: DatabaseSync): void {
   );
 }
 
-export function readMigrationLedger(db: DatabaseSync): readonly AppliedMigration[] {
+export function readMigrationLedger(
+  db: DatabaseSync,
+): readonly AppliedMigration[] {
   const rows = db
     .prepare(
       "SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version ASC",
@@ -82,7 +88,10 @@ export function readMigrationLedger(db: DatabaseSync): readonly AppliedMigration
     if (!isSqlRow(raw)) continue;
     const version = readInt(raw, "version");
     if (!Number.isInteger(version) || version < 1) {
-      throw new InvalidMigrationVersionError(version, "ledger version is not a positive integer");
+      throw new InvalidMigrationVersionError(
+        version,
+        "ledger version is not a positive integer",
+      );
     }
     ledger.push({
       version,
@@ -94,7 +103,11 @@ export function readMigrationLedger(db: DatabaseSync): readonly AppliedMigration
   return ledger;
 }
 
-function withBusyTimeout<T>(db: DatabaseSync, timeoutMs: number, work: () => T): T {
+function withBusyTimeout<T>(
+  db: DatabaseSync,
+  timeoutMs: number,
+  work: () => T,
+): T {
   db.exec(`PRAGMA busy_timeout = ${timeoutMs}`);
   try {
     return work();
@@ -155,7 +168,10 @@ function checkpointTruncate(db: DatabaseSync): void {
   }
 }
 
-export function migrateSessionIndex(db: DatabaseSync, options: MigrateOptions): MigrateReport {
+export function migrateSessionIndex(
+  db: DatabaseSync,
+  options: MigrateOptions,
+): MigrateReport {
   ensureLedger(db);
   const ledger = new Map<number, LedgerRow>();
   const known = new Map<number, SessionMigration>(
@@ -185,12 +201,21 @@ export function migrateSessionIndex(db: DatabaseSync, options: MigrateOptions): 
     ledger.set(entry.version, entry);
   }
   if (unknown.length > 0) {
-    throw new SchemaTooNewError(CACHE_SCHEMA_VERSION, [...unknown].sort((a, b) => a - b));
+    throw new SchemaTooNewError(
+      CACHE_SCHEMA_VERSION,
+      [...unknown].sort((a, b) => a - b),
+    );
   }
 
-  const pending = CACHE_MIGRATIONS.filter((migration) => !ledger.has(migration.version));
+  const pending = CACHE_MIGRATIONS.filter(
+    (migration) => !ledger.has(migration.version),
+  );
   if (pending.length === 0) {
-    return { applied: [], headVersion: CACHE_SCHEMA_VERSION, alreadyCurrent: true };
+    return {
+      applied: [],
+      headVersion: CACHE_SCHEMA_VERSION,
+      alreadyCurrent: true,
+    };
   }
 
   const applied: number[] = [];

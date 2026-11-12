@@ -8,6 +8,9 @@ export function makeUpdateCommand(): Command {
   return new Command("update")
     .description(`Check for and install ${DISPLAY} updates`)
     .option("-c, --check", "Only check for updates without installing")
-    .option("-v, --version <version>", "Update to a specific version (e.g., 1.2.3)")
+    .option(
+      "-v, --version <version>",
+      "Update to a specific version (e.g., 1.2.3)",
+    )
     .action(() => notImplemented("update"));
 }

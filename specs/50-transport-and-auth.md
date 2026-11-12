@@ -238,7 +238,7 @@ managed transport (`http`/`websocket`), an optional header purpose, and one of
 | `update-privacy` | POST | `/api/sessions/{id}/privacy` | none (hosted until Prem supports sharing) |
 | `create-message` | POST | `/api/sessions/{id}/message/create` | `/api/apps/cloud-sync/sessions/{id}/messages` |
 | `search-sessions` | GET (hosted) / POST (Prem) | `/api/sessions/search` | `/api/apps/cloud-sync/sessions/search` |
-| `cloud-sync-batch` | POST | `/api/sessions/batch`-family constant `SESSION_BATCH_PATH` | `/api/apps/cloud-sync/sessions/batch` |
+| `cloud-sync-batch` | POST | the `SESSION_BATCH_PATH` constant (value absent from the recovered tree; see Open question 1) | `/api/apps/cloud-sync/sessions/batch` |
 | `get-pinned-sessions` | GET | `/api/sessions/pinned` | Prem prefix `/pinned` |
 | `pin-session` / `unpin-session` | POST / DELETE | `/api/sessions/{id}/pin` | Prem prefix `/pin` |
 
@@ -307,7 +307,7 @@ credential-verification path; its response carries `userId`, `orgId`, optional
 `region`, `inferenceRegion`, `isEnterprise`, `isOnPrem`, `premBaseHost`,
 `premBaseHostV2`, `principalKind`, and `attribution`, and is parsed leniently so
 a newer backend field cannot break an older client
-(`orig/packages/common/src/api/cli/schemas.ts:44-100`). `[observed]`
+(`orig/packages/common/src/api/cli/schemas.ts:34-100`). `[observed]`
 
 ### D. Retry, backoff and deadlines
 
@@ -360,7 +360,9 @@ Anthropic `-remaining`/`-reset` pair is used when remaining is zero. Interactive
 turns allow 6 throttling attempts (`orig/packages/droid-core/src/llms/client/retryPolicy/index.ts:16-17,30,74-102,120-140,179-203`).
 `[observed]`
 
-**B42** A provider-capacity failure (500, 502, 503, 529, 408) waits about
+**B42** A provider-capacity failure (408, 502, 503, 529 unconditionally; 500
+when the message reads as a server error or overload, plus the overloaded and
+internal error classes) waits about
 500 ms when another provider can be rotated to, and otherwise backs off like a
 throttle (5 s…30 s); with no rotation target a single provider gets 10 attempts.
 Timeout failures use a 3 s base growing 1.5× per attempt, capped at 15 s
@@ -466,7 +468,7 @@ in-flight identity work (`orig/packages/runtime/auth/src/auth/common/cache.ts:50
 **B59** The default WorkOS API base is
 `https://api.workos.com/user_management`, overridable by
 `FACTORY_WORKOS_BASE_URL` (`orig/packages/runtime/auth/src/auth/workos/base-url.ts:3-9`;
-`orig/src/environmentResolution.ts:216-220`). `[observed]`
+`orig/src/environmentResolution.ts:239-241`). `[observed]`
 
 **B60** The public WorkOS client id is chosen from `FACTORY_ENV`: the production
 client id only for `production`, the development id otherwise. An invalid
@@ -742,8 +744,9 @@ duration limit, output degeneration, empty response)
 (`orig/packages/droid-core/src/llms/errors/constants.ts:1-44`). `[observed]`
 
 **B103** Retryability is part of the error class: throttling, overloaded,
-network, stream, internal, host-duration (first cut only) and unknown errors are
-retryable; invalid request, content moderation, context limit, request too
+network, stream, internal and unknown errors are retryable; a host-duration cut
+is retryable only when its thrower allows the single retry (a repeated cut is
+not); invalid request, content moderation, context limit, request too
 large, text-fields-too-large and output degeneration are not
 (`orig/packages/droid-core/src/llms/errors/errors.ts:125-545`). `[observed]`
 
@@ -864,8 +867,9 @@ by subtracting cached and cache-write counts
 **B121** Anthropic usage arrives twice: `message_start` seeds input and cache
 counts, `message_delta` overwrites them. Thinking tokens are estimated from the
 streamed character count and replaced by the provider's breakdown when present.
-Session totals are committed only for a successful stream, once per billed
-attempt (`orig/packages/droid-core/src/llms/client/chunk-processing.ts:704-733,742-757,959-1000`;
+Streaming never commits session totals; the send loop commits one billed attempt
+at a time, and an attempt that was retried, cut, resampled or aborted after
+reporting prompt tokens still counts (`orig/packages/droid-core/src/llms/client/chunk-processing.ts:704-733,742-757,959-1000`;
 `orig/src/services/SessionService.ts:8430-8497`). `[observed]`
 
 **B122** Streaming usage is a live-display snapshot only: `onTokenUsage(usage,
@@ -922,3 +926,362 @@ authentication context after starting a close of the local session
 and exits non-zero when any selected check fails
 (`orig/src/entrypoints/doctor/checks/auth.ts:147,234,260,403-427`;
 `orig/src/entrypoints/doctor/run.ts:406-421`). `[observed]`
+
+## Data & config
+
+### Environment variables
+
+| Name | Type / domain | Default | Absent / malformed | Clause |
+|---|---|---|---|---|
+| `FACTORY_API_BASE_URL` | absolute http(s) URL, no trailing `/` | baked build define | a release build fails config validation | B3, B7 |
+| `FACTORY_API_BASE_URL_EU` | absolute http(s) URL, no trailing `/` | baked build define | EU region falls back to `FACTORY_API_BASE_URL` | B1, B3 |
+| `FACTORY_API_KEY` | opaque key, prefix `fk-` | none | falls through to WorkOS/Prem | B52, B53 |
+| `FACTORY_WORKOS_BASE_URL` | URL | `https://api.workos.com/user_management` | default used | B59 |
+| `FACTORY_ENV` | `development` \| `production` | `development` | invalid value throws | B60 |
+| `FACTORY_DISABLE_KEYRING` | `true` \| `1` | false | any other value is false | B47 |
+| `FACTORY_AIRGAP_ENABLED` | `true` \| `1`; baked define wins | false | any other value is false | B89, B58 |
+| `FACTORY_HOME_OVERRIDE` | absolute path | OS home | ignored when empty | B45 |
+| `FACTORY_EXTRA_CA_CERTS`, `NODE_EXTRA_CA_CERTS` | inline PEM, or `path.delimiter` file list | none | unreadable entries contribute nothing | B85 |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | `0` disables verification | verification on | doctor warns | B87 |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (either case) | proxy URLs / host list | none | direct connection | B84 |
+| `CLI_VERSION` | version string | unset | `X-Client-Version` is not sent | B11 |
+
+### Files
+
+| Path (relative to the Factory home + env directory) | Format | Owner | Clause |
+|---|---|---|---|
+| `auth-deployment.json` | JSON `{version:1, revision:uuid, deployment}` | deployment selection | B70 |
+| `auth.v2.keyring` | encrypted credentials JSON | WorkOS v2 (keyring) | B46 |
+| `auth.v2.loginkeychain` | encrypted credentials JSON | WorkOS v2 (macOS security CLI) | B46 |
+| `auth.v2.file` | encrypted credentials JSON | WorkOS v2 (keyfile) | B46 |
+| `auth.v2.key` | 32-byte key | keyfile backend | B46 |
+| `auth.v2.write.lock` | lock file | all writers | B46 |
+| `prem-auth/<sha256(origin)>/credentials.json` | encrypted `{version, backend, ciphertext}` | Prem | B77 |
+| `prem-auth/<sha256(origin)>/credentials.key` | key | Prem keyfile backend | B77 |
+| `certs/…` | system-root cache | certificate loader | B86 |
+
+### Header names (literal)
+
+`Authorization`, `X-Factory-Org-Id`, `X-Factory-Client`, `X-Factory-Sdk`,
+`X-Factory-Request-Surface`, `X-Factory-Exec-Output-Format`,
+`X-Factory-Exec-Input-Format`, `X-Client-Version`,
+`X-Factory-Whoami-Extended`, `X-Factory-Session-Attribution`,
+`x-session-id`, `x-assistant-message-id`, `x-api-provider`,
+`x-message-call-type`, `traceparent`, `Content-Type`,
+`x-factory-upstream-error`, `x-factory-stream-deadline-ms`,
+`x-factory-computer-delete-support`, `fireworks-cached-prompt-tokens`,
+`x-api-key`, `proxy-authorization`, `cookie`.
+
+## Errors
+
+Grouped by trigger. Exit codes are process-level; library errors carry no exit
+status of their own.
+
+| Trigger | Identity | User-visible effect | Retry-safe |
+|---|---|---|---|
+| No credential at all | `AuthenticationError` / `notAuthenticatedMessage` | "Not authenticated…" | no (needs `/login` or key) |
+| Configured key rejected (400/401/403) | `ResponseError400/401/403`, reason `apiKeyRejected` | invalid-key copy | no |
+| Key validation could not run (≥500 / network) | reason `FactoryApiUnavailable` | "Factory API is not accessible…" | yes, later |
+| Key validation malformed 2xx | `ResponseError` (502) | validation-failed copy | no |
+| Expired session, refresh unreachable | transient `TokenRefreshError`, null token for nullable readers | expired/again-later copy | yes |
+| Refresh rejected (4xx ≠ 429) | permanent `TokenRefreshError` | expired-login copy | no; session ends |
+| Customer deployment signed out | `AuthenticationError('Sign in to this customer deployment.')` | customer-login copy | after sign-in |
+| Customer deployment awaiting org | `AuthenticationError('Choose an organization…')` | same | after choice |
+| Selection file malformed/unreadable | `AuthDeploymentSelectionError` | message + exit 1 at startup | no (repair file) |
+| Expected Prem pin mismatch | `ExpectedPremDeploymentError` | `droid deployment set --private-origin` | no |
+| Prem auth in airgap | `ResponseError403Forbidden` | "Prem authentication is unavailable…" | no |
+| Prem network/TLS failure | `ResponseError` (status preserved) | generic Prem auth failure | yes |
+| Factory call in airgap | `AirgapBlockedError` | "Outbound request blocked…" | no |
+| Hosted path on customer deployment | `MetaError` | "This hosted operation is unavailable…" / "This operation is unavailable…" | no |
+| Backend non-2xx | `FetchError` `${status} ${body}` | status + server text (hosted) | 5xx/429 only if caller retries |
+| Customer backend non-2xx | `FetchError('Customer request failed')` | status only | as above |
+| Daemon missing credentials | `MetaError` type `Precondition` | "Daemon not authenticated" | no, until configured |
+| HTTP 401 from WorkOS refresh | permanent `TokenRefreshError` | re-login | no |
+| HTTP 429 at a model provider | `LLMThrottlingError` / throttling reason | "high demand…" | yes, with server delay honoured |
+| HTTP 5xx/529 at a model provider | `LLMOverloadedError` / internal error | "provider is currently overloaded…" | yes (capacity policy) |
+| Network/TLS failure to a model provider | `LLMNetworkError` | "network issues…" | yes |
+| Proxy content gate 403 | code `content_policy_rejected` | policy-blocked copy | no |
+| No active plan 402 | code `no_active_subscription` | "No active subscription found." | no |
+| Request body too large 413 | `LLMRequestTooLargeError` | shrink attachments copy | no |
+| Context window exceeded | context-limit reason | "Context limit exceeded…" | no (compaction may follow) |
+
+## Acceptance tests
+
+| Clause | Test id | Fixture |
+|---|---|---|
+| B1–B9 | `tests/transport/test_base_url_matrix` | `fixtures/transport/base_url_matrix.json` |
+| B10–B20, B22 | `tests/transport/test_header_construction` | `fixtures/transport/credential_snapshot.json` |
+| B8, B9, B21, B91 | `tests/transport/test_request_policy` | `fixtures/transport/policy_cases.json` |
+| B23–B32 | `tests/transport/test_route_table` | `fixtures/transport/routes.json` |
+| B33–B39 | `tests/transport/test_deadlines` | `fixtures/transport/deadlines.json` |
+| B40–B44 | `tests/transport/test_llm_retry` | `fixtures/transport/retry_cases.json` |
+| B45–B58 | `tests/transport/test_credential_store` | `fixtures/transport/credential_store/` |
+| B59–B69 | `tests/transport/test_workos` | `fixtures/transport/workos_cases.json` |
+| B70–B74 | `tests/transport/test_deployment_selection` | `fixtures/transport/deployments.json` |
+| B75–B83 | `tests/transport/test_prem_auth` | `fixtures/transport/prem_cases.json` |
+| B84–B91 | `tests/transport/test_ca_and_airgap` | `fixtures/transport/ca_airgap.json` |
+| B92–B104 | `tests/transport/test_http_error_messages` | `fixtures/transport/http_errors.json` |
+| B105–B109 | `tests/transport/test_llm_transport_routing` | `fixtures/transport/routing.json` |
+| B110–B113 | `tests/transport/test_sse_reader` | `fixtures/transport/sse/*.txt` |
+| B114–B119 | `tests/transport/test_stream_events` | `fixtures/transport/streams/*.jsonl` |
+| B120–B123 | `tests/transport/test_usage_accounting` | `fixtures/transport/usage_streams.jsonl` |
+| B124–B126 | `tests/transport/test_converse_and_ws` | `fixtures/transport/converse_ws.json` |
+| B127–B130 | `tests/transport/test_cli_auth_surface` | `fixtures/transport/doctor_auth.json` |
+
+### Test specifications
+
+**`test_base_url_matrix`** — table-driven over `resolveCliApiBaseUrl(config,
+region)`. Rows: (deployment factory, region global, base
+`https://api.example`, eu `https://eu.example`) → `https://api.example`;
+(factory, eu, both) → `https://eu.example`; (factory, eu, eu absent) →
+`https://api.example`; (customer-prem `https://prem.example`, eu, both) →
+`https://prem.example`. Also asserts `getRegion` returns `global` with no
+credential and with a customer deployment, and that `getPremBaseHost` returns
+the origin for a customer deployment and `premBaseHostV2` for a managed one.
+Reject cases: empty base, trailing `/`, `ftp://` each throw. Fixture is a JSON
+array of cases; no network.
+
+**`test_header_construction`** — given a fake snapshot `{token: 't', org: 'o',
+purpose: 'operational'}` the produced header record equals
+`{Authorization: 'Bearer t', 'X-Factory-Org-Id': 'o', 'X-Factory-Client':
+'cli', 'X-Client-Version': <fixture version>}`; with no token the
+`Authorization` key is absent; with `purpose: 'usage'` the default
+`X-Factory-Client` is absent; SDK attribution adds `X-Factory-Sdk`; a caller
+header whose name differs only in case is never duplicated. Daemon builder adds
+`Content-Type: application/json` and lets a caller override win.
+
+**`test_request_policy`** — a policy `{origin: 'https://prem.example',
+allows: path === '/api/apps/x'}` accepts exactly that origin+path and rejects
+(a) another origin, (b) userinfo, (c) a fragment, (d) another path, (e) a
+`Host` header naming another authority, (f) an `Authorization`/`X-Factory-Org-Id`
+that differs from the expected value, (g) `x-api-key`/`proxy-authorization`/
+`cookie`. Expected refusal is `MetaError` before the injected fetch is called
+(assert call count 0).
+
+**`test_route_table`** — evaluates every row of `fixtures/transport/routes.json`
+(route id, params, hosted base, prem host, customer flag) and asserts the
+resolved method+URL, the SDK base URL, and the thrown message when the route has
+no Prem path. Includes `search-sessions`: GET hosted, POST on Prem. Asserts
+`customerPremOnly` routes are refused on a managed Prem and served on a
+customer Prem; `managedPremOnly` the reverse.
+
+**`test_deadlines`** — with a fake clock and an injected transport: one backend
+call issues exactly one fetch; whoami aborts at 10 000 ms; WorkOS refresh at
+15 000 ms; Prem auth at 15 000 ms; a 400/401/403 refresh yields a permanent
+`TokenRefreshError` (one attempt), a 500 yields three attempts at 500/1000 ms
+delays before the transient error; two queued refreshes never run concurrently
+(assert interleaving); a permanently dead refresh token is not redeemed twice.
+
+**`test_llm_retry`** — `getRetryConfig`/`getRouteAwareRetryConfig` with a
+seeded RNG: attempt counts per strategy are 1/5/4; 429 delays clamped to
+[5000, 30000] ms; `retry-after: 2` honoured as a minimum; timeout delays
+3000, 4500, 6750… capped at 15000; capacity delay ≈500–1000 ms with rotation
+and 5000–30000 without; interactive throttling grants 6 attempts; single
+provider capacity 10.
+
+**`test_credential_store`** — a temp base dir with injected keyfile adapter:
+load preference (secure then keyfile), `disableKeyring` never touches the secure
+adapter; save with `forceNew` writes keyfile when the key store is unavailable;
+refresh with a mismatched context is rejected; `updateCredentials` returns
+`rejected` for an undefined update and `unavailable` when ciphertext exists but
+cannot be decrypted; `clear` removes only the active file and keeps
+`auth.v2.key`; lookup order is airgap → env key → Prem → external → stored;
+strict reader throws transient on an unreadable store and returns null when
+signed out.
+
+**`test_workos`** — recorded request shapes against a fake fetch: device
+authorize body, poll body, refresh body (with and without
+`organization_id`); poll state machine (`authorization_pending`, `slow_down`
++1 s, `access_denied`, `expired_token`, unknown); login saves with `forceNew`;
+organization switch clears the org until identity; switch superseded error;
+org membership lookup returns the first `workosOrgIds` entry and triggers a
+scoped refresh.
+
+**`test_deployment_selection`** — missing file → `{kind:'factory'}`; malformed
+JSON → `AuthDeploymentSelectionError`; load of a customer deployment
+canonicalizes the origin; save preserves unknown metadata, bumps `revision`;
+`droid deployment set` with both flags → 400 message; in airgap → 403; expected
+origin mismatch → `ExpectedPremDeploymentError`; success prints the restart
+notice and exits 0.
+
+**`test_prem_auth`** — canonicalization accept/reject table (scheme, trailing
+dot, path, query, userinfo, backslash, whitespace, fragment, local http);
+discovery rejects a non-OIDC provider and an `openid`-less scope; device flow
+polls to exchange and returns a candidate without writing; a single grant is
+auto-selected, two grants stay unselected; a refresh with a changed user,
+issuer, session id or session expiry fails; a 401 refresh clears the record;
+logout revokes then clears; failures carry status only (assert no body text in
+`message`).
+
+**`test_ca_and_airgap`** — `parseExtraCaCertsValue` for inline PEM vs
+`a:b` path list vs empty entries; `AirgapBlockedError` fires for a relative
+path and for an absolute URL under the base origin, and not for an unrelated
+absolute URL; `FetchError` for a customer request has message `Customer request
+failed` and no body; request init carries `redirect:'error'` and
+`credentials:'omit'`.
+
+**`test_http_error_messages`** — table of (status, configured key?) → error
+type/message/exit: 400/401/403 → `ResponseError400/401/403` +
+`Factory API key was rejected.` + `apiKeyRejected`; 500 → unavailable copy;
+418 → validation-failed copy; malformed 200 (`ResponseError`) → validation
+failed; transport `TypeError` → unavailable. Also asserts `FetchError.message`
+is `${status} ${body}`; `ResponseError.toPublicObject()` shape; `droid exec`
+exit 1 on a refused invocation; wiki-search-style subcommand exit 1 on auth
+failure; `droid deployment` maps non-zero to 1.
+
+**`test_llm_transport_routing`** — `resolveProviderRoute` table for every
+`ModelProvider` member (Google, Converse, Factory+anthropic, Factory+responses
+endpoint, Factory+chat endpoint, generic, OpenAI, xAI, OpenAI image model,
+Anthropic, e2e mock); `getProxyBaseURL` picks `/a` for Fireworks-Anthropic
+models and `/o/v1` for OpenAI-compatible/Google; SDK base URLs strip the
+suffixes; the Anthropic request body carries `stream: true` and clamps
+`max_tokens` to the capability ceiling.
+
+**`test_sse_reader`** — fixtures: (a) two events split across arbitrary byte
+boundaries; (b) `event:`/`:` lines ignored; (c) multi-line `data:` joined with
+`\n`; (d) CRLF; (e) `[DONE]` ignored by the Gemini-style reader; (f) invalid
+JSON → error naming size and error name only, not payload; (g) oversized event
+→ error; (h) body ending inside an event → truncation error; (i) clean end at a
+boundary → generator completes; (j) abort → reason propagated and reader lock
+released.
+
+**`test_stream_events`** — replay recorded event lists through the chunk
+processors: Anthropic full sequence yields one text block, one tool call with
+accumulated JSON, and one usage emission at `message_delta` (assert no second
+emission on a following `message_stop`); Responses sequence yields text,
+reasoning, a function call with done-arguments replacing deltas, and completion;
+Chat-Completions sequence handles missing `index`, duplicate complete calls at
+one index, and a `finish_reason`-only chunk; Converse sequence maps stop
+reasons and raises on each error member.
+
+**`test_usage_accounting`** — OpenAI usage with `input_tokens=100`,
+`cached_tokens=40`, `cache_write_tokens=10` → `{inputTokens:50,
+cacheReadTokens:40, cacheCreationTokens:10}`; Anthropic `message_start` +
+`message_delta` overwrite; thinking estimate replaced by provider breakdown;
+`isStreaming=true` does not change session totals; one committed attempt adds
+exactly once; `factoryCredits` accumulated.
+
+**`test_converse_and_ws`** — Converse event union mapping and the five error
+members; WebSocket close reasons enum values; connection-scoped reasons not
+replayed.
+
+**`test_cli_auth_surface`** — root help contains no `auth` command; `/login`
+without a selector emits the `notAvailable` notification; `/logout` clears the
+credential and rotates daemon auth; `droid doctor --checks auth` emits the four
+check ids and exits non-zero when one is forced to `fail`.
+
+## Evidence
+
+| Evidence | Supports | Method |
+|---|---|---|
+| `ev_transport_1` | B1–B9 | `orig/packages/runtime/auth/src/auth/common/resolveCliApiBaseUrl.ts:13-21`, `orig/src/environment.ts:285-317`, `orig/src/environmentResolution.ts:90-127,189-197`, `orig/packages/runtime/auth/src/auth/common/cache.ts:617-620,665-703`, `orig/packages/utils/src/api/config.ts:7-40`, `orig/packages/utils/src/api/fetch.ts:11-29,200-218`, `orig/src/api/config.ts:302-334`; direct reading |
+| `ev_transport_2` | B10–B22 | `orig/src/api/config.ts:149-242,302-334`, `orig/packages/runtime/auth/src/auth/common/whoami.ts:19-56`, `orig/packages/droid-sdk-core/src/protocol/droid/schemas/constants.ts:7-36`, `orig/src/api/BackendClient.ts:60-99,807-886`, `orig/src/llm-proxy/utils.ts:235-296`, `orig/packages/utils/src/api/fetch.ts:32-96,255-296`, `orig/packages/daemon-core/src/services/ApiClient.ts:129-260,430-480`, `orig/packages/utils/src/api/constants.ts:6-9`, `orig/packages/runtime/auth/src/auth/prem/client.ts:107-140`; direct reading |
+| `ev_transport_3` | B23–B32 | `orig/src/api/BackendClient.ts:191-593,610-660,724-806,888-916`, `orig/packages/common/src/api/backend/enums.ts:9-83`, `orig/packages/common/src/api/llm-proxy/enums.ts:10-44`, `orig/packages/common/src/api/prem/constants/index.ts:34-38`, `orig/packages/common/src/api/cli/schemas.ts:34-100`; route table read exhaustively |
+| `ev_transport_4` | B33–B44 | `orig/packages/utils/src/api/fetch.ts:298-320`, `orig/packages/runtime/auth/src/auth/common/constants.ts:24-35`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:18-89`, `orig/packages/runtime/auth/src/auth/prem/client.ts:45-62`, `orig/packages/droid-core/src/llms/client/retryPolicy/index.ts:14-203`, `orig/packages/droid-core/src/llms/client/sendMessage.ts:484-491,3076-3081`, `orig/packages/common/src/api/llm-proxy/constants.ts:59-70`, `orig/packages/utils/src/api/httpStatus.ts:10-12`; constants and branches read |
+| `ev_transport_5` | B45–B58 | `orig/packages/runtime/auth/src/credentials/presence.ts:16-19`, `orig/packages/runtime/auth/src/credentials/constants.ts:1-3`, `orig/packages/runtime/auth/src/credentials/CredentialsStorage.ts:50-74,150-186,320-322,512-541,653-704,717-838`, `orig/packages/runtime/auth/src/auth/source.ts:83-160,234-320,579-663`, `orig/packages/runtime/auth/src/credentials/schemas.ts:10-42`, `orig/packages/runtime/auth/src/auth/common/cache.ts:50-95,506-593`, `orig/packages/runtime/auth/src/auth/common/constants.ts:8-24`; storage code read |
+| `ev_transport_6` | B59–B69 | `orig/packages/runtime/auth/src/auth/workos/base-url.ts:3-9`, `orig/packages/runtime/auth/src/auth/workos/config/index.ts:11-40`, `orig/packages/runtime/auth/src/auth/workos/login/device-code.ts:34-246`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:39-62`, `orig/packages/runtime/auth/src/auth/source.ts:531-605`, `orig/packages/runtime/auth/src/auth/active-organization.ts:88-126,180-234`, `orig/packages/runtime/auth/src/auth/resolve-org.ts:15-61`; flow code read |
+| `ev_transport_7` | B70–B74 | `orig/packages/runtime/auth/src/deployment/index.ts:25-95`, `schemas.ts:4-25`, `constants.ts:1`, `errors.ts:6-36`, `orig/packages/runtime/auth/src/auth/prem/config.ts:11-77,101-116`, `orig/src/entrypoints/deployment/command.ts:30-112`, `orig/src/environment.ts:285-317`, `orig/src/index.ts:186-196`; files and command read |
+| `ev_transport_8` | B75–B83 | `orig/packages/runtime/auth/src/auth/prem/client.ts:107-360,460-483`, `login.ts:47-171`, `storage.ts:80-104,224-300`, `schemas.ts`, `constants.ts:1-2`, `orig/packages/runtime/auth/src/auth/get.ts:36-91,165-190`, `orig/packages/runtime/auth/src/auth/active-organization.ts:50-70`; flow code read |
+| `ev_transport_9` | B84–B91 | `orig/src/constants/constants.ts:87-94`, `orig/src/utils/certificates/parseCertificates.ts:8-20`, `orig/src/utils/systemCertificates.ts:46,640-700`, `orig/src/entrypoints/doctor/checks/proxy.ts:17-20`, `certificates.ts:21-47,120-130`, `connectivity.ts:170-182`, `orig/packages/utils/src/api/fetch.ts:54,250,308-315`, `orig/packages/utils/src/api/errors.ts:40-56`, `orig/src/api/fetchBackend.ts:14-30`, `orig/packages/utils/src/api/constants.ts:1-9`; source read |
+| `ev_transport_10` | B92–B104 | `orig/packages/logging/src/errors/errors.ts:13-46`, `orig/packages/logging/src/errors/responses/errors.ts:7-68`, `orig/packages/runtime/auth/src/auth/api-key/verify.ts:47-127`, `orig/src/commands/authHelpers.ts:41-148`, `orig/src/i18n/authMessages.ts:11-63`, `orig/src/entrypoints/exec/run.ts:585-590,660-680`, `orig/src/entrypoints/wiki-search/run.ts:85-92`, `orig/packages/droid-core/src/llms/errors/utils.ts:1034-1213`, `errors/constants.ts:1-44`, `errors/errors.ts:125-545`, `orig/packages/common/src/api/llm-proxy/constants.ts:24-58`; classification and copy read |
+| `ev_transport_11` | B105–B126 | `orig/packages/droid-core/src/llms/client/converters.ts:102,1393,2080`, `sendMessage.ts:484-491,1330-1332,2676-2704,3076-3081,5040-5135`, `providerRouting.ts:60-102,320-352`, `chunk-processing.ts:699-1050,1144-1175,1177-1740,2117-2150,2151-2160,2238-2310,2410-2416`, `bedrock/converse.ts:266-287,333-420`, `orig/packages/common/src/api/llm-proxy/enums.ts:47-88`, `orig/packages/utils/src/api/response.ts:139-280`, `orig/src/api/BackendClient.ts:212-220`, `orig/src/services/SessionService.ts:8430-8497`; stream processors and adapters read |
+| `ev_transport_12` | B127–B130 | `evidence/cli/help.txt`, `orig/src/commands/loginCommand.ts:11-31`, `orig/src/commands/logoutCommand.ts:39-138`, `orig/src/entrypoints/doctor/checks/auth.ts:147,234,260,403-427`, `orig/src/entrypoints/doctor/run.ts:406-421`; help capture and command code read |
+
+## Open questions
+
+1. **The hosted session-batch path literal.** B24 cites
+   `@factory/common/api/sessions`'s `SESSION_BATCH_PATH` without its value;
+   the module is absent from the recovered tree (barrel elision). Settle by
+   locating the constant in a source map or by reading the backend route table
+   in a build with source maps. Blocks the exact cell only.
+2. **`FactoryApiConfig` field set.** `packages/utils/src/api/types.ts` is absent,
+   so B8/B9 describe the fields the implementation reads (`baseUrl`,
+   `getBaseUrl`, `getHeaders`, `requestPolicy`, `airgapEnabled`) rather than a
+   declared interface. A recovered `types.ts` would confirm field optionality.
+3. **Backend timeouts at call sites.** B33 states no timeout is imposed by the
+   transport. Which callers pass an `AbortSignal` (session listing does, cloud
+   sync may) is not exhaustively mapped. Settle by enumerating `request({…})`
+   call sites with `init: {signal}`. Does not block any clause.
+4. **`traceparent` injection.** B18 relies on `OtelTracing.injectContext`;
+   the propagation format (W3C vs custom) is not read. Settle by reading the
+   tracing package. Blocks the header value, not its presence.
+5. **Secure-storage service/account strings per platform.** B46/B48 establish
+   the file names and the `-dev` suffix; the keyring service is `Factory CLI`
+   and the account `auth-encryption-key`/`auth-encryption-key-security-cli`
+   (`CredentialsStorage.ts:50-52`), but each OS backend's storage encoding is
+   not read. Settle by reading `KeyringClient`/`SecurityCliKeyring` adapters.
+6. **Capacity status set.** B42 lists 500/502/503/529/408; the 408/502/503/529
+   set is read from `errors/utils.ts:508`, while including 500 comes from the
+   retry-policy comment (`retryPolicy/index.ts:148-153`). Confirm with
+   `isProviderCapacityError`'s body, which is not in the recovered files.
+7. **Responses WebSocket frame contract.** B126 covers close reasons and route
+   selection only. The `response.create` frame, the `_factory` extension key and
+   the idle/deadline recovery rules live in `responsesWebSocket.ts` and are not
+   specified here. Blocks a future websocket clause.
+8. **Whether any hidden `auth` command exists.** B127 is based on the captured
+   root help plus a grep of command registrations; a fully hidden command
+   registered under a different name would be invisible to both. Settle by
+   running the oracle's completion/command catalogue.
+9. **Exact `X-Factory-Client` values.** B11 names the header and the `cli`
+   default; the full `ClientType` value set (daemon, SDK, desktop, …) is in a
+   module not read. Settle from the protocol enum.
+
+## Clean-room notes
+
+**Must reproduce (the contract):**
+
+- The base-URL precedence: customer origin, then EU base on EU region, then
+  global base; per-request resolution through the same precedence.
+- Deployment selection as a separate, restart-scoped file that can only be
+  changed through `droid deployment set`, with missing = Factory and malformed =
+  hard startup failure.
+- The literal credential file names, their base directory, the `0600` mode,
+  secure-then-keyfile load order, `FACTORY_DISABLE_KEYRING` behaviour, key
+  retention across logout, and the atomic/lock-guarded write.
+- The credential lookup order and the invariant that `FACTORY_API_KEY` wins over
+  any stored session and reports its own organization.
+- The identity endpoint (`/api/cli/whoami`), its extended-response header, its
+  10 s deadline, its lenient schema, and its role as the single verifier for all
+  credential kinds.
+- The WorkOS device flow URLs, form bodies, poll state machine and deadlines;
+  the refresh form body; the serialization of redemptions; the permanent vs
+  transient classification (4xx ≠ 429 permanent).
+- The Prem discovery/exchange/refresh/logout endpoints, RFC 8628 polling, the
+  single-grant auto-selection, the 30 s expiry buffer, origin-keyed storage, and
+  the rule that Prem error text never leaves the deployment.
+- The route inventory and hosted/Prem placement rules, including which routes
+  are customer-only, managed-Prem-only, or hosted-only, and the exact refusal
+  messages for the wrong deployment.
+- The header names, their construction order, the customer-policy credential
+  invariance, the usage-purpose attribution rule, and the request attributes
+  `redirect:'error'` / `credentials:'omit'`.
+- The retry/backoff constants (attempts, base delays, caps, jitter fractions,
+  throttle and timeout policies) and the deadlines (10 s whoami, 15 s refresh,
+  15 s Prem, 4/10 min stream idle, 600 s default stream deadline).
+- The error taxonomy: HTTP status → typed error → user-visible message → exit
+  code, including the API-key 400/401/403 unification, ≥500 unavailability, the
+  malformed-200 validation failure, and the LLM reason set with its retryability.
+- The LLM transport: the normalized turn, per-provider dialect selection, the
+  proxy path families and SDK suffixes, SSE framing rules and failure modes, the
+  event orders and their terminality, tool-call delta assembly, and the disjoint
+  usage buckets with live-vs-durable accounting.
+- Airgap as a hard veto with its fixed message, applied at the final transport
+  and at helpers that front it.
+
+**Explicitly not part of the contract:**
+
+- Exact retry timing to the millisecond: jitter is random; tests pin the bounds
+  and the deterministic components only.
+- Log line wording, telemetry attribute names, and metric names.
+- The internal shape of the encrypted ciphertext (algorithm, key derivation) —
+  only that it is encrypted at rest, pinned to a backend, and unreadable without
+  the key.
+- The `getBaseUrl`/`getHeaders` callback indirection; a reimplementation may
+  resolve the same values eagerly per request.
+- The specific TypeScript class names (`FetchError`, `ResponseError`,
+  `LLMThrottlingError`, …) provided the error identity, message, status and
+  retryability match.
+- Which OS keyring backend is used, beyond the observable file/account names and
+  the `-dev` scoping.
+- Provider-side prompt caching, prompt-cache headers, eager input streaming and
+  native tool-call DSL recovery beyond the tool-call deltas described here.

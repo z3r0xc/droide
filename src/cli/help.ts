@@ -21,7 +21,9 @@ export function formatRows(rows: readonly Row[], gap = 6): string {
   for (const [term] of rows) width = Math.max(width, term.length);
   return rows
     .map(([term, description]) =>
-      description.length > 0 ? `  ${term.padEnd(width + gap)}${description}` : `  ${term}`,
+      description.length > 0
+        ? `  ${term.padEnd(width + gap)}${description}`
+        : `  ${term}`,
     )
     .join("\n");
 }
@@ -34,8 +36,14 @@ export function examplesBlock(rows: readonly Row[]): string {
 /** Options every session-launching command shares, in the subject's order. */
 export function addRuntimeOptions(command: Command): Command {
   return command
-    .option("--settings <path>", "Path to runtime settings file merged for this process only")
-    .option("--append-system-prompt <text>", "Append custom text to the end of the system prompt")
+    .option(
+      "--settings <path>",
+      "Path to runtime settings file merged for this process only",
+    )
+    .option(
+      "--append-system-prompt <text>",
+      "Append custom text to the end of the system prompt",
+    )
     .option(
       "--append-system-prompt-file <path>",
       "Append file contents to the end of the system prompt",
@@ -48,5 +56,8 @@ export function addRuntimeOptions(command: Command): Command {
     )
     .option("--auto <level>", "Autonomy level: low|medium|high")
     .option("--use-spec", "Start in spec mode")
-    .option("--disable-builtin-skills", "Disable Factory-provided builtin skills");
+    .option(
+      "--disable-builtin-skills",
+      "Disable Factory-provided builtin skills",
+    );
 }

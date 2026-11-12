@@ -134,8 +134,8 @@ the user transcript. `packages/droid-sdk-core/src/protocol/sessionV2/messages/en
 `image/jpeg | image/png | image/gif | image/webp`; documents are base64 PDF
 (`application/pdf`, optional `parsedData`) or plain text
 (`text/plain`). At most the 10 most recent images and 5 most recent PDFs stay
-in a request; evicted media is replaced by a placeholder and the model is told
-once via the media-limit reminder.
+in a request; older media is dropped from the request and the model is warned
+by the media-limit reminder.
 `packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:43-60`,
 `packages/droid-sdk-core/src/protocol/sessionV2/messages/schemas.ts:127-160`,
 `packages/droid-core/src/llms/client/image-limits.ts:16-17`,
@@ -369,8 +369,7 @@ restricted tool settles with
 `Tool cancelled: Spec mode is active - file edits and other state mutations
 are not allowed until the spec is approved`; a rejected `ExitSpecMode`
 settles with its rejection text. `src/core/ToolExecutor.ts:1600-1660`,
-`src/constants/constants.ts:12-20`,
-`packages/droid-core/src/llms/client/constants.ts:71-85`.
+`src/constants/constants.ts:12-20`.
 
 **B38 — Rejection ends the turn only for approver-less or subagent work.** In
 an ordinary interactive turn a user rejection leaves the turn running so the
@@ -398,10 +397,11 @@ another request. `src/core/ToolExecutor.ts:228-235`,
 
 **B41 — One context row per prompt.** Each prompt gets a single LLM-only
 `user` message (id prefix `context-`) holding a stable part (environment
-block, instructions, deferred-tool catalog announcement, skills listing,
-subagent listing, MCP auth/readiness, TodoWrite nudges, file-change,
-worktree, mission text, tagged paths) and a volatile part (current date,
-workspace-state snapshot). On the first message the last stable block is
+block, instructions, deferred-tool catalog announcement, MCP auth/readiness,
+TodoWrite nudges, file-change, worktree, mission text, tagged paths) and a
+volatile part (current date, workspace-state snapshot). The per-request
+re-attached reminders (deferred-tool baseline, skills listing, subagent
+listing) are added by the request assembler rather than stored in the row. On the first message the last stable block is
 tagged `prompt-cache-pin`.
 `src/core/AgentLoop.ts:5104-5130`,
 `src/agent/requestAssembly.ts:362-380`,
@@ -469,7 +469,7 @@ below the limit, so a session cannot loop.
 (`reason: 'context_limit'`) and retries the same iteration in place; the
 recovery is attempted once, with a fallback compaction model when the session
 model cannot summarize.
-`src/core/AgentLoop.ts:5699-5710`,
+`src/core/AgentLoop.ts:775-798`, `src/core/AgentLoop.ts:5699-5710`,
 `src/core/AgentLoop.ts:7151-7165`,
 `src/hooks/compaction/CompactionManager.ts:892-900`.
 
@@ -528,16 +528,21 @@ effort is clamped to the model's supported set, and a provider-coerced effort
 is written back to the session unless the effort was deliberately lowered for
 this turn.
 `packages/droid-sdk-core/src/protocol/llm/enums.ts:128-140`,
-`src/core/AgentLoop.ts:6700-6730`.
+`src/core/AgentLoop.ts:6690-6745`.
 
 ### Reliability
 
-**B55 — Retry budget.** The interactive default is 4 attempts, non-interactive
-5, `no_retry` 1. Attempts use exponential backoff (`delay × factor^attempt`)
-with jitter: base 1000 ms (interactive) / 2000 ms (non-interactive), factor 2
-/ 2.5. Interactive throttling extends to 6 attempts; a single provider with no
-rotation extends capacity errors to 10. `packages/droid-core/src/llms/client/retryPolicy/index.ts:20-60`,
+**B55 — Retry budget.** The loop's strategy is `non_interactive` when the
+runtime is a non-interactive CLI run or a mission worker session, otherwise
+`interactive`; best-effort background work uses `no_retry`. The interactive
+default is 4 attempts, non-interactive 5, `no_retry` 1. Attempts use
+exponential backoff (`delay × factor^attempt`) with jitter: base 1000 ms
+(interactive) / 2000 ms (non-interactive), factor 2 / 2.5. Interactive
+throttling extends to 6 attempts; a single provider with no rotation extends
+capacity errors to 10. `src/core/AgentLoop.ts:1438-1443`,
+`packages/droid-core/src/llms/client/retryPolicy/index.ts:20-60`,
 `packages/droid-core/src/llms/client/retryPolicy/index.ts:186-203`,
+`packages/droid-core/src/llms/client/sendMessage.ts:2302-2328`,
 `packages/daemon-sdk/src/retry.ts:15-42`.
 
 **B56 — Retry delays.** Throttling (429) waits max(5 s, backoff) capped at
@@ -578,7 +583,7 @@ shown instead, because it may be any body.
 `ABORTED_RESULT` without recording a failure metric, and the turn ends as
 `cancelled`; a provider failure records a failure metric and calls
 `onStreamingError`. `packages/droid-core/src/llms/client/sendMessage.ts:6236-6252`,
-`packages/droid-core/src/llms/client/constants.ts:26-30`.
+`packages/droid-core/src/llms/client/constants.ts:38-42`.
 
 ## Data & config
 
@@ -719,15 +724,14 @@ outcomes. Time, ids and jitter are injected.
 
 Two tests are load-bearing for this spec's acceptance:
 
-- `test_stream_text_only_transcript` is replaced here by
-  `test_stream_callback_sequence` + `test_assistant_attribution_persisted`:
+- `test_stream_callback_sequence` + `test_assistant_attribution_persisted`:
   feeding `stream_text.json` (`message_start` usage, a text block, deltas
   `"Hello"`, `" world"`, `message_delta` `end_turn`, `message_stop`) must emit
-  `streaming-start`, one `assistant-text-delta` per delta with increasing
-  `blockIndex 0` and the same `messageId`, `text-block-complete`,
-  `streaming-complete`; the persisted assistant message has one `text` block
-  `"Hello world"`, `role:"assistant"`, the injected fixed `modelId` and
-  `apiProvider`.
+  `streaming-start`, one `assistant-text-delta` per delta with the same
+  `messageId` and `blockIndex 0`, `text-block-complete` and
+  `streaming-complete`; the persisted assistant message has exactly one `text`
+  block `"Hello world"`, `role: "assistant"`, the injected fixed `modelId`,
+  and the `apiProvider` the fake transport reported.
 - `test_denied_path_tool_call_feedback`: a batch of one `Edit` call in an
   interactive session at autonomy `off`, with the permission transport
   answering `cancel`, must produce exactly one tool result
@@ -756,7 +760,7 @@ Two tests are load-bearing for this spec's acceptance:
 | `ev_loop_context` | B41–B44 | read `AgentLoop.ts:4790-4840,5104-5130`, `systemInfo.ts:938-1030,1031-1055`, `agentsMdGuidelines.ts:36-60`, `skills/*` |
 | `ev_loop_compaction` | B46–B49 | read `token-estimation.ts:5-33`, `SettingsService.ts:4838-4855`, `AgentLoop.ts:7743-7846,7151-7165`, `CompactionManager.ts:425-520,892-900` |
 | `ev_loop_models` | B51–B54 | read `model-registry.ts:561-700`, `llm/enums.ts:7-30,128-145`, `availability.ts:33-46`, `llm/index.ts:696-712`, `SessionService.ts:4717-4765`, `systemInfo.ts:1073-1112` |
-| `ev_loop_retry` | B55–B58, B60 | read `retryPolicy/index.ts:20-203`, `daemon-sdk/src/retry.ts:15-42`, `llmStreamingPlatform.ts:60-112`, `sendMessage.ts:1660-1672,6236-6252` |
+| `ev_loop_retry` | B55–B58, B60 | read `retryPolicy/index.ts:20-203`, `daemon-sdk/src/retry.ts:15-42`, `llmStreamingPlatform.ts:60-112`, `sendMessage.ts:1660-1672,2302-2328,6236-6252`, `AgentLoop.ts:1438-1443` |
 | `ev_loop_auth` | B59 | read `AgentLoop.ts:8331-8458`, `authHelpers.ts:52-68`, `authMessages.ts:20-45`, `agentTurnCompletion.ts:99-140` |
 
 All citations are `[observed]` unless noted. `[derived]` claims: B15 block order

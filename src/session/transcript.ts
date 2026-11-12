@@ -8,7 +8,15 @@
  * directory is rejected rather than joined.
  */
 
-import { existsSync, mkdirSync, openSync, closeSync, readFileSync, statSync, writeSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  openSync,
+  closeSync,
+  readFileSync,
+  statSync,
+  writeSync,
+} from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 
 import {
@@ -22,7 +30,8 @@ import {
 import { isSessionId } from "./ids.ts";
 
 export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+export type JsonValue =
+  JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 export type JsonObject = { readonly [key: string]: JsonValue };
 
 export function isJsonObject(value: unknown): value is JsonObject {
@@ -59,7 +68,8 @@ export function transcriptPathFor(
 
 /** One JSONL line, newline included. Refuses anything the reader cannot use. */
 export function serializeTranscriptRecord(record: JsonObject): string {
-  if (!isJsonObject(record)) throw new InvalidTranscriptRecordError("expected an object");
+  if (!isJsonObject(record))
+    throw new InvalidTranscriptRecordError("expected an object");
   let line: string;
   try {
     line = JSON.stringify(record);
@@ -72,7 +82,10 @@ export function serializeTranscriptRecord(record: JsonObject): string {
   return `${line}\n`;
 }
 
-export function parseTranscriptRecord(line: string, lineNumber: number): JsonObject {
+export function parseTranscriptRecord(
+  line: string,
+  lineNumber: number,
+): JsonObject {
   const text = line.endsWith("\r") ? line.slice(0, -1) : line;
   let parsed: unknown;
   try {
@@ -100,7 +113,10 @@ export function transcriptSize(path: string): number {
   return existsSync(path) ? statSync(path).size : 0;
 }
 
-export function readTranscriptFile(path: string, sessionId: string): readonly JsonObject[] {
+export function readTranscriptFile(
+  path: string,
+  sessionId: string,
+): readonly JsonObject[] {
   if (!existsSync(path)) throw new TranscriptUnavailableError(sessionId);
   const text = readFileSync(path, "utf8");
   if (text.length === 0) return [];

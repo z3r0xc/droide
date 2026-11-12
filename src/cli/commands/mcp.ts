@@ -8,7 +8,9 @@ function parseRepeated(value: string, previous: string[] = []): string[] {
 }
 
 function makePermissionsCommand(): Command {
-  const permissions = new Command("permissions").description("Manage persistent MCP tool permissions");
+  const permissions = new Command("permissions").description(
+    "Manage persistent MCP tool permissions",
+  );
   permissions
     .command("list")
     .description("List all persistent MCP permissions")
@@ -35,13 +37,26 @@ export function makeMcpCommand(): Command {
     .command("add")
     .description("Add a new MCP server")
     .argument("<name>", "Name of the MCP server")
-    .argument("<urlOrCommand...>", "URL for http/sse servers or command for stdio servers")
+    .argument(
+      "<urlOrCommand...>",
+      "URL for http/sse servers or command for stdio servers",
+    )
     .option(
       "--type <type>",
       'Server type: "http" (streamable), "sse" (remote SSE), or "stdio" (local) (default: stdio)',
     )
-    .option("--env <KEY=VALUE>", "Environment variable for stdio servers (can be used multiple times)", parseRepeated, [])
-    .option("--header <KEY: VALUE>", "HTTP header for remote servers (can be used multiple times)", parseRepeated, [])
+    .option(
+      "--env <KEY=VALUE>",
+      "Environment variable for stdio servers (can be used multiple times)",
+      parseRepeated,
+      [],
+    )
+    .option(
+      "--header <KEY: VALUE>",
+      "HTTP header for remote servers (can be used multiple times)",
+      parseRepeated,
+      [],
+    )
     .option("--no-oauth", "Disable OAuth for header/API-key remote servers")
     .action(() => notImplemented("mcp add"));
   mcp
@@ -50,11 +65,15 @@ export function makeMcpCommand(): Command {
     .action(() => notImplemented("mcp remove"));
   mcp
     .command("list")
-    .description("List configured MCP servers with connection and authentication status")
+    .description(
+      "List configured MCP servers with connection and authentication status",
+    )
     .action(() => notImplemented("mcp list"));
   mcp
     .command("auth")
-    .description("Authenticate every MCP server that needs authentication, one at a time")
+    .description(
+      "Authenticate every MCP server that needs authentication, one at a time",
+    )
     .action(() => notImplemented("mcp auth"));
   mcp.addCommand(makePermissionsCommand());
   return mcp;

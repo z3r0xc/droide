@@ -4,13 +4,18 @@ import { Command } from "commander";
 import { notImplemented } from "../not-implemented.ts";
 
 export function makeComputerCommand(): Command {
-  const computer = new Command("computer").description("Manage Remote Control registrations");
+  const computer = new Command("computer").description(
+    "Manage Remote Control registrations",
+  );
 
   computer
     .command("register")
     .description("Register this machine for Remote Control")
     .argument("[name]", "Computer name (defaults to hostname)")
-    .option("-y, --yes", "Skip interactive prompts (auto-clear stale local config)")
+    .option(
+      "-y, --yes",
+      "Skip interactive prompts (auto-clear stale local config)",
+    )
     .action(() => notImplemented("computer register"));
 
   computer
@@ -28,7 +33,10 @@ export function makeComputerCommand(): Command {
     .command("ssh")
     .description("Open SSH connection to a Remote Control computer")
     .argument("<computer-name>", "Computer name to connect to")
-    .argument("[command...]", "Command to run instead of an interactive shell (put -- before it)")
+    .argument(
+      "[command...]",
+      "Command to run instead of an interactive shell (put -- before it)",
+    )
     .option("--debug", "Enable debug output")
     .option("--proxy", "Run as stdio proxy (for ProxyCommand)")
     .option("--port <port>", "Target port", "22")

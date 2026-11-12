@@ -8,15 +8,17 @@ import { Command, Option } from "commander";
 
 import { notImplemented } from "../not-implemented.ts";
 
-const scopeOption = new Option("-s, --scope <scope>", "Installation scope").choices([
-  "user",
-  "project",
-]);
+const scopeOption = new Option(
+  "-s, --scope <scope>",
+  "Installation scope",
+).choices(["user", "project"]);
 
 export function makePluginCommand(): Command {
   const plugin = new Command("plugin").description("Manage plugins");
 
-  const marketplace = plugin.command("marketplace").description("Manage plugin marketplaces");
+  const marketplace = plugin
+    .command("marketplace")
+    .description("Manage plugin marketplaces");
   marketplace
     .command("add")
     .argument("<url>", "Git URL of the marketplace repository")
@@ -52,7 +54,10 @@ export function makePluginCommand(): Command {
     .command("uninstall")
     .alias("remove")
     .description("Uninstall a plugin")
-    .argument("<plugin>", "Plugin ID to uninstall (e.g., security-engineer@factory-plugins)")
+    .argument(
+      "<plugin>",
+      "Plugin ID to uninstall (e.g., security-engineer@factory-plugins)",
+    )
     .addOption(scopeOption)
     .action(() => notImplemented("plugin uninstall"));
 
