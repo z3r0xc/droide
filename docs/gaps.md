@@ -9,23 +9,23 @@ Total: **20** markers across **20** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
-| `src/tools/fs/edit.ts:173` | `B22` | : the match runs against the secret-scrubbed view in the |
+| `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view in the subject; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/grep.ts:24` | `B20` | for the full list. |
-| `src/tools/fs/paths.ts:191` | `B24` | : the artifacts directory, mission system files, |
-| `src/tools/fs/read.ts:266` | `B17` | : image and PDF reads are not implemented; refusing beats |
-| `src/tools/fs/read.ts:420` | `B12` | : the spill file under <factory>/tool-outputs is not |
+| `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
+| `src/tools/fs/read.ts:266` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
+| `src/tools/fs/read.ts:420` | `B12` | the spill file under <factory>/tool-outputs is not written by this build; the notice names how to ask for the rest instead. |
 | `src/tools/permissions.ts:174` | `B46` | for the exact sentences. |
-| `src/tools/shell/exec.ts:225` | `B28` | : the subject keeps detached:false on POSIX. |
-| `src/tools/shell/exec.ts:334` | `B31` | : no watchdog and no inner-PID/creation-time report yet; |
-| `src/tools/shell/exec.ts:369` | `B9` | : the subject's exact wording is not quoted by the spec. |
-| `src/transport/client.ts:111` | `B41` | the Anthropic -remaining/-reset header pair is not |
-| `src/transport/errors.ts:540` | `B102` | replace with the exact fixed copy from |
-| `src/transport/errors.ts:724` | `B101` | the body markers for quota-vs-payment (non-proxy), content |
-| `src/transport/errors.ts:79` | `B88` | the spec quotes only the certificate chain not trusted: … |
-| `src/transport/llm.ts:315` | `B121` | thinking tokens are also estimated from the streamed |
-| `src/transport/llm.ts:369` | `B117` | the spec does not quote the separator used |
+| `src/tools/shell/exec.ts:225` | `B28` | the subject keeps detached:false on POSIX. |
+| `src/tools/shell/exec.ts:334` | `B31` | no watchdog and no inner-PID/creation-time report yet; the wrapper PID and the log path are what this build returns. |
+| `src/tools/shell/exec.ts:369` | `B9` | the subject's exact wording is not quoted by the spec. |
+| `src/transport/client.ts:111` | `B41` | the Anthropic -remaining/-reset header pair is not implemented; the spec does not give the header names. |
+| `src/transport/errors.ts:540` | `B102` | replace with the exact fixed copy from orig/packages/droid-core/src/llms/errors/constants.ts:1-44. |
+| `src/transport/errors.ts:724` | `B101` | the body markers for quota-vs-payment (non-proxy), content moderation, context limit, request-too-large and thinking-signature/PDF invalidity are not quoted in the spec; only the proxy's two code values and the status bands are implemented. |
+| `src/transport/errors.ts:79` | `B88` | the spec quotes only the certificate chain not trusted: … prefix and the two remediations; the exact full sentence is not quoted. |
+| `src/transport/llm.ts:315` | `B121` | thinking tokens are also estimated from the streamed character count before the provider breakdown arrives; the spec does not give the estimate's ratio, so only the provider field is used here. |
+| `src/transport/llm.ts:369` | `B117` | the spec does not quote the separator used between the two parts. |
 | `src/transport/llm.ts:449` | `B114` | the spec states the handled event order only. |
-| `src/transport/llm.ts:521` | `B120` | the spec names the buckets but not every wire field; both |
+| `src/transport/llm.ts:521` | `B120` | the spec names the buckets but not every wire field; both input_tokens_details and prompt_tokens_details spellings are accepted. |
 | `src/transport/llm.ts:627` | `B118` | the derived id's exact spelling is not stated. |
-| `src/transport/urls.ts:108` | `B7` | the clause lists empty, scheme and trailing slash only; the |
-| `src/transport/urls.ts:53` | `B3` | the spec pins environment > baked define; an explicit |
+| `src/transport/urls.ts:108` | `B7` | the clause lists empty, scheme and trailing slash only; the credential and query/fragment refusals come from B9's request policy. |
+| `src/transport/urls.ts:53` | `B3` | the spec pins environment > baked define; an explicit caller-supplied override is not covered and is placed above both. |

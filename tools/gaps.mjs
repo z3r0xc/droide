@@ -33,9 +33,24 @@ for (const file of walk(SRC).sort()) {
   lines.forEach((line, index) => {
     const match = MARKER.exec(line.trim().replace(/^\*?\s*/, ""));
     if (match === null) return;
+    // A marker's note may continue on following comment lines; join them so the
+    // table reads as a sentence instead of a truncated fragment.
+    let note = match[2];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const continuation = (lines[next] ?? "").trim();
+      const isCommentLine = (continuation.startsWith("*") && !continuation.startsWith("*/")) || continuation.startsWith("//");
+      if (!isCommentLine) break;
+      note += ` ${continuation.replace(/^\*+\s*|^\/+\s*/, "")}`;
+      if (continuation.endsWith("*/")) break;
+    }
     rows.push({
       clause: match[1].trim().replace(/`/g, ""),
-      note: match[2].replace(/\*\/\s*$/, "").replace(/`/g, "").trim(),
+      note: note
+        .replace(/\*\/\s*$/, "")
+        .replace(/`/g, "")
+        .replace(/^:\s*/, "")
+        .replace(/\s+/g, " ")
+        .trim(),
       where: `${path.relative(ROOT, file).split(path.sep).join("/")}:${index + 1}`,
     });
   });
