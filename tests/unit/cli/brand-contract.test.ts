@@ -2,13 +2,44 @@
  * Brand contract: `docs/adr/0005-project-name-and-parity-normalisation.md`.
  *
  * Every user-facing occurrence of the program name comes from `src/cli/brand.ts`,
- * so our help pages never print the subject's name verbatim.
+ * so no help page prints the subject's name verbatim.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { DISPLAY, PROGRAM, SUBJECT_PROGRAM } from "../../../src/cli/brand.ts";
 import { runCli } from "./cli-process.ts";
+
+/** The subject's prose form; only tests and documentation may mention it. */
+const SUBJECT_DISPLAY = "Droid";
+
+interface HelpPage {
+  readonly label: string;
+  readonly args: readonly string[];
+  /** Text that must appear, with the product name already substituted. */
+  readonly expected: readonly string[];
+}
+
+const PAGES: readonly HelpPage[] = [
+  {
+    label: "root",
+    args: [],
+    expected: [
+      `Usage: ${PROGRAM} `,
+      `${DISPLAY} - Factory's AI coding agent in your terminal`,
+    ],
+  },
+  {
+    label: "update",
+    args: ["update"],
+    expected: [`Check for and install ${DISPLAY} updates`],
+  },
+  {
+    label: "daemon",
+    args: ["daemon"],
+    expected: [`Path to ${PROGRAM} executable for spawning sessions`],
+  },
+];
 
 /** Trimmed rows of the help block introduced by `heading`. */
 function blockRows(stdout: string, heading: string): string[] {
@@ -24,14 +55,19 @@ function blockRows(stdout: string, heading: string): string[] {
   return rows;
 }
 
-test("root help names the program through PROGRAM and DISPLAY only", () => {
-  const result = runCli(["--help"]);
+for (const page of PAGES) {
+  test(`${page.label} --help uses the brand constants and never the subject token`, () => {
+    const result = runCli([...page.args, "--help"]);
 
-  assert.equal(result.status, 0);
-  assert.ok(result.stdout.includes(`Usage: ${PROGRAM} `));
-  assert.ok(result.stdout.includes(`${DISPLAY} - Factory's AI coding agent in your terminal`));
-  assert.equal(result.stdout.includes(`${SUBJECT_PROGRAM} `), false);
-});
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "");
+    for (const expected of page.expected) {
+      assert.ok(result.stdout.includes(expected), `help page is missing: ${expected}`);
+    }
+    assert.equal(result.stdout.includes(`${SUBJECT_PROGRAM} `), false);
+    assert.equal(result.stdout.includes(`${SUBJECT_DISPLAY} `), false);
+  });
+}
 
 test("every Examples row starts with PROGRAM", () => {
   const rows = blockRows(runCli(["--help"]).stdout, "Examples:");
@@ -42,6 +78,17 @@ test("every Examples row starts with PROGRAM", () => {
       row === PROGRAM || row.startsWith(`${PROGRAM} `),
       `Examples row does not start with ${PROGRAM}: ${row}`,
     );
-    assert.equal(row.startsWith(`${SUBJECT_PROGRAM} `), false);
   }
+});
+
+test("the Examples block is the only place the bare program name starts a line", () => {
+  const stdout = runCli(["--help"]).stdout;
+  const exampleRows = blockRows(stdout, "Examples:");
+
+  const bareProgramRows = stdout
+    .split("\n")
+    .filter((line) => (line.trim().split(/\s+/)[0] ?? "") === PROGRAM)
+    .map((line) => line.trim());
+
+  assert.deepEqual(bareProgramRows, exampleRows);
 });

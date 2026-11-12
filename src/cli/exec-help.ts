@@ -4,7 +4,11 @@
  * The page is data, not terminal rendering: no I/O, no terminal width and no
  * clock. Everything that varies between builds arrives as `ExecHelpModels`,
  * so the rendered text is a pure function of the catalogue.
+ *
+ * The subject prints its own name here; ADR 0005 routes every user-visible
+ * occurrence through `brand.ts` and the parity harness substitutes it back.
  */
+import { DISPLAY, PROGRAM } from "./brand.ts";
 
 export interface ModelRow {
   readonly id: string;
@@ -53,7 +57,7 @@ export function renderExecHelp(models: ExecHelpModels): string {
     .map((flag) => `    ${flag}`)
     .join("\n");
 
-  return `Usage: droid exec [options] [prompt]
+  return `Usage: ${PROGRAM} exec [options] [prompt]
 
 Execute a single command (non-interactive mode)
 
@@ -99,7 +103,7 @@ Stream JSON-RPC Mode:
 ${ignoredFlags}
 
 Autonomy Levels:
-  Droid exec uses a tiered autonomy system to control what operations the agent can perform.
+  ${DISPLAY} exec uses a tiered autonomy system to control what operations the agent can perform.
   By default, it runs in read-only mode, requiring explicit flags to enable modifications.
 
   DEFAULT (no flags)         Read-only mode - The safest mode for reviewing planned changes without execution
@@ -188,76 +192,76 @@ Authentication:
 
   Setting API key examples:
     macOS/Linux:
-      export FACTORY_API_KEY=fk-... && droid exec "fix the bug"
+      export FACTORY_API_KEY=fk-... && ${PROGRAM} exec "fix the bug"
     Windows (PowerShell):
-      $env:FACTORY_API_KEY="fk-..." ; droid exec "fix the bug"
+      $env:FACTORY_API_KEY="fk-..." ; ${PROGRAM} exec "fix the bug"
     Windows (CMD):
-      set FACTORY_API_KEY=fk-... && droid exec "fix the bug"
+      set FACTORY_API_KEY=fk-... && ${PROGRAM} exec "fix the bug"
 
   Note: Keep your API key secret. Do not commit it to source control.
 
 Examples:
   # DEFAULT (no flags) - Read-only mode for planning and analysis
-  droid exec "Analyze the authentication system and create a detailed plan for migrating from session-based auth to OAuth2"
-  droid exec "Review the codebase for security vulnerabilities and generate a prioritized list of improvements"
-  droid exec "Analyze the project architecture and create a dependency graph"
+  ${PROGRAM} exec "Analyze the authentication system and create a detailed plan for migrating from session-based auth to OAuth2"
+  ${PROGRAM} exec "Review the codebase for security vulnerabilities and generate a prioritized list of improvements"
+  ${PROGRAM} exec "Analyze the project architecture and create a dependency graph"
 
   # --auto low - Safe file operations
-  droid exec --auto low "add JSDoc comments to all functions"
-  droid exec --auto low "fix typos in README.md"
-  droid exec --auto low "format all Python files with black"
+  ${PROGRAM} exec --auto low "add JSDoc comments to all functions"
+  ${PROGRAM} exec --auto low "fix typos in README.md"
+  ${PROGRAM} exec --auto low "format all Python files with black"
 
   # --auto medium - Development tasks
-  droid exec --auto medium "install deps, run tests, fix issues"
-  droid exec --auto medium "update packages and resolve conflicts"
-  droid exec --auto medium "set up the development environment and run the test suite"
+  ${PROGRAM} exec --auto medium "install deps, run tests, fix issues"
+  ${PROGRAM} exec --auto medium "update packages and resolve conflicts"
+  ${PROGRAM} exec --auto medium "set up the development environment and run the test suite"
 
   # Tool discovery and selection
-  droid exec --list-tools
-  droid exec --model gpt-5 --list-tools --output-format json
-  droid exec --only-tools Read,Grep "inspect this repository"
-  droid exec --add-tools 'MCP:slack/search_messages' "find relevant messages"
-  droid exec --remove-tools Execute "refactor without running commands"
-  droid exec --only-tools 'Read,MCP:github' --add-tools Grep "review this repository"
+  ${PROGRAM} exec --list-tools
+  ${PROGRAM} exec --model gpt-5 --list-tools --output-format json
+  ${PROGRAM} exec --only-tools Read,Grep "inspect this repository"
+  ${PROGRAM} exec --add-tools 'MCP:slack/search_messages' "find relevant messages"
+  ${PROGRAM} exec --remove-tools Execute "refactor without running commands"
+  ${PROGRAM} exec --only-tools 'Read,MCP:github' --add-tools Grep "review this repository"
 
   # Using custom models
-  droid exec --model custom:deepseek-v3 "analyze this code"
-  droid exec --auto medium --model custom:qwen-turbo "implement this feature"
+  ${PROGRAM} exec --model custom:deepseek-v3 "analyze this code"
+  ${PROGRAM} exec --auto medium --model custom:qwen-turbo "implement this feature"
 
   # --auto high - Production operations
-  droid exec --auto high "fix bug, test, commit, and push to main"
-  droid exec --auto high "deploy to staging after running tests"
-  droid exec --auto high "run database migration and update production config"
+  ${PROGRAM} exec --auto high "fix bug, test, commit, and push to main"
+  ${PROGRAM} exec --auto high "deploy to staging after running tests"
+  ${PROGRAM} exec --auto high "run database migration and update production config"
 
   # --mission - Multi-agent mission orchestration
-  droid exec --mission --skip-permissions-unsafe "Build a full authentication system with OAuth2"
-  droid exec --mission --auto high "Refactor the database layer to use connection pooling"
-  droid exec --mission --auto high --model gpt-5 "Add comprehensive test coverage for the API layer"
+  ${PROGRAM} exec --mission --skip-permissions-unsafe "Build a full authentication system with OAuth2"
+  ${PROGRAM} exec --mission --auto high "Refactor the database layer to use connection pooling"
+  ${PROGRAM} exec --mission --auto high --model gpt-5 "Add comprehensive test coverage for the API layer"
 
   # --mission with per-run worker / validator model overrides
-  droid exec --mission --auto high \\
+  ${PROGRAM} exec --mission --auto high \\
     --model claude-opus-4-6 \\
     --worker-model claude-opus-4-6 --worker-reasoning-effort medium \\
     --validator-model gpt-5 --validator-reasoning-effort high \\
     "Refactor the auth system"
 
   # File input with different autonomy levels
-  droid exec -f requirements.md
-  droid exec -f task.md --auto low
-  cat prompt.txt | droid exec --auto medium
-  echo "analyze code" | droid exec
+  ${PROGRAM} exec -f requirements.md
+  ${PROGRAM} exec -f task.md --auto low
+  cat prompt.txt | ${PROGRAM} exec --auto medium
+  echo "analyze code" | ${PROGRAM} exec
 
   # Session continuation (preserves context, no message replay)
-  droid exec -s <session-id> "continue previous task"
-  droid exec -s <session-id> "what did we discuss?"
-  droid exec --fork <session-id> "take a different approach from here"
+  ${PROGRAM} exec -s <session-id> "continue previous task"
+  ${PROGRAM} exec -s <session-id> "what did we discuss?"
+  ${PROGRAM} exec --fork <session-id> "take a different approach from here"
 
   # --skip-permissions-unsafe - Only in isolated environments!
   # In a Docker container:
   docker run --rm -v $(pwd):/workspace alpine:latest sh -c "
-    droid exec --skip-permissions-unsafe 'Install system deps, modify configs, run tests'"
+    ${PROGRAM} exec --skip-permissions-unsafe 'Install system deps, modify configs, run tests'"
 
   # In ephemeral CI/CD runner:
-  droid exec --skip-permissions-unsafe "Modify /etc/hosts, install kernel modules, reset network"
+  ${PROGRAM} exec --skip-permissions-unsafe "Modify /etc/hosts, install kernel modules, reset network"
 `;
 }

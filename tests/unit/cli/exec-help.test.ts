@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { PROGRAM } from "../../../src/cli/brand.ts";
 import type { ExecHelpModels } from "../../../src/cli/exec-help.ts";
 import { renderExecHelp } from "../../../src/cli/exec-help.ts";
 import { execHelpModels } from "../../../src/cli/models.ts";
@@ -40,8 +41,11 @@ function minimalModels(): ExecHelpModels {
 }
 
 test("the page starts with the exec usage line", () => {
-  assert.equal(page.split("\n")[0], "Usage: droid exec [options] [prompt]");
-  assert.ok(page.startsWith("Usage: droid exec [options] [prompt]\n"));
+  assert.equal(
+    page.split("\n")[0],
+    `Usage: ${PROGRAM} exec [options] [prompt]`,
+  );
+  assert.ok(page.startsWith(`Usage: ${PROGRAM} exec [options] [prompt]\n`));
 });
 
 test("every section heading appears exactly once, in order", () => {
@@ -50,7 +54,10 @@ test("every section heading appears exactly once, in order", () => {
     const occurrences = page.split(`\n${heading}\n`).length - 1;
     assert.equal(occurrences, 1, `${heading} must appear once as a heading`);
     const index = page.indexOf(`\n${heading}\n`);
-    assert.ok(index > previous, `${heading} must come after the previous heading`);
+    assert.ok(
+      index > previous,
+      `${heading} must come after the previous heading`,
+    );
     previous = index;
   }
 });
@@ -66,7 +73,9 @@ test("a model row is padded to the widest id", () => {
 
 test("(default) marks exactly one model", () => {
   assert.equal(page.split("(default)").length - 1, 1);
-  assert.ok(page.includes("\n  gpt-6.1-sol                  GPT-6.1 Sol (default)\n"));
+  assert.ok(
+    page.includes("\n  gpt-6.1-sol                  GPT-6.1 Sol (default)\n"),
+  );
 });
 
 test("the page ends with a single newline", () => {

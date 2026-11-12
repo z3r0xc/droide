@@ -50,7 +50,7 @@ before it is specified.**
 | `20-agent-loop.md` | pending | Provider message model, tool-call cycle, context assembly, model catalogue |
 | `30-tools-and-sandbox.md` | pending | Tool registry, permission matrix, filesystem and shell models, sandbox |
 | `50-transport-and-auth.md` | pending | Backend routes, auth flows, error taxonomy, LLM transport |
-| `60-extensions-mcp-and-skills.md` | pending | MCP, plugins, skills, ACP |
+| `60-extensions-mcp-and-skills.md` | draft | MCP, plugins, skills, ACP |
 | `70-daemon-and-remote-control.md` | pending | Daemon lifecycle, client protocol, remote control |
 
 `pending` means the spec file does not exist yet; the subsystem must not be
