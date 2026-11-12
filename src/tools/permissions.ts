@@ -168,25 +168,32 @@ export function decide(
   }
 }
 
-/** B46's level-specific guidance. `TODO(spec B46)` for wording beyond the levels. */
+/** B46's level-specific guidance. `TODO(spec B46)` for the exact sentences. */
 function guidance(context: PermissionContext): string {
   const maximum = context.maxAutonomy ?? "high";
-  if (AUTONOMY_NUMBER[effectiveAutonomy(context)] < AUTONOMY_NUMBER[maximum]) {
-    return (
-      `This session cannot exceed the organization's maximum autonomy level ` +
-      `(${maximum}). Ask an administrator to raise it.`
-    );
+  const level = effectiveAutonomy(context);
+  const organizationMaximum =
+    `This session cannot exceed the organization's maximum autonomy level ` +
+    `(${maximum}). Ask an administrator to raise it.`;
+  if (level === "off") {
+    return maximum === "off"
+      ? organizationMaximum
+      : "Re-run with --auto low, --auto medium or --auto high to allow this tool.";
   }
-  switch (effectiveAutonomy(context)) {
-    case "low":
-      return "Re-run with --auto medium or --auto high to allow this tool.";
-    case "medium":
-      return "Re-run with --auto high to allow this tool.";
-    case "high":
-      return "Re-run with --skip-permissions-unsafe to allow this tool.";
-    case "off":
-      return "Re-run with --auto low, --auto medium or --auto high to allow this tool.";
+  if (level === "low") {
+    if (maximum === "low") return organizationMaximum;
+    return maximum === "medium"
+      ? "Re-run with --auto medium to allow this tool."
+      : "Re-run with --auto medium or --auto high to allow this tool.";
   }
+  if (level === "medium") {
+    return maximum === "high"
+      ? "Re-run with --auto high to allow this tool."
+      : organizationMaximum;
+  }
+  return maximum === "high"
+    ? "Re-run with --skip-permissions-unsafe to allow this tool."
+    : organizationMaximum;
 }
 
 /**
