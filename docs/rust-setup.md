@@ -1,56 +1,51 @@
 # Rust toolchain on this workstation
 
-## Symptom
+## Status: fixed
 
-Any Rust build fails at link time, before our code is involved:
+The local toolchain builds and tests the workspace:
 
+```sh
+cargo test --workspace      # 39 tests
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
 ```
-$ rustc hello.rs -o hello.exe
-ld.exe: cannot find -lgcc_eh
-collect2.exe: error: ld returned 1 exit status
+
+## What was wrong
+
+Two independent failures, both in the mingw toolchain the machine defaults to
+(`stable-x86_64-pc-windows-gnu`, linker `w64devkit 16.2.0`):
+
+1. **`-lgcc_eh` missing.** w64devkit's sysroot shipped `libgcc.a` but not
+   `libgcc_eh.a`, which Rust's gnu target always requests, so even
+   `rustc hello.rs` failed to link.
+2. **CRT mismatch.** Adding `-L` to Rust's own `self-contained` directory to
+   supply that file made the linker mix two CRTs and fail with
+   `undefined reference to __p___initenv` / `_crt_atexit`.
+
+## The fix
+
+The repository pins the **rust-lld** linker with Rust's self-contained libraries
+for this target only, in `.cargo/config.toml`:
+
+```toml
+[target.x86_64-pc-windows-gnu]
+linker = "rust-lld"
+rustflags = ["-C", "link-self-contained=yes"]
 ```
 
-`cargo check` fails too, because dependency build scripts are compiled **and**
-linked before the check runs.
+`rust-lld` ships with the Rust toolchain, so the setting works on a clean
+machine and on CI; it avoids the mingw sysroot entirely. Nothing machine-local is
+hard-coded.
 
-## Diagnosis
+## If you prefer the MSVC toolchain
 
-- Active toolchain: `stable-x86_64-pc-windows-gnu`; its linker is
-  `C:\Users\handona\Apps\tools\w64devkit\w64devkit\bin\gcc.exe` (w64devkit 16.2).
-- w64devkit's sysroot has `libgcc.a` but **not** `libgcc_eh.a`, which Rust's
-  mingw target always requests.
-- The alternative `stable-x86_64-pc-windows-msvc` toolchain is installed but has
-  no Visual C++ tools (`link.exe`); the only `link.exe` on `PATH` is Git's GNU
-  `link`, which is not a linker for PE objects.
-- Copying `libgcc_eh.a` from Rust's `self-contained` directory next to the
-  build does not help: it drags in a second mingw CRT (`crt2.o`), and the two
-  runtimes disagree (`undefined reference to __p___initenv`, `_crt_atexit`).
+Install the "Desktop development with C++" workload and pin the host in
+`rust-toolchain.toml`:
 
-## What works
+```toml
+[toolchain]
+channel = "stable"
+host = "x86_64-pc-windows-msvc"
+```
 
-**CI is the verification path for `crates/`.** The GitHub workflow builds and
-tests the workspace on Linux, where the toolchain is healthy. Locally, Rust
-changes are validated by review and by CI on push.
-
-## Fixing it locally (either one is enough)
-
-1. **MSVC (recommended).** Install the "Desktop development with C++" workload
-   from the Visual Studio Installer, then pin the host:
-
-   ```toml
-   # rust-toolchain.toml
-   [toolchain]
-   channel = "stable"
-   host = "x86_64-pc-windows-msvc"
-   ```
-
-2. **Complete mingw-w64.** Replace w64devkit's sysroot with one that ships
-   `libgcc_eh.a` (MSYS2 `mingw-w64-x86_64-gcc`), or point Rust at it:
-
-   ```sh
-   # .cargo/config.toml (machine-local; do not commit)
-   [target.x86_64-pc-windows-gnu]
-   linker = "C:/msys64/mingw64/bin/gcc.exe"
-   ```
-
-Do not commit machine-local paths; keep this file as the record of the problem.
+That path needs no linker override. Do not commit machine-local paths.

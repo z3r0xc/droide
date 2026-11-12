@@ -10,7 +10,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# FFI (pty, DPAPI) needs `unsafe` in a few audited modules; they opt in with
+# `#[allow(unsafe_code)]` and are reviewed on their own. Everything else denies it.
+unsafe_code = "deny"
 missing_debug_implementations = "warn"
 
 [workspace.lints.clippy]

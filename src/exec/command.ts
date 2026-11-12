@@ -115,6 +115,14 @@ export interface ExecArgv {
   readonly useSpec: boolean;
   readonly specModel: string | undefined;
   readonly listTools: boolean;
+  readonly onlyTools: readonly string[];
+  readonly addTools: readonly string[];
+  readonly removeTools: readonly string[];
+  readonly appendSystemPrompt: string | undefined;
+  readonly appendSystemPromptFile: string | undefined;
+  readonly worktree: string | boolean | undefined;
+  readonly worktreeDir: string | undefined;
+  readonly tags: readonly string[];
 }
 
 export interface ExecCommandDeps {
@@ -494,6 +502,33 @@ function assertImplemented(
       "--list-tools is not implemented in this build.",
     );
   }
+  if (
+    argv.onlyTools.length > 0 ||
+    argv.addTools.length > 0 ||
+    argv.removeTools.length > 0
+  ) {
+    throw new ExecCommandError(
+      "Tool selection flags (--only-tools, --add-tools, --remove-tools) are " +
+        "not implemented in this build.",
+    );
+  }
+  if (
+    argv.appendSystemPrompt !== undefined ||
+    argv.appendSystemPromptFile !== undefined
+  ) {
+    throw new ExecCommandError(
+      "--append-system-prompt and --append-system-prompt-file are not " +
+        "implemented in this build.",
+    );
+  }
+  if (argv.worktree !== undefined || argv.worktreeDir !== undefined) {
+    throw new ExecCommandError(
+      "Worktree options are not implemented in this build.",
+    );
+  }
+  if (argv.tags.length > 0) {
+    throw new ExecCommandError("--tag is not implemented in this build.");
+  }
 }
 
 function withPromptOptions(error: unknown, program: string): unknown {
@@ -525,16 +560,15 @@ function sleepFor(ms: number, signal: AbortSignal): Promise<void> {
   if (ms <= 0) return Promise.resolve();
   if (signal.aborted) return Promise.reject(abortError());
   const { promise, resolve, reject } = Promise.withResolvers<void>();
-  const timer = setTimeout(resolve, ms);
-  timer.unref();
-  signal.addEventListener(
-    "abort",
-    () => {
-      clearTimeout(timer);
-      reject(abortError());
-    },
-    { once: true },
-  );
+  const onAbort = (): void => {
+    clearTimeout(timer);
+    reject(abortError());
+  };
+  const timer = setTimeout(() => {
+    signal.removeEventListener("abort", onAbort);
+    resolve();
+  }, ms);
+  signal.addEventListener("abort", onAbort, { once: true });
   return promise;
 }
 
@@ -617,7 +651,8 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
   }
   assertImplemented(argv, outputFormat, inputFormat);
 
-  // B2-B6: prompt before configuration, so a prompt error creates nothing.
+  // B2-B6: the context supplies the effective directory, then the prompt is
+  // resolved before any model, tool or provider work exists.
   const createContext = deps.createContext ?? createAppContext;
   const context = await createContext({
     environment: deps.environment,

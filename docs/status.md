@@ -19,7 +19,7 @@ cargo test --workspace                   # native layer (CI only here)
 | TypeScript product layer | 75 files, ~17k lines: CLI, app, config, session, agent, transport, exec, extensions, tools, native client |
 | Tests | 56 test files; 489 tests (488 pass, 1 skipped) |
 | CLI parity | 20/20 recorded cases against the subject |
-| Native (Rust) | protocol crate + tests; builds only in CI (see `docs/rust-setup.md`) |
+| Native (Rust) | `crates/droide-native`: protocol, safe paths, file search, sandbox profiles — 39 tests, clippy clean, builds locally |
 
 ## Command surface
 
@@ -44,7 +44,7 @@ cargo test --workspace                   # native layer (CI only here)
 | `60-extensions-mcp-and-skills.md` | stable | MCP config merge, tool naming, skill discovery, plugin manifests |
 | `70-daemon-and-remote-control.md` | review | not started |
 | `80-exec-and-streaming.md` | stable | record types, writer, one-shot runner, validation |
-| `90-native-layer.md` | stable | TypeScript client + fake-helper tests; Rust helpers pending |
+| `90-native-layer.md` | stable | TypeScript client + Rust helper (search, sandbox, paths, protocol); pty/secrets next |
 | `95-terminal-ui.md` | review | tokens, frame, header/transcript/composer/status line (in progress) |
 
 ## Known gaps and their owners
@@ -53,7 +53,7 @@ cargo test --workspace                   # native layer (CI only here)
 |---|---|---|
 | `droid` interactive mode | TUI is being built on React + Ink (`docs/adr/0006`); the CLI does not dispatch to it yet | M11 |
 | Bare `droide` invocation | fails loudly with exit 64 instead of starting the TUI | removes itself when M11 lands |
-| Native helpers (pty/search/secrets/sandbox) | local Rust linker broken (`docs/rust-setup.md`) | repair toolchain, then M10b |
+| Native helpers: pty and secrets | need audited `unsafe` FFI modules | next increment of M10b |
 | Session search | literal scan instead of the subject's index planner (documented deviation) | revisit with `40` §B45–B51 |
 | Context compaction | not implemented | M5 remainder (`20` §B35–B45) |
 | Narrower-than-spec behaviour in 20 places | each is marked `TODO(spec …)` in code | `docs/gaps.md` lists every one with its clause |

@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { AUTHENTICATION_REQUIRED } from "../../../src/exec/command.ts";
+import { isRecord } from "../../../src/transport/schema.ts";
 
 const REPO_ROOT = resolve(import.meta.dirname, "../../..");
 const ENTRY = fileURLToPath(new URL("../../../src/main.ts", import.meta.url));
@@ -108,6 +109,12 @@ function childEnvironment(directory: string): Record<string, string> {
   return environment;
 }
 
+/** Narrow parsed JSON without a cast; `isRecord` is the repo's one guard. */
+function recordOf(value: unknown): Readonly<Record<string, unknown>> {
+  if (!isRecord(value)) throw new Error("expected a JSON object");
+  return value;
+}
+
 function runCli(
   directory: string,
   args: readonly string[],
@@ -130,6 +137,7 @@ function runCli(
   child.stderr.setEncoding("utf8");
   child.stdout.on("data", (chunk: string) => (stdout += chunk));
   child.stderr.on("data", (chunk: string) => (stderr += chunk));
+  // Watchdog, not a sleep: a failed assertion must not leave the child behind.
   const timer = setTimeout(() => child.kill(), 30_000);
   timer.unref();
   child.on("error", (error) => {
@@ -190,19 +198,6 @@ async function withHarness(
 function execArgs(settingsPath: string, rest: readonly string[]): string[] {
   return ["exec", "--settings", settingsPath, ...rest];
 }
-
-const TEXT_SCRIPT: readonly MockResponse[] = [
-  {
-    kind: "sse",
-    chunks: [
-      { choices: [{ delta: { content: "hi" } }] },
-      {
-        choices: [{ delta: {}, finish_reason: "stop" }],
-        usage: { prompt_tokens: 11, completion_tokens: 7 },
-      },
-    ],
-  },
-];
 
 /** `Read` requires an absolute path (30 B14), so the script is built per run. */
 function toolScript(filePath: string): readonly MockResponse[] {
@@ -323,35 +318,42 @@ test(
   "-o json prints exactly one success object with the eight keys",
   { timeout: 60_000 },
   async () => {
-    await withHarness(TEXT_SCRIPT, async ({ directory, settingsPath }) => {
-      const result = await runCli(
-        directory,
-        execArgs(settingsPath, ["-o", "json", "-m", "custom:mock", "say hi"]),
-      );
-      assert.equal(result.code, 0);
-      assert.equal(result.stderr, "");
-      assert.equal(result.stdout.endsWith("\n"), true);
-      assert.equal(result.stdout.trimEnd().includes("\n"), false);
+    await withHarness(
+      (directory) => toolScript(join(directory, "fixture.txt")),
+      async ({ directory, settingsPath }) => {
+        const result = await runCli(
+          directory,
+          execArgs(settingsPath, [
+            "-o",
+            "json",
+            "-m",
+            "custom:mock",
+            "read fixture.txt",
+          ]),
+        );
+        assert.equal(result.code, 0);
+        assert.equal(result.stderr, "");
+        assert.equal(result.stdout.endsWith("\n"), true);
+        assert.equal(result.stdout.trimEnd().includes("\n"), false);
 
-      const parsed: unknown = JSON.parse(result.stdout);
-      assert.ok(typeof parsed === "object" && parsed !== null);
-      assert.deepEqual(Object.keys(parsed), [
-        "type",
-        "subtype",
-        "is_error",
-        "duration_ms",
-        "num_turns",
-        "result",
-        "session_id",
-        "usage",
-      ]);
-      const record = parsed as Readonly<Record<string, unknown>>;
-      assert.equal(record["type"], "result");
-      assert.equal(record["subtype"], "success");
-      assert.equal(record["is_error"], false);
-      assert.equal(record["result"], "hi");
-      assert.equal(record["num_turns"], 1);
-    });
+        const record = recordOf(JSON.parse(result.stdout));
+        assert.deepEqual(Object.keys(record), [
+          "type",
+          "subtype",
+          "is_error",
+          "duration_ms",
+          "num_turns",
+          "result",
+          "session_id",
+          "usage",
+        ]);
+        assert.equal(record["type"], "result");
+        assert.equal(record["subtype"], "success");
+        assert.equal(record["is_error"], false);
+        assert.equal(record["result"], "Done.");
+        assert.equal(record["num_turns"], 2);
+      },
+    );
   },
 );
 

@@ -1,0 +1,18 @@
+                             ╔═══════════════════╗
+                             ║    D R O I D E    ║
+                             ╚═══════════════════╝
+
+                                    v1.9.0
+
+                          Use /model to switch models
+
+               shift+tab to cycle modes · ctrl+N to cycle models
+                    ctrl+L for autonomy · tab for reasoning
+
+Skills (0) ✗  MCPs (0) ✗  Connectors (0) ✗  AGENTS.md ✗
+
+Auto (Off) · all actions require approval                      claude-sonnet-4-5
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ > Try "How do I handle errors in async functions?"                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+? for help

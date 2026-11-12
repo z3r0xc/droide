@@ -75,6 +75,14 @@ function baseArgv(overrides: Partial<ExecArgv> = {}): ExecArgv {
     useSpec: false,
     specModel: undefined,
     listTools: false,
+    onlyTools: [],
+    addTools: [],
+    removeTools: [],
+    appendSystemPrompt: undefined,
+    appendSystemPromptFile: undefined,
+    worktree: undefined,
+    worktreeDir: undefined,
+    tags: [],
     ...overrides,
   };
 }
@@ -475,6 +483,24 @@ test("a file and a positional prompt are refused with the three options", async 
     assert.match(stderr.text, /droide exec -f prompt\.txt/);
     assert.match(stderr.text, /droide exec "your prompt"/);
     assert.match(stderr.text, /cat prompt\.txt \| droide exec/);
+  } finally {
+    await temp.cleanup();
+  }
+});
+
+test("an unimplemented tool-selection flag is refused, not ignored", async () => {
+  const temp = await tempEnvironment();
+  try {
+    const stderr = new CollectingStream();
+    const code = await runExecCommand(
+      baseArgv({ onlyTools: ["Read"] }),
+      makeDeps(temp.environment, { stderr }),
+    );
+    assert.equal(code, 1);
+    assert.match(
+      stderr.text,
+      /Tool selection flags \(--only-tools, --add-tools, --remove-tools\) are not implemented/,
+    );
   } finally {
     await temp.cleanup();
   }

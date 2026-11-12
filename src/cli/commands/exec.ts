@@ -7,33 +7,15 @@
  * the action runs. `droid help exec` deliberately keeps Commander's rendering
  * (specs/10-cli-surface.md B26).
  */
-import { Command, InvalidArgumentError, Option } from "commander";
 import { randomUUID } from "node:crypto";
+
+import { Command, InvalidArgumentError, Option } from "commander";
 
 import { processEnvironment } from "../../config/paths.ts";
 import { runExecCommand, type ExecArgv } from "../../exec/command.ts";
 import { renderExecHelp } from "../exec-help.ts";
 import { execHelpModels } from "../models.ts";
 import { PROGRAM } from "../brand.ts";
-
-interface ExecInvocationOptions {
-  readonly help?: boolean;
-  readonly outputFormat?: string;
-  readonly inputFormat?: string;
-  readonly file?: string;
-  readonly auto?: string;
-  readonly skipPermissionsUnsafe?: boolean;
-  readonly sessionId?: string;
-  readonly fork?: string;
-  readonly model?: string;
-  readonly reasoningEffort?: string;
-  readonly specModel?: string;
-  readonly useSpec?: boolean;
-  readonly listTools?: boolean;
-  readonly mission?: boolean;
-  readonly cwd?: string;
-  readonly settings?: string;
-}
 
 /** Reads stdin to EOF; only called when the prompt is not on the command line. */
 async function readStdinText(): Promise<string> {
@@ -238,7 +220,7 @@ export function makeExecCommand(): Command {
     .action(
       async (
         prompt: string | undefined,
-        _options: ExecInvocationOptions,
+        _options: Readonly<Record<string, unknown>>,
         command: Command,
       ) => {
         // The root command declares `--cwd`, `--settings`, `--auto` and
@@ -251,6 +233,20 @@ export function makeExecCommand(): Command {
           return typeof value === "string" ? value : undefined;
         };
         const flag = (name: string): boolean => options[name] === true;
+        const optionValue = (name: string): string | boolean | undefined => {
+          const value = options[name];
+          return typeof value === "string" || typeof value === "boolean"
+            ? value
+            : undefined;
+        };
+        const names = (name: string): readonly string[] => {
+          const value = options[name];
+          return Array.isArray(value)
+            ? value.filter(
+                (entry): entry is string => typeof entry === "string",
+              )
+            : [];
+        };
         if (flag("help")) {
           // The golden page carries the subject's own trailing blank line, so the
           // renderer ends with one newline and the write supplies the second.
@@ -274,6 +270,14 @@ export function makeExecCommand(): Command {
           useSpec: flag("useSpec"),
           specModel: text("specModel"),
           listTools: flag("listTools"),
+          onlyTools: names("onlyTools"),
+          addTools: names("addTools"),
+          removeTools: names("removeTools"),
+          appendSystemPrompt: text("appendSystemPrompt"),
+          appendSystemPromptFile: text("appendSystemPromptFile"),
+          worktree: optionValue("worktree"),
+          worktreeDir: text("worktreeDir"),
+          tags: names("tag"),
         };
         process.exitCode = await runExecCommand(argv, {
           program: PROGRAM,

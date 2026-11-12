@@ -1,0 +1,7 @@
+# The mingw toolchain on this workstation ships a CRT that Rust's gnu target
+# cannot link (missing _crt_atexit / __p___initenv at build-script link time).
+# rust-lld with Rust's own self-contained libraries avoids the mingw sysroot
+# entirely and ships with the toolchain, so this works on a clean machine too.
+[target.x86_64-pc-windows-gnu]
+linker = "rust-lld"
+rustflags = ["-C", "link-self-contained=yes"]

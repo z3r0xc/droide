@@ -232,56 +232,41 @@ export const ANSI_PALETTE = pairTable({
   "ansi.cursor": ["#d75f00", "#d75f00"],
 });
 
+/** Every semantic colour slot name. */
+export type PaletteSlot =
+  | keyof typeof CORE_PALETTE.dark
+  | keyof typeof TEXT_PALETTE.dark
+  | keyof typeof DIFF_PALETTE.dark
+  | keyof typeof MARKDOWN_PALETTE.dark
+  | keyof typeof MISSION_CONTROL_PALETTE.dark
+  | keyof typeof SYNTAX_PALETTE.dark
+  | keyof typeof ANSI_PALETTE.dark;
+
 /** The flat, theme-resolved palette every renderer reads (B17). */
-const themePalette = (
-  core: typeof CORE_PALETTE,
-  text: typeof TEXT_PALETTE,
-  diff: typeof DIFF_PALETTE,
-  markdown: typeof MARKDOWN_PALETTE,
-  missionControl: typeof MISSION_CONTROL_PALETTE,
-  syntax: typeof SYNTAX_PALETTE,
-  ansi: typeof ANSI_PALETTE,
-  theme: ThemeName,
-) => ({
-  ...core[theme],
-  ...text[theme],
-  ...diff[theme],
-  ...markdown[theme],
-  ...missionControl[theme],
-  ...syntax[theme],
-  ...ansi[theme],
-  "text.selectionBg":
-    theme === "factory-light"
-      ? text.light["text.userBg"]
-      : text.dark["text.selectionBg"],
-});
+function themePalette(theme: ThemeName): Readonly<Record<PaletteSlot, string>> {
+  const side = theme === "factory-dark" ? "dark" : "light";
+  return {
+    ...CORE_PALETTE[side],
+    ...TEXT_PALETTE[side],
+    ...DIFF_PALETTE[side],
+    ...MARKDOWN_PALETTE[side],
+    ...MISSION_CONTROL_PALETTE[side],
+    ...SYNTAX_PALETTE[side],
+    ...ANSI_PALETTE[side],
+    "text.selectionBg":
+      side === "light"
+        ? TEXT_PALETTE.light["text.userBg"]
+        : TEXT_PALETTE.dark["text.selectionBg"],
+  };
+}
 
 /** factory-dark resolved to one flat slot map. */
-export const PALETTE_DARK = themePalette(
-  CORE_PALETTE,
-  TEXT_PALETTE,
-  DIFF_PALETTE,
-  MARKDOWN_PALETTE,
-  MISSION_CONTROL_PALETTE,
-  SYNTAX_PALETTE,
-  ANSI_PALETTE,
-  "factory-dark",
-);
+export const PALETTE_DARK: Readonly<Record<PaletteSlot, string>> =
+  themePalette("factory-dark");
 
 /** factory-light resolved to one flat slot map (unpublished slots inherit dark). */
-export const PALETTE_LIGHT = themePalette(
-  CORE_PALETTE,
-  TEXT_PALETTE,
-  DIFF_PALETTE,
-  MARKDOWN_PALETTE,
-  MISSION_CONTROL_PALETTE,
-  SYNTAX_PALETTE,
-  ANSI_PALETTE,
-  "factory-light",
-);
-
-/** Every semantic colour slot name. */
-export type PaletteSlot = keyof typeof PALETTE_DARK;
+export const PALETTE_LIGHT: Readonly<Record<PaletteSlot, string>> =
+  themePalette("factory-light");
 
 /** Resolve a theme name to its flat palette. */
 export function paletteFor(

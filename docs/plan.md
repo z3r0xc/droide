@@ -46,7 +46,7 @@ sections and ADRs.
 | M8 | Extensions: MCP client, plugins, skills, ACP | `specs/60-extensions-mcp-and-skills.md` | config merge tests, collision rules, skill discovery |
 | M9 | Daemon and remote control | `specs/70-daemon-and-remote-control.md` | handshake/version negotiation, single-instance lock |
 | M10a | Native **contract** in TypeScript: JSON-lines client, response validation, failure mapping | `specs/90-native-layer.md` | stub-helper integration tests; no leaked child processes |
-| M10b | Native **implementation** in Rust: pty, search, secrets, sandbox | `specs/90-native-layer.md`, `crates/` | `cargo test --workspace` in CI — **blocked locally**, see `docs/rust-setup.md` |
+| M10b | Native **implementation** in Rust: search, sandbox, paths, protocol (pty and secrets next) | `specs/90-native-layer.md`, `crates/` | `cargo test --workspace` locally and in CI — toolchain fixed, see `docs/rust-setup.md` |
 | M11 | Terminal UI | `specs/95-terminal-ui.md` | frame tests for a fixed terminal size; no flake on time |
 
 ## Definition of done (each milestone)
@@ -72,10 +72,8 @@ shared types in `src/contracts/`) is owned by the orchestrator only.
 - **Recovery gaps.** Re-export barrels and type-only modules are absent from the
   maps (`docs/architecture/README.md`). Any spec claim that depends on a missing
   file must say so and be marked `[inferred]`.
-- **Rust toolchain.** This workstation cannot link any Rust binary (missing
-  `libgcc_eh.a` in w64devkit; no MSVC linker). Rust is therefore written but
-  verified only in CI. Until the toolchain is repaired (`docs/rust-setup.md`),
-  the native contract is implemented and tested in TypeScript behind a fake
-  helper, so the boundary is proven without unverifiable native code.
+- **Rust toolchain.** Repaired: `.cargo/config.toml` pins rust-lld with Rust's
+  self-contained libraries, so `cargo test --workspace` runs locally. The
+  remaining native work (pty, secrets) needs audited `unsafe` FFI modules.
 - **Version drift.** The subject is pinned at v1.9.0; a newer release means a
   new recovery run and a golden re-record, never silent behaviour changes.

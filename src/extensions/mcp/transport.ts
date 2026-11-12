@@ -369,9 +369,12 @@ export class StdioMcpTransport implements McpTransport {
     return this.stderrTail;
   }
 
-  /** Whether the stream can no longer be read. A getter, so each read is live. */
-  private get boundaryClosed(): boolean {
-    return this.state === "closed";
+  /**
+   * Whether frames can still be read. A getter, so each read is live: an await
+   * inside the loop lets the state change underneath it.
+   */
+  private get streamInactive(): boolean {
+    return this.state !== "open";
   }
 
   setNotificationHandler(
@@ -591,7 +594,7 @@ export class StdioMcpTransport implements McpTransport {
   }
 
   private handleChunk(chunk: Buffer): void {
-    if (this.boundaryClosed) return;
+    if (this.streamInactive) return;
     this.buffer =
       this.buffer.length === 0 ? chunk : Buffer.concat([this.buffer, chunk]);
 
@@ -610,7 +613,7 @@ export class StdioMcpTransport implements McpTransport {
         return;
       }
       this.consumeLine(line);
-      if (this.boundaryClosed) return;
+      if (this.streamInactive) return;
       newline = this.buffer.indexOf(0x0a);
     }
 
@@ -653,14 +656,19 @@ export class StdioMcpTransport implements McpTransport {
       }
       case "request": {
         // We advertise no client capabilities, so the only honest answer is
-        // "method not found" (JSON-RPC -32601).
-        this.child.stdin?.write(
-          `${JSON.stringify({
-            jsonrpc: JSON_RPC_VERSION,
-            id: frame.id,
-            error: { code: -32601, message: "Method not found" },
-          })}\n`,
-        );
+        // "method not found" (JSON-RPC -32601). A dead pipe is not fatal here:
+        // the exit or stream handler owns that report.
+        try {
+          this.child.stdin?.write(
+            `${JSON.stringify({
+              jsonrpc: JSON_RPC_VERSION,
+              id: frame.id,
+              error: { code: -32601, message: "Method not found" },
+            })}\n`,
+          );
+        } catch {
+          // The boundary is already failing elsewhere.
+        }
         return;
       }
       case "error": {
@@ -1018,7 +1026,7 @@ export class HttpMcpTransport implements McpTransport {
         { server: this.server, method, cause: error },
       );
     }
-    if (response.status >= 400 && response.status !== 404) {
+    if (response.status >= 400) {
       throw new McpProtocolError(
         `rejected notification ${method} with HTTP ${response.status}`,
         { server: this.server, method },

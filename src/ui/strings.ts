@@ -38,6 +38,9 @@ export const MODE_ROW_AUTONOMY_OFF = "Auto (Off) · all actions require approval
 /** B13 — footer primary label. */
 export const FOOTER_HELP = `${GLYPHS.help} for help`;
 
+/** B13 — separator between footer blocks and hint segments. */
+export const BLOCK_SEPARATOR = " | ";
+
 /** B7 — truncation notice in the collapsed tool preview. */
 export function toolMoreLines(lines: number): string {
   return (

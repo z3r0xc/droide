@@ -41,7 +41,13 @@ import {
 } from "./transport.ts";
 import { boundText, MODEL_RESULT_BUDGET_BYTES } from "../../tools/result.ts";
 
-/** The revision this build speaks in the 2025 `initialize` handshake. */
+/**
+ * The revision this build speaks in the 2025 `initialize` handshake.
+ *
+ * TODO(spec B11): era negotiation is not attempted — no `server/discover`
+ * probe, no 2026-07-28 rescue after a `-32022` refusal, no legacy verdict
+ * cache; the server's chosen revision is accepted as returned.
+ */
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
 
 /** Client identity sent in `initialize`; a caller may replace it. */
@@ -408,6 +414,13 @@ function renderBlock(block: McpContentBlock): string {
 }
 
 /**
+ * TODO(spec B23): the three structured-output validation markers the SDK
+ * reports are not quoted by the spec, so an `isError` message that mentions
+ * them is rendered verbatim instead of being replaced by the remediation
+ * sentence.
+ */
+
+/**
  * Render a validated result for the model (B22): text blocks are re-indented
  * JSON, an empty successful result renders `structuredContent` or
  * `[No content returned]`, and an `isError` result renders `Error: ...`.
@@ -640,8 +653,14 @@ export class McpClient {
       ) {
         throw error;
       }
+      // An exit carries its code and stderr tail in the cause; surface both so a
+      // failing handshake is diagnosable without inspecting the chain.
+      const detail =
+        error instanceof McpError && error.cause instanceof Error
+          ? `${messageOf(error)} (${error.cause.message})`
+          : messageOf(error);
       throw new McpConnectError(
-        `MCP server "${this.server}" could not complete the initialize handshake: ${messageOf(error)}`,
+        `MCP server "${this.server}" could not complete the initialize handshake: ${detail}`,
         { server: this.server, method: "initialize", cause: error },
       );
     }
