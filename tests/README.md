@@ -33,5 +33,5 @@ plausible regressions, not to raise a count.
 
 `tests/parity/cases/*.json` are declarations (tracked locally only, in
 `.work/parity/`); the harness supports `--record` against our own build and
-`--check` against ours. See `docs/adr/0004-parity-harness-with-optional-oracle.md`.
+`--check` against ours. See `docs/adr/0010-own-brand-and-snapshot-harness.md`.
 A case that needs the oracle is reported `skipped`, never silently passed.

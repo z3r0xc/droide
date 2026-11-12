@@ -103,7 +103,7 @@ export interface AuthorizeServerInput {
   readonly server: AuthorizeServerTarget;
   readonly config: McpServerConfig;
   /** Where the sealed store lives; the sealer arrives separately. */
-  readonly store: { readonly factoryDir: string };
+  readonly store: { readonly stateDir: string };
   readonly sealer: CredentialSealer;
   readonly openBrowser: (url: string) => Promise<void>;
   readonly fetch: typeof fetch;
@@ -669,7 +669,7 @@ export async function authorizeServer(
   const timeoutMs = callbackRun.timeoutMs ?? AUTHORIZATION_WINDOW_MS;
 
   const storeOptions: CredentialStoreOptions = {
-    factoryDir: input.store.factoryDir,
+    stateDir: input.store.stateDir,
     sealer: input.sealer,
     now: input.clock,
   };

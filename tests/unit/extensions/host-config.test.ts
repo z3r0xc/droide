@@ -13,7 +13,7 @@ async function factory(
   document?: unknown,
 ): Promise<{ dir: string; root: string }> {
   const root = await mkdtemp(join(tmpdir(), "droide-host-"));
-  const dir = join(root, ".factory");
+  const dir = join(root, ".droide");
   await mkdir(dir, { recursive: true });
   if (document !== undefined) {
     await writeFile(

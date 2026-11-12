@@ -45,7 +45,7 @@ export interface InstalledPluginsResult {
 }
 
 export interface LoadInstalledPluginsOptions {
-  readonly factoryDir: string;
+  readonly stateDir: string;
   readonly projectDir: string;
   readonly enabledPlugins?: Readonly<Record<string, boolean>>;
   /** `strictKnownMarketplaces` (B36): what an external source must satisfy. */
@@ -237,6 +237,8 @@ function readOneScope(
       ...(version === undefined ? {} : { version }),
       ...(installedAt === undefined ? {} : { installedAt }),
       ...(lastUpdated === undefined ? {} : { lastUpdated }),
+      // TODO(spec B36): strictEnabledPlugins is parsed but not enforced, so an
+      // entry below the policy level still resolves as enabled here.
       enabled: options.enabledPlugins?.[id] !== false,
     });
   }
@@ -248,7 +250,7 @@ export function loadInstalledPlugins(
   options: LoadInstalledPluginsOptions,
 ): InstalledPluginsResult {
   const diagnostics: PluginDiagnostic[] = [];
-  const user = readOneScope(options.factoryDir, "user", options, diagnostics);
+  const user = readOneScope(options.stateDir, "user", options, diagnostics);
   const project = readOneScope(
     options.projectDir,
     "project",

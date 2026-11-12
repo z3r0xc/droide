@@ -90,7 +90,7 @@ function sourceDeps(deps: PluginListDeps): SourceDeps {
 
 function marketplaceDeps(deps: PluginCommandDeps): MarketplaceDeps {
   return {
-    scopeRoot: deps.context.paths.factoryDir,
+    scopeRoot: deps.context.paths.stateDir,
     ...(deps.io === undefined ? {} : { io: deps.io }),
     ...(deps.runGit === undefined ? {} : { runGit: deps.runGit }),
     ...(deps.now === undefined ? {} : { now: deps.now }),
@@ -101,7 +101,7 @@ function marketplaceDeps(deps: PluginCommandDeps): MarketplaceDeps {
 
 function installDeps(deps: PluginCommandDeps): PluginInstallDeps {
   const scopes: PluginScopes = {
-    user: deps.context.paths.factoryDir,
+    user: deps.context.paths.stateDir,
     project: deps.context.paths.projectDir,
   };
   return {
@@ -330,7 +330,7 @@ export async function runPluginList(
     return;
   }
   const result: InstalledPluginsResult = loadInstalledPlugins({
-    factoryDir: deps.context.paths.factoryDir,
+    stateDir: deps.context.paths.stateDir,
     projectDir: deps.context.paths.projectDir,
     ...(deps.context.settings.enabledPlugins === undefined
       ? {}

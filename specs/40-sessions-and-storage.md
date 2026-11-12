@@ -1,19 +1,19 @@
 # Sessions, session store and session search
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** review
 - **Owner:** storage / session index
 - **Related:** `specs/00-context.md`, `specs/template.md`; session transcript *writer* and `/btw` forks are the CLI session lifecycle; daemon RPC surface (`SEARCH_SESSIONS`) is the daemon spec; embeddings/semantic recall are their own slice. Tool ids: none.
 
 ## Purpose
 
-`droid` keeps one durable artefact per session — a JSONL transcript plus an
+`droide` keeps one durable artefact per session — a JSONL transcript plus an
 optional settings file under `<home>/<dir>/sessions/` — and projects it into a
 local SQLite *session index* that answers "list my sessions" and "search my
 sessions" without reading every file. This spec pins that projection: the
 database's shape and versioning, the rules that decide when a row is rewritten
 or restarted, the on-disk layout (including the WAL and lock behaviour the CLI
-and the daemon share), and the observable contract of `droid search` (alias
+and the daemon share), and the observable contract of `droide search` (alias
 `find`). The index is a disposable projection: every failure below is answered
 by rebuilding, never by losing a transcript.
 
@@ -22,14 +22,14 @@ by rebuilding, never by losing a transcript.
 In scope: the cache database DDL (all nine cache migrations), the annotations
 database DDL (its one migration), the migration ledger and open/recovery
 envelope, row and append write semantics, ingest/refresh planning and
-compaction of stale rows, the filesystem layout under the Factory home, and the
-`droid search|find` CLI contract.
+compaction of stale rows, the filesystem layout under the state root, and the
+`droide search|find` CLI contract.
 
 Out of scope, covered elsewhere:
 
 - The transcript **format** (event types, `session_start`, message blocks) and
   who writes it — session lifecycle spec. This spec only consumes it.
-- `droid exec`, TUI interaction, resume/fork pickers (`--resume`, `--last`) as
+- `droide exec`, TUI interaction, resume/fork pickers (`--resume`, `--last`) as
   commands — CLI spec. Only their data dependency (listing order) is here.
 - Cloud sync, federated search results merging and the daemon's JSON-RPC
   transport — daemon / cloud-sync specs. This spec records only what the local
@@ -44,13 +44,13 @@ not in the recovered source; see Open question 1).
 
 ## Terms
 
-- **Factory home** — the user's home directory (`os.homedir()`) unless
-  `FACTORY_HOME_OVERRIDE` is set (`packages/runtime/cli/src/home/index.ts:19-21`,
+- **State root** — the user's home directory (`os.homedir()`) unless
+  `DROIDE_HOME_OVERRIDE` is set (`packages/runtime/cli/src/home/index.ts:19-21`,
   `packages/runtime/cli/src/environment.ts:1-3`).
-- **Factory dir name** — `.factory` in production, `.factory-dev` otherwise
+- **State dir name** — `.droide` in production, `.droide-dev` otherwise
   (`packages/environment/src/constants/index.ts:6-9`,
-  `packages/utils/src/environment/factory-dir-name/index.ts:12-14`). Written
-  below as `<base>` = `Factory home` + `/` + `Factory dir name`.
+  `packages/utils/src/environment/dir-name/index.ts:12-14`). Written
+  below as `<base>` = `State root` + `/` + `State dir name`.
 - **Sessions dir** — `<base>/sessions` (`packages/runtime/session-index/src/access.ts:85-87`).
 - **Transcript** — `<sessions dir>/<project dir>/<session id>.jsonl`; the
   **settings file** is the sibling `<session id>.settings.json` and is optional.
@@ -86,7 +86,7 @@ not in the recovered source; see Open question 1).
   (`packages/utils/src/session-search/hit.ts:48-51`); the compact formatter also
   accepts `event:<id>` and `session:<id>` forms (`src/search/sessionSearch.ts:276-280`).
 - **Kind** — `message_text` | `document` | `tool_use` | `tool_result`
-  (`packages/droid-sdk-core/src/protocol/daemon/schemas/enums.ts:714-719`).
+  (`packages/sdk-core/src/protocol/daemon/schemas/enums.ts:714-719`).
 
 Citation note: two cache migrations (`0001_baseline`, `0003_tags_role_key`) are
 stored UTF-16LE in the bundle. Line numbers cited for them are of the decoded
@@ -382,9 +382,9 @@ still listed as it stands, after one shared wait of up to 2000 ms (polled every
 is there, and later listings on that store do not wait again
 (`listing.ts:216-270`, `360-372`). `[observed]`
 
-### `droid search` / `find`
+### `droide search` / `find`
 
-**B43.** Syntax: `droid search [options] <query>` (`find` is an alias). Options
+**B43.** Syntax: `droide search [options] <query>` (`find` is an alias). Options
 and defaults: `--kind <message_text|document|tool_use|tool_result|all>` default
 `all` (any other value is rejected); `--limit-sessions <n>` default 20;
 `--limit-hits <n>` default 3; `--context-chars <n>` default 80; `--json`;
@@ -474,9 +474,9 @@ prints the search-failed message and sets 1 (`run.ts:160-173`). `[observed]`
 
 ### Our head: version 10 (a local design, labelled)
 
-The subject's cache head is version 9. This build adds one migration of its own,
+The reference build's cache head is version 9. This build adds one migration of its own,
 `0010_transcript_index`, because the retrieval shape we need is a *literal
-transcript index* rather than the subject's `session_term_filters` planner.
+transcript index* rather than the reference build's `session_term_filters` planner.
 The difference is deliberate and recorded here, not hidden:
 
 | object | purpose |
@@ -493,9 +493,9 @@ of `search()` are identical with the index on or off — proven by
 `tests/integration/session/index.test.ts` (indexed vs literal parity over 15
 query/option cases, plus a prefilter-trust case).
 
-A binary database written by the subject is therefore *not* readable by this
+A binary database written by the reference build is therefore *not* readable by this
 build (different table names), and this build's database is not readable by the
-subject. That is the cost of a clean-room index; it is stated here instead of
+reference build. That is the cost of a clean-room index; it is stated here instead of
 being discovered by a user.
 
 ### Cache database, head version 9
@@ -505,7 +505,7 @@ being discovered by a user.
 (`constants.ts:9-22`); created with `IF NOT EXISTS` on every open, unlike
 migration SQL, which never uses `IF NOT EXISTS` (`0001_baseline*.sql:19-21`).
 
-The nine migrations, and what each is *for* (a reimplementation must produce the
+The nine migrations, and what each is *for* (a conforming build must produce the
 same head shape; only a migration's identity and effect are contract, not its
 wording):
 
@@ -540,7 +540,7 @@ by `0009_vector_bookkeeping*.sql:22`).
 | `title` | TEXT | | session title |
 | `org_id` | TEXT | | tenancy; NULL means "not permitted to assume" |
 | `owner` | TEXT | | tenancy |
-| `parent` | TEXT | | `FactorySessionData.parent` |
+| `parent` | TEXT | | `SessionData.parent` (vendor prefix elided) |
 | `calling_session_id` | TEXT | | parent session for subagents |
 | `calling_tool_use_id` | TEXT | | tool call that spawned it |
 | `mission` | TEXT | | mission id |
@@ -616,7 +616,7 @@ settle a recreated key (`0001_session_annotations*.sql:22-27`). Indexes:
 ### On-disk layout
 
 ```
-<home>/.factory/                        (.factory-dev outside production)
+<home>/.droide/                        (.droide-dev outside production)
 ├── sessions/
 │   ├── <sessionId>.jsonl               project_key ''
 │   ├── <sessionId>.settings.json       optional
@@ -637,8 +637,8 @@ its separators replaced by `-` (on Windows the `C:` colon is stripped)
 rather than recomputed. `.favorites` is read from the sessions dir and degrades
 to "no favorites" when unreadable or malformed (`listing.ts:45-78`).
 
-Environment: `FACTORY_HOME_OVERRIDE` (home override),
-`FACTORY_ENV`/`FACTORY_ENV_DIRS` (which of `.factory` / `.factory-dev`),
+Environment: `DROIDE_HOME_OVERRIDE` (state-root override),
+`DROIDE_ENV`/`DROIDE_ENV_DIRS` (which of `.droide` / `.droide-dev`),
 `MIN_SQLITE_VERSION` is a package constant, not an environment variable.
 
 SQLite: the package pins its own library where the runtime would dlopen an older
@@ -753,9 +753,9 @@ Three tests carry the load and must be exact:
 | `ev_search_engine` | B47–B52 | Reading `search.ts:289-400`, `640-900`, `1400-1700`, `2116-2196`, `2333-3064`; `utils/src/session-search/extract.ts:257-340`, `rank.ts:13-67` [observed] |
 | `ev_search_bounds` | B44, B51 | Reading `utils/src/session-search/query.ts:44-73`, `packages/common/src/session/constants.ts:77-86` [observed] |
 | `ev_session_paths` | B17, Data & config | Reading `session-paths/src/index.ts:36-160`, `280-381` [observed] |
-| `ev_factory_home` | Terms, layout | Reading `cli/src/home/index.ts:13-29`, `environment/src/constants/index.ts:6-9` [derived: `getFactoryDirName` is an accessor over `getBaseEnv()`] |
+| `ev_state_home` | Terms, layout | Reading `cli/src/home/index.ts:13-29`, `environment/src/constants/index.ts:6-9` [derived: `getDirName` is an accessor over `getBaseEnv()`] |
 | `ev_schema_version` | B32–B33 | Reading `ingest.ts:212-325`, `record.ts:833-868` [observed] |
-| `ev_daemon_search` | B49, B54 | Reading `daemon-search.ts:30-130`, `283-400`; protocol schema `droid-sdk-core/.../droid.ts:893-963` [observed] |
+| `ev_daemon_search` | B49, B54 | Reading `daemon-search.ts:30-130`, `283-400`; protocol schema `sdk-core/.../droid.ts:893-963` [observed] |
 
 Inferred only: the human strings behind the i18n keys (message catalogs are
 absent from the recovered tree), and the annotations database path.
@@ -765,7 +765,7 @@ absent from the recovered tree), and the annotations database path.
 1. **Human-facing wording.** `common:sessionSearch.*` message texts are not in
    the recovered source (only `t('common:sessionSearch.…')` calls). The
    *structure* of B53 is observed; the literal words are not. Settle by running
-   `droid search x --help`/a search against a seeded home capture. Blocks the
+   `droide search x --help`/a search against a seeded home capture. Blocks the
    exact-text half of B53/B56.
 2. **Annotations database path and writer.** Only its DDL, its generated
    manifest and the `preserveQuarantine` flag are present; the module that opens
@@ -778,7 +778,7 @@ absent from the recovered tree), and the annotations database path.
    column-changed, missing-index, foreign-object; ready / busy / failed), their
    serialised strings are not. Affects log assertions only.
 4. **`--reindex` semantics for a one-shot search.** `requestRebuild` is a no-op
-   for `droid search` (`run.ts:56-62`), and `refresh` is passed through to
+   for `droide search` (`run.ts:56-62`), and `refresh` is passed through to
    `searchEverywhere` (`run.ts:98-110`). Whether `--reindex` performs a full
    refresh or a per-session one before scanning is not visible in the shipped
    code path. Blocks no clause (B43 only lists the flag); it affects how fresh a
@@ -787,7 +787,7 @@ absent from the recovered tree), and the annotations database path.
    `unavailable` and the CLI has no JSON-directory fallback (unlike the listing);
    the observable result is an empty, incomplete result, but the sequence that
    produces it from a cold start with `busy` is not exercised in the source we
-   have. Blocks no clause; recorded so a reimplementation does not invent a
+   have. Blocks no clause; recorded so a conforming build does not invent a
    fallback.
 6. **`sessions.org_id` tenancy asymmetry.** Listings include `org_id IS NULL`
    rows alongside the active org, and search does the same but also admits
@@ -798,7 +798,7 @@ absent from the recovered tree), and the annotations database path.
 
 ## Clean-room notes
 
-A reimplementation must reproduce:
+A conforming build must reproduce:
 
 - The exact cache schema at head — table, column, index and trigger names,
   nullability, defaults, the three `session_spans` `CHECK`s and both partial

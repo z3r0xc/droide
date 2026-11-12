@@ -74,7 +74,7 @@ function externalMarketplace(
   const repo = join(root, directory);
   writeAt(
     repo,
-    ".factory-plugin/marketplace.json",
+    ".droide-plugin/marketplace.json",
     JSON.stringify({ name: directory, plugins }, null, 2),
   );
   gitIn(repo, ["init", "-q", "-b", "main"]);
@@ -96,13 +96,13 @@ async function bench(
     readonly timeoutSignal?: SourceDeps["timeoutSignal"];
   } = {},
 ): Promise<{
-  readonly factoryDir: string;
+  readonly stateDir: string;
   readonly projectDir: string;
   readonly deps: PluginInstallDeps;
 }> {
-  const factoryDir = join(root, "home", ".factory");
-  const projectDir = join(root, "project", ".factory");
-  await addMarketplace(repository, {}, { scopeRoot: factoryDir }).catch(
+  const stateDir = join(root, "home", ".droide");
+  const projectDir = join(root, "project", ".droide");
+  await addMarketplace(repository, {}, { scopeRoot: stateDir }).catch(
     (error: unknown) => {
       if (
         !(error instanceof PluginOperationError) ||
@@ -112,10 +112,10 @@ async function bench(
     },
   );
   return {
-    factoryDir,
+    stateDir,
     projectDir,
     deps: {
-      scopes: { user: factoryDir, project: projectDir },
+      scopes: { user: stateDir, project: projectDir },
       timeoutMs: 60_000,
       policy: options.policy ?? NO_PLUGIN_POLICY,
       sourceDeps: {
@@ -163,14 +163,14 @@ test("every source kind is parsed and git-subdir without a path is refused", () 
       package: "@acme/demo",
       version: "^1.2.0",
       registry: "https://registry.example.test",
-      authTokenEnvVar: "FACTORY_PLUGIN_TOKEN_NPM",
+      authTokenEnvVar: "DROIDE_PLUGIN_TOKEN_NPM",
     }),
     {
       source: "npm",
       package: "@acme/demo",
       version: "^1.2.0",
       registry: "https://registry.example.test",
-      authTokenEnvVar: "FACTORY_PLUGIN_TOKEN_NPM",
+      authTokenEnvVar: "DROIDE_PLUGIN_TOKEN_NPM",
     },
   );
   assert.deepEqual(
@@ -211,7 +211,7 @@ test("a local source is used in place", async () => {
   const root = createTempRoot();
   try {
     const directory = join(root.path, "local-plugin");
-    writeAt(directory, ".factory-plugin/plugin.json", "{}\n");
+    writeAt(directory, ".droide-plugin/plugin.json", "{}\n");
     const materialized = await materializeSource(
       { source: "local", path: directory },
       { target: join(root.path, "unused") },
@@ -241,7 +241,7 @@ test("a github source clones through git and records its commit", async () => {
     assert.equal(materialized.version, repo.head.slice(0, 12));
     assert.equal(materialized.commit, repo.head);
     assert.equal(
-      existsSync(join(target, ".factory-plugin", "marketplace.json")),
+      existsSync(join(target, ".droide-plugin", "marketplace.json")),
       true,
     );
     assert.deepEqual(local.urls, ["https://github.com/acme/team-tools.git"]);
@@ -294,7 +294,7 @@ test("a git-subdir source publishes only the named subdirectory", async () => {
     assert.equal(materialized.commit, repo.head);
     assert.equal(existsSync(join(target, "SKILL.md")), true);
     assert.equal(
-      existsSync(join(target, ".factory-plugin", "marketplace.json")),
+      existsSync(join(target, ".droide-plugin", "marketplace.json")),
       false,
     );
   } finally {
@@ -307,7 +307,7 @@ test("an archive source verifies its digest and installs through the marketplace
   try {
     const archive = buildZip([
       { name: "skills/demo/SKILL.md", data: "# demo\n", method: "deflate" },
-      { name: ".factory-plugin/plugin.json", data: "{}\n" },
+      { name: ".droide-plugin/plugin.json", data: "{}\n" },
     ]);
     const fetch = fakeFetch({
       "https://files.example.test/demo.zip": { body: archive },
@@ -331,7 +331,7 @@ test("an archive source verifies its digest and installs through the marketplace
       true,
     );
     assert.equal(entry.externalSource, undefined);
-    const entries = registryDocument(installedPluginsPath(scaffold.factoryDir))[
+    const entries = registryDocument(installedPluginsPath(scaffold.stateDir))[
       "plugins"
     ];
     assert.ok(isRecord(entries));
@@ -542,7 +542,7 @@ test("an npm source records its resolved identity and version", async () => {
   try {
     const tarball = buildTarball({
       "skills/demo/SKILL.md": "# demo\n",
-      ".factory-plugin/plugin.json": "{}\n",
+      ".droide-plugin/plugin.json": "{}\n",
     });
     const integrity = `sha512-${createHash("sha512").update(tarball).digest("base64")}`;
     const resolved =
@@ -591,7 +591,7 @@ test("an npm source records its resolved identity and version", async () => {
       true,
     );
 
-    const plugins = registryDocument(installedPluginsPath(scaffold.factoryDir))[
+    const plugins = registryDocument(installedPluginsPath(scaffold.stateDir))[
       "plugins"
     ];
     assert.ok(isRecord(plugins));
@@ -610,24 +610,24 @@ test("provenance survives a round-trip and a changed source is refused on load",
       directory: "prov-tools",
       manifestName: "Prov Tools",
     });
-    const factoryDir = join(root.path, "home", ".factory");
-    const projectDir = join(root.path, "project", ".factory");
-    await addMarketplace(repo.path, {}, { scopeRoot: factoryDir });
+    const stateDir = join(root.path, "home", ".droide");
+    const projectDir = join(root.path, "project", ".droide");
+    await addMarketplace(repo.path, {}, { scopeRoot: stateDir });
     await installPlugin(
       "demo@prov-tools",
       {},
-      { scopes: { user: factoryDir, project: projectDir } },
+      { scopes: { user: stateDir, project: projectDir } },
     );
 
-    const trusted = loadInstalledPlugins({ factoryDir, projectDir });
+    const trusted = loadInstalledPlugins({ stateDir, projectDir });
     assert.equal(trusted.plugins.length, 1);
     assert.deepEqual(trusted.diagnostics, []);
 
-    const registry = registryDocument(knownMarketplacesPath(factoryDir));
+    const registry = registryDocument(knownMarketplacesPath(stateDir));
     const recorded = registry["prov-tools"];
     assert.ok(isRecord(recorded) && isRecord(recorded["source"]));
     writeFileSync(
-      knownMarketplacesPath(factoryDir),
+      knownMarketplacesPath(stateDir),
       JSON.stringify(
         {
           "prov-tools": {
@@ -640,7 +640,7 @@ test("provenance survives a round-trip and a changed source is refused on load",
       ),
     );
 
-    const refused = loadInstalledPlugins({ factoryDir, projectDir });
+    const refused = loadInstalledPlugins({ stateDir, projectDir });
     assert.deepEqual(refused.plugins, []);
     assert.equal(refused.diagnostics.length, 1);
     assert.match(refused.diagnostics[0]?.message ?? "", /no longer matches/u);
@@ -662,7 +662,7 @@ test("the strict allowlist refuses a marketplace and an external source", async 
         repo.path,
         {},
         {
-          scopeRoot: join(root.path, "home", ".factory"),
+          scopeRoot: join(root.path, "home", ".droide"),
           policy: { allowedSources: [] },
         },
       ),
@@ -692,12 +692,12 @@ test("the strict allowlist refuses a marketplace and an external source", async 
 
 test("token hosts come from user and org settings only", () => {
   const userSettings: Settings = {
-    pluginTokenHosts: { FACTORY_PLUGIN_TOKEN_DEMO: "files.example.test" },
+    pluginTokenHosts: { DROIDE_PLUGIN_TOKEN_DEMO: "files.example.test" },
   };
   assert.equal(
     resolvePluginPolicy(userSettings, [
       { level: "user", settings: userSettings },
-    ]).tokenHosts.get("FACTORY_PLUGIN_TOKEN_DEMO"),
+    ]).tokenHosts.get("DROIDE_PLUGIN_TOKEN_DEMO"),
     "files.example.test",
   );
   assert.equal(
@@ -705,11 +705,11 @@ test("token hosts come from user and org settings only", () => {
       {
         level: "org",
         settings: {
-          pluginTokenHosts: { FACTORY_PLUGIN_TOKEN_DEMO: "org.example.test" },
+          pluginTokenHosts: { DROIDE_PLUGIN_TOKEN_DEMO: "org.example.test" },
         },
       },
       { level: "user", settings: userSettings },
-    ]).tokenHosts.get("FACTORY_PLUGIN_TOKEN_DEMO"),
+    ]).tokenHosts.get("DROIDE_PLUGIN_TOKEN_DEMO"),
     "org.example.test",
   );
 
@@ -720,7 +720,7 @@ test("token hosts come from user and org settings only", () => {
           level: "project",
           settings: {
             pluginTokenHosts: {
-              FACTORY_PLUGIN_TOKEN_DEMO: "evil.example.test",
+              DROIDE_PLUGIN_TOKEN_DEMO: "evil.example.test",
             },
           },
         },
@@ -736,7 +736,7 @@ test("an archive token goes only to the host its variable is bound to", async ()
   const root = createTempRoot();
   try {
     const archive = buildZip([
-      { name: ".factory-plugin/plugin.json", data: "{}\n" },
+      { name: ".droide-plugin/plugin.json", data: "{}\n" },
       { name: "skills/demo/SKILL.md", data: "# demo\n" },
     ]);
     const url = "https://files.example.test/demo.zip";
@@ -744,34 +744,30 @@ test("an archive token goes only to the host its variable is bound to", async ()
     const source = {
       source: "archive",
       url,
-      authTokenEnvVar: "FACTORY_PLUGIN_TOKEN_DEMO",
+      authTokenEnvVar: "DROIDE_PLUGIN_TOKEN_DEMO",
     } as const;
     const repo = externalMarketplace(root.path, "token-tools", [
       { name: "demo", source },
     ]);
 
     const bound = policy({
-      tokenHosts: new Map([
-        ["FACTORY_PLUGIN_TOKEN_DEMO", "files.example.test"],
-      ]),
+      tokenHosts: new Map([["DROIDE_PLUGIN_TOKEN_DEMO", "files.example.test"]]),
     });
     const allowed = await bench(root.path, repo, {
       fetch: fetch.fetch,
       policy: bound,
-      env: { FACTORY_PLUGIN_TOKEN_DEMO: "secret-value" },
+      env: { DROIDE_PLUGIN_TOKEN_DEMO: "secret-value" },
     });
     await installPlugin("demo@token-tools", {}, allowed.deps);
     assert.equal(fetch.headers[0]?.["Authorization"], "Bearer secret-value");
 
     const unbound = policy({
-      tokenHosts: new Map([
-        ["FACTORY_PLUGIN_TOKEN_DEMO", "other.example.test"],
-      ]),
+      tokenHosts: new Map([["DROIDE_PLUGIN_TOKEN_DEMO", "other.example.test"]]),
     });
     const refused = await bench(root.path, repo, {
       fetch: fetch.fetch,
       policy: unbound,
-      env: { FACTORY_PLUGIN_TOKEN_DEMO: "secret-value" },
+      env: { DROIDE_PLUGIN_TOKEN_DEMO: "secret-value" },
     });
     await assert.rejects(
       installPlugin("demo@token-tools", {}, refused.deps),
@@ -792,8 +788,8 @@ test("extraKnownMarketplaces registers on demand and a drifted source is refused
       directory: "extra-tools",
       manifestName: "Extra Tools",
     });
-    const factoryDir = join(root.path, "home", ".factory");
-    const projectDir = join(root.path, "project", ".factory");
+    const stateDir = join(root.path, "home", ".droide");
+    const projectDir = join(root.path, "project", ".droide");
     const configured = policy({
       extraMarketplaces: new Map<string, PluginSource>([
         ["extra-tools", { source: "local", path: repo.path }],
@@ -802,9 +798,9 @@ test("extraKnownMarketplaces registers on demand and a drifted source is refused
     await installPlugin(
       "demo@extra-tools",
       {},
-      { scopes: { user: factoryDir, project: projectDir }, policy: configured },
+      { scopes: { user: stateDir, project: projectDir }, policy: configured },
     );
-    const registry = registryDocument(knownMarketplacesPath(factoryDir));
+    const registry = registryDocument(knownMarketplacesPath(stateDir));
     assert.ok(isRecord(registry["extra-tools"]));
 
     const other = createMarketplaceRepo(root.path, {
@@ -816,7 +812,7 @@ test("extraKnownMarketplaces registers on demand and a drifted source is refused
         "demo@extra-tools",
         {},
         {
-          scopes: { user: factoryDir, project: projectDir },
+          scopes: { user: stateDir, project: projectDir },
           policy: policy({
             extraMarketplaces: new Map<string, PluginSource>([
               ["extra-tools", { source: "local", path: other.path }],
@@ -857,22 +853,22 @@ test("a git-subdir plugin records its external source and commit", async () => {
     };
     writeAt(
       repo.path,
-      ".factory-plugin/marketplace.json",
+      ".droide-plugin/marketplace.json",
       JSON.stringify(manifest, null, 2),
     );
     gitIn(repo.path, ["add", "-A"]);
     gitIn(repo.path, ["commit", "-qm", "git-subdir source"]);
     const head = gitIn(repo.path, ["rev-parse", "HEAD"]).trim();
 
-    const factoryDir = join(root.path, "home", ".factory");
-    const projectDir = join(root.path, "project", ".factory");
+    const stateDir = join(root.path, "home", ".droide");
+    const projectDir = join(root.path, "project", ".droide");
     const local = localOnlyRunner();
-    await addMarketplace(repo.path, {}, { scopeRoot: factoryDir });
+    await addMarketplace(repo.path, {}, { scopeRoot: stateDir });
     const entry = await installPlugin(
       "demo@subdir-install",
       {},
       {
-        scopes: { user: factoryDir, project: projectDir },
+        scopes: { user: stateDir, project: projectDir },
         runGit: local.runner,
         timeoutMs: 60_000,
         policy: policy(),
@@ -886,9 +882,7 @@ test("a git-subdir plugin records its external source and commit", async () => {
       path: "plugins/demo",
     });
     assert.equal(existsSync(join(entry.installPath, "SKILL.md")), true);
-    const plugins = registryDocument(installedPluginsPath(factoryDir))[
-      "plugins"
-    ];
+    const plugins = registryDocument(installedPluginsPath(stateDir))["plugins"];
     assert.ok(isRecord(plugins));
     const stored = plugins["demo@subdir-install"];
     assert.ok(Array.isArray(stored) && isRecord(stored[0]));

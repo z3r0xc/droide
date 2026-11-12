@@ -97,11 +97,11 @@ export function createMarketplaceRepo(
 
   writeAt(
     repo,
-    ".factory-plugin/marketplace.json",
+    ".droide-plugin/marketplace.json",
     manifest(options.manifestName),
   );
   for (const plugin of plugins) {
-    writeAt(repo, `plugins/${plugin}/.factory-plugin/plugin.json`, "{}\n");
+    writeAt(repo, `plugins/${plugin}/.droide-plugin/plugin.json`, "{}\n");
     writeAt(repo, `plugins/${plugin}/SKILL.md`, `# ${plugin}\n`);
   }
 
@@ -116,7 +116,7 @@ export function createMarketplaceRepo(
   if (options.branch !== undefined) {
     gitIn(repo, ["checkout", "-q", "-b", options.branch]);
     manifestName = `${options.manifestName}-branch`;
-    writeAt(repo, ".factory-plugin/marketplace.json", manifest(manifestName));
+    writeAt(repo, ".droide-plugin/marketplace.json", manifest(manifestName));
     gitIn(repo, ["add", "-A"]);
     gitIn(repo, ["commit", "-qm", "branch variant"]);
   }

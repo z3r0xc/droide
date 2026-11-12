@@ -20,7 +20,7 @@ async function sandbox(): Promise<{
   const home = join(root, "home");
   const project = join(root, "project");
   await mkdir(home, { recursive: true });
-  await mkdir(join(project, ".factory"), { recursive: true });
+  await mkdir(join(project, ".droide"), { recursive: true });
   return {
     root,
     project,
@@ -32,7 +32,7 @@ test("the prompt carries identity, environment, skills and instructions in order
   const { root, project, environment } = await sandbox();
   try {
     await writeFile(join(project, "AGENTS.md"), "project rules");
-    const skillDir = join(project, ".factory", "skills", "deploy");
+    const skillDir = join(project, ".droide", "skills", "deploy");
     await mkdir(skillDir, { recursive: true });
     await writeFile(
       join(skillDir, "SKILL.md"),
@@ -87,7 +87,7 @@ test("appended text and file contents come last", async () => {
 test("--disable-builtin-skills removes only builtin entries", async () => {
   const { root, project, environment } = await sandbox();
   try {
-    const skillDir = join(project, ".factory", "skills", "local");
+    const skillDir = join(project, ".droide", "skills", "local");
     await mkdir(skillDir, { recursive: true });
     await writeFile(
       join(skillDir, "SKILL.md"),

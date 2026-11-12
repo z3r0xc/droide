@@ -1389,7 +1389,7 @@ function extractTarball(
 
 /** Directory markers that identify a plugin root when no manifest exists. */
 export const PLUGIN_ROOT_MARKERS = [
-  ".factory-plugin",
+  ".droide-plugin",
   ".claude-plugin",
   "skills",
   "commands",

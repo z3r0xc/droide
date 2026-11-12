@@ -93,7 +93,7 @@ test("the credential store writes ciphertext, never the token", async (t) => {
   t.after(() => sealer.close());
 
   const stored = await putCredential(
-    { factoryDir: dir, sealer, now: () => Date.parse("2026-01-02T03:04:05Z") },
+    { stateDir: dir, sealer, now: () => Date.parse("2026-01-02T03:04:05Z") },
     {
       credential: {
         serverName: "linear",
@@ -110,7 +110,7 @@ test("the credential store writes ciphertext, never the token", async (t) => {
   assert.equal(sealedBytes.includes("access-token-1"), false);
   assert.equal(sealedBytes.includes("auth.example.test"), false);
 
-  const document = await readCredentials({ factoryDir: dir, sealer });
+  const document = await readCredentials({ stateDir: dir, sealer });
   assert.equal(document.servers["linear"]?.issuer, "https://auth.example.test");
   assert.equal(document.servers["linear"]?.revision, 1);
   assert.equal(

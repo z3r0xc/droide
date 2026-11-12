@@ -1,6 +1,6 @@
 # Tools and sandbox
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft
 - **Owner:** tools / sandbox
 - **Related:** `10-cli-surface.md` (flags, exit codes), `20-agent-loop.md` (dispatch,
@@ -20,7 +20,7 @@ is denied.
 ## Scope
 
 Covers: the tool registry and definition metadata; the input/output schemas of
-every built-in tool reachable in 1.9.0; which tools are advertised to the model,
+every built-in tool reachable in the recorded release; which tools are advertised to the model,
 deferred behind `ToolSearch`, or internal; the permission decision for mutating
 calls; the filesystem and shell execution model; and `src/sandbox/**`, including
 the platform confinement layers and `apply-seccomp`.
@@ -39,33 +39,33 @@ registry (`@`McpService` and `src/tools/tui.ts` are the CLI's complete set).
 ## Terms
 
 - **llmId** — the model-facing tool name (`Read`, `Execute`, `mcp__…`-mapped
-  `<server>___<tool>`). Constants live in `@factory/droid-sdk-core/protocol/tools`.
+  `<server>___<tool>`). Constants live in `sdk-core/protocol/tools`.
 - **tool id** — the registry key (`read-cli`, `execute-cli`); one llmId may have
-  several ids (`@packages/droid-core/src/tools/registry.ts:83`).
+  several ids (`@packages/core/src/tools/registry.ts:83`).
 - **deferred tool** — a tool whose schema is not in the turn's catalog until
   `ToolSearch` loads it (`deferred: true`).
 - **side effect** — declared sandbox class of a tool: `filesystem-read`,
   `filesystem-write`, `network`, `process`, `external-service`,
-  `persistent-settings` (`@packages/droid-core/src/tools/enums.ts:10-17`).
+  `persistent-settings` (`@packages/core/src/tools/enums.ts:10-17`).
 - **autonomy level** — `off | low | medium | high`
-  (`@packages/droid-sdk-core/src/protocol/shared/enums.ts:22-27`). Selected by
+  (`@packages/sdk-core/src/protocol/shared/enums.ts:22-27`). Selected by
   `--auto <level>`; `--skip-permissions-unsafe` sets a confirmation bypass instead.
 - **risk level** — the model's declared `low | medium | high` impact of an
   `Execute` command; invalid or missing parses to `high`
-  (`@packages/droid-core/src/tools/utils/risk-level.ts:23-35`).
+  (`@packages/core/src/tools/utils/risk-level.ts:23-35`).
 - **workspace root** — the agent working directory (`getAgentWorkingDirectory()`),
   the base for relative paths and the default search root. Not a jail: file tools
   accept absolute paths anywhere, subject to the gates below.
 - **sandbox** — two layers: application-level policy checks in
-  `DroidSandboxManager`, and OS-level confinement through
+  `SandboxManager` (vendor prefix elided), and OS-level confinement through
   `@anthropic-ai/sandbox-runtime` (SRT).
 - **per-command mode** — each `Execute` command is wrapped individually
   (`SandboxMode.PerCommand`); **whole-process mode** — the CLI re-execs itself
   under the OS sandbox for its whole lifetime (`SandboxMode.WholeProcess`)
-  (`@packages/droid-sdk-core/src/protocol/settings/enums.ts:27-30`).
+  (`@packages/sdk-core/src/protocol/settings/enums.ts:27-30`).
 - **deny floor** — non-overridable deny entries the manager adds itself:
   credential files (read+write) and trusted/executable config (write)
-  (`@src/sandbox/DroidSandboxManager.ts:262-284`, `:333-345`).
+  (`@src/sandbox/SandboxManager.ts:262-284`, `:333-345`).
 - **`@path:line` citation** — shorthand in this spec for
   `evidence/original/windows-x64/<path>:<line>`.
 
@@ -122,18 +122,18 @@ result schema unless noted.
 | `Loop` | loop id | schedulable hosts | yes | no | external-service | loop record |
 | `ProposeMission` / `StartMissionRun` / `EndFeatureRun` / `DismissHandoffItems` | mission ids | mission mode | yes | ProposeMission yes | fs/process per definition | result |
 | `SpawnAgent` / `ListAgents` / `SendMessage` / `InterruptAgent` / `RenameAgent` / `ArchiveAgent` / `CreateListener` | mission-v2 ids | flag `MissionsV2` | yes | no | external-service | result |
-| `GenerateDroid` | `generate-droid-cli` | yes | no | no | external-service | string |
+| `GenerateAgent` | `generate-agent-cli` | yes | no | no | external-service | string |
 | `GetAgentEffectivenessUsage` / `StoreAgentReadinessReport` / `RenderAgentEffectivenessReport` | ids | command-gated | no | no | external-service / fs-write | report |
 | `ListEvalRuns` / `ListDatasets` / `ReadDataset` / `ReadEvalRun` / `CreateEvalRun` / `ListEvalPresets` / `SaveEvalPreset` / `CreateDataset` | eval ids | flag `AutoEvalPipeline` | yes | no (create/run yes) | network/fs per definition | eval records |
 | `<server>___<tool>` | `mcp_<server>_<tool>` | per server, maybe deferred | yes | yes | external-service | stringified result |
 
-Definitions: `@packages/droid-core/src/tools/definitions/**`, registration
+Definitions: `@packages/core/src/tools/definitions/**`, registration
 `@src/tools/tui.ts:200-570`, automation/mission/inbox ids
-`@packages/droid-core/src/tools/definitions/cli/automationCli.ts:29-35`,
-`@packages/droid-core/src/tools/definitions/cli/computersCli.ts:11-34`,
-`@packages/droid-core/src/tools/definitions/cli/linkWorkCli.ts:10`,
-`@packages/droid-core/src/tools/definitions/cli/sendInboxMessageCli.ts:11`,
-`@packages/droid-core/src/tools/definitions/cli/loopCli.ts:10`.
+`@packages/core/src/tools/definitions/cli/automationCli.ts:29-35`,
+`@packages/core/src/tools/definitions/cli/computersCli.ts:11-34`,
+`@packages/core/src/tools/definitions/cli/linkWorkCli.ts:10`,
+`@packages/core/src/tools/definitions/cli/sendInboxMessageCli.ts:11`,
+`@packages/core/src/tools/definitions/cli/loopCli.ts:10`.
 
 ## Observable behaviour
 
@@ -144,14 +144,14 @@ lookups by both exist, and several ids may share an llmId (registration order
 decides which is returned first). Registration rejects a tool that omits
 `sideEffects`, is not an array, or carries an unknown value, with
 `Tool is missing sandbox side-effect metadata` /
-`Tool has invalid sandbox side-effect metadata` (`@packages/droid-core/src/tools/registry.ts:12-33`).
+`Tool has invalid sandbox side-effect metadata` (`@packages/core/src/tools/registry.ts:12-33`).
 
 **B2 — Definition metadata is authoritative for names.** `displayName` comes from
 the definition; the pre-hydration fallback map must mirror it. `createTool` derives
 the model-facing JSON schema from the zod schema (or from `llmInputSchema` when the
 model should see a narrower shape), sets `isMcpTool:false` and `source:'native'`,
 and defaults output to the generic result schema
-(`@packages/droid-core/src/tools/create-tool.ts:23-56`).
+(`@packages/core/src/tools/create-tool.ts:23-56`).
 
 **B3 — Catalog membership.** A turn advertises a tool only when it is registered,
 enabled for the session (`isToolEnabled`), available for the active model, not
@@ -162,7 +162,7 @@ or a deferred tool's loader. Deferred tools are advertised only through
 **B4 — Two visibility axes.** `isTopLevelTool` = advertised to the model;
 `isVisibleToUser` = shown in UI tool selection. File/shell tools are
 model-facing but not user-selectable (`isVisibleToUser:false`), e.g. Read
-(`@packages/droid-core/src/tools/definitions/cli/readCli.ts:34-40`).
+(`@packages/core/src/tools/definitions/cli/readCli.ts:34-40`).
 
 **B5 — Tool availability by autonomy (exec).** Without `--auto` or
 `--skip-permissions-unsafe`, only the read-only set is advertised plus `Execute`,
@@ -172,10 +172,10 @@ proposal tools are excluded. With either flag, all tool ids are admissible;
 autonomy then governs only what `Execute` auto-approves
 (`@src/exec/tool-groups.ts:69-117`, `@src/commands/resolveToolSelection.ts:316-323`).
 
-**B6 — Internal tools.** `StructuredOutput`, `GenerateDroid`, tool-result and
+**B6 — Internal tools.** `StructuredOutput`, `GenerateAgent`, tool-result and
 report stores are registered but not user-selectable (`isVisibleToUser:false`);
 they are still dispatchable when their gate is on
-(`@packages/droid-core/src/tools/definitions/cli/structuredOutput.ts:13-28`).
+(`@packages/core/src/tools/definitions/cli/structuredOutput.ts:13-28`).
 
 ### Input validation
 
@@ -183,40 +183,40 @@ they are still dispatchable when their gate is on
 against its zod schema if one is attached, else against its JSON schema with Ajv
 policy `{removeAdditional:true, useDefaults:true}`; MCP and connector tools are not
 pre-validated because their servers validate their own arguments
-(`@packages/droid-core/src/tools/utils/constants.ts:21-25`,
+(`@packages/core/src/tools/utils/constants.ts:21-25`,
 `@src/agent/toolInputValidation.ts:74-84`).
 
 **B8 — Validation failure text.** A rejected call returns an error result whose
 text is the schema error followed by
 `Tool "<toolId>" accepts the following parameters:` and one
 `- <field>[ (required)]: <description>` line per property, ending
-`Please retry with valid parameters.` (`@packages/droid-core/src/tools/utils/validate-tool-parameters.ts:89-112`).
+`Please retry with valid parameters.` (`@packages/core/src/tools/utils/validate-tool-parameters.ts:89-112`).
 
 **B9 — Lenient fields.** `Execute`'s `summary`, `riskLevelReason`, `riskLevel` never
 fail validation for a malformed value; a missing `riskLevel` is denied separately
-with its own guidance (`@packages/droid-core/src/tools/definitions/cli/schema.ts:1075-1090`,
+with its own guidance (`@packages/core/src/tools/definitions/cli/schema.ts:1075-1090`,
 `@src/agent/tools.ts:1629-1672`).
 
 **B10 — Schema compile failure is not a refusal.** If a schema cannot compile, the
 call proceeds and a once-per-tool warning is logged
-(`@packages/droid-core/src/tools/utils/validate-tool-parameters.ts:214-224`).
+(`@packages/core/src/tools/utils/validate-tool-parameters.ts:214-224`).
 
 ### Result budgets and truncation
 
 **B11 — Two byte budgets.** A tool result is held to its declared
 `modelResultBudgetBytes`, default 32 KiB (`MODEL_RESULT_BUDGET_BYTES`); content the
 model asked for by name (Read, Task, TaskOutput, FetchUrl, Skill, `text()`) gets
-64 KiB (`MODEL_TEXT_BUDGET_BYTES`) (`@packages/droid-core/src/tools/utils/constants.ts:32-40`).
+64 KiB (`MODEL_TEXT_BUDGET_BYTES`) (`@packages/core/src/tools/utils/constants.ts:32-40`).
 
 **B12 — Cut shape.** An over-budget result keeps its head and tail around one
 notice, cut on UTF-8 code-point boundaries; the notice is
 `[... <N> bytes cut from the middle of <M>; whole output: <where>]`. The notice
 counts against the budget; if it cannot fit, only the notice is returned
-(`@packages/droid-core/src/tools/utils/large-output.ts:60-100`).
+(`@packages/core/src/tools/utils/large-output.ts:60-100`).
 
 **B13 — Oversized program results are refused, not cut.** Inside `Script`, a nested
 result over 32 MiB of text, or 32 MiB of JSON when it is many small records, is
-rejected with a remedy instead of being truncated (`@packages/droid-core/src/tools/definitions/cli/script/schema.ts:36-40`,
+rejected with a remedy instead of being truncated (`@packages/core/src/tools/definitions/cli/script/schema.ts:36-40`,
 `@src/tools/executors/client/execute-cli.ts:286-303`).
 
 ### File tools
@@ -226,7 +226,7 @@ rejected with a remedy instead of being truncated (`@packages/droid-core/src/too
 `limit` (number, default 2400, must be > 0; non-finite for program reads);
 `line_numbers` (boolean, default false → each line rendered `N→text`);
 `image_quality` (`default|high`, default `default`)
-(`@packages/droid-core/src/tools/definitions/cli/schema.ts:81-111`).
+(`@packages/core/src/tools/definitions/cli/schema.ts:81-111`).
 
 **B15 — `Read` text result.** A file of ≤200 lines is returned whole. A longer
 file with no range parameter opens as a numbered outline when 8+ declaration lines
@@ -244,7 +244,7 @@ returned LF-normalised with the BOM stripped. A text file over 8 MiB is scanned 
 chunks and only the requested lines plus scrub context are loaded; a read whose
 window would exceed 5 MiB of loaded lines is refused with a request for fewer
 lines. UTF-16 text that large is refused with a conversion instruction
-(`@packages/droid-core/src/tools/utils/file-encoding.ts:1-20`, `:40-190`,
+(`@packages/core/src/tools/utils/file-encoding.ts:1-20`, `:40-190`,
 `@src/tools/executors/client/read-cli.ts:72-95`, `:214-270`).
 
 **B17 — `Read` media.** JPEG/PNG/GIF up to 5 MB return an image block (a GIF
@@ -252,7 +252,7 @@ returns its first frame); PDFs up to 3 MB and ≤100 pages return a document blo
 larger or longer PDFs fall back to extracted text with a header naming the reason.
 A password-protected PDF and an unsupported image type are errors. Secret-looking
 content is scrubbed and a redaction reminder accompanies the result
-(`@packages/droid-core/src/tools/definitions/cli/constants.ts:1-46`,
+(`@packages/core/src/tools/definitions/cli/constants.ts:1-46`,
 `@src/tools/executors/client/read-cli.ts:600-790`).
 
 **B18 — `LS`.** Input `directory_path` (absolute; omitted or `.` = workspace root)
@@ -260,7 +260,7 @@ and `ignorePatterns` (glob names). Entries are sorted by name, without `.`/`..`,
 each with `name`, `type` (`file|directory|symlink|other` from `lstat`) and `size`.
 Denied entries are concealed when the sandbox is on, and the listing is refused
 rather than shown unfiltered when entries cannot be enumerated
-(`@packages/droid-core/src/tools/definitions/cli/schema.ts:827-865`,
+(`@packages/core/src/tools/definitions/cli/schema.ts:827-865`,
 `@src/tools/executors/client/ls-cli.ts:140-250`).
 
 **B19 — `Glob`.** `patterns` (string or string[]), `excludePatterns`, `folder`
@@ -268,7 +268,7 @@ rather than shown unfiltered when entries cannot be enumerated
 then allowRead re-includes, then the credential-floor excludes last; at most 1000
 paths. Missing/non-directory root and an empty pattern list are errors; an empty
 match is `No matching files found`. Program reads receive absolute paths, users a
-newline-joined list (`@packages/droid-core/src/tools/definitions/cli/globSearchCli.ts:14-29`,
+newline-joined list (`@packages/core/src/tools/definitions/cli/globSearchCli.ts:14-29`,
 `@src/tools/executors/client/glob-search-cli.ts:29-233`).
 
 **B20 — `Grep`.** Input as in `grepSearchCliToolSchema`: `pattern`, `path`, `glob_pattern`,
@@ -279,7 +279,7 @@ pattern containing a newline, and in content mode limits per-file matches
 (`--max-count`) to `head_limit`, or 500 when none was given, or 1 for a
 non-positive limit. No match yields `No matching files found` / `No matches found`.
 A program call whose result exceeds the 20 MB ripgrep buffer is refused with a
-narrowing remedy (`@packages/droid-core/src/tools/definitions/cli/schema.ts:896-980`,
+narrowing remedy (`@packages/core/src/tools/definitions/cli/schema.ts:896-980`,
 `@src/tools/executors/client/grep-search-cli.ts:287-381`, `@src/utils/constants.ts:27-30`).
 
 **B21 — `Create`.** `file_path` and `content` required; a missing content is an
@@ -287,8 +287,8 @@ error, a directory target is an error, and an existing file is overwritten. A
 trailing newline is ensured; new files keep the model's line endings, overwrites
 preserve the file's. The result is `{success:true,file_path}` for a new file or a
 structured line diff for an overwrite, plus any new IDE diagnostics. The file is
-snapshotted for rewind and a `SKILL.md` under a `.factory*` skills directory is
-auto-registered (`@packages/droid-core/src/tools/definitions/cli/schema.ts:1145-1150`,
+snapshotted for rewind and a `SKILL.md` under a `.droide*` skills directory is
+auto-registered (`@packages/core/src/tools/definitions/cli/schema.ts:1145-1150`,
 `@src/tools/executors/client/create-cli.ts:78-285`).
 
 **B22 — `Edit`.** `file_path`, `old_str`, `new_str` required; `change_all` default
@@ -298,7 +298,7 @@ more than one occurrence without `change_all`; `old_str` ending in a newline whi
 `new_str` does not when the match is not at EOF (line-join guard). A file must have
 been read (or created) in the session, and a file changed externally since that
 read is refused. Trailing-newline convention is preserved
-(`@packages/droid-core/src/tools/utils/file-tools-utils.ts:29-84`,
+(`@packages/core/src/tools/utils/file-tools-utils.ts:29-84`,
 `@src/agent/file-edit/edit.ts:48-90`, `@src/agent/file-edit/utils.ts:302-353`).
 
 **B23 — `ApplyPatch`.** Input is one `input` string in the patch grammar:
@@ -306,7 +306,7 @@ read is refused. Trailing-newline convention is preserved
 `*** Delete File: `, `*** Move to: ` (only directly after an update header) and
 `*** End of File`; `+`/`-`/space line prefixes. Malformed structure is a refused
 call; sandbox precheck parses every header target before execution
-(`@packages/droid-core/src/tools/utils/constants.ts:1-18`,
+(`@packages/core/src/tools/utils/constants.ts:1-18`,
 `@src/sandbox/sandboxPreCheck.ts:1030-1075`).
 
 **B24 — File-tool write guards.** Create/Edit/ApplyPatch refuse to touch: the
@@ -327,14 +327,14 @@ disappeared, or changed since the preview/approval (`@src/agent/file-edit/utils.
 `^[A-Z]\S*(?:\s+\S+){2,7}$`), `command` (required), `timeout` (seconds, default
 60), `riskLevelReason` (default `High risk command`), `riskLevel`
 (default `high`), `fireAndForget` (default false)
-(`@packages/droid-core/src/tools/definitions/cli/schema.ts:1033-1077`,
+(`@packages/core/src/tools/definitions/cli/schema.ts:1033-1077`,
 `@packages/utils/src/toolCallSummary/constants.ts:3`).
 
 **B27 — `Execute` result.** Success or failure is carried by `exitCode` (null when
 signalled), `signal`, `stoppedProcesses` (count of leftover processes stopped as
 the call returned) and the output. Output within the Script result cap (32 MiB)
 is returned inline as `output`; past it the result carries `outputBytes` and
-`outputFile`, and the file is kept (`@packages/droid-core/src/tools/definitions/cli/schema.ts:113-147`,
+`outputFile`, and the file is kept (`@packages/core/src/tools/definitions/cli/schema.ts:113-147`,
 `@src/tools/executors/client/execute-cli.ts:278-305`).
 
 **B28 — Shell per OS.** POSIX: `spawn(script, [], {shell:'bash', detached:false})`
@@ -371,7 +371,7 @@ family sweep that adopts children orphaned by the dying wrapper. An
 status updates carrying the last two lines and, for detailed views, the full
 output; 8 KiB is the display tail. `fireAndForget` returns a PID and a temp log
 path; on POSIX it launches `exec nohup bash -c …` via a detached group with a
-watchdog that kills the group when droid dies (unless
+watchdog that kills the group when the CLI dies (unless
 `preserveBackgroundProcesses`); on Windows it launches through `Start-Process
 -WindowStyle Hidden -PassThru`, merging all streams into one UTF-8 log and
 reporting the inner PID + creation time within 2 s
@@ -388,42 +388,42 @@ optional leading directives (`// @script: {"startInBackground": true}`,
 outstanding nested calls and 1 MiB aggregate input, 1024 output events and 5 MiB
 emitted content, 32 MiB per nested result; observation window 250 s, after which
 the call returns `status:"running"`. `WaitForScript` takes `toolCallId` and
-`action` (`wait|status|kill`) (`@packages/droid-core/src/tools/definitions/cli/script/schema.ts:5-40`,
+`action` (`wait|status|kill`) (`@packages/core/src/tools/definitions/cli/script/schema.ts:5-40`,
 `:184-203`).
 
 **B34 — `TodoWrite`.** Input `todos`: a string of numbered lines
 `N. [pending|in_progress|completed] text`, max 50 items, 500 chars each; the list
 order is line order. Runtime schema also accepts an array for tolerance
 (`@packages/utils/src/todo/schema.ts:3-37`,
-`@packages/droid-core/src/tools/definitions/todo/constants.ts:1-26`).
+`@packages/core/src/tools/definitions/todo/constants.ts:1-26`).
 
 **B35 — `Task` family.** `Task` requires `subagent_type`, `description`, `prompt`;
 optional `image_paths`, `complexity` (`light|medium|heavy`), `resume`, and
 `machine_name` only when remote execution is enabled. `TaskOutput` takes
 `task_id`, `block` (default true), `timeout` (default 30000 ms); `TaskStop` takes
-`task_id` and sends SIGTERM then SIGKILL (`@packages/droid-core/src/tools/definitions/cli/taskCli.ts:22-68`,
-`@packages/droid-core/src/tools/definitions/cli/taskOutputCli.ts:10-24`,
-`@packages/droid-core/src/tools/definitions/cli/taskStopCli.ts:9-13`).
+`task_id` and sends SIGTERM then SIGKILL (`@packages/core/src/tools/definitions/cli/taskCli.ts:22-68`,
+`@packages/core/src/tools/definitions/cli/taskOutputCli.ts:10-24`,
+`@packages/core/src/tools/definitions/cli/taskStopCli.ts:9-13`).
 
 **B36 — Web tools.** `WebSearch` (deferred) accepts the You.com shape
 (`query`, `numResults` 1–20, `text`, `knowledge:"core"`) or, behind the Parallel
 flag, `objective` + `searchQueries` + `numResults`; string-typed numbers and
 booleans are coerced. `FetchUrl` (deferred) takes one absolute URL and returns
 `{markdown, title, effectiveUrl, metadata{url,statusCode,error,title}, linkedUrls?}`
-(`@packages/droid-core/src/tools/definitions/web/schema.ts:100-247`).
+(`@packages/core/src/tools/definitions/web/schema.ts:100-247`).
 
 **B37 — `AskUser`.** Two accepted shapes: a plain-text `questionnaire` (1–4
 questions, 2–4 options, optional `(multi)`), and a structured questions shape for
 Anthropic models; optional `blocking` and `context` are accepted in both. The tool
 declares `requiresConfirmation:true` yet executes directly, waiting for answers
-(`@packages/droid-core/src/tools/definitions/cli/schema.ts:1169-1221`,
+(`@packages/core/src/tools/definitions/cli/schema.ts:1169-1221`,
 `@src/agent/shouldConfirmExecution.ts:1088-1090`).
 
 **B38 — `ExitSpecMode`.** Input `title?`, `plan` (required, markdown, one concrete
 plan); result `{approved:boolean}`. In non-interactive exec it needs no approval;
 interactively it opens the plan approval. It refuses plans containing unresolved
 `Option A/B` alternatives and blank plans
-(`@packages/droid-core/src/tools/definitions/cli/exitSpecMode.ts:11-47`,
+(`@packages/core/src/tools/definitions/cli/exitSpecMode.ts:11-47`,
 `@src/agent/shouldConfirmExecution.ts:960-1030`).
 
 **B39 — MCP-bridged tools.** Each server tool becomes a registry entry with
@@ -438,7 +438,7 @@ Deferral is per server (`@src/services/mcp/McpService.ts:4429-4475`,
 **B40 — `ToolSearch`.** Input `query` is either `select:<name>[,<name>…]` (exact
 deferred names) or keywords with optional `+`-required terms; `max_results`
 (positive int, default 5) applies to keyword queries only
-(`@packages/droid-core/src/tools/definitions/cli/schema.ts:1223-1239`).
+(`@packages/core/src/tools/definitions/cli/schema.ts:1223-1239`).
 
 ### Permission decisions
 
@@ -505,20 +505,20 @@ paths support `/abs`, `~/`, and cwd-relative prefixes and are symlink-realpathed
 **B49 — Read policy precedence.** (1) credential deny floor → denied,
 non-promptable; (2) user/project `denyRead` unless the path is under `allowRead`
 or a call-scoped Allow Once grant; (3) otherwise allowed
-(`@src/sandbox/DroidSandboxManager.ts:483-570`).
+(`@src/sandbox/SandboxManager.ts:483-570`).
 
 **B50 — Write policy precedence.** (1) deny floor (credentials, trusted config,
 external org-managed settings file) → denied, non-promptable; (2) user/project
 `denyWrite` → denied, promptable; (3) operational home subpaths, the workspace
 root, and `allowWrite` → allowed; (4) anything else → denied, promptable. All deny
 rules are evaluated before any allow rule
-(`@src/sandbox/DroidSandboxManager.ts:607-663`).
+(`@src/sandbox/SandboxManager.ts:607-663`).
 
 **B51 — Network policy.** Invalid hostnames and uncanonicalizable hosts are
 denied; explicit `deniedDomains` (wildcard-aware) deny; an allowed domain (or `*`
-as default-allow) admits; otherwise promptable. Factory control-plane hosts are
-always in the effective allow list, and a customer-prem origin replaces them
-(`@src/sandbox/DroidSandboxManager.ts:702-760`, `:1262-1300`).
+as default-allow) admits; otherwise promptable. Managed-service control-plane
+hosts are always in the effective allow list, and a customer-prem origin replaces them
+(`@src/sandbox/SandboxManager.ts:702-760`, `:1262-1300`).
 
 **B52 — Precheck, then guard.** Before execution the precheck maps each tool's
 declared side effects to a policy handler and probes caller-supplied paths or URLs:
@@ -548,17 +548,17 @@ discriminator group SID — network only, "Filesystem restrictions are NOT enfor
 on Windows yet". Seatbelt deny rules are last-match-wins, so the deny floor is
 prepended and wins over the cwd allow-write root; `allowPty` is enabled only in
 whole-process mode so the TUI can repaint
-(`@src/sandbox/DroidSandboxManager.ts:1090-1120`, `:1330-1385`,
+(`@src/sandbox/SandboxManager.ts:1090-1120`, `:1330-1385`,
 `@evidence/original-vendor/windows-x64/node_modules/@anthropic-ai/sandbox-runtime/dist/sandbox/windows-sandbox-utils.js:1-24`).
 
 **B55 — `apply-seccomp`.** On Linux only, the seccomp helper is materialised from
 the SEA-bundled copy into
-`~/.factory/sandbox-runtime/seccomp/apply-seccomp-<sha256>`, owner-only mode
+`~/.droide/sandbox-runtime/seccomp/apply-seccomp-<sha256>`, owner-only mode
 `0700`, and re-hashed with `O_NOFOLLOW` before every reuse; a symlinked directory,
 a non-regular file, or an empty embedded helper is refused. Its absence is a
 whole-process-mode failure and a dependency-check warning on Linux
 (`@src/utils/applySeccompEmbedded.ts:1-200`,
-`@src/sandbox/DroidSandboxManager.ts:112-120`, `:1377`).
+`@src/sandbox/SandboxManager.ts:112-120`, `:1377`).
 
 **B56 — Whole-process verification is empirical.** Before running, the sealed child
 probes every configured deny-read/deny-write path, the deny floor, a writable
@@ -575,23 +575,23 @@ reason (`denyRead_not_enforced`, `denyWriteFloor_not_enforced`,
 | sandbox mode | `sandbox.mode` | no | `per-command` | `whole-process` on Linux/macOS only |
 | allow/deny paths | `sandbox.filesystem.*` | no | `[]` | prefixes `/`, `~/`, relative |
 | network allow/deny | `sandbox.network.*` | no | `[]`, false | `*` only in `allowedDomains` |
-| user allow-always writes | `~/.factory/settings.json` `sandbox.filesystem.allowWrite`/`allowRead` | no | — | written by the Allow Always answer |
+| user allow-always writes | `~/.droide/settings.json` `sandbox.filesystem.allowWrite`/`allowRead` | no | — | written by the Allow Always answer |
 | command allow/deny/block | `commandAllowlist`, `commandDenylist`, `commandBlocklist`, plus `permissionRules` behind `CliRulesEngine` | no | see defaults | deny = always ask; block = never run |
 | default allowlist | built-in | — | `ls, pwd, dir, git status/diff/log/show/blame/ls-files` | `@packages/common/src/settings/constants.ts:170-182` |
 | default denylist | built-in | — | `rm -rf /`, `mkfs*`, `dd of=/dev…`, `shutdown`, fork bombs, `chmod -R 777 /`, Windows `Format-Volume` | `@packages/common/src/policy/constants.ts:25-56` |
 | default blocklist | built-in | — | empty | orgs opt in |
-| seccomp helper | `~/.factory/sandbox-runtime/seccomp/apply-seccomp-<sha256>` | linux only | — | 0700, content-addressed |
-| sandbox operational writable roots | `~/.factory/{logs,sessions,cache,temp,…}` | — | — | always writable |
-| credential deny-read floor | `~/.factory/{auth.v2.*,auth.encrypted,computer-identity,prem-auth,config.json,mcp-oauth.*}` | — | — | never readable |
-| trusted-config deny-write floor | `~/.factory/{settings.json,settings.local.json,hooks.json,mcp.json,update-policy.json,org-managed-settings.json,host.json,computer.json,certs,bin,tools,sandbox-runtime,exit-spool,…}` + `FACTORY_ORG_MANAGED_SETTINGS_LOCAL_PATH` | — | — | never writable |
-| background log | `os.tmpdir()/droid-bg-<epoch>-<uuid>.out` | — | — | fire-and-forget only |
-| tool output spill | `~/.factory/tool-outputs/<…>` | — | — | named by the cut notice |
+| seccomp helper | `~/.droide/sandbox-runtime/seccomp/apply-seccomp-<sha256>` | linux only | — | 0700, content-addressed |
+| sandbox operational writable roots | `~/.droide/{logs,sessions,cache,temp,…}` | — | — | always writable |
+| credential deny-read floor | `~/.droide/{auth.v2.*,auth.encrypted,computer-identity,prem-auth,config.json,mcp-oauth.*}` | — | — | never readable |
+| trusted-config deny-write floor | `~/.droide/{settings.json,settings.local.json,hooks.json,mcp.json,update-policy.json,org-managed-settings.json,host.json,computer.json,certs,bin,tools,sandbox-runtime,exit-spool,…}` + `DROIDE_ORG_MANAGED_SETTINGS_LOCAL_PATH` | — | — | never writable |
+| background log | `os.tmpdir()/droide-bg-<epoch>-<uuid>.out` | — | — | fire-and-forget only |
+| tool output spill | `~/.droide/tool-outputs/<…>` | — | — | named by the cut notice |
 
 Flags: `--auto low|medium|high`, `--skip-permissions-unsafe`, `--only-tools`,
 `--add-tools`, `--remove-tools`, `--use-spec` (`@src/entrypoints/exec/help.ts:96-125`).
-Environment: `DROID_SANDBOXED`, `DROID_WHOLE_PROCESS_SANDBOX_GUARD_PATH`,
-`DROID_WHOLE_PROCESS_SANDBOX_CONTROL_FD`, `DROID_WHOLE_PROCESS_NET_PROBE`,
-`FACTORY_E2E_TOOLS_READY_GATE_FILE`, `FACTORY_ORG_MANAGED_SETTINGS_LOCAL_PATH`
+Environment: `DROIDE_SANDBOXED`, `DROIDE_WHOLE_PROCESS_SANDBOX_GUARD_PATH`,
+`DROIDE_WHOLE_PROCESS_SANDBOX_CONTROL_FD`, `DROIDE_WHOLE_PROCESS_NET_PROBE`,
+`DROIDE_E2E_TOOLS_READY_GATE_FILE`, `DROIDE_ORG_MANAGED_SETTINGS_LOCAL_PATH`
 (`@src/sandbox/constants.ts:1-50`).
 
 ## Errors
@@ -712,40 +712,40 @@ with `vendor:` (then `evidence/original-vendor/windows-x64/`).
 
 | Evidence | Supports | Method |
 |---|---|---|
-| `packages/droid-sdk-core/src/protocol/tools/constants.ts:22-115` | B1, B39 | read |
-| `packages/droid-core/src/tools/registry.ts:12-140` | B1 | read |
-| `packages/droid-core/src/tools/create-tool.ts:23-56` | B2 | read |
-| `packages/droid-core/src/tools/enums.ts:1-71` | Terms, B52 | read |
+| `packages/sdk-core/src/protocol/tools/constants.ts:22-115` | B1, B39 | read |
+| `packages/core/src/tools/registry.ts:12-140` | B1 | read |
+| `packages/core/src/tools/create-tool.ts:23-56` | B2 | read |
+| `packages/core/src/tools/enums.ts:1-71` | Terms, B52 | read |
 | `src/agent/tools.ts:1268-1312` | B3 | read |
 | `src/commands/resolveToolSelection.ts:316-323` | B5 | read |
 | `src/exec/tool-groups.ts:35-117` | B5 | read |
 | `src/agent/toolInputValidation.ts:74-84` | B7, B9 | read |
-| `packages/droid-core/src/tools/utils/validate-tool-parameters.ts:89-320` | B7, B8, B10 | read |
-| `packages/droid-core/src/tools/utils/constants.ts:21-40` | B11 | read |
-| `packages/droid-core/src/tools/utils/large-output.ts:40-220` | B12, B13 | read |
-| `packages/droid-core/src/tools/definitions/cli/schema.ts:81-111` | B14 | read |
+| `packages/core/src/tools/utils/validate-tool-parameters.ts:89-320` | B7, B8, B10 | read |
+| `packages/core/src/tools/utils/constants.ts:21-40` | B11 | read |
+| `packages/core/src/tools/utils/large-output.ts:40-220` | B12, B13 | read |
+| `packages/core/src/tools/definitions/cli/schema.ts:81-111` | B14 | read |
 | `src/utils/truncate.ts:19-137` | B15 | read |
-| `packages/droid-core/src/tools/utils/file-encoding.ts:1-200` | B16, B22 | read |
+| `packages/core/src/tools/utils/file-encoding.ts:1-200` | B16, B22 | read |
 | `src/tools/executors/client/read-cli.ts:72-800` | B16, B17 | read |
-| `packages/droid-core/src/tools/definitions/cli/schema.ts:827-980` | B18–B20 | read |
+| `packages/core/src/tools/definitions/cli/schema.ts:827-980` | B18–B20 | read |
 | `src/tools/executors/client/ls-cli.ts:140-250` | B18 | read |
 | `src/tools/executors/client/glob-search-cli.ts:29-233` | B19 | read |
 | `src/tools/executors/client/grep-search-cli.ts:287-381` | B20 | read |
 | `src/tools/executors/client/create-cli.ts:78-285` | B21 | read |
-| `packages/droid-core/src/tools/utils/file-tools-utils.ts:29-84` | B22 | read |
+| `packages/core/src/tools/utils/file-tools-utils.ts:29-84` | B22 | read |
 | `src/agent/file-edit/edit.ts:48-90`, `src/agent/file-edit/utils.ts:302-400` | B22 | read |
 | `src/tools/executors/client/utils/protectedWritePath.ts:182-268` | B24 | read |
 | `src/agent/file-edit/utils.ts:1047-1180` | B25 | read |
-| `packages/droid-core/src/tools/definitions/cli/schema.ts:1033-1127` | B26, B27 | read |
+| `packages/core/src/tools/definitions/cli/schema.ts:1033-1127` | B26, B27 | read |
 | `src/tools/executors/client/shell/shell-executor.ts:226-475` | B28, B29 | read |
 | `src/tools/executors/client/execute-cli.ts:1036-1360` | B30, B31 | read |
 | `src/services/TerminalService/LocalTerminalService.ts:1197-1320` | B30 | read |
 | `src/tools/executors/client/shell/shell-executor.ts:560-900` | B31, B32 | read |
-| `packages/droid-core/src/tools/definitions/cli/script/schema.ts:5-203` | B33 | read |
+| `packages/core/src/tools/definitions/cli/script/schema.ts:5-203` | B33 | read |
 | `packages/utils/src/todo/schema.ts:1-45` | B34 | read |
-| `packages/droid-core/src/tools/definitions/cli/task*.ts` | B35 | read |
-| `packages/droid-core/src/tools/definitions/web/schema.ts:100-247` | B36 | read |
-| `packages/droid-core/src/tools/definitions/cli/schema.ts:1169-1247` | B37, B38, B40 | read |
+| `packages/core/src/tools/definitions/cli/task*.ts` | B35 | read |
+| `packages/core/src/tools/definitions/web/schema.ts:100-247` | B36 | read |
+| `packages/core/src/tools/definitions/cli/schema.ts:1169-1247` | B37, B38, B40 | read |
 | `src/services/mcp/McpService.ts:4429-4475` | B39 | read |
 | `src/tools/executors/client/mcp/McpToolExecutor.ts:215-345` | B39 | read |
 | `src/agent/shouldConfirmExecution.ts:820-1130` | B41–B43 | read |
@@ -758,8 +758,8 @@ with `vendor:` (then `evidence/original-vendor/windows-x64/`).
 | `src/sandbox/buildSandboxConfig.ts:11-46` | B48 | read |
 | `packages/common/src/settings/schema.ts:577-608` | B48 | read |
 | `packages/runtime/settings/src/sandbox-paths.ts:31-93` | B48 | read |
-| `src/sandbox/DroidSandboxManager.ts:262-760` | B49–B51 | read |
-| `src/sandbox/DroidSandboxManager.ts:1080-1385` | B53–B55 | read |
+| `src/sandbox/SandboxManager.ts:262-760` | B49–B51 | read |
+| `src/sandbox/SandboxManager.ts:1080-1385` | B53–B55 | read |
 | `src/sandbox/sandboxPreCheck.ts:563-1230` | B52 | read |
 | `src/sandbox/sandboxGuard.ts:64-262` | B52 | read |
 | `src/sandbox/allowAlwaysPersistence.ts:1-245` | B52 | read |
@@ -773,7 +773,7 @@ Clauses B15's outline thresholds, B17's media caps, B29's env list, B30's
 `[observed]`. The mapping "`--auto` level X auto-runs risk ≤ X" is `[derived]` from
 the numeric comparison plus the enum order; the platform statement "Windows has no
 filesystem enforcement" is `[observed]` in the vendored SRT comment and therefore
-`[derived]` as a droid-visible contract.
+`[derived]` as a CLI-visible contract.
 
 ## Open questions
 
@@ -795,15 +795,15 @@ filesystem enforcement" is `[observed]` in the vendored SRT comment and therefor
    top-level fields from the first applied file; the exact non-streaming result
    was not read. Blocks an exact output-contract clause.
 5. **Windows whole-process gap.** SRT reports Windows as supported for
-   per-command sandboxing while droid refuses whole-process there. Whether the
-   per-command Windows path enforces any filesystem rule droid relies on (vs.
-   only network) is stated by the vendor comment as "not enforced"; droid's own
+   per-command sandboxing while the CLI refuses whole-process there. Whether the
+   per-command Windows path enforces any filesystem rule the CLI relies on (vs.
+   only network) is stated by the vendored comment as "not enforced"; the CLI's own
    app-level checks are the only filesystem guard. Confirming this on a Windows
    run is out of scope for this spec.
 
 ## Clean-room notes
 
-**Contract a reimplementation must reproduce**
+**Contract a conforming build must reproduce**
 
 - The llmId set, the id↔llmId split, the six side-effect classes and their
   validation, and per-tool metadata (`requiresConfirmation` as metadata only,
@@ -831,12 +831,12 @@ filesystem enforcement" is `[observed]` in the vendored SRT comment and therefor
 - Platform confinement claims: Linux bwrap+netns+seccomp with a digest-verified
   `apply-seccomp`; macOS seatbelt with deny-last ordering and `allowPty` in
   whole-process mode; Windows network-only confinement via SRT's helper, with
-  droid-level file checks as the only filesystem guard.
+  CLI-level file checks as the only filesystem guard.
 
 **Explicitly not part of the contract**
 
 - The private helper names, class layout and SRT wrapper internals; the wire shape
-  between droid and `srt-win.exe`; the seccomp filter's syscall list.
+  between the CLI and `srt-win.exe`; the seccomp filter's syscall list.
 - Exact prompt copy and colours of the confirmation UI, the i18n keys behind the
   guidance strings (the English text is the contract; translations are not).
 - The pre-hydration display-name fallback map's ordering, the memoization

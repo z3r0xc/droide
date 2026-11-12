@@ -197,11 +197,6 @@ export class AcpHarness {
     this.input.end();
     await this.done;
   }
-
-  async disposeAfter(text: string): Promise<void> {
-    this.input.end(text);
-    await this.done;
-  }
 }
 
 export function completed(finalText = "done"): TurnOutcome {
@@ -213,17 +208,11 @@ export function completed(finalText = "done"): TurnOutcome {
   };
 }
 
-export function failed(message: string): TurnOutcome {
-  return { kind: "failed", message };
-}
-
 export function cancelledOutcome(message = "cancelled"): TurnOutcome {
   return { kind: "cancelled", message };
 }
 
 export const SESSION_ID = "0b8f2f0e-9b1a-4c3d-8e4f-1a2b3c4d5e6f";
-export const OTHER_SESSION_ID = "1c9f3f1e-0a2b-4d4e-9f5a-2b3c4d5e6f70";
-
 /** Build a harness with one fixed ACP session already created. */
 export async function openSession(
   options: AcpHarnessOptions,

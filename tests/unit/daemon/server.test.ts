@@ -11,7 +11,7 @@ import { PRODUCT_VERSION } from "../../../src/cli/brand.ts";
 import { AUTHENTICATION_REQUIRED_MESSAGE } from "../../../src/daemon/auth.ts";
 import { DaemonStartupError } from "../../../src/daemon/errors.ts";
 import {
-  FACTORY_PROTOCOL_VERSION,
+  DROIDE_PROTOCOL_VERSION,
   createErrorResponse,
   createRequest,
   createSuccessResponse,
@@ -270,7 +270,7 @@ test("the gate rejects a non-auth first request with the fixed sentence", async 
     peer.send({
       type: "notification",
       jsonrpc: "2.0",
-      factoryApiVersion: "1.0.0",
+      droideApiVersion: "1.0.0",
       method: "daemon.session_cancel",
     });
     peer.send(
@@ -280,8 +280,8 @@ test("the gate rejects a non-auth first request with the fixed sentence", async 
     assert.deepEqual(response, {
       type: "response",
       jsonrpc: "2.0",
-      factoryApiVersion: "1.0.0",
-      factoryProtocolVersion: FACTORY_PROTOCOL_VERSION,
+      droideApiVersion: "1.0.0",
+      droideProtocolVersion: DROIDE_PROTOCOL_VERSION,
       id: AUTH_ID,
       error: { code: -32001, message: AUTHENTICATION_REQUIRED_MESSAGE },
     });
@@ -404,7 +404,7 @@ test("a version mismatch never blocks authenticate; it decorates a later failure
     assert.equal(failure.message, "Method not found: daemon.unknown");
     assert.deepEqual(failure.data, {
       protocolVersionMismatch: {
-        localFactoryProtocolVersion: FACTORY_PROTOCOL_VERSION,
+        localFactoryProtocolVersion: DROIDE_PROTOCOL_VERSION,
         peerFactoryProtocolVersion: "1.300.0",
         messageType: "request",
         method: "daemon.unknown",
@@ -792,7 +792,7 @@ test("an authenticated notification reaches the injected sink", async () => {
     peer.send({
       type: "notification",
       jsonrpc: "2.0",
-      factoryApiVersion: "1.0.0",
+      droideApiVersion: "1.0.0",
       method: "daemon.session_cancel",
       params: { sessionId: "s" },
     });

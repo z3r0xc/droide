@@ -189,7 +189,7 @@ function completionRecord(input: {
       output_tokens: input.usage.output_tokens,
       cache_read_input_tokens: input.usage.cache_read_input_tokens,
       cache_creation_input_tokens: input.usage.cache_creation_input_tokens,
-      factory_credits: input.usage.factory_credits,
+      droide_credits: input.usage.droide_credits,
       thinking_tokens: input.usage.thinking_tokens,
       ...(input.usage.ttft_ms === undefined
         ? {}

@@ -2,31 +2,31 @@
 
 <div align="center">
   <img src="./docs/assets/hero.svg" width="100%"
-       alt="Droide — a terminal coding agent rebuilt from its specification; one real chain from the repository, spec to code to test">
+       alt="Droide — a terminal coding agent; one real chain from the repository, spec to code to test">
 </div>
 
-**Droide** is a clean-room reimplementation of the `droid` CLI v1.9.0: the same
-command surface, help pages, refusals and exit codes, rebuilt from a written
-specification instead of copied source.
+**Droide** is a terminal coding agent for your repository: one command surface
+for prompts, sessions, tools, MCP servers, plugins and a local daemon, driven
+from a terminal.
 
 The product layer is TypeScript — Node 24, ESM, types stripped at load, no build
 step. The native layer is Rust, behind one JSON-lines child process. Both are
 written against a single contract: [`specs/`](./specs/README.md).
 
-## Why this exists
+## How it is built
 
-The specification is the deliverable. The reimplementation is the check that the
+The specification is the deliverable. The implementation is the check that the
 specification is complete and unambiguous enough to build from.
 
 - **SDD — spec first.** Every subsystem has one document under `specs/`, and
   nothing is implemented before it is specified. Clauses are labelled
   `[observed]`, `[derived]` or `[inferred]`, and each carries a citation — a
-  recovered file and line, or a recorded golden.
+  source location, or a recorded case.
 - **ADD — decisions as records.** Anything that constrains structure is an ADR
   in [`docs/adr/`](./docs/adr/0000-template.md), written when the decision is
   made. The split into two runtimes is
-  [ADR 0002](./docs/adr/0002-hybrid-rust-typescript-layers.md); the rule that no
-  subject code is copied is
+  [ADR 0002](./docs/adr/0002-hybrid-rust-typescript-layers.md); the rule that
+  recovered material never enters the build is
   [ADR 0003](./docs/adr/0003-evidence-first-clean-room-policy.md).
 - **TDD — clauses compile to tests.** Every behavioural clause names at least one
   deterministic test: no network, no credentials, no wall clock. Where the build
@@ -37,25 +37,25 @@ specification is complete and unambiguous enough to build from.
 
 What runs today, run against this tree:
 
-| Surface                                                                                    | Today                                                                                                                                                                                                                                                 |
-| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--version`, `--help`, subcommand help                                                     | works — reports `1.9.0`; 20/20 recorded parity cases against the subject (goldens are local, see [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md))                                                                                  |
-| `doctor`                                                                                   | works — 16 named checks; eleven are real probes (config, environment, system, binaries, updates, filesystem, git, proxy, certs, auth, mcp) and the rest report `skip` with a reason                                                                               |
-| `search` / `find`                                                                          | works — served from a local transcript index with a proving fallback to the literal scan; `--reindex` refreshes it                                                                                                                                    |
-| `mcp list`, `mcp add`, `mcp remove`, `mcp permissions`                                     | work — merged configuration, surgical JSONC edits that keep comments, atomic writes, permission list/revoke/clear                                                                                                                                     |
-| `plugin list`, `plugin marketplace`, `plugin install`, `plugin uninstall`, `plugin update` | work — git-backed marketplaces validated before adoption, atomic registry merges, collision and reference refusals                                                                                                                                    |
-| `exec`                                                                                     | works for `text`, `json` and `stream-json` with a prompt, `-f` or stdin, session continuation and streaming input; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` refuse                                                                       |
-| `resume`                                                                                   | works — lists sessions, accepts a UUID or link, continues through the `exec -s` path, forks with `--fork`                                                                                                                                             |
-| `daemon`                                                                                   | works locally — WebSocket transport, JSON-RPC, auth gate, single instance, ordered shutdown; Remote Control and the port proxy are declared, not built                                                                                                |
-| `droide` with no arguments                                                                 | launches the interactive shell on a TTY pair; a typed prompt runs an agent turn with streamed rows, approvals and Esc-cancel                                                                                                                          |
+| Surface                                                                                    | Today                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--version`, `--help`, subcommand help                                                     | works — reports `0.4.0`; 20 recorded CLI cases replay green (snapshots are local, see [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md))                                                                                                                                                                                     |
+| `doctor`                                                                                   | works — 16 named checks; eleven are real probes (config, environment, system, binaries, updates, filesystem, git, proxy, certs, auth, mcp) and the rest report `skip` with a reason                                                                                                                                                      |
+| `search` / `find`                                                                          | works — served from a local transcript index with a proving fallback to the literal scan; `--reindex` refreshes it                                                                                                                                                                                                                       |
+| `mcp list`, `mcp add`, `mcp remove`, `mcp permissions`                                     | work — merged configuration, surgical JSONC edits that keep comments, atomic writes, permission list/revoke/clear                                                                                                                                                                                                                        |
+| `plugin list`, `plugin marketplace`, `plugin install`, `plugin uninstall`, `plugin update` | work — git-backed marketplaces validated before adoption, atomic registry merges, collision and reference refusals                                                                                                                                                                                                                       |
+| `exec`                                                                                     | works for `text`, `json` and `stream-json` with a prompt, `-f` or stdin, session continuation and streaming input; `stream-jsonrpc`, ACP, `--mission` and `--list-tools` refuse                                                                                                                                                          |
+| `resume`                                                                                   | works — lists sessions, accepts a UUID or link, continues through the `exec -s` path, forks with `--fork`                                                                                                                                                                                                                                |
+| `daemon`                                                                                   | works locally — WebSocket transport, JSON-RPC, auth gate, single instance, ordered shutdown; Remote Control and the port proxy are declared, not built                                                                                                                                                                                   |
+| `droide` with no arguments                                                                 | launches the interactive shell on a TTY pair; a typed prompt runs an agent turn with streamed rows, approvals and Esc-cancel                                                                                                                                                                                                             |
 | native helper                                                                              | 15 JSON-line methods (including PTY sessions), typed and validated on the TypeScript side, 69 Rust tests, plus a contract test that spawns a real process through the compiled binary (`npm run test:native`); the tool runtime uses it for discovery when the binary is present and degrades to the TypeScript implementation otherwise |
-| test suite                                                                                 | 1096 tests in 116 files: 1090 pass, 6 skipped, plus 69 Rust tests                                                                                                                                                                                     |
+| test suite                                                                                 | 1237 tests in 128 files: 1230 pass, 7 skipped, plus 69 Rust tests                                                                                                                                                                                                                                                                        |
 
 `exec` needs a model credential. Without one it refuses instead of guessing:
 
 ```console
 $ node bin/droide.mjs exec -o json "hi"
-Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY environment variable.
+Authentication failed. Please log in using /login or set a valid DROIDE_API_KEY environment variable.
 ```
 
 Declared, in flight:
@@ -80,9 +80,9 @@ $ node bin/droide.mjs exec --list-tools
 ```
 
 Current shape of the tree: 11 numbered specification documents — shared context
-plus ten subsystem specs, 9,333 lines under `specs/` — 123 TypeScript files
-under `src/` (33,069 lines), 8 Rust files under `crates/droide-native/src/`,
-8 ADRs, 1096 TypeScript tests and 69 Rust tests. Every place where the build is
+plus ten subsystem specs, 9,409 lines under `specs/` — 147 TypeScript files
+under `src/` (51,294 lines), 9 Rust files under `crates/droide-native/src/`,
+9 ADRs, 1237 TypeScript tests and 69 Rust tests. Every place where the build is
 narrower than the clause it cites is marked `TODO(spec …)` in the code and
 counted in [`docs/gaps.md`](./docs/gaps.md), which `npm run gaps` regenerates.
 
@@ -92,15 +92,15 @@ Node 24 or newer, and a Rust toolchain for the native layer.
 
 ```sh
 npm ci                          # install once; there is no build step
-node bin/droide.mjs --version   # 1.9.0
+node bin/droide.mjs --version   # 0.4.0
 node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 16 named checks (11 real probes), text or --json
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 906 tests
+npm test                        # 1237 tests
 npm run typecheck
 npm run test:parity             # 20/20
-cargo test --workspace          # 57 tests
+cargo test --workspace          # 69 tests
 ```
 
 `exec` is the machine-facing surface (`text`, `json`, `stream-json`):
@@ -133,7 +133,7 @@ node bin/droide.mjs exec -f prompt.txt --auto low
   that flushes one frame per request; `protocol.rs` frames and dispatches;
   `paths.rs` enforces containment; `search.rs` walks and searches; `sandbox.rs`
   describes bubblewrap, seatbelt or "no confinement" profiles; `pty.rs` quotes
-  the command line the way the subject re-splits it; `secrets.rs` stores secrets
+  the command line the way the shell re-splits it; `secrets.rs` stores secrets
   with DPAPI on Windows.
 - The fifteen methods are `native.version`, `hash.sha256`, `search.walk`,
   `search.text`, `path.resolve`, `sandbox.profile`, `pty.quote`, `pty.spawn`,
@@ -145,40 +145,40 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 
 ## Specifications and decisions
 
-| Document                                                                     | Subject                                                  |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------- |
-| [`00-context.md`](./specs/00-context.md)                                     | shared context: the subject, its evidence and vocabulary |
-| [`10-cli-surface.md`](./specs/10-cli-surface.md)                             | commands, options, help, refusals, exit codes            |
-| [`20-agent-loop.md`](./specs/20-agent-loop.md)                               | message model, turn loop, provider adapter               |
-| [`30-tools-and-sandbox.md`](./specs/30-tools-and-sandbox.md)                 | tool registry, validators, permissions, sandbox          |
-| [`40-sessions-and-storage.md`](./specs/40-sessions-and-storage.md)           | session files, migrations, transcript, search            |
-| [`50-transport-and-auth.md`](./specs/50-transport-and-auth.md)               | URLs, headers, SSE, error identity, auth                 |
-| [`60-extensions-mcp-and-skills.md`](./specs/60-extensions-mcp-and-skills.md) | MCP servers, tool naming, skills, plugins                |
-| [`70-daemon-and-remote-control.md`](./specs/70-daemon-and-remote-control.md) | daemon RPC surface and remote control                    |
-| [`80-exec-and-streaming.md`](./specs/80-exec-and-streaming.md)               | non-interactive runs and stream formats                  |
-| [`90-native-layer.md`](./specs/90-native-layer.md)                           | the helper process and its methods                       |
-| [`95-terminal-ui.md`](./specs/95-terminal-ui.md)                             | tokens, capabilities, shell layout, frames               |
+| Document                                                                     | Subject                                                   |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------- |
+| [`00-context.md`](./specs/00-context.md)                                     | shared context: terms, evidence policy and citation rules |
+| [`10-cli-surface.md`](./specs/10-cli-surface.md)                             | commands, options, help, refusals, exit codes             |
+| [`20-agent-loop.md`](./specs/20-agent-loop.md)                               | message model, turn loop, provider adapter                |
+| [`30-tools-and-sandbox.md`](./specs/30-tools-and-sandbox.md)                 | tool registry, validators, permissions, sandbox           |
+| [`40-sessions-and-storage.md`](./specs/40-sessions-and-storage.md)           | session files, migrations, transcript, search             |
+| [`50-transport-and-auth.md`](./specs/50-transport-and-auth.md)               | URLs, headers, SSE, error identity, auth                  |
+| [`60-extensions-mcp-and-skills.md`](./specs/60-extensions-mcp-and-skills.md) | MCP servers, tool naming, skills, plugins                 |
+| [`70-daemon-and-remote-control.md`](./specs/70-daemon-and-remote-control.md) | daemon RPC surface and remote control                     |
+| [`80-exec-and-streaming.md`](./specs/80-exec-and-streaming.md)               | non-interactive runs and stream formats                   |
+| [`90-native-layer.md`](./specs/90-native-layer.md)                           | the helper process and its methods                        |
+| [`95-terminal-ui.md`](./specs/95-terminal-ui.md)                             | tokens, capabilities, shell layout, frames                |
 
 Status vocabulary — `draft`, `review`, `stable`, `blocked` — is defined in
 [`specs/README.md`](./specs/README.md); per-spec state lives in
 [`docs/status.md`](./docs/status.md), and the milestones and their gates in
-[`docs/plan.md`](./docs/plan.md). How each part of the subject was recovered is
-mapped in [`docs/architecture/README.md`](./docs/architecture/README.md) and the
-[`evidence/`](./evidence/README.md) ledger.
+[`docs/plan.md`](./docs/plan.md). The evidence-derived layer map of the reference
+tree is in [`docs/architecture/README.md`](./docs/architecture/README.md), and
+the ledger conventions in [`evidence/`](./evidence/README.md).
 
 Decisions that shaped the build:
 
-| ADR                                                              | Decision                                                              |
-| ---------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [0001](./docs/adr/0001-bun-standalone-extraction.md)             | recover the embedded JavaScript bundle before decompiling native code |
-| [0002](./docs/adr/0002-hybrid-rust-typescript-layers.md)         | Rust for the native layer, TypeScript for the product layer           |
-| [0003](./docs/adr/0003-evidence-first-clean-room-policy.md)      | evidence-first clean-room policy                                      |
-| [0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)   | declarative parity cases with an optional oracle                      |
-| [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | the project is `droide`; the CLI design stays identical               |
-| [0006](./docs/adr/0006-terminal-ui-stack.md)                     | the terminal UI is React + Ink, with tokens from the spec             |
-| [0007](./docs/adr/0007-update-channel.md)                        | updates come from this repository's releases, never the subject's     |
-| [0008](./docs/adr/0008-oauth-credential-envelope.md)             | MCP OAuth credentials are sealed by the OS, never by a key file       |
-| [0009](./docs/adr/0009-update-installation.md)                   | updates are staged, digest-verified, swapped atomically and rolled back |
+| ADR                                                         | Decision                                                                |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [0001](./docs/adr/0001-bun-standalone-extraction.md)        | recover the embedded JavaScript bundle before decompiling native code   |
+| [0002](./docs/adr/0002-hybrid-rust-typescript-layers.md)    | Rust for the native layer, TypeScript for the product layer             |
+| [0003](./docs/adr/0003-evidence-first-clean-room-policy.md) | evidence-first clean-room policy                                        |
+| [0006](./docs/adr/0006-terminal-ui-stack.md)                | the terminal UI is React + Ink, with tokens from the spec               |
+| [0007](./docs/adr/0007-update-channel.md)                   | updates come from this repository's releases                            |
+| [0008](./docs/adr/0008-oauth-credential-envelope.md)        | MCP OAuth credentials are sealed by the OS, never by a key file         |
+| [0009](./docs/adr/0009-update-installation.md)              | updates are staged, digest-verified, swapped atomically and rolled back |
+| [0010](./docs/adr/0010-own-brand-and-snapshot-harness.md)   | Droide is its own product; the harness records our own snapshots        |
+| [0011](./docs/adr/0011-own-disk-layout-and-env.md)          | our own state directory, plugin layout and environment variable names   |
 
 ## Contributing
 
@@ -188,7 +188,7 @@ these gates pass:
 1. `npm run typecheck`
 2. `npm run format:check`
 3. `npm test`
-4. `npm run test:parity` (needs the local goldens under `.work/parity`)
+4. `npm run test:parity` (needs the local snapshots under `.work/parity`)
 5. `cargo test --workspace`
 6. `npm run gaps:check`
 7. the spec clause it implements is cited in the commit message or PR body
@@ -203,6 +203,6 @@ Tests live in [`tests/`](./tests/README.md): `unit/` is fast and hermetic,
 
 ## Licence
 
-MIT — see [`LICENSE`](./LICENSE). No code from the subject is copied, and no
+MIT — see [`LICENSE`](./LICENSE). No third-party code is copied, and no
 proprietary artefact is tracked here
 ([ADR 0003](./docs/adr/0003-evidence-first-clean-room-policy.md)).

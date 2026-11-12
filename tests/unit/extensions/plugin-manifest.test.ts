@@ -59,7 +59,7 @@ test("test_plugin_manifest_validation: both manifest paths are searched and a mi
   const temp = createTempDirectory();
   try {
     assert.deepEqual(PLUGIN_MANIFEST_PATHS, [
-      ".factory-plugin/plugin.json",
+      ".droide-plugin/plugin.json",
       ".claude-plugin/plugin.json",
     ]);
     assert.equal(loadPluginManifest(temp.path).kind, "absent");
@@ -73,7 +73,7 @@ test("test_plugin_manifest_validation: the factory manifest is JSONC and only ho
   try {
     writeFixture(
       temp.path,
-      ".factory-plugin/plugin.json",
+      ".droide-plugin/plugin.json",
       `{
         // the only key the loader reads
         "name": "ignored",
@@ -93,7 +93,7 @@ test("test_plugin_manifest_validation: the factory manifest is JSONC and only ho
 });
 
 test("test_plugin_manifest_validation: hooks accept an event map, event maps, or hook-file paths", () => {
-  const path = "/plugin/.factory-plugin/plugin.json";
+  const path = "/plugin/.droide-plugin/plugin.json";
   const eventMap = parsePluginManifest(
     '{ "hooks": { "SessionStart": "echo hi" } }',
     path,
@@ -114,7 +114,7 @@ test("test_plugin_manifest_validation: hooks accept an event map, event maps, or
 });
 
 test("test_plugin_manifest_validation: malformed manifests are manifest-invalid", () => {
-  const path = "/plugin/.factory-plugin/plugin.json";
+  const path = "/plugin/.droide-plugin/plugin.json";
   assert.throws(
     () => parsePluginManifest("{", path),
     expectPluginError("manifest-invalid"),
@@ -158,12 +158,12 @@ test("test_plugin_manifest_validation: a Claude-layout manifest is the fallback"
 test("test_plugin_manifest_validation: an unreadable manifest is manifest-invalid, not absent", () => {
   const temp = createTempDirectory();
   try {
-    writeFixture(temp.path, ".factory-plugin/plugin.json", "{}");
+    writeFixture(temp.path, ".droide-plugin/plugin.json", "{}");
     assert.throws(
       () =>
         loadPluginManifest(temp.path, {
           readFile: (path) => {
-            if (path.includes(".factory-plugin")) {
+            if (path.includes(".droide-plugin")) {
               const error = new Error("permission denied");
               Object.defineProperty(error, "code", { value: "EACCES" });
               throw error;

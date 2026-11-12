@@ -7,7 +7,8 @@
 
 ## Context
 
-The six vendored `droid` 1.9.0 binaries are Bun single-file executables. Two
+The six vendored platform binaries of the reference build are Bun single-file
+executables. Two
 byte-level observations support that, made without executing anything: the
 string `.bun` occurs in the section-name area of the Linux, Windows, and macOS
 samples, and each contains the string `Bun v1.4.4`. Exact section offsets and
@@ -55,7 +56,7 @@ layout; no proprietary binary is committed as a test fixture.
 
 Good:
 
-- The bulk of `droid`'s behaviour — prompts, tool contracts, config parsing,
+- The bulk of the CLI's behaviour — prompts, tool contracts, config parsing,
   session state, error text — lives in JavaScript. Recovering it yields
   semantics directly, at a cost that does not scale with binary size.
 - Six platform builds can be compared. Where they disagree, the platform
@@ -73,11 +74,11 @@ Costs and risks:
 - Recovered code is minified and bundled: module names, comments, and type
   information are gone. Module boundaries have to be reconstructed from the
   bundle's module table, and symbol names from string and property usage.
-- Reading recovered proprietary code creates a provenance hazard for a
-  clean-room implementation. Policy: extracted code stays in
-  `evidence/extracted/`, is cited by id, and is never copied into the
-  reimplementation. The implementation is written against spec clauses; a spec
-  clause may describe behaviour, not transcribe code.
+- Reading recovered proprietary code creates a provenance hazard for our own
+  implementation. Policy: extracted code stays in `evidence/extracted/`, is
+  cited by id, and is never copied into `src/` or `crates/`. The implementation
+  is written against spec clauses; a spec clause may describe behaviour, not
+  transcribe code.
 - The JavaScript payload does not cover embedded native assets (search binaries,
   terminal helpers, database engines). Those need their own analysis, deferred
   until a spec clause depends on them.
@@ -92,14 +93,14 @@ module; then open the first subsystem specs.
 
 **Decompile the native binary first (Rizin/Ghidra).** Rejected as the primary
 route. A 250–350 MB binary embeds a full JavaScript engine; most recovered
-native functions would be runtime internals rather than `droid` logic, and the
+native functions would be runtime internals rather than application logic, and the
 application-level semantics would have to be reconstructed from calling
 conventions and string references. It is orders of magnitude more work per
 established fact, and it is not deterministic across engine versions. Kept as a
 targeted tool for native shims.
 
 **Runtime tracing or instrumentation.** Rejected. It requires executing the
-vendor binary, which this project forbids, and it observes only the paths that
+reference binary, which this project forbids, and it observes only the paths that
 are exercised, so coverage is neither complete nor reproducible. It also cannot
 see configuration schemas or error branches that a run does not hit.
 

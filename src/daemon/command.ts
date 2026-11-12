@@ -10,8 +10,8 @@
  */
 
 import {
-  factoryDir,
-  factoryHome,
+  stateDir,
+  stateHome,
   joinPath,
   type Environment,
 } from "../config/paths.ts";
@@ -104,13 +104,13 @@ export function environmentAuthPolicy(
   };
 }
 
-/** Where the daemon's own log lives: `<state dir>/logs/the daemon.log`. */
+/** Where the daemon's own log lives: `<state dir>/logs/daemon.log`. */
 export function daemonLogsPath(environment: Environment): string {
   return joinPath(
     environment.platform,
-    factoryDir(environment),
+    stateDir(environment),
     "logs",
-    "the daemon.log",
+    "daemon.log",
   );
 }
 
@@ -123,7 +123,7 @@ export function exportSettingsEnvironment(
   environment: Record<string, string | undefined>,
 ): void {
   if (settings === undefined || settings.length === 0) return;
-  environment["FACTORY_RUNTIME_SETTINGS_PATH"] = settings;
+  environment["DROIDE_RUNTIME_SETTINGS_PATH"] = settings;
 }
 
 /**
@@ -182,7 +182,7 @@ export function daemonServerOptions(
     ...(argv.port === undefined ? {} : { port: argv.port }),
     ...(argv.unixPath === undefined ? {} : { unixPath: argv.unixPath }),
     auth: deps.auth ?? environmentAuthPolicy(environment),
-    homedir: factoryHome(environment),
+    homedir: stateHome(environment),
     platform: environment.platform,
     pid: deps.pid ?? process.pid,
     logsPath: daemonLogsPath(environment),

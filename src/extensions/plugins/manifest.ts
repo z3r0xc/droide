@@ -14,16 +14,16 @@ import { isRecord } from "../guards.ts";
 import { JsoncParseError, parseJsonc } from "../jsonc.ts";
 
 /**
- * Manifest locations, most specific first (B33). `.factory-plugin/` is the
+ * Manifest locations, most specific first (B33). `.droide-plugin/` is the
  * Factory layout; `.claude-plugin/` is the Claude Code root marker.
  *
- * TODO(spec): B33 states that `.factory-plugin/plugin.json` is read and that
+ * TODO(spec): B33 states that `.droide-plugin/plugin.json` is read and that
  * `.claude-plugin/` marks a plugin root, but does not pin reading
  * `.claude-plugin/plugin.json` directly. The fallback mirrors B32's
  * marketplace rule until the install path is implemented.
  */
 export const PLUGIN_MANIFEST_PATHS = [
-  ".factory-plugin/plugin.json",
+  ".droide-plugin/plugin.json",
   ".claude-plugin/plugin.json",
 ] as const;
 

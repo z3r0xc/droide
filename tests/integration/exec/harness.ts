@@ -125,7 +125,7 @@ export function childEnvironment(directory: string): Record<string, string> {
     HOME: directory,
     USERPROFILE: directory,
     APPDATA: join(directory, "AppData"),
-    FACTORY_HOME_OVERRIDE: directory,
+    DROIDE_HOME_OVERRIDE: directory,
     NO_COLOR: "1",
     TERM: "dumb",
     PATH: process.env.PATH ?? "",
@@ -295,7 +295,7 @@ function platformOf(): Platform {
 /** The environment the spawned CLI sees for this sandbox. */
 export function fixtureEnvironment(directory: string): Environment {
   return {
-    env: { FACTORY_HOME_OVERRIDE: directory },
+    env: { DROIDE_HOME_OVERRIDE: directory },
     home: directory,
     platform: platformOf(),
     cwd: directory,

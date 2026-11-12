@@ -21,7 +21,7 @@ const BAKED: BakedApiUrls = {
   apiBaseUrlEu: "https://eu.example",
 };
 
-function factoryConfig(
+function helperConfig(
   env: Readonly<Record<string, string | undefined>>,
   baked: BakedApiUrls = BAKED,
 ): ApiUrlConfig {
@@ -78,7 +78,7 @@ const MATRIX: readonly BaseUrlCase[] = [
     name: "the environment beats the baked define",
     deployment: "factory",
     region: "global",
-    env: { FACTORY_API_BASE_URL: "https://env.example" },
+    env: { DROIDE_API_BASE_URL: "https://env.example" },
     baked: BAKED,
     expected: "https://env.example/",
   },
@@ -86,7 +86,7 @@ const MATRIX: readonly BaseUrlCase[] = [
     name: "the EU environment value beats the baked EU define",
     deployment: "factory",
     region: "eu",
-    env: { FACTORY_API_BASE_URL_EU: "https://eu-env.example" },
+    env: { DROIDE_API_BASE_URL_EU: "https://eu-env.example" },
     baked: BAKED,
     expected: "https://eu-env.example/",
   },
@@ -112,7 +112,7 @@ for (const testCase of MATRIX) {
 test("an explicit override beats the environment and the baked define", () => {
   const config = createApiUrlConfig({
     deployment: { kind: "factory" },
-    environment: { env: { FACTORY_API_BASE_URL: "https://env.example" } },
+    environment: { env: { DROIDE_API_BASE_URL: "https://env.example" } },
     baked: BAKED,
     overrides: { apiBaseUrl: "https://override.example" },
   });
@@ -170,7 +170,7 @@ test("a configured base URL carrying credentials or a query is refused", () => {
 });
 
 test("an empty environment value falls through to the baked define", () => {
-  const config = factoryConfig({ FACTORY_API_BASE_URL: "" });
+  const config = helperConfig({ DROIDE_API_BASE_URL: "" });
   assert.equal(config.apiBaseUrl.href, "https://api.example/");
 });
 
@@ -276,7 +276,7 @@ test("joinApiPath keeps a base path prefix and refuses absolute paths", () => {
     "https://prem.example/prefix/api/sessions/v2",
   );
   assert.equal(
-    resolveApiRequestUrl(factoryConfig({}), "global", "/api/cli/whoami").href,
+    resolveApiRequestUrl(helperConfig({}), "global", "/api/cli/whoami").href,
     "https://api.example/api/cli/whoami",
   );
   assert.throws(() => joinApiPath(base, "api/x"), InvalidBaseUrlError);

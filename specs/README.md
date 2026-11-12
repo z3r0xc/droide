@@ -1,6 +1,6 @@
 # Specifications
 
-One file per subsystem of the reimplementation, numbered by layer. A spec is the
+One file per subsystem, numbered by layer. A spec is the
 contract the code is written against and judged by: **nothing is implemented
 before it is specified.**
 
@@ -16,16 +16,17 @@ before it is specified.**
 3. **Every clause is labelled and cited.** `[observed]` (read directly),
    `[derived]` (computed from several observations) or `[inferred]` (judgement),
    with a location (`evidence/original/windows-x64/<path>:<line>`) or a recorded
-   golden (`tests/parity/expected/<case>.json`). A clause without a citation is
-   an open question, not a clause.
+   case (`tests/parity/expected/<case>.json`). A clause without a citation is an
+   open question, not a clause.
 4. **Every clause has a test.** Acceptance tests name at least one deterministic
    test per behavioural clause. Determinism: no network, no credentials, no wall
-   clock, no dependence on the subject binary.
+   clock, no dependence on a reference binary.
 5. **Gaps are explicit.** Where evidence is incomplete — re-export barrels and
    type-only modules were elided from the bundle — write the narrowest supported
    clause and put the rest under Open questions. Never smooth a gap with a guess.
-6. **Version-locked.** Specs describe `droid` v1.9.0. A different version needs a
-   new recovery run and new specs, never a silent edit.
+6. **Version-locked.** Every spec pins the contract of one release line. A
+   behaviour change needs a clause change, a re-recorded case and a new spec
+   revision, never a silent edit.
 7. **Open questions name what would settle them** (a file to read, a probe to
    run, a decision to make).
 

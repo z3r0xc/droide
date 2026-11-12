@@ -1,6 +1,6 @@
 /**
  * JSON with comments. Contract: `specs/60-extensions-mcp-and-skills.md` B2
- * (`mcp.json` is JSONC) and B33 (`.factory-plugin/plugin.json` is optional
+ * (`mcp.json` is JSONC) and B33 (`.droide-plugin/plugin.json` is optional
  * JSONC).
  *
  * The readers accept comments and trailing commas; everything else is plain

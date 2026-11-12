@@ -18,11 +18,11 @@ async function sandbox(
   const root = await mkdtemp(join(tmpdir(), "droide-mcp-list-"));
   const home = join(root, "home");
   const project = join(root, "project");
-  await mkdir(join(home, ".factory"), { recursive: true });
-  await mkdir(join(project, ".factory"), { recursive: true });
+  await mkdir(join(home, ".droide"), { recursive: true });
+  await mkdir(join(project, ".droide"), { recursive: true });
   if (mcpServers !== null) {
     await writeFile(
-      join(home, ".factory", "mcp.json"),
+      join(home, ".droide", "mcp.json"),
       JSON.stringify({ mcpServers }, null, 2),
     );
   }
@@ -35,7 +35,7 @@ async function sandbox(
 async function render(environment: Environment): Promise<string> {
   const context = await createAppContext({ environment });
   const configuration = loadMcpConfiguration(
-    mcpConfigFileSources(context.paths.factoryDir, context.environment.cwd),
+    mcpConfigFileSources(context.paths.stateDir, context.environment.cwd),
   );
   return renderMcpList(configuration);
 }
@@ -79,7 +79,7 @@ test("a broken document is reported and exits 1", async () => {
   const { root, environment } = await sandbox(null);
   try {
     await writeFile(
-      join(environment.home, ".factory", "mcp.json"),
+      join(environment.home, ".droide", "mcp.json"),
       "{ not json",
     );
     const context = await createAppContext({ environment });

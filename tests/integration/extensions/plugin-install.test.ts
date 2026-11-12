@@ -35,7 +35,7 @@ import {
 } from "./plugin-repo-fixtures.ts";
 
 interface Sandbox {
-  readonly factoryDir: string;
+  readonly stateDir: string;
   readonly projectDir: string;
   readonly repo: { readonly path: string; readonly head: string };
   readonly deps: PluginInstallDeps;
@@ -50,25 +50,25 @@ async function sandbox(
     manifestName: "Team Tools",
     ...(options.plugins === undefined ? {} : { plugins: options.plugins }),
   });
-  const factoryDir = join(root, "home", ".factory");
-  const projectDir = join(root, "project", ".factory");
+  const stateDir = join(root, "home", ".droide");
+  const projectDir = join(root, "project", ".droide");
   const local = localOnlyRunner();
   await addMarketplace(
     repo.path,
     {},
     {
-      scopeRoot: factoryDir,
+      scopeRoot: stateDir,
       timeoutMs: 60_000,
       runGit: local.runner,
     },
   );
   const deps: PluginInstallDeps = {
-    scopes: { user: factoryDir, project: projectDir },
+    scopes: { user: stateDir, project: projectDir },
     timeoutMs: 60_000,
     runGit: local.runner,
   };
   return {
-    factoryDir,
+    stateDir,
     projectDir,
     repo: { path: repo.path, head: repo.head },
     deps,
@@ -103,12 +103,12 @@ test("install copies the plugin into the cache and records its entry", async () 
     assert.equal(entry.version, bench.repo.head.slice(0, 12));
     assert.equal(
       entry.installPath,
-      join(bench.factoryDir, "plugins", "demo@team-tools", entry.version),
+      join(bench.stateDir, "plugins", "demo@team-tools", entry.version),
     );
     assert.equal(existsSync(join(entry.installPath, "SKILL.md")), true);
 
     const entries = entriesFor(
-      installedPluginsPath(bench.factoryDir),
+      installedPluginsPath(bench.stateDir),
       "demo@team-tools",
     );
     assert.equal(entries.length, 1);
@@ -141,7 +141,7 @@ test("the same id is refused in the other scope", async () => {
       (error: unknown) =>
         error instanceof PluginOperationError && error.code === "plugin-exists",
     );
-    assert.equal(existsSync(installedPluginsPath(bench.factoryDir)), false);
+    assert.equal(existsSync(installedPluginsPath(bench.stateDir)), false);
   } finally {
     root.cleanup();
   }
@@ -169,7 +169,7 @@ test("unknown marketplaces and plugins are refused and nothing is written", asyn
         error instanceof PluginOperationError &&
         error.code === "plugin-id-invalid",
     );
-    assert.equal(existsSync(installedPluginsPath(bench.factoryDir)), false);
+    assert.equal(existsSync(installedPluginsPath(bench.stateDir)), false);
   } finally {
     root.cleanup();
   }
@@ -188,7 +188,7 @@ test("reinstalling in one scope replaces that entry and keeps other ids intact",
       source: "elsewhere",
     };
     writeAt(
-      bench.factoryDir,
+      bench.stateDir,
       "plugins/installed_plugins.json",
       `${JSON.stringify(
         { schemaVersion: 1, plugins: { "other@elsewhere": [other] } },
@@ -209,12 +209,12 @@ test("reinstalling in one scope replaces that entry and keeps other ids intact",
     assert.notEqual(first.installPath, second.installPath);
     assert.equal(existsSync(first.installPath), false);
     assert.equal(existsSync(second.installPath), true);
-    const document = registryDocument(installedPluginsPath(bench.factoryDir));
+    const document = registryDocument(installedPluginsPath(bench.stateDir));
     const plugins = document["plugins"];
     assert.ok(isRecord(plugins));
     assert.deepEqual(plugins["other@elsewhere"], [other]);
     assert.equal(
-      entriesFor(installedPluginsPath(bench.factoryDir), "demo@team-tools")
+      entriesFor(installedPluginsPath(bench.stateDir), "demo@team-tools")
         .length,
       1,
     );
@@ -233,7 +233,7 @@ test("a source that climbs out of the marketplace is refused", async () => {
     });
     commitFile(
       bench.repo.path,
-      ".factory-plugin/marketplace.json",
+      ".droide-plugin/marketplace.json",
       manifest,
       "escaping source",
     );
@@ -254,7 +254,7 @@ test("uninstall refuses while a settings file references the plugin", async () =
     const bench = await sandbox(root.path);
     const entry = await installPlugin("demo@team-tools", {}, bench.deps);
     writeAt(
-      bench.factoryDir,
+      bench.stateDir,
       "settings.json",
       `${JSON.stringify({ enabledPlugins: { "demo@team-tools": true } })}\n`,
     );
@@ -267,11 +267,11 @@ test("uninstall refuses while a settings file references the plugin", async () =
     );
     assert.equal(existsSync(entry.installPath), true);
 
-    writeAt(bench.factoryDir, "settings.json", "{}\n");
+    writeAt(bench.stateDir, "settings.json", "{}\n");
     const removed = await uninstallPlugin("demo@team-tools", {}, bench.deps);
     assert.equal(removed.scope, "user");
     assert.equal(existsSync(entry.installPath), false);
-    const plugins = registryDocument(installedPluginsPath(bench.factoryDir))[
+    const plugins = registryDocument(installedPluginsPath(bench.stateDir))[
       "plugins"
     ];
     assert.ok(isRecord(plugins));
@@ -345,7 +345,7 @@ test("update replaces the copy only when the version differs", async () => {
     assert.equal(existsSync(entry.installPath), false);
 
     const entries = entriesFor(
-      installedPluginsPath(bench.factoryDir),
+      installedPluginsPath(bench.stateDir),
       "demo@team-tools",
     );
     assert.equal(entries[0]?.["version"], newHead.slice(0, 12));
@@ -366,7 +366,7 @@ test("a throwing registry rename leaves installed_plugins.json untouched", async
   try {
     const bench = await sandbox(root.path, { plugins: ["demo", "second"] });
     await installPlugin("demo@team-tools", {}, bench.deps);
-    const path = installedPluginsPath(bench.factoryDir);
+    const path = installedPluginsPath(bench.stateDir);
     const before = readFileSync(path, "utf8");
 
     const failing: PluginIo = {
@@ -393,7 +393,7 @@ test("an entry is written with a trailing newline and stable keys", async () => 
   try {
     const bench = await sandbox(root.path);
     await installPlugin("demo@team-tools", {}, bench.deps);
-    const raw = readFileSync(installedPluginsPath(bench.factoryDir), "utf8");
+    const raw = readFileSync(installedPluginsPath(bench.stateDir), "utf8");
     assert.ok(raw.endsWith("\n"));
     assert.match(raw, /"schemaVersion": 1/u);
     assert.match(raw, /"demo@team-tools"/u);

@@ -35,6 +35,9 @@ import {
   type AcpToolKind,
   type AcpToolConfirmationOutcome,
 } from "../acp/protocol.ts";
+import type { Writable } from "node:stream";
+
+import type { AcpServerOptions } from "../acp/server.ts";
 import { isRecord } from "../transport/schema.ts";
 import type { PermissionRequest } from "../tools/permissions.ts";
 
@@ -406,4 +409,114 @@ export function createAcpConfirm(
         "reject_once",
     );
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Process entry (B60)                                                        */
+/* -------------------------------------------------------------------------- */
+
+/** The console methods B60 redirects away from stdout. */
+export interface AcpConsole {
+  log(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  debug(...args: unknown[]): void;
+}
+
+function formatConsoleArguments(args: readonly unknown[]): string {
+  return args
+    .map((value) => {
+      if (typeof value === "string") return value;
+      try {
+        return JSON.stringify(value) ?? String(value);
+      } catch {
+        return String(value);
+      }
+    })
+    .join(" ");
+}
+
+/**
+ * Send `console.*` to one text sink and return a restore function. ACP owns
+ * stdout for frames, so B60 allows console output on stderr only.
+ */
+export function redirectConsoleOutput(
+  write: (text: string) => void,
+  target: AcpConsole = console,
+): () => void {
+  const original = {
+    log: target.log,
+    info: target.info,
+    warn: target.warn,
+    debug: target.debug,
+  };
+  const redirect = (...args: unknown[]): void => {
+    write(`${formatConsoleArguments(args)}\n`);
+  };
+  target.log = redirect;
+  target.info = redirect;
+  target.warn = redirect;
+  target.debug = redirect;
+  return () => {
+    target.log = original.log;
+    target.info = original.info;
+    target.warn = original.warn;
+    target.debug = original.debug;
+  };
+}
+
+export interface RunAcpDaemonOptions extends Omit<
+  AcpServerOptions,
+  "stdin" | "stdout"
+> {
+  readonly stdin?: AsyncIterable<string | Uint8Array>;
+  readonly stdout?: Writable;
+  readonly stderr?: Writable;
+  /** Defaults to `true`; tests and embeddings leave signals to the caller. */
+  readonly installSignalHandlers?: boolean;
+}
+
+/**
+ * The `droid exec --output-format acp` handoff: console output moves to
+ * stderr, the server owns stdout, and a signal closes it cleanly.
+ *
+ * TODO(spec B60): `src/exec/command.ts` still refuses `-o acp` before this
+ * entry is reached; connecting it is a change to that file, outside this
+ * slice. The entry itself is complete here.
+ */
+export async function runAcpDaemon(
+  options: RunAcpDaemonOptions,
+): Promise<number> {
+  const { stdin, stdout, stderr, installSignalHandlers, ...serverOptions } =
+    options;
+  const { createAcpServer } = await import("../acp/server.ts");
+  const restore = redirectConsoleOutput((text) => {
+    (stderr ?? process.stderr).write(text);
+  });
+  const server = createAcpServer({
+    ...serverOptions,
+    stdin: stdin ?? process.stdin,
+    stdout: stdout ?? process.stdout,
+  });
+  const onSignal = (): void => {
+    void server.close();
+    if (stdin === undefined) process.stdin.destroy();
+  };
+  const install = installSignalHandlers !== false;
+  if (install) {
+    process.once("SIGINT", onSignal);
+    process.once("SIGTERM", onSignal);
+  }
+  try {
+    await server.run();
+    return 0;
+  } catch {
+    return 1;
+  } finally {
+    if (install) {
+      process.off("SIGINT", onSignal);
+      process.off("SIGTERM", onSignal);
+    }
+    restore();
+  }
 }

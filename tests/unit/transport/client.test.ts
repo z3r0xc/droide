@@ -104,7 +104,7 @@ test("one request, no retry: a 500 becomes FetchError with the status and body",
       assert.equal(error.message, "500 boom");
       assert.equal(error.statusCode, 500);
       assert.equal(error.operation, "list-sessions");
-      assert.equal(error.factoryBackend, true);
+      assert.equal(error.droideBackend, true);
       assert.equal(error.requestUrl, "https://api.example/api/sessions/v2");
       return true;
     },

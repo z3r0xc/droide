@@ -1,13 +1,13 @@
 # Daemon, client protocol and Remote Control
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft
 - **Owner:** daemon / transport
-- **Related:** `specs/00-context.md`, `specs/template.md`; session persistence and the session index are the storage spec; `droid exec` streaming is the exec spec; registration storage lives in `host.json` (storage spec covers `host.json` only as a file); tool ids: none.
+- **Related:** `specs/00-context.md`, `specs/template.md`; session persistence and the session index are the storage spec; `droide exec` streaming is the exec spec; registration storage lives in `host.json` (storage spec covers `host.json` only as a file); tool ids: none.
 
 ## Purpose
 
-`droid daemon` runs the long-lived local server that the desktop app, the
+`droide daemon` runs the long-lived local server that the desktop app, the
 web app, SDKs and other daemons talk to. This spec pins what a caller can see:
 how the daemon picks its transport and announces readiness, the JSON-RPC
 framing and handshake every client must perform, the lifecycle of the work a
@@ -17,7 +17,7 @@ reachable.
 
 ## Scope
 
-In scope: `droid daemon` flags and startup; TCP/Unix/parent-IPC transports;
+In scope: `droide daemon` flags and startup; TCP/Unix/parent-IPC transports;
 readiness signalling (stdout, `sd_notify`, parent IPC message); there is **no
 daemon discovery file** (see B4); the request/response envelope, version
 field, authentication gate, connection-status notification, compression and
@@ -37,11 +37,11 @@ Out of scope, covered elsewhere:
   their payload semantics.
 - The full list of ~200 `daemon.*` methods. Only methods that define the
   protocol lifecycle are enumerated; the method catalogue is generated from
-  `packages/droid-sdk-core/src/protocol/daemon/schemas/enums.ts` and is a
+  `packages/sdk-core/src/protocol/daemon/schemas/enums.ts` and is a
   mechanical surface.
 - Desktop/Electron-side daemon management (`apps/desktop/.../*` appears only
   in comments in the recovered source and is not shipped here).
-- `droid computer ssh` and `port-forward` tunnel mechanics beyond their
+- `droide computer ssh` and `port-forward` tunnel mechanics beyond their
   entry point and failure messages.
 
 Deliberately deferred: human-facing i18n strings for `commands:daemon.*` and
@@ -50,33 +50,33 @@ Bun behaviour for a pre-existing Unix socket path (Open question 3).
 
 ## Terms
 
-- **Daemon** — the process started by `droid daemon`; one per Factory home
+- **Daemon** — the process started by `droide daemon`; one per home directory
   and transport endpoint.
 - **Transport** — one of `websocket` (TCP or Unix socket; the `--listen`
   default), `ipc` (the parent/child Node IPC channel, `--listen ipc`), or the
-  in-process transport used by the TUI and `droid exec` (never a separate
+  in-process transport used by the TUI and `droide exec` (never a separate
   process).
 - **Parent IPC** — the Node `process.send`/`'message'` channel between a
   parent CLI/desktop process and a daemon it spawned.
 - **Child IPC** — the same channel attached to worker sessions the daemon
   spawns; always active, which is why `--enable-child-ipc` is a hidden no-op.
 - **Envelope** — one JSON object on the wire: `type` = `request` |
-  `response` | `notification`, plus `jsonrpc`, `factoryApiVersion`,
-  `factoryProtocolVersion` and, for requests, `id` and `method`.
-- **Protocol version** — `factoryProtocolVersion`, a `major.minor.patch`
-  string; v1.9.0 emits `1.321.0`. `factoryApiVersion` is a frozen legacy
-  field (`1.0.0`) and is never used for compatibility decisions.
+  `response` | `notification`, plus `jsonrpc`, `droideApiVersion`,
+  `droideProtocolVersion` and, for requests, `id` and `method`.
+- **Protocol version** — `droideProtocolVersion`, a `major.minor.patch`
+  string; the recorded release emits `1.321.0`. `droideApiVersion` is a frozen
+  legacy field (`1.0.0`) and is never used for compatibility decisions.
 - **Auth gate** — the state of a JSON-RPC connection before
   `daemon.authenticate` succeeds.
 - **Remote Control** — the feature that lets a client reach a daemon through
-  the Factory relay instead of a local socket; enabled with
+  the Droide relay instead of a local socket; enabled with
   `--remote-control` (alias `--remote-access`).
 - **Computer** — a backend record identifying a machine that can be reached
   for Remote Control; identifiers are the backend `computerId` and the local
   `hostId`.
 - **Computer identity** — the machine's X25519 key pair used to authenticate
   the end-to-end encrypted channel.
-- **Background process** (our term for the target's "background task") — a
+- **Background process** (our term for the reference build's "background task") — a
   fire-and-forget process a session started and the daemon still tracks.
 - **Long-running operation** (our term) — any request whose result is not
   immediate; carried by one request id, notifications, and one terminal
@@ -86,22 +86,22 @@ Bun behaviour for a pre-existing Unix socket path (Open question 3).
 
 ### Daemon command surface
 
-**B1 — `droid daemon --help` is fixed.** It prints exactly:
-`Usage: droid daemon [options]`, the description `Run the Factory daemon
+**B1 — `droide daemon --help` is fixed.** It prints exactly:
+`Usage: droide daemon [options]`, the description `Run the Droide daemon
 server`, and these options in order: `-p, --port <number>`, `--host <address>`
 (default `"127.0.0.1"`), `--unix <path>`, `-d, --debug` (default `false`),
 `--listen <transport>` (choices `"websocket"`, `"ipc"`, default
-`"websocket"`), `--droid-path <path>`, `--liveness-fd <fd>`,
+`"websocket"`), `--droide-path <path>`, `--liveness-fd <fd>`,
 `--parent-pid <pid>`, `--remote-control`, `--remote-access` (described as the
 alias, default `false`), `--settings <path>`, `-h, --help`.
 `--enable-child-ipc` exists but is hidden, so it does not appear.
 (`src/entrypoints/daemon/command.ts:20-83`; confirmed against a captured
-`droid daemon --help` golden during this investigation.)
+`droide daemon --help` golden during this investigation.)
 
 **B2 — `--settings` is inherited and exported.** If `--settings` is absent on
 `daemon` and the root command supplied `--settings`, the daemon uses the root
 value. A non-empty value sets the environment variable
-`FACTORY_RUNTIME_SETTINGS_PATH` for the daemon's own process before the run
+`DROIDE_RUNTIME_SETTINGS_PATH` for the daemon's own process before the run
 module loads, so runtime settings resolve from that file.
 (`src/entrypoints/daemon/command.ts:85-104`.)
 
@@ -120,7 +120,7 @@ advertises the bound port, not `0`.
 nor a pid file; the endpoint is whatever the supervisor passed and readiness
 is signalled out-of-band (B5). Consequently two daemons on the same endpoint
 are distinguished only by who holds the bind (B6/B7). No file under the
-Factory home is written by daemon startup itself.
+home directory is written by daemon startup itself.
 (`packages/daemon-core/src/server/web-socket-server.ts:487-512`;
 absence across `src/entrypoints/daemon/**` and
 `packages/daemon-core/src/server/**`.)
@@ -160,7 +160,7 @@ stderr, logs `CLI daemon startup failed`, and exits **1**. There is no lock
 file and no "already running" probe: exclusivity is the bind itself, so the
 second of two concurrent starts loses after the retry budget.
 (`packages/daemon-core/src/server/web-socket-server.ts:501-556`;
-`packages/droid-sdk-core/src/protocol/daemon/constants.ts:104-115`;
+`packages/sdk-core/src/protocol/daemon/constants.ts:104-115`;
 `src/entrypoints/daemon/run.ts:655-665`.)
 
 **B8 — Shutdown is graceful, bounded and closes at 0.** Signals
@@ -194,11 +194,11 @@ shuts down (exit 0) when the channel disconnects.
 `src/entrypoints/daemon/handler.ts:380-410`.)
 
 **B11 — `--listen ipc` preconditions.** Without `process.send` the daemon
-fails with `droid.daemon.ipc-unavailable` and message "`--listen ipc
+fails with `droide.daemon.ipc-unavailable` and message "`--listen ipc
 requires the daemon to be spawned with an inherited IPC channel`". If the
-channel is already disconnected it fails with `droid.daemon.ipc-disconnected`.
+channel is already disconnected it fails with `droide.daemon.ipc-disconnected`.
 Combining it with `--remote-control` fails with
-`droid.daemon.ipc-remote-access`: "`--listen ipc cannot be combined with
+`droide.daemon.ipc-remote-access`: "`--listen ipc cannot be combined with
 --remote-control`". All three exit 1 via `Startup failed: <message>`.
 (`src/entrypoints/daemon/handler.ts:380-400,290-296`.)
 
@@ -213,13 +213,13 @@ envelope `{type:"client_frame", clientId, frameType:"text"|"binary", data}`;
 binary data is base64. The daemon's IPC/WS send path serialises the same
 envelope object it dispatches, so a response and its request share the
 envelope shape.
-(`packages/droid-sdk-core/src/protocol/daemon/constants.ts:87-88,95`;
-`packages/droid-sdk-core/src/transport-protocol/payload-codec.ts:11-30`;
+(`packages/sdk-core/src/protocol/daemon/constants.ts:87-88,95`;
+`packages/sdk-core/src/transport-protocol/payload-codec.ts:11-30`;
 `packages/daemon-core/src/server/ipc/ipc-server-transport.ts:16-38`;
 `packages/common/src/relay/schemas.ts:50-59`.)
 
 **B13 — Envelope fields.** Every envelope carries
-`jsonrpc:"2.0"`, `factoryApiVersion:"1.0.0"` and `factoryProtocolVersion`
+`jsonrpc:"2.0"`, `droideApiVersion:"1.0.0"` and `droideProtocolVersion`
 (the current version string; optional when reading). A request has
 `type:"request"`, `id` (client-generated UUID v4 string), `method` and
 optional `params` (omitted entirely when absent). A success response has
@@ -227,15 +227,15 @@ optional `params` (omitted entirely when absent). A success response has
 `{code, message, data?}` and no `result`. A notification has `type:
 "notification"`, `method`, optional `params`. `_meta` may carry W3C
 `traceparent`/`tracestate` and `requestAttribution`.
-(`packages/droid-sdk-core/src/protocol/shared/schemas.ts:290-410`;
+(`packages/sdk-core/src/protocol/shared/schemas.ts:290-410`;
 `packages/daemon-sdk/src/RequestEngine.ts:229-258`.)
 
 **B14 — Version handling is advisory, not a gate.** The daemon compares the
-inbound `factoryProtocolVersion` by exact string equality with its own. A
+inbound `droideProtocolVersion` by exact string equality with its own. A
 missing field is not a mismatch. A mismatch never rejects an otherwise valid
 `daemon.authenticate`; it is attached as
-`error.data.protocolVersionMismatch = {localFactoryProtocolVersion,
-peerFactoryProtocolVersion, messageType?, method?, requestId?}` to failures
+`error.data.protocolVersionMismatch = {localProtocolVersion,
+peerProtocolVersion, messageType?, method?, requestId?}` to failures
 only: a parse error, an unsupported authentication method (answered
 `METHOD_NOT_FOUND`), and an unknown method after authentication. Clients use
 the same comparison to ignore a notification they cannot parse instead of
@@ -255,7 +255,7 @@ either `token` (WorkOS JWT) or `apiKey` (`fk-*`); grants
 (`actAsGrant`, `sharedSessionGrant`) and `activeOrganizationId` have their own
 preconditions, enforced by schema refinements that fail as `PARSE_ERROR`.
 (`packages/daemon-core/src/server/daemon-connection-handler.ts:560-725`;
-`packages/droid-sdk-core/src/protocol/daemon/schemas/connection.ts:45-135`.)
+`packages/sdk-core/src/protocol/daemon/schemas/connection.ts:45-135`.)
 
 **B16 — Authenticate result and post-auth sequence.** Success returns
 `{result:{userId, orgId, encoding?, pipelined?}}`; `encoding:"deflate-raw"`
@@ -273,7 +273,7 @@ as an ordinary response with its own id; any other pipelined method is
 answered `INVALID_REQUEST` with "`Method is not allowed in the authentication
 pipeline`", and `pipelined:true` is set in the result.
 (`packages/daemon-core/src/server/daemon-connection-handler.ts:640-680,960-1040,1208-1265`;
-`packages/droid-sdk-core/src/protocol/daemon/constants.ts:84-102`.)
+`packages/sdk-core/src/protocol/daemon/constants.ts:84-102`.)
 
 **B17 — Re-authenticate and logout.** On an authenticated connection,
 `daemon.authenticate` does not re-verify the credential: the daemon replies
@@ -328,7 +328,7 @@ client-side abort of a request is local only — it removes the pending entry
 and does not cancel daemon work unless the method has its own cancel RPC.
 `daemon.interrupt_session` responses report drained request ids on protocol
 ≥ 1.292.0 (`STOP_DRAIN_PROTOCOL_VERSION`).
-(`packages/droid-sdk-core/src/protocol/daemon/schemas/enums.ts:69-82`;
+(`packages/sdk-core/src/protocol/daemon/schemas/enums.ts:69-82`;
 `packages/daemon-sdk/src/constants.ts:38-46`.)
 
 **B22 — Background-process lifecycle.** A session may start
@@ -342,9 +342,9 @@ clock. A load/initialize result carries the same snapshot as
 session has no worker or nothing matched, and the daemon forwards the kill to
 the worker otherwise. `outputFile` and `pid` refer to the session host, not
 the client.
-(`packages/droid-sdk-core/src/protocol/droid/schemas/cli.ts:536-566`;
-`packages/droid-sdk-core/src/protocol/droid/schemas/client.ts:1354-1360,688-692`;
-`packages/daemon-core/src/server/handlers/droid-request-handler.ts:18688-18704`.)
+(`packages/sdk-core/src/protocol/droid/schemas/cli.ts:536-566`;
+`packages/sdk-core/src/protocol/droid/schemas/client.ts:1354-1360,688-692`;
+`packages/daemon-core/src/server/handlers/request-handler.ts:18688-18704`.)
 
 **B23 — Session retention.** A Local or Computer daemon reaps an idle session
 after 30 minutes (`OVERRIDE_DROID_SESSION_TIMEOUT_MS` overrides; an Ephemeral
@@ -369,7 +369,7 @@ the original request id.
 
 ### Remote Control and computers
 
-**B25 — What `droid computer` exposes.** `droid computer register [name]`
+**B25 — What `droide computer` exposes.** `droide computer register [name]`
 (`-y/--yes`), `remove` (`-y`), `list`, `ssh <name> [command...]` (with
 `--debug`, `--proxy`, `--port`, default `22`), `port-forward <name>
 <mappings...>` (with `--address`, default `127.0.0.1`, `--debug`), and the
@@ -379,7 +379,7 @@ load auth and block on feature flags before acting.
 
 **B26 — What registration writes.** `register` creates a BYOM computer in the
 backend (`CreateComputer` with `{name, provider:"byom", hostId, remoteUser}`),
-then saves `computerRegistration` into `host.json` under the Factory dir as
+then saves `computerRegistration` into `host.json` under the state dir as
 `{computerId, firestoreOrgId, userId, registeredAt}` alongside the stable
 `hostId`, `schemaVersion:1`, optional `provisioningId`, and `createdAt`. The
 legacy `computer.json` is written too. A registration is only honoured for
@@ -389,7 +389,7 @@ poll, stale after 5 s).
 (`src/api/computer.ts:88-115`;
 `packages/runtime/host/src/HostConfigStore.ts:13-95`;
 `packages/runtime/host/src/HostIdentityService.ts:85-170,180-250`;
-`packages/droid-sdk-core/src/protocol/host/schemas.ts:5-26`.)
+`packages/sdk-core/src/protocol/host/schemas.ts:5-26`.)
 
 **B27 — Reconciliation before use.** A stored registration is checked against
 the backend `computerId`: missing on backend → local registration cleared
@@ -420,7 +420,7 @@ publishes its computer identity to the backend (`UpdateComputer` with
 `{computerIdentity:{publicKey(base64), keyId, algorithm:"X25519"}}`),
 retrying transient failures until the startup signal aborts; a failed
 publish leaves any existing relay connection intact. It then opens a WebSocket
-to `relayAgentUrl`, offering subprotocols `factory-relay.<N>` descending from
+to `relayAgentUrl`, offering subprotocols `droide-relay.<N>` descending from
 the current version and retrying without a subprotocol only on a
 subprotocol-mismatch close, and sends `{method:"relay.authenticate", token? |
 apiKey?, activeOrganizationId?, connectionEpoch?}` as the **first** message.
@@ -432,10 +432,10 @@ close before it fails startup. The daemon reports
 (`packages/daemon-core/src/server/daemon-server.ts:662-780`;
 `packages/daemon-core/src/relay/WebSocketRelayTransport.ts:300-400`;
 `packages/common/src/relay/constants.ts:63-100`;
-`packages/droid-sdk-core/src/protocol/daemon/schemas/relay-auth.ts:14-72`.)
+`packages/sdk-core/src/protocol/daemon/schemas/relay-auth.ts:14-72`.)
 
 **B30 — Computer identity at rest.** The X25519 identity is
-`<Factory dir>/computer-identity/identity.json`:
+`<stateDir>/computer-identity/identity.json`:
 `{schemaVersion:1, publicKey, privateKey, keyId, algorithm:"X25519"}`, both
 keys canonical base64 of 32 bytes, `keyId` 32 lowercase hex characters. The
 private key is never logged or returned by an API; the whole directory is the
@@ -468,7 +468,7 @@ daemon: relay with air-gap enabled is refused
 ("`Remote Control is unavailable in air-gapped mode.`"); `relayCapable`, a
 relay config, a non-local `machineType`, or a non-loopback `host` are refused
 with "`Customer deployments support local daemons only.`"; a relay URL must
-match the customer origin; `droid daemon --remote-control` on a customer
+match the customer origin; `droide daemon --remote-control` on a customer
 deployment is refused unless the machine is a provisioned Computer (provider
 must be OpenCompute). A provisioned registration is never cleared locally and
 a missing host binding says "Reprovision it.".
@@ -481,7 +481,7 @@ a missing host binding says "Reprovision it.".
 probe) and proxies `/port-proxy/<port><path>` to `localhost:<port>` on the
 daemon machine for ports 1024-65535. A proxy request needs the per-process
 32-byte base64url token (`daemon.get_proxy_token`), supplied as the
-`factorydToken` query parameter or the `factoryd_proxy` cookie; otherwise
+`daemonToken` query parameter or the `daemon_proxy` cookie; otherwise
 `401 Unauthorized`. A query token is exchanged for an `HttpOnly;
 SameSite=Strict` cookie scoped to `/port-proxy/<port>` by a 302 that strips
 it from the URL. Paths are normalised and rejected when they escape the
@@ -490,7 +490,7 @@ prefix. Anything else answers `404 Not Found`.
 `packages/daemon-core/src/server/auth/proxy-token.ts:1-24`.)
 
 **B34 — CLI behaviour when the daemon is unavailable.** The interactive TUI
-and `droid exec` do not need the background daemon: they construct the same
+and `droide exec` do not need the background daemon: they construct the same
 request core in-process and talk to it through the in-process transport, so an
 absent daemon changes nothing there. Remote commands surface classified
 failures: `DaemonUnreachable`/`DaemonTimeout` render the app message
@@ -499,7 +499,7 @@ try again in a moment."), a computer without `relayClientUrl` renders
 `commands:ssh.computerNotReady`, and other connection failures map to their
 reason's fixed text (e.g. `Protocol version mismatch. Please update your
 client.`, `Another daemon is already connected to this computer...`,
-`Computer is offline or hibernating.`). `droid doctor` only checks that a
+`Computer is offline or hibernating.`). `droide doctor` only checks that a
 localhost TCP listen+connect+echo works (`daemon.loopback`), not that a daemon
 runs.
 (`src/services/daemon/createSameProcessDaemonClient.ts:1-20`;
@@ -519,23 +519,23 @@ runs.
 | `--unix <path>` | path | none | Unix socket; wins over `--port`. |
 | `-d, --debug` | boolean | `false` | Verbose daemon debug log. |
 | `--listen <transport>` | `websocket` \| `ipc` | `websocket` | `ipc` = IPC-only, no socket. |
-| `--droid-path <path>` | path | none | Droid executable for spawned sessions; resolved from PATH otherwise. |
+| `--droide-path <path>` | path | none | Droide executable for spawned sessions; resolved from PATH otherwise. |
 | `--liveness-fd <fd>` | integer | none | Inherited pipe; parent-death shutdown. |
 | `--parent-pid <pid>` | integer | none | Polled parent; parent-death shutdown. |
 | `--remote-control` | boolean | `false` | Enables Remote Control (implies `remoteAccess`). |
 | `--remote-access` | boolean | `false` | Alias for `--remote-control`. |
-| `--settings <path>` | path | root `--settings` | Exported as `FACTORY_RUNTIME_SETTINGS_PATH`. |
+| `--settings <path>` | path | root `--settings` | Exported as `DROIDE_RUNTIME_SETTINGS_PATH`. |
 | `--enable-child-ipc` | (hidden) | — | No-op; child IPC is always on. |
 
 ### Environment
 
 | Variable | Where | Meaning |
 |---|---|---|
-| `FACTORY_RUNTIME_SETTINGS_PATH` | set by `--settings` | Runtime settings overlay for the daemon process only. |
+| `DROIDE_RUNTIME_SETTINGS_PATH` | set by `--settings` | Runtime settings overlay for the daemon process only. |
 | `NOTIFY_SOCKET`, `WATCHDOG_*`, `LISTEN_*`, `INVOCATION_ID` | read at boot, then stripped from `process.env` | systemd notification; stripped so children cannot signal systemd. |
 | `OVERRIDE_DROID_SESSION_TIMEOUT_MS` | daemon config | Positive integer; replaces the 30-minute inactivity timeout. |
-| `FACTORY_DAEMON_HEARTBEAT_INTERVAL_MS` | daemon config | Positive integer; heartbeat interval override. |
-| `FACTORY_DAEMON_CGROUP_ISOLATION`, `FACTORY_DAEMON_CGROUP_RESERVE_BYTES`, `FACTORY_DAEMON_CGROUP_STATUS`, `FACTORY_DAEMON_CGROUP_REASON` | Computer only | Managed cgroup admission and report. |
+| `DROIDE_DAEMON_HEARTBEAT_INTERVAL_MS` | daemon config | Positive integer; heartbeat interval override. |
+| `DROIDE_DAEMON_CGROUP_ISOLATION`, `DROIDE_DAEMON_CGROUP_RESERVE_BYTES`, `DROIDE_DAEMON_CGROUP_STATUS`, `DROIDE_DAEMON_CGROUP_REASON` | Computer only | Managed cgroup admission and report. |
 | `SHELL_ENV_FROM_PARENT_ENV_VAR` marker | daemon | `1` means the parent already loaded the login shell environment. |
 
 (`src/entrypoints/daemon/run.ts:30-42`;
@@ -547,8 +547,8 @@ runs.
 | Constant | Value | Source |
 |---|---|---|
 | `JSONRPC_VERSION` | `2.0` | `protocol/shared/constants.ts:7` |
-| `LEGACY_FACTORY_API_VERSION` | `1.0.0` (frozen) | `protocol/shared/constants.ts:5` |
-| `FACTORY_PROTOCOL_VERSION` | `1.321.0` | `protocol/droid/schemas/constants.ts:6` |
+| `LEGACY_DROIDE_API_VERSION` | `1.0.0` (frozen) | `protocol/shared/constants.ts:5` |
+| `DROIDE_PROTOCOL_VERSION` | `1.321.0` | `protocol/droid/schemas/constants.ts:6` |
 | `COMPRESSED_PAYLOAD_TAG` | `0x01` | `protocol/daemon/constants.ts:95` |
 | `DEFLATE_RAW_ENCODING` | `deflate-raw` | `protocol/daemon/constants.ts:88` |
 | `CLIENT_FRAME_TARGET_BYTES` | 8 MiB | `daemon-core/.../constants/constants.ts:13` |
@@ -569,17 +569,17 @@ runs.
 `-32602` INVALID_PARAMS, `-32603` INTERNAL_ERROR, `-32001`
 AUTHENTICATION_ERROR, `-32004` ENTITY_NOT_FOUND, `-32005`
 SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
-(`packages/droid-sdk-core/src/protocol/shared/enums.ts:63-83`.)
+(`packages/sdk-core/src/protocol/shared/enums.ts:63-83`.)
 
 ### Persisted files
 
 | Path | Shape | Written by |
 |---|---|---|
-| `<Factory home>/<Factory dir>/host.json` | `HostConfig` (`schemaVersion:1`, `hostId`, `createdAt`, optional `provisioningId`, optional `computerRegistration`) | host identity service |
+| `<home>/<stateDir>/host.json` | `HostConfig` (`schemaVersion:1`, `hostId`, `createdAt`, optional `provisioningId`, optional `computerRegistration`) | host identity service |
 | `<...>/computer.json` | `LegacyComputerConfig` (`computerId`, optional `hostId`/`provisioningId`, `registeredAt`) | host identity service |
 | `<...>/computer-identity/identity.json` | `PersistedComputerIdentity` | host identity service |
 | `<...>/pending-askuser-requests.json` | `{version:1, requests:[...]}` | daemon shutdown / failed start |
-| `<...>/logs/factoryd.log` | daemon log | logging |
+| `<...>/logs/daemon.log` | daemon log | logging |
 
 ## Errors
 
@@ -591,7 +591,7 @@ SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
 | `--unix` path exists and cannot be bound | Same as above with the bind message | Socket file left as found. Recovery is removing the file (Open question 3). |
 | `--listen ipc` without an inherited channel | `Startup failed: --listen ipc requires the daemon to be spawned with an inherited IPC channel`; exit 1 | No transport opened. |
 | `--listen ipc` + `--remote-control` | `Startup failed: --listen ipc cannot be combined with --remote-control`; exit 1 | Nothing opened. |
-| Parent channel already gone (`ipc`) | code `droid.daemon.ipc-disconnected`; exit 1 | Nothing opened. |
+| Parent channel already gone (`ipc`) | code `droide.daemon.ipc-disconnected`; exit 1 | Nothing opened. |
 | Customer-prem + relay/air-gap/non-local | `MetaError` message (B32); exit 1 | Nothing opened. |
 | Remote control without registration, non-TTY | `commands:daemon.remoteAccessRegistrationRequired`; exit 1 | No registration written. |
 | Relay URL missing | `commands:daemon.remoteAccessRelayUrlRequired`; exit 1 | Registration already saved (B28). |
@@ -626,7 +626,7 @@ SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
 | Secure handshake rejected (pin mismatch) | `SecureIdentityRejected`; transport refreshes the pin once, then fails |
 | Tampered secure record | close 4017 locally / `Unauthorized` to older relays; `SecureProtocolViolation` |
 
-(`packages/droid-sdk-core/src/protocol/daemon/schemas/relay-auth.ts:29-80`;
+(`packages/sdk-core/src/protocol/daemon/schemas/relay-auth.ts:29-80`;
 `packages/daemon-sdk/src/session/connection-failure.ts:330-380`.)
 
 ## Acceptance tests
@@ -634,9 +634,9 @@ SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
 | Clause | Test id | Fixture |
 |---|---|---|
 | B1, B11 (surface) | `tests/daemon/test_help_daemon` | recorded stdout golden; `$COLUMNS` fixed at 80 |
-| B2 | `tests/daemon/test_settings_flag_forwarding` | temp `HOME`; root `--settings <tmp>`; assert `FACTORY_RUNTIME_SETTINGS_PATH` in the child env |
+| B2 | `tests/daemon/test_settings_flag_forwarding` | temp `HOME`; root `--settings <tmp>`; assert `DROIDE_RUNTIME_SETTINGS_PATH` in the child env |
 | B3 | `tests/daemon/test_transport_selection` | config table: `{listen,unix,port}` → expected constructor config (ipc-only / unix / tcp / none) |
-| B4 | `tests/daemon/test_no_discovery_file` | temp `HOME`; start daemon with `--port 0`; assert the Factory dir gains no port/pid file |
+| B4 | `tests/daemon/test_no_discovery_file` | temp `HOME`; start daemon with `--port 0`; assert the state dir gains no port/pid file |
 | B5 | `tests/daemon/test_readiness_signals` | fake parent IPC sink + `NOTIFY_SOCKET` temp socket; assert ready message keys and `READY=1` before the banner |
 | B6, B7 | `tests/daemon/test_single_instance_two_starts` | two daemons, same fixed loopback port, in-process harness; second exits 1 with `Startup failed:`; first still answers `/health` |
 | B7 | `tests/daemon/test_stale_port_retry` | injected `serve` that throws `EADDRINUSE` 5× then succeeds with fake timers; assert delays `[500,1000,2000,4000,8000]`, success logged on attempt 5; 6 failures rethrow |
@@ -666,7 +666,7 @@ SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
 | B34 | `tests/cli/test_daemon_unavailable_messages` | classified errors → exact fallback strings |
 
 Fixtures are synthesised JSON envelopes and in-memory fakes; no fixture is
-copied from the original binary. Tests that bind use loopback only and a
+copied from the reference build. Tests that bind use loopback only and a
 fixed free port; timer tests use fake timers.
 
 ## Evidence
@@ -682,7 +682,7 @@ fixed free port; timer tests use fake timers.
 | `ev_protocol_envelope_1` | B13, B14 | `protocol/shared/schemas.ts:290-410`; `default-helpers.ts:413-434`; `envelope-helpers.ts:160-245` |
 | `ev_protocol_auth_1` | B15, B16, B17, B18 | `daemon-connection-handler.ts:522-1040,1208-1265`; `request-dispatcher.ts:140-395` |
 | `ev_protocol_client_1` | B19, B20, B21 | `RequestEngine.ts:182-215,466-560,863-980`; `DaemonClient.ts:365-395,543-612`; `pending-daemon-request-store.ts:263-330` |
-| `ev_protocol_background_1` | B22 | `protocol/droid/schemas/cli.ts:536-566`; `schemas/client.ts:688-692,1354-1360`; `droid-request-handler.ts:18688-18704` |
+| `ev_protocol_background_1` | B22 | `protocol/droid/schemas/cli.ts:536-566`; `schemas/client.ts:688-692,1354-1360`; `request-handler.ts:18688-18704` |
 | `ev_daemon_retention_1` | B23, B24 | `droid-registry.ts:116,252-267,1975-2100`; `pendingElicitationPersistence.ts:22-40` |
 | `ev_remote_cli_1` | B25, B26, B27 | `computer/command.ts:12-105`; `computer/run.ts:145-300`; `registration.ts:27-125`; `HostConfigStore.ts:13-95` |
 | `ev_remote_daemon_1` | B28, B29 | `remoteAccess.ts:78-371`; `daemon-server.ts:662-780`; `WebSocketRelayTransport.ts:300-400` |
@@ -702,7 +702,7 @@ fixed free port; timer tests use fake timers.
    pinned.
 2. **`--unix` on Windows.** The daemon has no platform gate before
    `Bun.serve({unix})`; whether a Windows build binds a named pipe or fails is
-   unobserved. Settled by running `droid daemon --unix <tmp>` on Windows with
+   unobserved. Settled by running `droide daemon --unix <tmp>` on Windows with
    a temp `HOME` (not permitted under the current rules). Blocks the Windows
    half of B3/B7.
 3. **Stale Unix socket path.** The daemon never unlinks the path before bind
@@ -721,7 +721,7 @@ fixed free port; timer tests use fake timers.
    B34 quotes the string as reachable only through that table.
 6. **`directChannel` (encrypted direct WebSocket).** `DaemonConfig` supports
    it (`web-socket-server.ts:666-698`) but the CLI never sets it. Whether a
-   non-CLI host (desktop-managed `factoryd`) uses it is unknown. If it does,
+   non-CLI host (desktop-managed `droide-daemon`) uses it is unknown. If it does,
    B31's "local WebSocket is plaintext" must be narrowed. Does not block the
    current contract.
 7. **`--host` beyond loopback.** The CLI accepts any `--host`, but nothing
@@ -732,9 +732,9 @@ fixed free port; timer tests use fake timers.
 
 ## Clean-room notes
 
-A reimplementation must reproduce:
+A conforming build must reproduce:
 
-- The exact `droid daemon` flag set, defaults and help text (B1), including
+- The exact `droide daemon` flag set, defaults and help text (B1), including
   the hidden `--enable-child-ipc` no-op and the `--remote-access` alias.
 - Transport precedence and the absence of a discovery file: endpoint comes
   from the supervisor; readiness is stdout + optional `sd_notify` + optional
@@ -742,8 +742,8 @@ A reimplementation must reproduce:
 - The bind-as-mutex model with the 500 ms doubling retry (5 retries) and the
   `Startup failed: …`/exit-1 outcome; a graceful, ordered, 10 s-bounded
   shutdown that exits 0.
-- The JSON-RPC envelope byte shape: `type`/`jsonrpc`/`factoryApiVersion`/
-  `factoryProtocolVersion`, UUID request ids, `result`-or-`error` responses,
+- The JSON-RPC envelope byte shape: `type`/`jsonrpc`/`droideApiVersion`/
+  `droideProtocolVersion`, UUID request ids, `result`-or-`error` responses,
   optional `params`, optional `_meta`.
 - Advisory (non-blocking) protocol-version comparison with the mismatch
   record attached only to failures; `-32001` auth gate with the exact message;
@@ -761,7 +761,7 @@ A reimplementation must reproduce:
 - Remote Control registration in `host.json` (+ legacy `computer.json`),
   reconciliation statuses, the BYOM registration flow and its refusals, the
   relay `relay.authenticate` first-message handshake with the
-  `factory-relay.N` subprotocol, the X25519 identity file and its publication,
+  `droide-relay.N` subprotocol, the X25519 identity file and its publication,
   and the identity-mismatch `reason` values.
 - `/health` and the token-gated `/port-proxy/<port>` surface.
 - CLI failure text for unreachable daemons and the in-process fallback.

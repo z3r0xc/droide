@@ -3,14 +3,14 @@
  * runtime overlay's two sources.
  *
  * Contract: `specs/10-cli-surface.md` B77-B79 (the overlay is
- * `options.settings ?? FACTORY_RUNTIME_SETTINGS_PATH`, and a path that cannot
+ * `options.settings ?? DROIDE_RUNTIME_SETTINGS_PATH`, and a path that cannot
  * be read is dropped rather than fatal) and "Settings files" (org → runtime →
  * project/folder → user → dynamic config → builtin defaults). This slice
  * implements the four levels the rest of the CLI observes directly:
  *
  *   org policy  >  runtime overlay  >  project/folder  >  user
  *
- * The full hierarchy has seven further levels (automation folder, `.factory`
+ * The full hierarchy has seven further levels (automation folder, `.droide`
  * folders, project `.agent`, plugins, dynamic config, builtin defaults); they
  * are owned by the extension, plugin and daemon slices and are merged by their
  * callers into {@link ResolveSettingsOptions.orgSettings} or by extending this
@@ -127,11 +127,11 @@ export function resolveSettingsPath(
   return trimmed === "" ? undefined : resolvePath(environment, trimmed);
 }
 
-/** `FACTORY_RUNTIME_SETTINGS_PATH` as the contract reads it: trimmed, or none. */
+/** `DROIDE_RUNTIME_SETTINGS_PATH` as the contract reads it: trimmed, or none. */
 export function runtimeSettingsPathFromEnvironment(
   environment: Environment,
 ): string | undefined {
-  const value = environment.env.FACTORY_RUNTIME_SETTINGS_PATH;
+  const value = environment.env.DROIDE_RUNTIME_SETTINGS_PATH;
   return value === undefined
     ? undefined
     : resolveSettingsPath(environment, value);

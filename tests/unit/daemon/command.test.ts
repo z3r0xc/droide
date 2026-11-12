@@ -119,16 +119,16 @@ test("the daemon log path lives under the state dir", () => {
   const environment = environmentOf();
   assert.equal(
     daemonLogsPath(environment),
-    join(environment.home, ".factory", "logs", "the daemon.log"),
+    join(environment.home, ".droide", "logs", "daemon.log"),
   );
   assert.equal(
     daemonLogsPath(
       environmentOf({
-        FACTORY_HOME_OVERRIDE: environment.home,
-        FACTORY_ENV: "development",
+        DROIDE_HOME_OVERRIDE: environment.home,
+        DROIDE_ENV: "development",
       }),
     ),
-    join(environment.home, ".factory-dev", "logs", "the daemon.log"),
+    join(environment.home, ".droide-dev", "logs", "daemon.log"),
   );
 });
 
@@ -136,9 +136,9 @@ test("--settings is exported for the daemon process only when non-empty", () => 
   const env: Record<string, string | undefined> = {};
   exportSettingsEnvironment(undefined, env);
   exportSettingsEnvironment("", env);
-  assert.equal(env["FACTORY_RUNTIME_SETTINGS_PATH"], undefined);
+  assert.equal(env["DROIDE_RUNTIME_SETTINGS_PATH"], undefined);
   exportSettingsEnvironment("/tmp/settings.json", env);
-  assert.equal(env["FACTORY_RUNTIME_SETTINGS_PATH"], "/tmp/settings.json");
+  assert.equal(env["DROIDE_RUNTIME_SETTINGS_PATH"], "/tmp/settings.json");
 });
 
 test("flags map onto the server configuration with unix winning over port", () => {

@@ -91,7 +91,7 @@ export async function createSessionTooling(
         : configuredBinary,
   });
   const sources = mcpConfigFileSources(
-    options.context.paths.factoryDir,
+    options.context.paths.stateDir,
     options.context.environment.cwd,
   );
   const configuration = loadMcpConfiguration(sources);

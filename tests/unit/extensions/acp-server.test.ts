@@ -5,6 +5,7 @@
  */
 
 import assert from "node:assert/strict";
+import { PassThrough } from "node:stream";
 import { test } from "node:test";
 
 import type {
@@ -18,6 +19,9 @@ import { agentMessageChunk } from "../../../src/acp/protocol.ts";
 import type { AcpSessionStore } from "../../../src/acp/server.ts";
 import {
   createAcpConfirm,
+  redirectConsoleOutput,
+  runAcpDaemon,
+  type AcpConsole,
   type AcpPermissionResponse,
   type AcpTurnRunner,
 } from "../../../src/exec/acp-runner.ts";
@@ -26,6 +30,7 @@ import type { SessionStore } from "../../../src/session/store.ts";
 import { isRecord } from "../../../src/transport/schema.ts";
 import {
   AcpHarness,
+  FakeSessionStore,
   SESSION_ID,
   cancelledOutcome,
   completed,
@@ -78,10 +83,6 @@ function updateOf(frame: AcpInboundMessage): AcpSessionUpdate {
   const update = params["update"];
   assert.ok(isSessionUpdate(update), "expected a session update");
   return update;
-}
-
-function updateName(update: AcpSessionUpdate): string {
-  return update.sessionUpdate;
 }
 
 async function collectUntilResponse(
@@ -293,13 +294,16 @@ test("prompt: one turn streams ordered updates before its response (B65, B68)", 
   });
   const { updates, response } = await collectUntilResponse(harness, 7);
 
-  assert.deepEqual(updates.map(updateName), [
-    "agent_thought_chunk",
-    "agent_thought_chunk",
-    "agent_message_chunk",
-    "tool_call",
-    "tool_call_update",
-  ]);
+  assert.deepEqual(
+    updates.map((update) => update.sessionUpdate),
+    [
+      "agent_thought_chunk",
+      "agent_thought_chunk",
+      "agent_message_chunk",
+      "tool_call",
+      "tool_call_update",
+    ],
+  );
   assert.deepEqual(updates[0], {
     sessionUpdate: "agent_thought_chunk",
     content: { type: "text", text: "weighing options" },
@@ -840,4 +844,55 @@ test("permissions: createAcpConfirm maps a selected allow kind to approval (B69)
     ask: async () => ({ outcome: "cancelled" }),
   });
   assert.equal(await deny({ toolId: "Execute", toolClass: "execute" }), false);
+});
+
+test("entry: runAcpDaemon owns stdout, returns 0 at EOF and restores console (B60)", async () => {
+  const input = new PassThrough();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  let output = "";
+  stdout.on("data", (chunk: Buffer) => {
+    output += chunk.toString("utf8");
+  });
+  const running = runAcpDaemon({
+    stdin: input,
+    stdout,
+    stderr,
+    installSignalHandlers: false,
+    authenticated: true,
+    store: new FakeSessionStore(),
+    clock: () => 0,
+    turnRunner: scriptedRunner(async () => completed()),
+  });
+  input.end(`${JSON.stringify(INITIALIZE)}\n`);
+  assert.equal(await running, 0);
+  stdout.end();
+  stderr.end();
+  const lines = output.trim().split("\n");
+  assert.equal(lines.length, 1);
+  const frame = JSON.parse(lines[0] ?? "") as AcpInboundMessage;
+  const result = resultOf(frame);
+  assert.equal(result["protocolVersion"], 1);
+  assert.deepEqual(result["agentInfo"], {
+    name: "droide",
+    title: "Factory Droid",
+    version: "0.4.0",
+  });
+  assert.ok(isRecord(result["agentCapabilities"]));
+});
+
+test("console: redirectConsoleOutput sends every level to its sink and restores", () => {
+  const writes: string[] = [];
+  const fake: AcpConsole = {
+    log: () => {},
+    info: () => {},
+    warn: () => {},
+    debug: () => {},
+  };
+  const restore = redirectConsoleOutput((text) => writes.push(text), fake);
+  fake.log("hello", { a: 1 }, 2);
+  fake.warn("careful");
+  restore();
+  fake.debug("after restore");
+  assert.deepEqual(writes, ['hello {"a":1} 2\n', "careful\n"]);
 });

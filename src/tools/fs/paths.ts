@@ -16,7 +16,7 @@ import * as nodePath from "node:path";
 
 import {
   expandTilde,
-  factoryDir,
+  stateDir,
   isAbsolutePath,
   joinPath,
 } from "../../config/paths.ts";
@@ -197,7 +197,7 @@ export function assertWritablePath(
   given: string,
   resolved: string,
 ): void {
-  const factory = factoryDir(context.environment);
+  const factory = stateDir(context.environment);
   for (const candidate of [given, resolved]) {
     const absolute = isAbsolutePath(context.environment.platform, candidate)
       ? nodePath.normalize(candidate)
@@ -216,7 +216,7 @@ export function isCredentialFile(
   resolved: string,
   environment: Environment,
 ): boolean {
-  const factory = factoryDir(environment);
+  const factory = stateDir(environment);
   return (
     protectedName(factory, resolved, CREDENTIAL_FILES, []) ||
     protectedName(factory, resolved, {}, CREDENTIAL_PREFIXES)

@@ -6,23 +6,23 @@
 
 ## Context
 
-The subject's interactive surface is a React component tree rendered to a
-terminal (`src/components/**`, 340 files, plus `src/repl/**`), and
+The reference build's interactive surface is a React component tree rendered to
+a terminal (`src/components/**`, 340 files, plus `src/repl/**`), and
 `specs/95-terminal-ui.md` pins its appearance as data: a palette table, a glyph
 set, spacing constants, row budgets, key bindings and the capability matrix for
 16-colour and `TERM=dumb` terminals.
 
-Reimplementing a terminal layout engine by hand would put the *design contract*
-behind hand-written cursor arithmetic, and every spacing rule would be a place
-to drift.
+Writing a terminal layout engine by hand would put the *design contract* behind
+hand-written cursor arithmetic, and every spacing rule would be a place to
+drift.
 
 ## Decision
 
 1. **React + Ink** for the interactive UI. Ink is the same rendering model the
-   subject uses (flexbox-ish layout, components, hooks), so a spec clause about
-   "a 6-column transcript inset" maps to one style property instead of custom
-   escape-sequence code. Both are MIT-licensed third-party libraries, not
-   subject code.
+   reference build uses (flexbox-ish layout, components, hooks), so a spec clause
+   about "a 6-column transcript inset" maps to one style property instead of
+   custom escape-sequence code. Both are MIT-licensed third-party libraries, not
+   recovered code.
 2. **The spec owns the pixels.** `src/ui/tokens.ts` transcribes the palette,
    glyphs and spacing from `specs/95-terminal-ui.md` as typed constants; no
    component may hard-code a colour or glyph. A unit test asserts the token
@@ -50,7 +50,7 @@ to drift.
 - **Hand-written ANSI renderer**: full control, but every layout rule becomes
   bespoke code and the 1:1 design requirement becomes untestable.
 - **Blessed/neo-blessed**: mature, but its widget model does not match the
-  subject's component structure, so the spec's renderer-by-renderer clauses
-  would need translation.
+  reference build's component structure, so the spec's renderer-by-renderer
+  clauses would need translation.
 - **No interactive UI (exec-only)**: would leave the primary product surface
   unimplemented; rejected by the owner's requirement.

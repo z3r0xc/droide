@@ -18,9 +18,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI runs all of it except the parity suites that need goldens (those are recorded
-from the subject locally and never committed — see
-`docs/adr/0004-parity-harness-with-optional-oracle.md`).
+CI runs all of it except the parity suites that need recorded goldens (those are
+recorded locally and never committed — see
+`docs/adr/0010-own-brand-and-snapshot-harness.md`).
 
 ## Spec first
 
@@ -37,7 +37,7 @@ between the specification and the build is visible.
 
 ## Provenance
 
-Recovered subject code, extracted binaries and parity goldens live under
+Recovered reference sources, extracted binaries and recorded cases live under
 `raw/`, `evidence/` and `.work/`, which are git-ignored. Nothing from those trees
 may be committed, pasted into `src/`, or cited as a source in a commit message.
 Specs cite them; code does not copy them (`docs/adr/0003-…`).

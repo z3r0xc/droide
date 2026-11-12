@@ -1,17 +1,17 @@
-# droide
+# droide — engineering handbook
 
-A specification-first reverse engineering of the Factory AI `droid` CLI, version
-1.9.0, followed by a clean-room reimplementation with tests.
+How Droide is specified, decided and built. The product itself is described in
+the [README](../README.md); this directory holds the process.
 
 ## Goal
 
-Produce a written, evidence-backed specification of what `droid` does — its
-observable behaviour, its data and configuration surface, and its failure modes
-— and then implement that specification independently, with a deterministic
-test suite that maps back to it.
+Droide is a terminal coding agent. Its observable behaviour — the command
+surface, the data and configuration it reads and writes, and its failure modes —
+is written down in `specs/` before it is implemented, and every clause carries a
+citation and at least one deterministic test.
 
-The specification is the deliverable. The reimplementation is the check that
-the specification is complete and unambiguous enough to build from.
+The specification is the deliverable. The implementation is the check that the
+specification is complete and unambiguous enough to build from.
 
 ## Method
 
@@ -27,25 +27,22 @@ Three disciplines, applied in this order:
    not reconstructed afterwards.
 3. **TDD — test driven development.** Every acceptance criterion in a spec maps
    to at least one deterministic test. Tests run offline, without a clock or
-   network dependency, and fixtures are synthesised rather than copied from the
-   proprietary binaries. See `tests/README.md`.
+   network dependency, and fixtures are synthesised rather than copied from a
+   proprietary artefact. See `tests/README.md`.
 
 Analysis happens in `tools/` and produces evidence, never conclusions on its
 own: see `evidence/README.md` for the ledger conventions that tie an observation
 to a spec clause.
 
-## Current status
+## Provenance policy
 
-**Phase 1: extraction.**
+Evidence, contract and implementation are kept apart
+([ADR 0003](./adr/0003-evidence-first-clean-room-policy.md)):
 
-The target artefacts are staged but untracked under `raw/`
-(`docs/vendored-artifacts.md` records exactly what, with checksums). The current
-work is recovering the JavaScript bundle embedded in the Bun single-file
-executables, per `docs/adr/0001-bun-standalone-extraction.md`, and building the
-deterministic extractor in `tools/` that phase 2 (behavioural enumeration and
-spec writing) will draw on.
-
-No subsystem spec has been written yet. No reimplementation code exists yet.
+- raw inputs, extracted bundles and recovered sources live untracked under
+  `raw/` and `evidence/`, and are never committed or shipped;
+- `specs/` states behaviour in prose and tables, with a citation per claim;
+- `src/` and `crates/` are written against the spec, not against the evidence.
 
 ## Layout
 
@@ -56,7 +53,7 @@ No subsystem spec has been written yet. No reimplementation code exists yet.
 | `tests/` | Acceptance tests and fixtures, mapped to spec clauses |
 | `tools/` | Deterministic analysers and extractors, each with tests |
 | `evidence/` | The evidence ledger: what was observed, derived, or inferred |
-| `raw/` | Untracked vendored upstream artefacts (binaries, reference sources) |
+| `raw/` | Untracked reference artefacts (binaries, upstream source trees) |
 
 ## Documents
 
@@ -68,4 +65,4 @@ No subsystem spec has been written yet. No reimplementation code exists yet.
 | `release.md` | versioning, release gates, artefacts, rollback |
 | `rust-setup.md` | how the Rust toolchain is configured on this workstation |
 | `adr/` | architecture decisions, one file per decision |
-| `architecture/README.md` | evidence-derived map of the subject we reimplement |
+| `architecture/README.md` | evidence-derived layer map of the reference tree |

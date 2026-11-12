@@ -26,6 +26,7 @@ import {
 import { isBrokenPipeError } from "../exec/writer.ts";
 import {
   ACP_ERROR_CODES,
+  ACP_MAX_FRAME_BYTES,
   ACP_METHODS,
   AcpProtocolError,
   authMethodsFor,
@@ -276,6 +277,7 @@ class AcpServerImpl implements AcpServer {
   readonly #options: AcpServerOptions;
   readonly #writer: FrameWriter;
   readonly #lines: NdjsonLines;
+  readonly #maxFrameBytes: number;
   readonly #sessions = new Map<string, ServerSession>();
   readonly #pendingPermissions = new Map<string, PendingPermission>();
   readonly #tasks = new Set<Promise<void>>();
@@ -286,11 +288,9 @@ class AcpServerImpl implements AcpServer {
 
   constructor(options: AcpServerOptions) {
     this.#options = options;
-    this.#writer = new FrameWriter(
-      options.stdout,
-      options.maxFrameBytes ?? 8 * 1024 * 1024,
-    );
-    this.#lines = new NdjsonLines(options.maxFrameBytes ?? 8 * 1024 * 1024);
+    this.#maxFrameBytes = options.maxFrameBytes ?? ACP_MAX_FRAME_BYTES;
+    this.#writer = new FrameWriter(options.stdout, this.#maxFrameBytes);
+    this.#lines = new NdjsonLines(this.#maxFrameBytes);
     this.#authenticated = options.authenticated === true;
   }
 
@@ -341,7 +341,7 @@ class AcpServerImpl implements AcpServer {
         createAcpFailure(
           null,
           ACP_ERROR_CODES.parse,
-          `Parse error: frame is above the ${this.#options.maxFrameBytes ?? 8 * 1024 * 1024}-byte limit`,
+          `Parse error: frame is above the ${this.#maxFrameBytes}-byte limit`,
         ),
       );
       return;
@@ -349,10 +349,7 @@ class AcpServerImpl implements AcpServer {
     if (line.text === "") return;
     let message: AcpInboundMessage;
     try {
-      message = parseAcpFrame(
-        line.text,
-        this.#options.maxFrameBytes ?? 8 * 1024 * 1024,
-      );
+      message = parseAcpFrame(line.text, this.#maxFrameBytes);
     } catch (error) {
       const protocol =
         error instanceof AcpProtocolError
@@ -385,6 +382,9 @@ class AcpServerImpl implements AcpServer {
   /* ----------------------------- requests ------------------------------- */
 
   async #handleRequest(request: AcpRequestMessage): Promise<void> {
+    // TODO(spec B70): session/set_mode, session/set_config_option and the
+    // legacy session/set_model are not served, and no current_mode_update or
+    // config_option_update is ever emitted.
     try {
       switch (request.method) {
         case ACP_METHODS.initialize: {
@@ -433,9 +433,6 @@ class AcpServerImpl implements AcpServer {
           // session/list are advertised by initialize but this slice does not
           // serve them. They answer method-not-found rather than pretending
           // to succeed.
-          // TODO(spec B70): session/set_mode, session/set_config_option and
-          // the legacy session/set_model are not served, and no
-          // current_mode_update/config_option_update is ever emitted.
           await this.#writer.write(
             createAcpFailure(
               request.id,
@@ -733,113 +730,4 @@ class AcpServerImpl implements AcpServer {
 /** Build the ACP server; `run()` starts reading. */
 export function createAcpServer(options: AcpServerOptions): AcpServer {
   return new AcpServerImpl(options);
-}
-
-/* -------------------------------------------------------------------------- */
-/* Process entry (B60)                                                        */
-/* -------------------------------------------------------------------------- */
-
-/** The console methods B60 redirects away from stdout. */
-export interface AcpConsole {
-  log(...args: unknown[]): void;
-  info(...args: unknown[]): void;
-  warn(...args: unknown[]): void;
-  debug(...args: unknown[]): void;
-}
-
-function formatConsoleArguments(args: readonly unknown[]): string {
-  return args
-    .map((value) => {
-      if (typeof value === "string") return value;
-      try {
-        return JSON.stringify(value) ?? String(value);
-      } catch {
-        return String(value);
-      }
-    })
-    .join(" ");
-}
-
-/**
- * Send `console.*` to one text sink and return a restore function. ACP owns
- * stdout for frames, so B60 allows console output on stderr only.
- */
-export function redirectConsoleOutput(
-  write: (text: string) => void,
-  target: AcpConsole = console,
-): () => void {
-  const original = {
-    log: target.log,
-    info: target.info,
-    warn: target.warn,
-    debug: target.debug,
-  };
-  const redirect = (...args: unknown[]): void => {
-    write(`${formatConsoleArguments(args)}\n`);
-  };
-  target.log = redirect;
-  target.info = redirect;
-  target.warn = redirect;
-  target.debug = redirect;
-  return () => {
-    target.log = original.log;
-    target.info = original.info;
-    target.warn = original.warn;
-    target.debug = original.debug;
-  };
-}
-
-export interface RunAcpDaemonOptions extends Omit<
-  AcpServerOptions,
-  "stdin" | "stdout"
-> {
-  readonly stdin?: AsyncIterable<string | Uint8Array>;
-  readonly stdout?: Writable;
-  readonly stderr?: Writable;
-  /** Defaults to `true`; tests and embeddings leave signals to the caller. */
-  readonly installSignalHandlers?: boolean;
-}
-
-/**
- * The `droid exec --output-format acp` handoff: console output moves to
- * stderr, the server owns stdout, and a signal closes it cleanly.
- *
- * TODO(spec B60): `src/exec/command.ts` still refuses `-o acp` before this
- * entry is reached; connecting it is a change to that file, outside this
- * slice. The entry itself is complete here.
- */
-export async function runAcpDaemon(
-  options: RunAcpDaemonOptions,
-): Promise<number> {
-  const { stdin, stdout, stderr, installSignalHandlers, ...serverOptions } =
-    options;
-  const restore = redirectConsoleOutput((text) => {
-    (stderr ?? process.stderr).write(text);
-  });
-  const server = createAcpServer({
-    ...serverOptions,
-    stdin: stdin ?? process.stdin,
-    stdout: stdout ?? process.stdout,
-  });
-  const onSignal = (): void => {
-    void server.close();
-    if (stdin === undefined) process.stdin.destroy();
-  };
-  const install = installSignalHandlers !== false;
-  if (install) {
-    process.once("SIGINT", onSignal);
-    process.once("SIGTERM", onSignal);
-  }
-  try {
-    await server.run();
-    return 0;
-  } catch {
-    return 1;
-  } finally {
-    if (install) {
-      process.off("SIGINT", onSignal);
-      process.off("SIGTERM", onSignal);
-    }
-    restore();
-  }
 }

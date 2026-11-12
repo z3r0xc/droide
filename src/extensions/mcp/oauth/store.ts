@@ -76,7 +76,7 @@ export class CredentialStoreError extends Error {
 }
 
 export interface CredentialStoreOptions {
-  readonly factoryDir: string;
+  readonly stateDir: string;
   readonly sealer: CredentialSealer;
   readonly now?: () => number;
 }
@@ -87,10 +87,10 @@ const EMPTY: CredentialDocument = {
   tombstones: {},
 };
 
-function paths(factoryDir: string): { sealed: string; header: string } {
+function paths(stateDir: string): { sealed: string; header: string } {
   return {
-    sealed: join(factoryDir, CREDENTIAL_SEALED_FILE),
-    header: join(factoryDir, CREDENTIAL_HEADER_FILE),
+    sealed: join(stateDir, CREDENTIAL_SEALED_FILE),
+    header: join(stateDir, CREDENTIAL_HEADER_FILE),
   };
 }
 
@@ -208,7 +208,7 @@ function parseDocument(value: unknown): CredentialDocument {
 export async function readCredentials(
   options: CredentialStoreOptions,
 ): Promise<CredentialDocument> {
-  const files = paths(options.factoryDir);
+  const files = paths(options.stateDir);
   let sealed: Buffer;
   try {
     sealed = await readFile(files.sealed);
@@ -240,8 +240,8 @@ async function writeDocument(
   options: CredentialStoreOptions,
   document: CredentialDocument,
 ): Promise<void> {
-  const files = paths(options.factoryDir);
-  await mkdir(options.factoryDir, { recursive: true });
+  const files = paths(options.stateDir);
+  await mkdir(options.stateDir, { recursive: true });
   const sealed = await options.sealer.seal(
     Buffer.from(JSON.stringify(document), "utf8"),
   );
@@ -333,7 +333,7 @@ export async function deleteCredential(
 export async function clearCredentialStore(
   options: CredentialStoreOptions,
 ): Promise<void> {
-  const files = paths(options.factoryDir);
+  const files = paths(options.stateDir);
   await rm(files.sealed, { force: true });
   await rm(files.header, { force: true });
 }

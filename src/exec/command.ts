@@ -102,8 +102,8 @@ export const AUTHENTICATION_REQUIRED =
 
 const CUSTOM_MODEL_PREFIX = "custom:";
 
-/** The baked managed base URL; `FACTORY_API_BASE_URL` overrides it (50 B3). */
-const DEFAULT_API_BASE_URL = "https://api.factory.ai";
+/** The baked managed base URL; `DROIDE_API_BASE_URL` overrides it (50 B3). */
+const DEFAULT_API_BASE_URL = "https://api.droide.ai";
 
 /** B20: the one failure prefix for a turn, in `text` mode. */
 export const EXEC_FAILURE_PREFIX = "Error during droide execution: ";
@@ -407,14 +407,14 @@ function managedModelTarget(
   if (apiKey === undefined || apiKey === "") {
     throw new ExecCommandError(AUTHENTICATION_REQUIRED);
   }
-  const configured = env["FACTORY_API_BASE_URL"]?.trim();
+  const configured = env["DROIDE_API_BASE_URL"]?.trim();
   const baseValue =
     configured === undefined || configured === ""
       ? DEFAULT_API_BASE_URL
       : configured;
   let base: URL;
   try {
-    base = parseApiBaseUrl(baseValue, "FACTORY_API_BASE_URL");
+    base = parseApiBaseUrl(baseValue, "DROIDE_API_BASE_URL");
   } catch (error) {
     throw new ExecCommandError(messageOf(error), { cause: error });
   }

@@ -55,7 +55,7 @@ import type { ClosableCredentialSealer } from "../native/sealer.ts";
 
 /** Where the command reads and writes; `io` is injected in tests. */
 export interface McpMutationDeps {
-  readonly factoryDir: string;
+  readonly stateDir: string;
   readonly projectRoot: string;
   readonly io?: McpConfigIo;
   readonly write: (text: string) => void;
@@ -82,9 +82,9 @@ function ioFor(deps: McpMutationDeps): McpConfigIo {
   return deps.io ?? defaultMcpConfigIo;
 }
 
-/** The user scope is always `<factoryDir>/mcp.json` (B1, B6). */
+/** The user scope is always `<stateDir>/mcp.json` (B1, B6). */
 function userTarget(deps: McpMutationDeps): McpEditTarget {
-  return { path: join(deps.factoryDir, "mcp.json"), scope: "user" };
+  return { path: join(deps.stateDir, "mcp.json"), scope: "user" };
 }
 
 function report(deps: McpMutationDeps, error: unknown): void {
@@ -309,7 +309,7 @@ export async function runMcpAdd(
     const config = buildAddConfig(urlOrCommand, options);
     const key = canonicalName(name);
     const merged = loadMcpConfiguration(
-      mcpConfigFileSources(deps.factoryDir, deps.projectRoot),
+      mcpConfigFileSources(deps.stateDir, deps.projectRoot),
     );
     if (merged.servers.has(key)) {
       throw new McpEditError(
@@ -338,7 +338,7 @@ function removableServerNames(deps: McpMutationDeps): readonly string[] {
   );
   if (servers === undefined || servers.value.kind !== "object") return [];
   const merged = loadMcpConfiguration(
-    mcpConfigFileSources(deps.factoryDir, deps.projectRoot),
+    mcpConfigFileSources(deps.stateDir, deps.projectRoot),
   );
   const names = new Set<string>();
   for (const member of servers.value.members) {
@@ -379,7 +379,7 @@ export async function runMcpRemove(
     const key = canonicalName(name);
     const target = userTarget(deps);
     const merged = loadMcpConfiguration(
-      mcpConfigFileSources(deps.factoryDir, deps.projectRoot),
+      mcpConfigFileSources(deps.stateDir, deps.projectRoot),
     );
     const entry = merged.servers.get(key);
     if (entry !== undefined && entry.level !== "user-settings") {
@@ -418,8 +418,8 @@ function needsAuthentication(
 
 /** Injected seams for `mcp auth`; the CLI supplies none of them. */
 export interface McpAuthInjection {
-  /** Defaults to the deps' factory dir; tests point it at a temp directory. */
-  readonly store?: { readonly factoryDir: string };
+  /** Defaults to the deps' state dir; tests point it at a temp directory. */
+  readonly store?: { readonly stateDir: string };
   readonly sealer?: CredentialSealer;
   /** Absolute helper path; defaults to `DROIDE_NATIVE_BIN`. */
   readonly nativeHelperPath?: string;
@@ -483,11 +483,11 @@ export async function runMcpAuth(
   injection: McpAuthInjection = {},
 ): Promise<void> {
   const now = injection.now ?? (() => Date.now());
-  const factoryDir = injection.store?.factoryDir ?? deps.factoryDir;
+  const stateDir = injection.store?.stateDir ?? deps.stateDir;
   let owned: ClosableCredentialSealer | undefined;
   try {
     const configuration = loadMcpConfiguration(
-      mcpConfigFileSources(deps.factoryDir, deps.projectRoot),
+      mcpConfigFileSources(deps.stateDir, deps.projectRoot),
     );
     // A server that opted out of OAuth, or a stdio server, is never a
     // candidate: deciding that needs no credential store, so a run with
@@ -503,7 +503,7 @@ export async function runMcpAuth(
 
     const sealer = injection.sealer ?? (owned = resolveSealer(injection));
     const credentials = await readCredentials({
-      factoryDir,
+      stateDir,
       sealer,
       now,
     });
@@ -545,7 +545,7 @@ export async function runMcpAuth(
             allowedByPolicy: candidate.allowedByPolicy,
           },
           config,
-          store: { factoryDir },
+          store: { stateDir },
           sealer,
           openBrowser: injection.openBrowser ?? openInBrowser,
           fetch: injection.fetch ?? globalThis.fetch,

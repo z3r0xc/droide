@@ -79,7 +79,7 @@ export function renderMcpList(configuration: McpConfiguration): string {
 
 export async function runMcpList(deps: McpListDeps): Promise<void> {
   const sources = mcpConfigFileSources(
-    deps.context.paths.factoryDir,
+    deps.context.paths.stateDir,
     deps.context.environment.cwd,
   );
   const configuration = loadMcpConfiguration(sources);

@@ -1,15 +1,15 @@
 # Extensions: MCP, Plugins & Marketplaces, Skills, ACP
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft
 - **Owner:** extensions surface (MCP / plugins / skills / ACP)
 - **Related:** `specs/00-context.md`, `docs/architecture/README.md`; the settings-resolution, tool-catalog, agent-loop and CLI specs own the neighbouring concerns named in Scope.
 
 ## Purpose
 
-Droid is extended from outside its own code: users configure external tool servers (MCP), install
+Droide is extended from outside its own code: users configure external tool servers (MCP), install
 packaged bundles of prompt assets (plugins and the marketplaces that distribute them), and write
-reusable instruction documents (skills) that the model or the user can activate. Separately, Droid can
+reusable instruction documents (skills) that the model or the user can activate. Separately, Droide can
 be driven by an editor through the Agent Client Protocol (ACP) instead of a terminal UI. This spec pins
 what a user or a collaborating program can observe on all four surfaces: which files are read, in what
 order, how names collide, what reaches the model, and what the wire looks like.
@@ -41,12 +41,12 @@ preconditions are policy-gated.
   maximum 32 characters, `invalid-server-name` when empty
   (`evidence/original/windows-x64/packages/utils/src/mcp/normalizeServerName/index.ts:15-54`).
 - **llmId** — the provider-facing tool name; for an MCP tool `<server>___<tool>` where `___` is
-  `MCP_TOOL_NAME_SEPARATOR` (`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/tools/constants.ts:110-111`).
+  `MCP_TOOL_NAME_SEPARATOR` (`evidence/original/windows-x64/packages/sdk-core/src/protocol/tools/constants.ts:110-111`).
 - **Claude Code name** — the compatibility alias `mcp__<server>__<tool>`
-  (`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/tools/constants.ts:113-115`).
+  (`evidence/original/windows-x64/packages/sdk-core/src/protocol/tools/constants.ts:113-115`).
 - **plugin** — a directory with prompt components; **plugin id** is `plugin-name@marketplace`
   (`evidence/original/windows-x64/packages/runtime/plugins/src/pluginId.ts:1-37`).
-- **marketplace** — a git/npm/local source carrying `.factory-plugin/marketplace.json`; its name is
+- **marketplace** — a git/npm/local source carrying `.droide-plugin/marketplace.json`; its name is
   derived from the source (`evidence/original/windows-x64/packages/runtime/plugins/src/getMarketplaceNameFromSource.ts:48-99`).
 - **plugin scope** — where a plugin is enabled/installed: `org`, `project`, `user`, precedence
   `org > project > user` (`evidence/original/windows-x64/packages/runtime/plugins/src/constants.ts:26-39`).
@@ -61,15 +61,15 @@ preconditions are policy-gated.
 
 ### MCP configuration
 
-**B1 — Server config file locations.** Droid reads exactly two MCP config files for a session:
-`<factoryDir>/mcp.json` where the factory dir is `getFactoryHome()` joined with the deployment's factory
-dir name (`~/.factory` by default), and `<projectRoot>/.factory/mcp.json`, where `projectRoot` is the git
-root when there is one and the agent working directory otherwise
+**B1 — Server config file locations.** Droide reads exactly two MCP config files for a session:
+`<stateDir>/mcp.json` where the state dir is `homePath()` (vendor prefix elided) joined with the
+deployment's state dir name (`~/.droide` by default), and `<projectRoot>/.droide/mcp.json`, where
+`projectRoot` is the git root when there is one and the agent working directory otherwise
 (`evidence/original/windows-x64/src/services/mcp/mcpConfigPresence.ts:73-81`).
 
 **B2 — Config syntax and tolerance.** `mcp.json` is parsed as JSONC. A parse error, an unreadable file,
 or a non-object document contributes no servers from that file; a missing file is not an error
-(`evidence/original/windows-x64/packages/runtime/settings/src/FactorySettingsFolder.ts:1286-1310`).
+(`evidence/original/windows-x64/packages/runtime/settings/src/SettingsFolder.ts:1286-1310`).
 The document shape is `{ mcpServers, persistentPermissions? }`
 (`evidence/original/windows-x64/packages/common/src/settings/schema.ts:2359-2362`).
 
@@ -91,12 +91,12 @@ is merged (`evidence/original/windows-x64/packages/runtime/settings/src/mergeMcp
 **B5 — Name canonicalization and aliases.** After merging, the server map is re-keyed by normalized
 name; when two raw keys normalize identically the later entry (higher precedence) wins, and the earlier
 raw spelling is lost from the canonical view
-(`evidence/original/windows-x64/packages/utils/src/mcp/normalizeServerName/index.ts:56-72`). `droid mcp add`
+(`evidence/original/windows-x64/packages/utils/src/mcp/normalizeServerName/index.ts:56-72`). `droide mcp add`
 normalizes the name it writes, and an existing server under any alias of that name makes the add fail
 (`evidence/original/windows-x64/src/commands/mcp/add.ts:57-99`, `:214-241`).
 
-**B6 — `droid mcp add` writes to the user file.** A successful add writes the server at
-`SettingsLevel.User` — that is, into `<factoryDir>/mcp.json` — after the org MCP policy check. `--type`
+**B6 — `droide mcp add` writes to the user file.** A successful add writes the server at
+`SettingsLevel.User` — that is, into `<stateDir>/mcp.json` — after the org MCP policy check. `--type`
 defaults to `stdio`; `--env` is rejected for remote types, `--header` for stdio; a bare URL without
 `--type` is rejected; stdio `command`/`args` are parsed with shell quoting; `--no-oauth` disables OAuth
 for header-authenticated remote servers (`evidence/original/windows-x64/src/entrypoints/mcp/command.ts:17-46`,
@@ -118,7 +118,7 @@ when the variable is unset **or empty**. A plugin server's path variables resolv
 environment (`evidence/original/windows-x64/src/mcp/resolveMcpSecretReferences.ts:8-80`).
 
 **B9 — Sandboxed stdio environments.** When the sandbox is active, a stdio server's child environment is
-filtered to an allowlist plus keys explicitly configured in `mcp.json`; proxy variables, Droid's sandbox
+filtered to an allowlist plus keys explicitly configured in `mcp.json`; proxy variables, Droide's sandbox
 marker, and exported shell functions are always dropped. Unavailable parent sandbox settings make the
 stdio launch fail closed (`evidence/original/windows-x64/src/mcp/sandbox.ts:77-150`).
 
@@ -142,7 +142,7 @@ is distrusted. Modern verdicts are never stored
 (`evidence/original/windows-x64/src/mcp/protocolEra.ts:1-84`, `evidence/original/windows-x64/src/mcp/constants.ts:83-90`).
 
 **B13 — Tool listing deadline.** A server's `tools/list` gets 15 s by default, override via
-`FACTORY_MCP_LIST_TOOLS_TIMEOUT_MS`; the strict listing is retried leniently inside the same window so
+`DROIDE_MCP_LIST_TOOLS_TIMEOUT_MS`; the strict listing is retried leniently inside the same window so
 the two attempts cannot stack. Distinct failures are negative-cached for 60 s, and manual recovery
 (retry, reconnect, `tools/list_changed`, config change) clears the entry immediately
 (`evidence/original/windows-x64/src/mcp/constants.ts:23-33`, `evidence/original/windows-x64/src/mcp/McpToolList.ts:29-62`).
@@ -169,8 +169,8 @@ characters outside `[a-zA-Z0-9_-]` become `_`, and a name longer than 64 charact
 mutated sibling gets a deterministic hash suffix derived from its raw llmId; the result is stable across
 sessions and tool-list orderings. A Claude Code name is emitted only when it can be read back
 unambiguously (no `___`, server segment round-trips)
-(`evidence/original/windows-x64/packages/droid-core/src/llms/client/tool-call-ids.ts:13-70`,
-`evidence/original/windows-x64/packages/droid-core/src/llms/client/constants.ts:85`,
+(`evidence/original/windows-x64/packages/core/src/llms/client/tool-call-ids.ts:13-70`,
+`evidence/original/windows-x64/packages/core/src/llms/client/constants.ts:85`,
 `evidence/original/windows-x64/src/mcp/utils.ts:115-117`, `:255-305`).
 
 **B18 — Registration lifecycle.** Registering a server's tools replaces that server's previous set;
@@ -220,7 +220,7 @@ org `maxAutonomyLevel` ceiling. The fingerprint covers only `type + command + ar
 (`evidence/original/windows-x64/packages/common/src/settings/schema.ts:2325-2355`,
 `evidence/original/windows-x64/src/services/mcp/McpPermissionService.ts:1-35`, `:196-260`).
 
-**B25 — CLI surface.** `droid mcp` exposes `add`, `remove`, `list`, `auth`, and
+**B25 — CLI surface.** `droide mcp` exposes `add`, `remove`, `list`, `auth`, and
 `permissions {list, revoke <server> [tool], clear --confirm}`; `remove` without a name offers the
 removable servers, and `clear` requires `--confirm`
 (`tests/parity/expected/help-mcp.json`,
@@ -233,12 +233,12 @@ object `{ resource?, authorizationServerIssuer?, clientMetadataUrl?, clientId?, 
 callbackPort?, tokenEndpointAuthMethod? }`. `clientMetadataUrl` may not be combined with configured
 client credentials and requires public token-endpoint auth; configured client credentials require
 `authorizationServerIssuer`; every rejection is a validation issue on `mcp.json` load
-(`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/settings/schema.ts:96-160`).
+(`evidence/original/windows-x64/packages/sdk-core/src/protocol/settings/schema.ts:96-160`).
 
 **B27 — Redirect and client identity.** The loopback callback server starts at port 54621 and tries up to
-100 consecutive ports. The published client metadata is `https://api.factory.ai/mcp/oauth-client` with
-the loopback redirect set, the hosted `/mcp/oauth/callback` set, and dynamic-registration redirect
-coverage for all 100 loopback ports
+100 consecutive ports. The published client metadata is `<apiBase>/mcp/oauth-client`, where `<apiBase>`
+is the managed backend base URL (`DROIDE_API_BASE_URL`), with the loopback redirect set, the hosted
+`/mcp/oauth/callback` set, and dynamic-registration redirect coverage for all 100 loopback ports
 (`evidence/original/windows-x64/packages/common/src/mcp-oauth/constants.ts:3-74`).
 
 **B28 — Authorization window.** An interactive authorization is bounded at 4 minutes, deliberately below
@@ -261,14 +261,14 @@ background "auth required" notification for that server instead of being retried
 ### Plugins and marketplaces
 
 **B31 — On-disk layout.** Plugin state lives under `<scopeRoot>/plugins/`, where `<scopeRoot>` is the
-factory dir (user) or `<project>/.factory` (project): `known_marketplaces.json` plus `known_marketplaces/`,
+state dir (user) or `<project>/.droide` (project): `known_marketplaces.json` plus `known_marketplaces/`,
 `installed_plugins.json` plus `installed_plugins/`, `marketplaces/` (checked-out marketplaces), `cache/`
 (installed plugin copies) and `data/<plugin slot>` (persistent plugin data). Only
 `known_marketplaces/` and `installed_plugins/` are hot-watched
 (`evidence/original/windows-x64/packages/runtime/plugins/src/constants.ts:5-21`,
 `evidence/original/windows-x64/packages/runtime/plugins/src/PluginRegistry.ts:57-58`, `:283-300`, `:791-815`).
 
-**B32 — Marketplace manifest.** Every marketplace reader prefers `.factory-plugin/marketplace.json` and
+**B32 — Marketplace manifest.** Every marketplace reader prefers `.droide-plugin/marketplace.json` and
 falls back to `.claude-plugin/marketplace.json`. The document is
 `{ name, description?, owner?{name,email?,url?}, plugins: [{ name, description?, source, category?,
 homepage?, tags? }] }`; the name is stripped of non-printable characters. A manifest whose `name` or
@@ -276,10 +276,10 @@ homepage?, tags? }] }`; the name is stripped of non-printable characters. A mani
 is rejected (`evidence/original/windows-x64/packages/common/src/settings/schema.ts:490-523`,
 `evidence/original/windows-x64/packages/runtime/plugins/src/MarketplaceService.ts:639-680`).
 
-**B33 — Plugin root and manifest.** A plugin root is a directory containing `.factory-plugin/` or
+**B33 — Plugin root and manifest.** A plugin root is a directory containing `.droide-plugin/` or
 `.claude-plugin/`, or (for archives) one of the component markers `skills`, `commands`, `agents`,
-`droids`, `hooks`, `output-styles`, `mcp.json`, `.mcp.json`. `.factory-plugin/plugin.json` is optional
-JSONC; the only key Droid reads from it is `hooks`, which may be an inline event map, a list of event
+`droids`, `hooks`, `output-styles`, `mcp.json`, `.mcp.json`. `.droide-plugin/plugin.json` is optional
+JSONC; the only key Droide reads from it is `hooks`, which may be an inline event map, a list of event
 maps, or a list of hook-file paths. A document declaring `$schema` starting with
 `https://agent-plugins.org/schemas/` is recognized as an Agent Plugins document
 (`evidence/original/windows-x64/packages/runtime/plugins/src/archivePluginInstaller.internals.ts:438-486`,
@@ -309,7 +309,7 @@ declares marketplaces that may be auto-registered; `strictKnownMarketplaces` nar
 configured at all; `pluginTokenHosts` is honored from user and org settings only
 (`evidence/original/windows-x64/packages/common/src/settings/schema.ts:1457-1489`).
 
-**B37 — Install flow.** `droid plugin install <plugin@marketplace> [-s user|project]` parses the id on
+**B37 — Install flow.** `droide plugin install <plugin@marketplace> [-s user|project]` parses the id on
 the first `@` at index ≥ 1, defaults the scope to `user`, looks the plugin up in the registered
 marketplace, refuses a marketplace whose recorded source no longer matches its configured source
 (`Marketplace "X" does not match its configured source`), refuses a source denied by org policy
@@ -324,12 +324,12 @@ enablement entry is removed rather than set to `false`
 (`evidence/original/windows-x64/src/entrypoints/plugin/uninstall.ts:16-45`,
 `evidence/original/windows-x64/packages/runtime/settings/src/PluginMarketplaceManager.ts:2172-2200`, `:3900-3910`).
 
-**B39 — Update flow.** `droid plugin update [plugin] [-s scope]` updates one plugin or all and reports
+**B39 — Update flow.** `droide plugin update [plugin] [-s scope]` updates one plugin or all and reports
 one line per success (`(short-version)`) and one per failure; an empty result set reports "nothing to
 update" for the named plugin or for all
 (`evidence/original/windows-x64/src/entrypoints/plugin/update.ts:11-66`).
 
-**B40 — Marketplace CLI.** `droid plugin marketplace add <url> | remove <name> | list | update [name]`
+**B40 — Marketplace CLI.** `droide plugin marketplace add <url> | remove <name> | list | update [name]`
 maps onto the same manager: `add` parses the source (a local path with `~` is expanded), `list` prints a
 table with terminal-safe values, `update` refreshes one or all
 (`evidence/original/windows-x64/src/entrypoints/plugin/command.ts:24-70`,
@@ -338,7 +338,7 @@ table with terminal-safe values, `update` refreshes one or all
 **B41 — Component merge into the runtime.** An enabled plugin contributes `droids/*.md`, `skills/*/SKILL.md`,
 `commands/*`, `output-styles/*`, `hooks` and `mcp.json` servers. Each scope's plugins are loaded, then
 their components merged **within that scope** by the same merge helpers the settings hierarchy uses:
-droids, skills and commands keep the first-loaded plugin's entry for a name (`higher` is the accumulated
+`droids`, skills and commands keep the first-loaded plugin's entry for a name (`higher` is the accumulated
 result), hooks concatenate per event, output styles merge, and MCP servers merge per name with the
 **later** plugin in load order overriding (`{...existing, ...incoming}`)
 (`evidence/original/windows-x64/packages/runtime/plugins/src/PluginLoader.ts:355-380`, `:283-296`,
@@ -352,12 +352,12 @@ Plugin skills carry `pluginId` and `pluginScope`, and their `SkillLocation` is d
 (`evidence/original/windows-x64/packages/runtime/plugins/src/PluginLoader.ts:515-560`).
 
 **B42 — Claude Code layout translation.** A plugin directory shipping `.claude-plugin/` is copied to
-`.factory-plugin/`, `agents/` to `droids/`, and `.mcp.json` to `mcp.json`; the Claude MCP document is
+`.droide-plugin/`, `agents/` to `droids/`, and `.mcp.json` to `mcp.json`; the Claude MCP document is
 wrapped into `{ "mcpServers": … }` and the translation is refused if the result grows past the source
 size plus the wrapper bytes. A plugin that authors both `mcp.json` and `.mcp.json` keeps `mcp.json`
 (`evidence/original/windows-x64/packages/runtime/plugins/src/pluginCopy.ts:196-250`).
 
-**B43 — Plugin path variables.** `${CLAUDE_PLUGIN_ROOT}` / `$CLAUDE_PLUGIN_ROOT` (and the `DROID_`
+**B43 — Plugin path variables.** `${CLAUDE_PLUGIN_ROOT}` / `$CLAUDE_PLUGIN_ROOT` (and the `DROIDE_`
 spellings) expand to the plugin root, `*_PLUGIN_DATA` to the plugin data directory, in plugin-authored
 text; a missing data directory stays as written. In a plugin MCP server's `env`/`headers` the variables
 are braced so the connection-time resolver reads them from the plugin's paths
@@ -387,13 +387,13 @@ settings and dynamic config contribute no skills array at all
 **B47 — On-disk skill layout.** Skills load from `<settingsFolder>/skills/<name>/SKILL.md` for every
 settings-bearing folder, from `~/.agent/skills` / `~/.agents/skills` and the project `.agent`/`.agents`
 counterparts, and from `<missionDir>/skills/`. A folder with no `SKILL.md` contributes nothing for that
-name (`evidence/original/windows-x64/packages/runtime/settings/src/FactorySettingsFolder.ts:1455-1487`,
+name (`evidence/original/windows-x64/packages/runtime/settings/src/SettingsFolder.ts:1455-1487`,
 `evidence/original/windows-x64/packages/runtime/settings/src/AgentSettingsFolder.ts:33-40`, `:105-140`,
 `evidence/original/windows-x64/src/skills/builtin/index.ts:131-155`).
 
 **B48 — Frontmatter keys.** `name` (required) and `description` (required) are the agentskills.io fields;
 optional: `license`, `compatibility`, `metadata`, `allowed-tools` (string or list), `version` (non-string
-degrades to absent), and the Factory extensions `tools` (deprecated alias of `allowed-tools`), `enabled`
+degrades to absent), and the Droide extensions `tools` (deprecated alias of `allowed-tools`), `enabled`
 (default `true`), `user-invocable` (default `true`), `disable-model-invocation` (default `false`)
 (`evidence/original/windows-x64/packages/common/src/settings/schema.ts:2396-2420`).
 
@@ -422,7 +422,7 @@ Eight builtins have no `SKILL.md` asset at all and exist only as prompt constant
 (`evidence/original/windows-x64/src/skills/builtin/builtinSkillDefinitions.ts:186-247`).
 `agent-browser` is a hybrid: its body is the embedded `SKILL.md` with the frontmatter stripped, while its
 name and description (and the desktop-pane description variant selected by
-`FACTORY_DESKTOP_CDP_PORT` + `AGENT_BROWSER_CDP`) come from code
+`DROIDE_DESKTOP_CDP_PORT` + `AGENT_BROWSER_CDP`) come from code
 (`evidence/original/windows-x64/src/skills/builtin/agent-browser/prompt.ts:1-4`,
 `evidence/original/windows-x64/src/skills/builtin/index.ts:157-180`).
 
@@ -472,7 +472,7 @@ becomes a no-op when the flag is set. The flag is rejected in ACP output modes w
 `evidence/original/windows-x64/src/entrypoints/exec/assertValidOptions.ts:166-175`).
 
 **B59 — Interaction with `--use-spec`.** Spec mode does not change skill discovery or the listing: it
-restricts tools. A turn in spec mode may only modify files under `.factory/specs` (or `.factory-dev/specs`),
+restricts tools. A turn in spec mode may only modify files under `.droide/specs` (or `.droide-dev/specs`),
 and automation memory/skill/run-outcome write tools are refused outright, so any skill instruction that
 writes such files fails at the tool boundary. `--use-spec` / `--spec-model` also cannot be combined with
 `--mission`, `--session-id`, or `--fork`
@@ -490,7 +490,7 @@ shipped; the table is the required inventory, not an exhaustive behaviour descri
 | 1 | `agent-browser` | — | Automates browsers and Electron desktop apps for testing, form filling, screenshots, data extraction | `SKILL-g9mxfkpy.md` |
 | 2 | `automation-memory` | — | Inspect/reset what an automation remembers between runs, and the skills it carries | `SKILL-ep3wc2nz.md` |
 | 3 | `browse-wiki` | NU | Search and read wiki documentation for a repository | `SKILL-gbdd199q.md` |
-| 4 | `build-ios-apps` | — | Build, run, test, debug iOS apps in the Simulator with the Factory desktop mirror | `SKILL-jhwpbkqk.md` |
+| 4 | `build-ios-apps` | — | Build, run, test, debug iOS apps in the Simulator with the Droide desktop mirror | `SKILL-jhwpbkqk.md` |
 | 5 | `cve-remediation` | — | Continuous CVE remediation in a workstream | `SKILL-f0vnm661.md` |
 | 6 | `dataset-create` | — | Create and publish an evaluation dataset of Harbor tasks | `SKILL-dgqkwhk5.md` |
 | 7 | `dataset-maintenance` | — | Keep an evaluation dataset healthy (broken/flaky/too-easy tasks) | `SKILL-aza89ye8.md` |
@@ -499,10 +499,10 @@ shipped; the table is the required inventory, not an exhaustive behaviour descri
 | 10 | `eval-hillclimb` | — | Improve a skill/prompt/setting via controlled eval experiments | `SKILL-8zwg7vja.md` |
 | 11 | `eval-runs` | — | Answer any question about an eval run (status, score, trials, transcript) | `SKILL-r5eawrmy.md` |
 | 12 | `excel` | — | Produce polished Excel spreadsheets as real `.xlsx` | `SKILL-1g9nn1va.md` |
-| 13 | `handoff-to-droid-computer` | — | Hand this session's task to a remote droid computer | `SKILL-v8mzxg6g.md` |
+| 13 | `handoff-to-computer` | — | Hand this session's task to a remote computer | `SKILL-v8mzxg6g.md` |
 | 14 | `incident` | NU | RCA runbook for alerts | `SKILL-4fmdpwyt.md` |
 | 15 | `init` | NM | Generate `AGENTS.md` contributor guidelines for a repository | `SKILL-85xzpb50.md` |
-| 16 | `install-code-review` | — | Install Droid automated code review (GitHub/GitLab/Bitbucket/Azure DevOps) | `SKILL-8tzj0zgy.md` |
+| 16 | `install-code-review` | — | Install Droide automated code review (GitHub/GitLab/Bitbucket/Azure DevOps) | `SKILL-8tzj0zgy.md` |
 | 17 | `install-qa` | — | Set up automated QA testing: questionnaire, modular QA skill, CI | `SKILL-2t6kq9c6.md` |
 | 18 | `install-triage` | — | Scaffold a scheduled Slack triage automation | `SKILL-4e67370f.md` |
 | 19 | `install-wiki` | — | Install a CI action that refreshes the repository wiki | `SKILL-6x222byp.md` |
@@ -518,12 +518,12 @@ shipped; the table is the required inventory, not an exhaustive behaviour descri
 | 29 | `review` | — | Review code changes and identify high-confidence, actionable bugs | `SKILL-pvsxjwm1.md` |
 | 30 | `review` (recall variant) | — | Recall-oriented replacement when the `ReviewRecallSkill` flag is on | `SKILL.recall-7hc692m5.md` |
 | 31 | `security-review` | — | STRIDE / OWASP Top 10 / OWASP LLM Top 10 / supply-chain review | `SKILL-e24hmgjz.md` |
-| 32 | `session-navigation` | — | Navigate, search, and manage Droid sessions | `SKILL-09h1a4ja.md` |
-| 33 | `shared-context` | — | Read/publish shared documents via `droid space` | `SKILL-c3q5m9m8.md` |
+| 32 | `session-navigation` | — | Navigate, search, and manage Droide sessions | `SKILL-09h1a4ja.md` |
+| 33 | `shared-context` | — | Read/publish shared documents via `droide space` | `SKILL-c3q5m9m8.md` |
 | 34 | `simplify` | — | Review the intended change for reuse, quality, compatibility, efficiency | `SKILL-q59hwpmh.md` |
 | 35 | `visualize` | — | Inline charts and diagrams in desktop/web chat | `SKILL-a2hq898w.md` |
 | 36 | `wiki` | — | Generate comprehensive codebase documentation for a repository | `SKILL-jptbza44.md` |
-| 37 | `wiki-video-gen` | — | Factory-branded HyperFrames video overviews for wikis | `SKILL-jxjgmy45.md` |
+| 37 | `wiki-video-gen` | — | Droide-branded HyperFrames video overviews for wikis | `SKILL-jxjgmy45.md` |
 | 38 | `word-document` | — | Produce polished Word documents | `SKILL-mpyk7mee.md` |
 
 Two assets carry the name `review`: the second replaces the first when the `ReviewRecallSkill` feature
@@ -534,7 +534,7 @@ builtins named in B52 have no asset and therefore no row here.
 
 ### ACP
 
-**B60 — Transport and startup.** `droid exec --output-format acp` (and `acp-daemon`) starts an ACP
+**B60 — Transport and startup.** `droide exec --output-format acp` (and `acp-daemon`) starts an ACP
 agent: all console output is redirected to stderr, and the protocol is NDJSON over stdin/stdout
 (`evidence/original/windows-x64/src/exec/acpDaemonRunner.ts:14-47`,
 `evidence/original/windows-x64/src/entrypoints/exec/handler.ts:824-831`).
@@ -549,8 +549,10 @@ next prompt (`evidence/original/windows-x64/src/exec/acpDaemonRunner.ts:49-92`).
 **B62 — `initialize` capabilities.** The response advertises `loadSession`, `sessionCapabilities`
 `{list, resume, close, fork}`, `promptCapabilities {image, embeddedContext}`,
 `mcpCapabilities {http, sse}`, `auth {logout}`, and the unstable `_meta['terminal-auth']` extension.
-`agentInfo` is `{name: package name, title: 'Factory Droid', version}`. Auth methods are
-`customer-prem` for customer-prem deployments, else `device-pairing` ("Login") and `factory-api-key`
+`agentInfo` is `{name: package name, title: 'Droide', version}`. Auth methods are
+`customer-prem` for customer-prem deployments, else `device-pairing` ("Login") and
+`factory-api-key` — TODO(spec 60): the method id becomes `droide-api-key` when the ACP
+implementation is renamed; the two land together
 (`evidence/original/windows-x64/src/acp/AcpAgent.ts:1450-1517`).
 
 **B63 — Session creation.** `session/new` requires authentication, mints a UUID session id, marks the
@@ -585,14 +587,14 @@ cancelled by a stale request (`evidence/original/windows-x64/src/acp/AcpAgent.ts
 **B68 — Session updates.** Server→client updates use `session/update` with
 `sessionId` and one of: `agent_message_chunk`, `agent_thought_chunk`, `user_message_chunk`, `plan`,
 `tool_call`, `tool_call_update`, `session_info_update`, `available_commands_update`,
-`current_mode_update`, `config_option_update`, `usage_update`. Updates may carry a strict `_meta.factory`
+`current_mode_update`, `config_option_update`, `usage_update`. Updates may carry a strict `_meta.droide`
 `{source: mcp|connector, server, tool}` and Zed extensions `subagent_session_info`, `terminal_info`,
 `terminal_output`, `terminal_exit`
 (`evidence/original/windows-x64/src/acp/protocol/sessionUpdates.ts:266-705`,
 `evidence/original/windows-x64/src/acp/protocol/schemas.ts:1-40`,
 `evidence/original/windows-x64/src/acp/AcpAgent.ts:1238`, `:1313-1333`, `:2033-2044`).
 
-**B69 — Permission requests.** Droid's confirmation options are mapped to ACP kinds: proceed-once and
+**B69 — Permission requests.** Droide's confirmation options are mapped to ACP kinds: proceed-once and
 proceed-edit → `allow_once`; proceed-always, always-tools, always-server and the auto-run variants →
 `allow_always`; cancel → `reject_once`; anything else defaults to `allow_once`. Batch labels use
 "both"/"all" quantifiers, and options are shortened for ACP's limited space (e.g. `Allow`, `Allow always`,
@@ -605,7 +607,7 @@ proceed-edit → `allow_once`; proceed-always, always-tools, always-server and t
 `model`, `reasoning_effort`, `autonomy_level`; `session/set_model` is accepted for older clients and
 routed through the same settings path. Each successful change emits `current_mode_update` when the mode
 changed and `config_option_update` with the full option set when mode, model or effort changed
-(`evidence/original/windows-x64/packages/droid-sdk-core/src/protocol/shared/enums.ts:39-45`,
+(`evidence/original/windows-x64/packages/sdk-core/src/protocol/shared/enums.ts:39-45`,
 `evidence/original/windows-x64/src/acp/session/constants.ts:4-6`,
 `evidence/original/windows-x64/src/acp/session/modes.ts:14-38`,
 `evidence/original/windows-x64/src/acp/AcpAgent.ts:1290-1335`).
@@ -622,8 +624,8 @@ removes the session so later requests for that id fail rather than reviving it
 
 | Item | Location / shape | Required | Default | Notes |
 |---|---|---|---|---|
-| User servers | `<factoryDir>/mcp.json` → `mcpServers.<name>` | no | absent | key normalized before use (`evidence/original/windows-x64/src/services/mcp/mcpConfigPresence.ts:73-81`, `evidence/original/windows-x64/packages/runtime/settings/src/FactorySettingsFolder.ts:1286-1310`) |
-| Project servers | `<projectRoot>/.factory/mcp.json` | no | absent | `projectRoot` = git root else cwd |
+| User servers | `<stateDir>/mcp.json` → `mcpServers.<name>` | no | absent | key normalized before use (`evidence/original/windows-x64/src/services/mcp/mcpConfigPresence.ts:73-81`, `evidence/original/windows-x64/packages/runtime/settings/src/SettingsFolder.ts:1286-1310`) |
+| Project servers | `<projectRoot>/.droide/mcp.json` | no | absent | `projectRoot` = git root else cwd |
 | Transport | `type`: `stdio`\|`http`\|`sse` | no | `stdio` | discriminated union |
 | stdio | `command`, `args[]`, `env{}` | `command` | `args: []` | `env` is the credential channel |
 | remote | `url`, `headers{}`, `oauth` | `url` | — | `oauth: false` disables |
@@ -632,7 +634,7 @@ removes the session so later requests for that id fail rather than reviving it
 | Permissions | `persistentPermissions.servers/tools` | no | — | nested shape; flat keys migrate |
 | Era cache | `cache/mcp/protocol-eras/v1/<sha256>.json` | no | — | `{version:1, checkedAt}`, ≤1 KiB |
 | Catalogs | `cache/mcp/catalogs/<server>.json` | no | — | `MCP_CATALOG_VERSION = 1`, ≤4 MiB |
-| Env overrides | `FACTORY_MCP_LIST_TOOLS_TIMEOUT_MS`, `FACTORY_MCP_BLOCKING_LOAD_TIMEOUT_MS` | no | 15 000 / 60 000 | per-fetch / per-session |
+| Env overrides | `DROIDE_MCP_LIST_TOOLS_TIMEOUT_MS`, `DROIDE_MCP_BLOCKING_LOAD_TIMEOUT_MS` | no | 15 000 / 60 000 | per-fetch / per-session |
 
 ### Plugins
 
@@ -641,7 +643,7 @@ removes the session so later requests for that id fail rather than reviving it
 | Marketplace registry | `<scopeRoot>/plugins/known_marketplaces.json` (+ `known_marketplaces/`) | one entry per registered marketplace (`MarketplaceEntrySchema`: `source`, `installLocation`, `lastUpdated`, `autoUpdate` default `true`) |
 | Installed registry | `<scopeRoot>/plugins/installed_plugins.json` (+ `installed_plugins/`) | `{schemaVersion, plugins: {id: entry[]}}` |
 | Entry | `scope`, `installPath`, `version`, `installedAt`, `lastUpdated`, `source`, `marketplaceSourceHash?`, `externalSource?`, `externalCommit?`, `npm?`, `portableOnly?` | one array per plugin id |
-| Marketplace checkout | `<scopeRoot>/plugins/marketplaces/<name>/` | manifest at `.factory-plugin/marketplace.json` or `.claude-plugin/marketplace.json` |
+| Marketplace checkout | `<scopeRoot>/plugins/marketplaces/<name>/` | manifest at `.droide-plugin/marketplace.json` or `.claude-plugin/marketplace.json` |
 | Plugin copies | `<scopeRoot>/plugins/cache/<version>/` | staging prefix `.plugin-staging-` |
 | Plugin data | `<scopeRoot>/plugins/data/<slot>/` | referenced as `${*_PLUGIN_DATA}` |
 | Enablement | `general.enabledPlugins` in `settings.json` | plus `strictEnabledPlugins`, `extraKnownMarketplaces`, `strictKnownMarketplaces`, `pluginTokenHosts` |
@@ -665,7 +667,7 @@ removes the session so later requests for that id fail rather than reviving it
 | Mode ids | `normal`, `spec`, `auto-low`, `auto-medium`, `auto-high` |
 | Config option ids | `model`, `reasoning_effort`, `autonomy_level` |
 | Stop reasons | `end_turn`, `cancelled`, `refusal` (+ SDK-defined others unused here) |
-| Meta extension | `_meta.factory.source ∈ {mcp, connector}` |
+| Meta extension | `_meta.droide.source ∈ {mcp, connector}` |
 
 ## Errors
 
@@ -699,9 +701,9 @@ removes the session so later requests for that id fail rather than reviving it
 
 ## Acceptance tests
 
-All fixtures are synthesised: temporary directories standing in for `~/.factory` and a project root, plus
+All fixtures are synthesised: temporary directories standing in for `~/.droide` and a project root, plus
 hand-written `SKILL.md`, `mcp.json`, `marketplace.json` and `plugin.json` files. No network, no
-credentials, no wall clock, no dependence on the original binary.
+credentials, no wall clock, no dependence on the reference build.
 
 | Clause | Test id | Fixture |
 |---|---|---|
@@ -774,15 +776,15 @@ Every `path:line` below is relative to `evidence/original/windows-x64/`, e.g.
 |---|---|---|
 | `ev_mcp_constants_1` (`src/mcp/constants.ts:6-102`) | B10, B13, B19, B20, B28 | reading |
 | `ev_mcp_schema_1` (`packages/common/src/settings/schema.ts:2254-2362`) | B3, B4, B24 | reading |
-| `ev_mcp_schema_2` (`packages/droid-sdk-core/src/protocol/settings/schema.ts:96-160`) | B26 | reading |
+| `ev_mcp_schema_2` (`packages/sdk-core/src/protocol/settings/schema.ts:96-160`) | B26 | reading |
 | `ev_mcp_merge_1` (`packages/runtime/settings/src/mergeMcp.ts:1-28`) | B4 | reading |
 | `ev_mcp_hierarchy_1` (`packages/runtime/settings/src/SettingsManager.ts:3923-4053`) | B4 | reading |
 | `ev_mcp_hierarchy_2` (`packages/runtime/settings/src/SettingsResolver.ts:286-305`) | B4 | reading |
 | `ev_mcp_paths_1` (`src/services/mcp/mcpConfigPresence.ts:73-81`, `:236-266`) | B1, B4 | reading |
-| `ev_mcp_load_1` (`packages/runtime/settings/src/FactorySettingsFolder.ts:1286-1315`) | B2 | reading |
+| `ev_mcp_load_1` (`packages/runtime/settings/src/SettingsFolder.ts:1286-1315`) | B2 | reading |
 | `ev_mcp_names_1` (`packages/utils/src/mcp/normalizeServerName/index.ts:15-82`) | B5 | reading |
 | `ev_mcp_names_2` (`src/mcp/utils.ts:115-117`, `:255-305`) | B17 | reading |
-| `ev_mcp_names_3` (`packages/droid-core/src/llms/client/tool-call-ids.ts:13-70`) | B17 | reading |
+| `ev_mcp_names_3` (`packages/core/src/llms/client/tool-call-ids.ts:13-70`) | B17 | reading |
 | `ev_mcp_service_1` (`src/services/mcp/McpService.ts:4198-4310`, `:4429-4480`) | B16, B18 | reading |
 | `ev_mcp_hub_1` (`src/mcp/McpHub.ts:1762-1800`, `:2221-2330`) | B15, B20, B21, B30 | reading |
 | `ev_mcp_exec_1` (`src/tools/executors/client/mcp/formatMcpResult.ts:12-125`) | B22, B23 | reading |
@@ -813,7 +815,7 @@ Every `path:line` below is relative to `evidence/original/windows-x64/`, e.g.
 | `ev_skill_priority_1` (`src/skills/constants.ts:3-44`) | B46, B53, B54, B55 | reading |
 | `ev_skill_resolve_1` (`src/skills/resolveEffectiveSkills.ts:71-240`) | B50, B51 | reading |
 | `ev_skill_index_1` (`src/skills/builtin/index.ts:204-215`, `:467-633`) | B46, B51, B58 | reading |
-| `ev_skill_dirs_1` (`packages/runtime/settings/src/FactorySettingsFolder.ts:1455-1487`, `packages/runtime/settings/src/AgentSettingsFolder.ts:33-140`) | B47 | reading |
+| `ev_skill_dirs_1` (`packages/runtime/settings/src/SettingsFolder.ts:1455-1487`, `packages/runtime/settings/src/AgentSettingsFolder.ts:33-140`) | B47 | reading |
 | `ev_skill_fm_1` (`packages/common/src/settings/schema.ts:2396-2420`) | B48 | reading |
 | `ev_skill_fm_2` (`packages/utils/src/frontmatter/parseSkillFrontmatter.ts:73-118`) | B49 | reading |
 | `ev_skill_builtin_1` (`src/skills/builtin/loadBuiltinSkill.ts:89-110`, `src/skills/builtin/builtinSkillDefinitions.ts:186-247`, `src/skills/builtin/agent-browser/prompt.ts:1-4`) | B52 | reading |
@@ -855,13 +857,13 @@ markers and the settings schema). B67's stale-request rule is `[observed]` in co
    is elided. What is
    known: it carries a `root`, an optional `data` directory, and path variables resolve from it.
    Blocks B43's exact key names.
-3. **`.factory-plugin/plugin.json` full schema.** Only `hooks` is read and only a `$schema` prefix is
+3. **`.droide-plugin/plugin.json` full schema.** Only `hooks` is read and only a `$schema` prefix is
    sniffed; no schema exists for `name`, `version`, `description`. Whether other keys are validated,
    ignored, or rejected on install is unknown; `manifest-invalid` (`PluginFailureReason`) names a
    failure class (`evidence/original/windows-x64/packages/runtime/plugins/src/enums.ts:39-58`) but its
    trigger site is not in the recovered tree. Blocks a claim that a manifest without `name` is accepted or
    rejected.
-4. **`droid mcp list` exact output.** The command's rendering (table columns, auth-status wording) lives in
+4. **`droide mcp list` exact output.** The command's rendering (table columns, auth-status wording) lives in
    the 593-line `src/commands/mcp/utils.ts`, which was only skimmed; B25 pins the command set only, not
    the text. Settling it needs the renderer plus a recorded golden.
 5. **Stdio command resolution on Windows.** `spawnStdioFamily`
@@ -871,7 +873,7 @@ markers and the settings schema). B67's stale-request rule is `[observed]` in co
 6. **Protocol era for SSE servers.** Comments state SSE predates 2026-07-28 (`legacy_only`), but the connect
    path for `sse` was not read line by line. B11 states the plan source; whether a configured SSE server
    with modern negotiation on is ever probed is unverified.
-7. **`FACTORY_MCP_LIST_TOOLS_TIMEOUT_MS` / `FACTORY_MCP_BLOCKING_LOAD_TIMEOUT_MS` bounds.** The resolver is
+7. **`DROIDE_MCP_LIST_TOOLS_TIMEOUT_MS` / `DROIDE_MCP_BLOCKING_LOAD_TIMEOUT_MS` bounds.** The resolver is
    at `evidence/original/windows-x64/src/environment.ts:405-420`; the accepted range and the fallback for a
    malformed value were not read.
 8. **MCP catalog prewarming preconditions.**
@@ -880,9 +882,9 @@ markers and the settings schema). B67's stale-request rule is `[observed]` in co
 
 ## Clean-room notes
 
-**The contract a reimplementation must reproduce**
+**The contract a conforming build must reproduce**
 
-- Two MCP config files (`<factoryDir>/mcp.json`, `<projectRoot>/.factory/mcp.json`), JSONC, tolerant of a
+- Two MCP config files (`<stateDir>/mcp.json`, `<projectRoot>/.droide/mcp.json`), JSONC, tolerant of a
   broken file, merged lowest-first with per-name whole-entry override and normalized-name identity.
 - The server schema exactly: `type` defaulting to `stdio`, `command/args/env` vs `url/headers/oauth`, and
   `disabled`, `enabledTools`, `disabledTools`, `timeout`, `connectTimeout`.
@@ -899,7 +901,7 @@ markers and the settings schema). B67's stale-request rule is `[observed]` in co
 - Persistent-permission gating (impact ≤ approved, identity match, autonomy ceiling) and the nested
   `servers`/`tools` shape.
 - Plugin layout under `<scopeRoot>/plugins/` with both the legacy file and the directory registry readable,
-  the two marketplace-manifest paths, the archive root markers, the Claude→Factory layout translation and
+  the two marketplace-manifest paths, the archive root markers, the Claude→Droide layout translation and
   the `PLUGIN_ROOT`/`PLUGIN_DATA` variable expansion.
 - Plugin id parsing on the first `@` at index ≥ 1, default install scope `user`, uninstall scope probing
   user→project, and the install refusals (unknown marketplace, source drift, org policy, checksum).
@@ -917,7 +919,7 @@ markers and the settings schema). B67's stale-request rule is `[observed]` in co
 **Explicitly not part of the contract**
 
 - Exact wording of progress/spinner text, table formatting, and log lines.
-- The set of bundled skills is a *release* property: a reimplementation must keep the mechanism and the
+- The set of bundled skills is a *release* property: a conforming build must keep the mechanism and the
   inventory of the release it targets, but adding or removing a skill is not a behaviour change of this
   subsystem.
 - Internal implementation choices: the stdio process-family/job-object machinery, catalog prewarming,

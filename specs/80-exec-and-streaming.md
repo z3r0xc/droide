@@ -1,13 +1,13 @@
 # Exec mode and streaming protocols
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft
 - **Owner:** exec / protocol slice
 - **Related:** `00-context.md`; `tests/parity/cases/help-exec.json`; deferred: session store, JSON-RPC streaming, ACP server, tool catalogue, settings precedence
 
 ## Purpose
 
-`droid exec` is the non-interactive front door to the agent: one process, one
+`droide exec` is the non-interactive front door to the agent: one process, one
 stdout a script can parse, one exit code CI can branch on. It takes the prompt
 from argv, a file or stdin, applies an explicit autonomy ceiling instead of
 asking a human, and reports the run in one of several machine formats —
@@ -19,7 +19,7 @@ forking, and exit codes.
 
 ## Scope
 
-Covers `droid exec` as an invocations and wire contract: option handling,
+Covers `droide exec` as an invocations and wire contract: option handling,
 prompt acquisition, autonomy/permission resolution for an unattended process,
 `--output-format text|json|stream-json|debug`, `--input-format stream-json`,
 the boundary behaviour of `stream-jsonrpc`/`acp`/`acp-daemon`, and exit status.
@@ -40,8 +40,8 @@ Out of scope, with the owning spec named:
   effects on exec output (`--list-tools`) are named here.
 - Authentication, settings hierarchy and model catalogue resolution.
 
-There is **no `--json` and no `--quiet` flag on `droid exec`** in 1.9.0
-(`evidence/original/windows-x64/src/entrypoints/exec/command.ts:47-230` lists the
+There is **no `--json` and no `--quiet` flag on `droide exec`** in the
+recorded release (`evidence/original/windows-x64/src/entrypoints/exec/command.ts:47-230` lists the
 whole option set; the curated help lists the same set,
 `entrypoints/exec/help.ts:100-150`). Scripted callers use
 `-o json`/`-o stream-json`, and `exec` is quiet by construction: stdout carries
@@ -49,7 +49,7 @@ only the result, and `console.*` output is redirected to a log file (B33, B34).
 
 ## Terms
 
-- **exec run** — one `droid exec` process. It performs zero, one, or (with
+- **exec run** — one `droide exec` process. It performs zero, one, or (with
   `--input-format stream-json`) many agent turns.
 - **prompt source** — where the user text comes from: `-f/--file`, piped stdin,
   or the positional argument.
@@ -61,7 +61,7 @@ only the result, and `console.*` output is redirected to a log file (B33, B34).
   `completion` record (success) or an `error` record (failure).
 - **autonomy level** — `off | low | medium | high`; the CLI accepts only
   `low|medium|high` via `--auto`
-  (`packages/droid-sdk-core/src/protocol/shared/enums.ts:22-28`).
+  (`packages/sdk-core/src/protocol/shared/enums.ts:22-28`).
 - **autonomy mode** — the `(interactionMode, autonomyLevel)` pair exec resolves
   once per run: `spec` when `--use-spec`/`--spec-model` is given, else `auto`.
 - **immediate exit** — the exec-only state in which a denied tool call that
@@ -77,7 +77,7 @@ only the result, and `console.*` output is redirected to a log file (B33, B34).
 
 ### Invocation and prompt sources
 
-**B1.** The command is `droid exec [options] [prompt]`
+**B1.** The command is `droide exec [options] [prompt]`
 (`entrypoints/exec/command.ts:47-50`). An unrecognised option is rejected by
 Commander before any bootstrap runs; the usage error is written to stderr and
 the process exits `1` (`cli.ts:480`, `cli.ts:583-590`). `exec --help` is an
@@ -199,7 +199,7 @@ updates, the updates joined by a blank line stand in; otherwise the empty
 string is the answer (`exec/renderlessExecRunner.ts:91-129`).
 
 **B20.** On failure the final text is not printed to stdout; exec writes
-`Error during droid execution: <message>` to stderr and exits `1`
+`Error during droide execution: <message>` to stderr and exits `1`
 (`entrypoints/exec/handler.ts:537-573`).
 
 ### Output format `json`
@@ -229,7 +229,7 @@ exits `1` (`entrypoints/exec/handler.ts:546-557`,
 
 **B23.** `usage` is snake_case and always carries `input_tokens`,
 `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`,
-`factory_credits`, `thinking_tokens`; `ttft_ms` is present only when the session
+`droide_credits`, `thinking_tokens`; `ttft_ms` is present only when the session
 has a mean time-to-first-token (`exec/streamJsonEventHelpers.ts:212-231`).
 Token counts are inclusive of child sessions. When no session exists yet, all
 counters are `0` (`entrypoints/exec/handler.ts:246-258`).
@@ -239,7 +239,7 @@ counters are `0` (`entrypoints/exec/handler.ts:246-258`).
 **B24.** `-o stream-json` writes JSONL: one JSON object per line terminated by
 `\n`, never an array, never a wrapper (`exec/streamJsonEventHelpers.ts:152-154`).
 `-o debug` is the deprecated spelling of the same format and produces
-identical events (`packages/droid-sdk-core/src/protocol/shared/enums.ts:134-143`;
+identical events (`packages/sdk-core/src/protocol/shared/enums.ts:134-143`;
 selection logic `entrypoints/exec/handler.ts:1196-1198`).
 
 **B25.** There are exactly seven record kinds. `timestamp` is epoch
@@ -336,8 +336,8 @@ run, and the later `cli` record is the terminal one.
 **B33.** Stdout carries records only. Every diagnostic — selection warnings,
 hook-settings issues, ignored-flag warnings, worktree notices, MCP start
 failures — goes to stderr (`entrypoints/exec/handler.ts:145-147`, `:311-323`).
-`console.*` output is redirected to `<home>/.factory/logs/console.log` (or
-`.factory-dev` outside production) before any run output
+`console.*` output is redirected to `<home>/.droide/logs/console.log` (or
+`.droide-dev` outside production) before any run output
 (`utils/patch-console.ts:1-16`, `:65-80`), and when stdout is not a TTY the run
 sets `FORCE_COLOR=0` and `NO_COLOR=1` for itself and its tool children
 (`utils/command-wrapper.ts:12-24`).
@@ -508,7 +508,7 @@ is owned by the daemon and is not specified here (Open question 3).
 the session still owes background work: it drains it first, abandoning what does
 not settle within the bound — 5 minutes of background-task idleness per task and
 35 minutes per completion outcome, the latter overridable with
-`FACTORY_ONE_SHOT_COMPLETION_OUTCOME_TIMEOUT_MS` — or immediately with the
+`DROIDE_ONE_SHOT_COMPLETION_OUTCOME_TIMEOUT_MS` — or immediately with the
 respective reason when the main turn failed or permission was denied
 (`exec/sharedAgentRunner.ts:1576-1600`, `exec/owedWork.ts:84-114`).
 
@@ -539,7 +539,7 @@ respective reason when the main turn failed or permission was denied
 | `--init-session-id`, `--calling-session-id`, `--calling-tool-use-id`, `--session-title`, `--depth`, `--request-id`, `--log-group-id`, `--tool-execution-mode`, `--allow-subagents-in-scripts`, `--enabled-tools`, `--additional-tools`, `--disabled-tools`, `--restrict-tools` | — | — | internal / delegated-run plumbing, hidden from `exec --help` (`entrypoints/exec/command.ts:60-230`) |
 
 `--output-format` values are the `ExecOutputFormat` enum
-(`packages/droid-sdk-core/src/protocol/shared/enums.ts:134-143`); `--input-format`
+(`packages/sdk-core/src/protocol/shared/enums.ts:134-143`); `--input-format`
 values are `ExecInputFormat` (`:128-132`). Any other value is refused with
 `Invalid --output-format value` / the input-format message and exit `1`
 (`entrypoints/exec/assertValidOptions.ts:84-94`, `:274-281`).
@@ -548,20 +548,20 @@ values are `ExecInputFormat` (`:128-132`). Any other value is refused with
 
 | Variable | Used for |
 |---|---|
-| `FACTORY_API_KEY` | Factory-managed models; an unauthenticated managed run fails with the auth message (B55) |
-| `FACTORY_ONE_SHOT_COMPLETION_OUTCOME_TIMEOUT_MS` | owed-work bound (B58) |
-| `FACTORY_EXEC_ORIGINAL_INVOCATION` | `0` marks a daemon-spawned worker, which suppresses origin attribution (`entrypoints/exec/handler.ts:619-632`) |
-| `FACTORY_HOME_OVERRIDE`, `FACTORY_ENV` | choose the `.factory` vs `.factory-dev` log directory (B33) |
+| `DROIDE_API_KEY` | managed models; an unauthenticated managed run fails with the auth message (B55) |
+| `DROIDE_ONE_SHOT_COMPLETION_OUTCOME_TIMEOUT_MS` | owed-work bound (B58) |
+| `DROIDE_EXEC_ORIGINAL_INVOCATION` | `0` marks a daemon-spawned worker, which suppresses origin attribution (`entrypoints/exec/handler.ts:619-632`) |
+| `DROIDE_HOME_OVERRIDE`, `DROIDE_ENV` | choose the `.droide` vs `.droide-dev` log directory (B33) |
 | `FORCE_COLOR`, `NO_COLOR` | set to `0`/`1` by exec itself when stdout is not a TTY (B33) |
 
 ### Files
 
 - `-f/--file` is read relative to the run's working directory (after `--cwd`)
   (`entrypoints/exec/handler.ts:211-213`).
-- Console chatter: `<home>/.factory/logs/console.log`
+- Console chatter: `<home>/.droide/logs/console.log`
   (`utils/patch-console.ts:12-16`, `:65-80`).
 - `--settings <path>` merges a runtime settings file for this process only;
-  exec never writes `~/.factory/settings.json` as a side effect of configuration
+  exec never writes `~/.droide/settings.json` as a side effect of configuration
   (`entrypoints/exec/run.ts:279-292`).
 
 ## Errors
@@ -573,8 +573,8 @@ values are `ExecInputFormat` (`:128-132`). Any other value is refused with
 | Bad `-f` file | `Prompt file not found: <path>` / `Prompt file is empty: <path>` / permission text | 1 | no session |
 | Empty stdin | `No prompt received on stdin (the input was empty). …` | 1 | no session |
 | No prompt | `No prompt provided. Usage:` | 1 | no session |
-| Denied Execute/Script/MCP call | assistant text `Exec ended early: insufficient permission to proceed. <guidance>`; text mode prints it on stderr as `Error during droid execution: …`, stream-json closes with an `error` record | 1 | turn and session persisted; retry with higher `--auto` |
-| Provider/model failure | `error` record (stream-json) or `Error during droid execution: <diagnostic>` | 1 | partial transcript persisted; retry is a new turn |
+| Denied Execute/Script/MCP call | assistant text `Exec ended early: insufficient permission to proceed. <guidance>`; text mode prints it on stderr as `Error during droide execution: …`, stream-json closes with an `error` record | 1 | turn and session persisted; retry with higher `--auto` |
+| Provider/model failure | `error` record (stream-json) or `Error during droide execution: <diagnostic>` | 1 | partial transcript persisted; retry is a new turn |
 | Unauthenticated managed run | auth message as the run's final text | 1 | no model call |
 | Turn cancelled without a signal | none added | 1 | turn persisted as cancelled |
 | SIGINT / SIGTERM (one-shot modes) | none added | 130 / 143 (B56) | turn persisted as cancelled |
@@ -590,12 +590,12 @@ transcript.
 ## Acceptance tests
 
 All tests run offline against a scripted mock provider and a temporary
-`FACTORY_HOME_OVERRIDE`. Fixtures are synthesised. The mock is a local HTTP
+`DROIDE_HOME_OVERRIDE`. Fixtures are synthesised. The mock is a local HTTP
 server (127.0.0.1, ephemeral port) serving the OpenAI-compatible
 `POST /v1/chat/completions` streaming dialect, referenced by a `custom:` model in
 a fixture `settings.json` whose `general.customModels[]` entry is
 `{"id":"mock","model":"mock-1","provider":"openai","baseUrl":"http://127.0.0.1:<port>/v1","apiKey":"test"}`
-(`packages/droid-sdk-core/src/protocol/settings/schema.ts:366-395`,
+(`packages/sdk-core/src/protocol/settings/schema.ts:366-395`,
 `:586-608`). Each fixture scripts the exact assistant turns, including
 `tool_calls`, so no network or model variance exists.
 
@@ -644,7 +644,7 @@ Invocation (cwd a temp dir containing `fixture.txt` with the single line
 `hello fixture`):
 
 ```
-droid exec --output-format stream-json --model custom:mock "read fixture.txt" < /dev/null
+droide exec --output-format stream-json --model custom:mock "read fixture.txt" < /dev/null
 ```
 
 Mock script: turn 1 = one assistant message whose content is a `tool_calls`
@@ -659,7 +659,7 @@ Expected normalised stdout, in this order, one record per line, nothing else:
 {"type":"tool_call","id":"<tool-use-id>","messageId":"<uuid>","toolId":"Read","toolName":"Read","parameters":{"file_path":"fixture.txt"},"timestamp":0,"session_id":"<sid>"}
 {"type":"tool_result","id":"<tool-use-id>","messageId":"<uuid>","toolId":"Read","isError":false,"value":"<tool-output>","timestamp":0,"session_id":"<sid>"}
 {"type":"message","role":"assistant","id":"<uuid>","text":"Done.","timestamp":0,"session_id":"<sid>"}
-{"type":"completion","finalText":"Done.","numTurns":2,"durationMs":0,"session_id":"<sid>","timestamp":0,"usage":{"input_tokens":<n>,"output_tokens":<n>,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"factory_credits":0,"thinking_tokens":0}}
+{"type":"completion","finalText":"Done.","numTurns":2,"durationMs":0,"session_id":"<sid>","timestamp":0,"usage":{"input_tokens":<n>,"output_tokens":<n>,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"droide_credits":0,"thinking_tokens":0}}
 ```
 
 Assertions: `reasoning_effort` is the non-empty effort the session resolved
@@ -676,10 +676,10 @@ Four invocations, same mock harness, `settings.json` fixture, stdin
 
 | Scenario | Invocation | Fixture script | Expected stdout | Expected stderr | Exit |
 |---|---|---|---|---|---|
-| success | `droid exec --model custom:mock "say hi"` | assistant text `hi` | `hi\n` | empty | 0 |
-| denied permission | `droid exec --auto low --model custom:mock "delete it"` | assistant `tool_calls` → `Execute` with `{"command":"rm -rf ./build"}` | empty | `Error during droid execution: Exec ended early: insufficient permission to proceed. Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.` | 1 |
-| provider error | `droid exec --model custom:mock "say hi"` | server returns HTTP 500 on turn 1 | empty | `Error during droid execution: <provider diagnostic>` | 1 |
-| cancelled | `droid exec --model custom:mock "say hi"`, SIGINT sent once the first token is served | assistant stream never completes | empty (or the partial text, if the turn had already answered) | — | 130 |
+| success | `droide exec --model custom:mock "say hi"` | assistant text `hi` | `hi\n` | empty | 0 |
+| denied permission | `droide exec --auto low --model custom:mock "delete it"` | assistant `tool_calls` → `Execute` with `{"command":"rm -rf ./build"}` | empty | `Error during droide execution: Exec ended early: insufficient permission to proceed. Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.` | 1 |
+| provider error | `droide exec --model custom:mock "say hi"` | server returns HTTP 500 on turn 1 | empty | `Error during droide execution: <provider diagnostic>` | 1 |
+| cancelled | `droide exec --model custom:mock "say hi"`, SIGINT sent once the first token is served | assistant stream never completes | empty (or the partial text, if the turn had already answered) | — | 130 |
 
 The denied-permission case must reach a *confirmation* rather than a
 tool-availability refusal: `--auto low` makes every tool selectable, and an
@@ -690,7 +690,7 @@ assert exit `0` with the tool result present.
 
 ### `tests/exec/test_json_summary_success`
 
-`droid exec -o json --model custom:mock "say hi" < /dev/null` prints exactly one
+`droide exec -o json --model custom:mock "say hi" < /dev/null` prints exactly one
 line, parses as one object with keys
 `type,subtype,is_error,duration_ms,num_turns,result,session_id,usage`,
 `type:"result"`, `subtype:"success"`, `is_error:false`, `result:"hi"`,
@@ -700,7 +700,7 @@ line, parses as one object with keys
 
 Piping `fixtures/exec/stream_input.jsonl` (`{"role":"user","content":"one"}` then
 `{"role":"user","content":"two"}`) into
-`droid exec --input-format stream-json --output-format stream-json --model custom:mock`
+`droide exec --input-format stream-json --output-format stream-json --model custom:mock`
 yields: one `system/init`; then for message "one" the user echo, the assistant
 text and one `completion`; then for message "two" the same three records under
 the same `session_id`; then EOF and exit `0`. The stderr starts with the
@@ -733,7 +733,7 @@ deprecation warning (B41).
 | `ev_exec_owed_1` | B58 | read `exec/owedWork.ts:84-114`; `exec/sharedAgentRunner.ts:1576-1600` |
 | `ev_exec_console_1` | B33 | read `utils/patch-console.ts:1-80`; `utils/command-wrapper.ts:12-24` |
 | `ev_exec_catalog_1` | B53 | read `utils/toolCatalog.ts:138-169` |
-| `ev_exec_model_1` | Acceptance fixtures (`custom:` model shape) | read `packages/droid-sdk-core/src/protocol/settings/schema.ts:366-395`, `:586-608` |
+| `ev_exec_model_1` | Acceptance fixtures (`custom:` model shape) | read `packages/sdk-core/src/protocol/settings/schema.ts:366-395`, `:586-608` |
 
 ## Open questions
 
@@ -748,7 +748,7 @@ deprecation warning (B41).
    emitted by `JsonRpcStreamingExecRunner` is not specified here (B48–B51 cover
    only the boundary). Settled by a dedicated `jsonrpc-streaming.md` reading
    `exec/streamingJsonRpcExecRunner.ts` and
-   `packages/droid-sdk-core/src/protocol/droid`. Blocks implementation of the
+   `packages/sdk-core/src/protocol/droid`. Blocks implementation of the
    JSON-RPC payloads, not of exec.
 3. **ACP exit codes and lifetime.** `runAcpDaemon` owns exit status after B52;
    the codes are unknown at this slice. Settled by an `acp-server.md`.
@@ -759,18 +759,18 @@ deprecation warning (B41).
 5. **ANSI colour on a TTY.** B20/B14 texts are produced through `chalk`, so on a
    TTY the stderr line carries escape codes. The spec pins the plain text; the
    exact colour codes are not contractual. Settled by deciding (as a design
-   choice) that a reimplementation must emit the same plain text and may colour
+   choice) that a conforming build must emit the same plain text and may colour
    it.
 6. **Windows signal mapping.** B56 uses `os.constants.signals`; on Windows only
-   SIGINT/SIGTERM-equivalent delivery exists, so `droid exec` may observe fewer
-   signal kinds than on POSIX. Settled by a Windows-specific parity recording.
+   SIGINT/SIGTERM-equivalent delivery exists, so `droide exec` may observe fewer
+   signal kinds than on POSIX. Settled by a Windows-specific recorded case.
    Only the two documented codes are contractual.
 
 ## Clean-room notes
 
 **Must reproduce (the contract).**
 
-- `droid exec [options] [prompt]`, the option names and defaults in the table
+- `droide exec [options] [prompt]`, the option names and defaults in the table
   above, the four validation refusals of B7/B37/B38/B48/B51, and the
   `--file` > stdin > argv precedence with its conflict and no-prompt errors.
 - Default autonomy = auto/low with the read-only tool base; `--auto` widening to

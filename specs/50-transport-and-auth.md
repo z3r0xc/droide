@@ -1,20 +1,20 @@
 # Transport and authentication
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft
 - **Owner:** Transport / auth
 - **Related:** `00-context.md`; `10-cli-surface.md` (dispatch of
-  `droid deployment`, exit-code normalization); `40-sessions-and-storage.md`
+  `droide deployment`, exit-code normalization); `40-sessions-and-storage.md`
   (local session store, not the HTTP session API); `80-exec-and-streaming.md`
   (exec record shapes; it defers the agent loop's retry orchestration to the
   agent-loop spec). Tool ids: none.
 
 ## Purpose
 
-Everything `droid` sends over HTTP and everything it presents as proof of who
-the caller is. This subsystem owns: which host a request goes to (Factory
-control plane, Factory-managed Prem, or a customer's own Prem), the exact
-headers a request carries, the closed inventory of backend routes, the retry
+Everything `droide` sends over HTTP and everything it presents as proof of who
+the caller is. This subsystem owns: which host a request goes to (the hosted
+control plane, managed Prem, or a customer's own Prem), the exact headers a
+request carries, the closed inventory of backend routes, the retry
 and deadline budget each boundary enforces, how credentials are stored,
 refreshed, revoked and read back for a different process, and how a failed
 request becomes a typed error with user-visible copy and an exit status. The
@@ -45,7 +45,7 @@ per-provider adapters).
 - Session transcript persistence and cloud-sync batching semantics —
   `40-sessions-and-storage.md`, cloud-sync spec. This spec inventories the
   routes and states their placement rules.
-- MCP OAuth (`droid mcp auth`) and its credential store — MCP spec.
+- MCP OAuth (`droide mcp auth`) and its credential store — MCP spec.
 - Interactive-login UI, pickers and localization catalogues beyond the English
   fallbacks quoted here.
 - Telemetry authentication and feature-flag evaluation — their own specs.
@@ -60,24 +60,24 @@ Citations are abbreviated: `orig/…` = `evidence/original/windows-x64/…`.
 
 | Term | Meaning |
 |---|---|
-| **backend** | The Factory control plane reached at `apiBaseUrl`/`apiBaseUrlEu`, or at a customer Prem origin. |
-| **hosted route** | A route served by the Factory control plane, e.g. `/api/sessions/v2`. |
-| **managed Prem** | A Factory-hosted Prem placement advertised per organization as `premBaseHostV2`; it is *not* an authentication authority (`orig/packages/common/src/api/backend/schemas.ts:45-47`). |
+| **backend** | The hosted control plane reached at `apiBaseUrl`/`apiBaseUrlEu`, or at a customer Prem origin. |
+| **hosted route** | A route served by the hosted control plane, e.g. `/api/sessions/v2`. |
+| **managed Prem** | A hosted Prem placement advertised per organization as `premBaseHostV2`; it is *not* an authentication authority (`orig/packages/common/src/api/backend/schemas.ts:45-47`). |
 | **customer Prem** | A self-hosted deployment selected by `auth-deployment.json`; it *is* the authentication authority (`orig/packages/runtime/auth/src/auth/prem/config.ts:101-107`). |
 | **deployment selection** | The persisted choice `factory` or `customer-prem`+origin. Independent of whether credentials are saved. |
-| **credential source** | One of `workos` (stored WorkOS session or brokered provider), `api-key` (`FACTORY_API_KEY`), `prem` (customer credential record). Spelled `TokenSourceType` in code. |
+| **credential source** | One of `workos` (stored WorkOS session or brokered provider), `api-key` (`DROIDE_API_KEY`), `prem` (customer credential record). Spelled `TokenSourceType` in code. |
 | **credential snapshot** | One consistent read of token + active organization (+ Prem identity) plus the user it names. |
 | **base URL** | The origin (and any path prefix) a relative backend path is appended to. |
 | **managed LLM route** | One of the `/api/llm/…` proxy paths; `headerPurpose: 'usage'`. |
 | **turn attempt** | One HTTP/WebSocket request to a model provider under the retry policy; a *turn* may contain several attempts. |
 | **stream event** | One decoded JSON payload from an SSE `data:` field or one Responses WebSocket frame. |
-| **airgap** | `FACTORY_AIRGAP_ENABLED` (or the baked define) is true: no Factory-bound request may leave the process. |
+| **airgap** | `DROIDE_AIRGAP_ENABLED` (or the baked define) is true: no backend-bound request may leave the process. |
 
 ## Observable behaviour
 
 ### A. Base-URL resolution
 
-**B1** For a Factory API request the destination is, in order: the
+**B1** For a backend API request the destination is, in order: the
 customer-Prem origin when a `customer-prem` deployment is selected; else
 `apiBaseUrlEu` when the resolved region is `eu` **and** that value is
 configured; else `apiBaseUrl`
@@ -91,15 +91,15 @@ selection keeps the environment-resolved URLs
 (`orig/src/environment.ts:300-317`). `[observed]`
 
 **B3** For a `factory` selection, `apiBaseUrl` comes from
-`FACTORY_API_BASE_URL` and `apiBaseUrlEu` from `FACTORY_API_BASE_URL_EU`; the
+`DROIDE_API_BASE_URL` and `apiBaseUrlEu` from `DROIDE_API_BASE_URL_EU`; the
 environment variable beats the baked build define. A test runtime substitutes
 the test defaults only when neither is set
 (`orig/src/environmentResolution.ts:90-127,189-197`). `[observed]`
 
 **B4** The region used by B1 is `global` whenever a customer Prem is selected,
 whenever no credential resolves, or when the cached identity has no region;
-otherwise it is the region the identity reports (`FactoryRegion.global|eu`)
-(`orig/packages/runtime/auth/src/auth/common/cache.ts:665-676`;
+otherwise it is the region the identity reports (`Region.global|eu`; vendor
+prefix elided) (`orig/packages/runtime/auth/src/auth/common/cache.ts:665-676`;
 `orig/packages/common/src/shared/enums.ts:129-132`). `[observed]`
 
 **B5** The Prem host used for a *managed* Prem organization is
@@ -141,7 +141,7 @@ to `cli`), `X-Factory-Sdk` (SDK callers only), `X-Factory-Request-Surface`,
 `X-Factory-Exec-Output-Format`, `X-Factory-Exec-Input-Format`, and
 `X-Client-Version` (sent only when `CLI_VERSION` is set)
 (`orig/src/api/config.ts:149-186,209-228`;
-`orig/packages/droid-sdk-core/src/protocol/droid/schemas/constants.ts:7-19`).
+`orig/packages/sdk-core/src/protocol/schemas/constants.ts:7-19`).
 `[observed]`
 
 **B12** `headerPurpose: 'usage'` omits the operational `X-Factory-Client`
@@ -155,7 +155,7 @@ SDK tuple cannot be relabelled onto proxy traffic
 and an optional `X-Factory-Session-Attribution` claim; the credential itself is
 presented as `Authorization: Bearer` plus `X-Factory-Org-Id` only when an active
 organization is set (`orig/packages/runtime/auth/src/auth/common/whoami.ts:19-56`;
-`orig/packages/droid-sdk-core/src/protocol/droid/schemas/constants.ts:21-36`).
+`orig/packages/sdk-core/src/protocol/schemas/constants.ts:21-36`).
 `[observed]`
 
 **B14** For any credential other than an API key the request organization is
@@ -174,18 +174,18 @@ key stores no choice; it is `null` when a key belongs to a different
 organization than the stored selection
 (`orig/packages/runtime/auth/src/auth/get.ts:256-282`). `[observed]`
 
-**B17** Managed model requests to the Factory proxy carry, besides auth and
+**B17** Managed model requests to the inference proxy carry, besides auth and
 client headers: `x-session-id`, `x-assistant-message-id`, `x-api-provider`,
 optional `x-message-call-type`, the source tool-call id when present, a provider
 routing source header, `User-Agent`, `X-Client-Version` (the package version),
 and an OpenAI-platform header when the provider is an OpenAI-platform one
 (`orig/src/llm-proxy/utils.ts:235-296`). `[observed]`
 
-**B18** Factory API requests receive a `traceparent` header injected from the
+**B18** Backend API requests receive a `traceparent` header injected from the
 active OpenTelemetry context (`orig/packages/utils/src/api/fetch.ts:255-275`).
 `[observed]`
 
-**B19** On the plain Factory-API path the header merge order is: base headers
+**B19** On the plain backend path the header merge order is: base headers
 minus any name the later groups mention (case-insensitively), then config
 headers, then trace headers, then the caller's `init.headers` — so a caller can
 override config headers. On a customer-policy request the config's expected
@@ -244,7 +244,7 @@ managed transport (`http`/`websocket`), an optional header purpose, and one of
 
 (`orig/src/api/BackendClient.ts:274-394`;
 `orig/packages/common/src/api/prem/constants/index.ts:34-38`; the batch constant
-in `@factory/common/api/sessions` is not present in the recovered tree, so its
+in `common/api/sessions` is not present in the recovered tree, so its
 literal is `[inferred]` to remain the hosted `/api/sessions` prefix.)
 `[observed except where noted]`
 
@@ -350,14 +350,14 @@ signed-out (`orig/packages/runtime/auth/src/auth/source.ts:83-95,101-160,466-530
 **B40** Model-call retry defaults depend on strategy: `NoRetry` 1 attempt,
 `NonInteractive` 5, `Interactive` 4; base delay 2000 ms non-interactive and
 1000 ms otherwise; backoff factor 2.5 and 2 respectively, with jitter
-(`orig/packages/droid-core/src/llms/client/retryPolicy/index.ts:14-15,61-72,105-120`).
+(`orig/packages/core/src/llms/client/retryPolicy/index.ts:14-15,61-72,105-120`).
 `[observed]`
 
 **B41** A throttling failure waits at least 5 s and at most 30 s, plus up to 20 %
 jitter; a server-provided delay is respected as a minimum. `retry-after-ms` is
 read in milliseconds, `retry-after` in seconds or as an HTTP date, and an
 Anthropic `-remaining`/`-reset` pair is used when remaining is zero. Interactive
-turns allow 6 throttling attempts (`orig/packages/droid-core/src/llms/client/retryPolicy/index.ts:16-17,30,74-102,120-140,179-203`).
+turns allow 6 throttling attempts (`orig/packages/core/src/llms/client/retryPolicy/index.ts:16-17,30,74-102,120-140,179-203`).
 `[observed]`
 
 **B42** A provider-capacity failure (408, 502, 503, 529 unconditionally; 500
@@ -366,13 +366,13 @@ internal error classes) waits about
 500 ms when another provider can be rotated to, and otherwise backs off like a
 throttle (5 s…30 s); with no rotation target a single provider gets 10 attempts.
 Timeout failures use a 3 s base growing 1.5× per attempt, capped at 15 s
-(`orig/packages/droid-core/src/llms/client/retryPolicy/index.ts:20-34,148-170`).
+(`orig/packages/core/src/llms/client/retryPolicy/index.ts:20-34,148-170`).
 `[observed]`
 
 **B43** A managed Anthropic stream that produces no event for 4 minutes is
 failed as idle; while the model is thinking the budget is 10 minutes. Custom
 models use the configured request timeout instead
-(`orig/packages/droid-core/src/llms/client/sendMessage.ts:484-491,3076-3081`).
+(`orig/packages/core/src/llms/client/sendMessage.ts:484-491,3076-3081`).
 `[observed]`
 
 **B44** A managed stream's server-side deadline is advertised as
@@ -382,11 +382,11 @@ models use the configured request timeout instead
 ### E. Credential storage and lookup
 
 **B45** Credential files live in the credential base directory:
-`$FACTORY_HOME/<.factory|.factory-dev>`, where `FACTORY_HOME_OVERRIDE` replaces
+`$DROIDE_HOME/<.droide|.droide-dev>`, where `DROIDE_HOME_OVERRIDE` replaces
 the home directory and the directory name is the production-tier name
 (`orig/packages/runtime/auth/src/credentials/presence.ts:16-19`;
 `orig/packages/runtime/cli/src/home/index.ts:20-23`;
-`orig/packages/utils/src/environment/factory-dir-name/index.ts:12-14`).
+`orig/packages/utils/src/environment/dir-name/index.ts:12-14`).
 `[observed]`
 
 **B46** The WorkOS v2 store uses these literal names: `auth.v2.keyring` (keyring
@@ -399,7 +399,7 @@ ciphertext), `auth.v2.loginkeychain` (macOS security-CLI ciphertext),
 
 **B47** Load order: the in-memory recall for the same file identity; then the
 secure file, when secure storage is enabled; then the keyfile. With
-`FACTORY_DISABLE_KEYRING` (any `true`/`1`) the secure file is never read and the
+`DROIDE_DISABLE_KEYRING` (any `true`/`1`) the secure file is never read and the
 OS key store is never touched (`orig/packages/runtime/auth/src/credentials/CredentialsStorage.ts:320-322,512-541`).
 `[observed]`
 
@@ -418,7 +418,7 @@ write is rejected. `updateCredentials` reports `applied`, `rejected` or
 **B50** A new login uses secure storage when enabled. If the OS key store is
 unusable, the login is written to the keyfile instead, but only when no secure
 ciphertext exists that the new record would shadow; the reason is retained for
-`droid doctor` and the login-saved-to-disk message
+`droide doctor` and the login-saved-to-disk message
 (`orig/packages/runtime/auth/src/credentials/CredentialsStorage.ts:653-672,717-780`).
 `[observed]`
 
@@ -428,12 +428,12 @@ never deletes key material, so a re-login reuses the key
 `orig/packages/runtime/auth/src/auth/logout.ts:12-38`). `[observed]`
 
 **B52** Credential lookup order is fixed: airgap synthetic credential; then
-`FACTORY_API_KEY`; then, when a customer deployment is selected, the Prem
+`DROIDE_API_KEY`; then, when a customer deployment is selected, the Prem
 credential record; then an installed external WorkOS provider; then the stored
 WorkOS session (`orig/packages/runtime/auth/src/auth/source.ts:234-290`).
 `[observed]`
 
-**B53** A configured `FACTORY_API_KEY` always wins over a stored WorkOS session,
+**B53** A configured `DROIDE_API_KEY` always wins over a stored WorkOS session,
 even an expired one, and names no organization of its own
 (`orig/packages/runtime/auth/src/auth/source.ts:241-248,300-320`). `[observed]`
 
@@ -459,7 +459,7 @@ token hashes to a different entry
 (`orig/packages/runtime/auth/src/auth/common/cache.ts:50-88,93-95,506-593`).
 `[observed]`
 
-**B58** In airgap the credential is synthetic: `FACTORY_API_KEY`-shaped token
+**B58** In airgap the credential is synthetic: `DROIDE_API_KEY`-shaped token
 `airgapped-token` and user `{userId: 'airgapped-user', orgId:
 'airgapped-org', email: ''}`; the org id is deliberately non-routable
 (`orig/packages/runtime/auth/src/auth/common/constants.ts:8-24`;
@@ -469,12 +469,12 @@ token hashes to a different entry
 
 **B59** The default WorkOS API base is
 `https://api.workos.com/user_management`, overridable by
-`FACTORY_WORKOS_BASE_URL` (`orig/packages/runtime/auth/src/auth/workos/base-url.ts:3-9`;
+`DROIDE_WORKOS_BASE_URL` (`orig/packages/runtime/auth/src/auth/workos/base-url.ts:3-9`;
 `orig/src/environmentResolution.ts:239-241`). `[observed]`
 
-**B60** The public WorkOS client id is chosen from `FACTORY_ENV`: the production
+**B60** The public WorkOS client id is chosen from `DROIDE_ENV`: the production
 client id only for `production`, the development id otherwise. An invalid
-`FACTORY_ENV` throws `MetaError` naming the allowed values
+`DROIDE_ENV` throws `MetaError` naming the allowed values
 (`orig/packages/runtime/auth/src/auth/workos/config/index.ts:11-40`). `[observed]`
 
 **B61** Device login starts with `POST {workosBase}/authorize/device`,
@@ -538,10 +538,10 @@ credential base directory with shape `{version: 1, revision: <uuid>, deployment:
 `orig/packages/runtime/auth/src/deployment/schemas.ts:4-25`;
 `orig/packages/runtime/auth/src/deployment/constants.ts:1`). `[observed]`
 
-**B71** A missing selection file means Factory. A malformed or unreadable file
-is not a sign-out: it throws `AuthDeploymentSelectionError` naming the file, and
-the process writes the message to stderr and exits 1 before dispatch
-(`orig/packages/runtime/auth/src/deployment/index.ts:51-68`;
+**B71** A missing selection file means the `factory` deployment. A malformed or
+unreadable file is not a sign-out: it throws `AuthDeploymentSelectionError`
+naming the file, and the process writes the message to stderr and exits 1
+before dispatch (`orig/packages/runtime/auth/src/deployment/index.ts:51-68`;
 `orig/packages/runtime/auth/src/deployment/errors.ts:6-18`;
 `orig/src/index.ts:186-196`). `[observed]`
 
@@ -551,16 +551,16 @@ userinfo and fragments are refused; `http` is allowed only for `localhost`,
 `127.0.0.1` or `[::1]`; a trailing dot is removed and the result is the origin
 (`orig/packages/runtime/auth/src/auth/prem/config.ts:11-77`). `[observed]`
 
-**B73** `droid deployment set` requires exactly one of `--private-origin` or
+**B73** `droide deployment set` requires exactly one of `--private-origin` or
 `--factory`, refuses to run in airgap or inside a sandbox, saves the selection,
-and prints `Deployment saved. Restart Droid, desktop, daemons, and workers to
+and prints `Deployment saved. Restart Droide, desktop, daemons, and workers to
 use it. Saved credentials are unchanged.` It exits 0 on success and 1 on any
 failure (`orig/src/entrypoints/deployment/command.ts:30-112`). `[observed]`
 
 **B74** When the computer is pinned to an expected Prem origin and the saved
-selection differs (including a missing file, which reads as Factory), startup
-throws `ExpectedPremDeploymentError` asking for
-`droid deployment set --private-origin` (`orig/src/environment.ts:285-298`;
+selection differs (including a missing file, which reads as the `factory`
+deployment), startup throws `ExpectedPremDeploymentError` asking for
+`droide deployment set --private-origin` (`orig/src/environment.ts:285-298`;
 `orig/packages/runtime/auth/src/deployment/errors.ts:20-36`). `[observed]`
 
 **B75** Prem discovery is `GET {origin}/api/auth/config`; the result must
@@ -614,9 +614,9 @@ stored human credential otherwise; with no credential it throws
 authentication is unavailable in airgap mode.`
 (`orig/packages/runtime/auth/src/auth/prem/config.ts:110-116`). `[observed]`
 
-**B83** A selected customer authority is never reinterpreted as Factory: when
-the deployment is `customer-prem` and no API key wins, identity, active
-organization and visibility all read the Prem record
+**B83** A selected customer authority is never reinterpreted as the hosted
+control plane: when the deployment is `customer-prem` and no API key wins,
+identity, active organization and visibility all read the Prem record
 (`orig/packages/runtime/auth/src/auth/get.ts:165-190`;
 `orig/packages/runtime/auth/src/auth/active-organization.ts:50-70`).
 `[observed]`
@@ -625,11 +625,11 @@ organization and visibility all read the Prem record
 
 **B84** Ambient proxy configuration is honoured through the standard
 `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` variables, accepted in either case;
-`droid doctor` reports the effective proxy and redacts credentials embedded in
+`droide doctor` reports the effective proxy and redacts credentials embedded in
 proxy URLs (`orig/src/constants/constants.ts:87-94`;
 `orig/src/entrypoints/doctor/checks/proxy.ts:17-20`). `[observed]`
 
-**B85** Extra roots are read from `FACTORY_EXTRA_CA_CERTS` and
+**B85** Extra roots are read from `DROIDE_EXTRA_CA_CERTS` and
 `NODE_EXTRA_CA_CERTS`; each is either inline PEM or a `path.delimiter` list of
 files with empty entries dropped (`orig/src/utils/certificates/parseCertificates.ts:8-20`).
 `[observed]`
@@ -637,24 +637,24 @@ files with empty entries dropped (`orig/src/utils/certificates/parseCertificates
 **B86** Startup trust material is the bundled Node roots plus the OS system
 store plus the extra roots; the merged list is installed on
 `https.globalAgent` and used by a patched `tls.createSecureContext`, capped at
-4096 certificates. System roots are cached under the Factory directory and a
+4096 certificates. System roots are cached under the state directory and a
 cache older than 24 h is reported as stale
 (`orig/src/utils/systemCertificates.ts:46,640-700`;
 `orig/src/entrypoints/doctor/checks/certificates.ts:21-47,140-180`).
 `[observed]`
 
 **B87** `NODE_TLS_REJECT_UNAUTHORIZED` disables certificate verification
-process-wide; `droid doctor` warns that this is unsafe and recommends trusting
-the appliance root through `FACTORY_EXTRA_CA_CERTS` instead
+process-wide; `droide doctor` warns that this is unsafe and recommends trusting
+the appliance root through `DROIDE_EXTRA_CA_CERTS` instead
 (`orig/src/entrypoints/doctor/checks/certificates.ts:120-130`). `[observed]`
 
 **B88** TLS interception is diagnosed as `certificate chain not trusted: …`
 with the remediation to export the appliance root CA (PEM) and point
-`FACTORY_EXTRA_CA_CERTS` at it, and on Windows to delete the certificate cache
-under the Factory directory (`orig/src/entrypoints/doctor/checks/connectivity.ts:170-182`).
+`DROIDE_EXTRA_CA_CERTS` at it, and on Windows to delete the certificate cache
+under the state directory (`orig/src/entrypoints/doctor/checks/connectivity.ts:170-182`).
 `[observed]`
 
-**B89** Airgap vetoes every Factory-bound request with `AirgapBlockedError`
+**B89** Airgap vetoes every backend-bound request with `AirgapBlockedError`
 whose message is `Outbound request blocked because Airgap Mode is enabled; only
 BYOK, MCP, and marketplaces are permitted.`; the veto fires for relative URLs
 and for absolute URLs under the configured base URL, and BYOK/absolute external
@@ -675,7 +675,7 @@ off the origin (`orig/packages/utils/src/api/constants.ts:1-9`). `[observed]`
 **B92** A non-2xx response on the configured-fetch path throws `FetchError`,
 whose message is `<status> <body>` (or `<status> Fetch failed` for an empty
 body) and which carries the `Response`, `statusCode` and, when known, the
-request URL and a factory-backend marker
+request URL and a backend marker
 (`orig/packages/logging/src/errors/errors.ts:13-46`). `[observed]`
 
 **B93** A customer-deployment failure instead throws `FetchError('Customer
@@ -689,27 +689,27 @@ plus `code`, and `displayToUser: true` metadata adds the same fields under
 `error` for OpenAI-SDK-compatible readers
 (`orig/packages/logging/src/errors/responses/errors.ts:7-68`). `[observed]`
 
-**B95** API-key verification maps 400, 401 and 403 to `Factory API key was
+**B95** API-key verification maps 400, 401 and 403 to `API key was
 rejected.` with `ResponseError400BadRequest` / `…401Unauthorized` /
 `…403Forbidden` respectively; every other non-2xx becomes a generic
-`ResponseError` carrying `Factory API key validation failed.` and the status.
+`ResponseError` carrying `API key validation failed.` and the status.
 Transport failures and a malformed 2xx propagate unchanged
 (`orig/packages/runtime/auth/src/auth/api-key/verify.ts:47-127`). `[observed]`
 
 **B96** Classification of an API-key validation outcome: 400/401/403 →
 `apiKeyRejected` with the invalid-key copy; any status ≥ 500 →
-`FactoryApiUnavailable` with the network/proxy copy; any other status →
-`FactoryApiValidationFailed`; a `ResponseError`/`MetaError` without a status
+`ApiUnavailable` with the network/proxy copy; any other status →
+`ApiValidationFailed`; a `ResponseError`/`MetaError` without a status
 (malformed 2xx) → validation failed; any other `Error` → unavailable
 (`orig/src/commands/authHelpers.ts:65-148`). `[observed]`
 
 **B97** The user-visible auth copy is fixed: not-authenticated (`Not
-authenticated. Please log in using /login or set a valid FACTORY_API_KEY
+authenticated. Please log in using /login or set a valid DROIDE_API_KEY
 environment variable.`), invalid API key (`Authentication failed.
-FACTORY_API_KEY is set but appears to be invalid. Unset it or replace it with a
-valid key.`), API unavailable (`FACTORY_API_KEY could not be validated because
-the Factory API is not accessible. Check network or proxy access and try
-again.`), validation failed (`FACTORY_API_KEY validation failed. Try again or
+DROIDE_API_KEY is set but appears to be invalid. Unset it or replace it with a
+valid key.`), API unavailable (`DROIDE_API_KEY could not be validated because
+the API is not accessible. Check network or proxy access and try
+again.`), validation failed (`DROIDE_API_KEY validation failed. Try again or
 contact support if the problem continues.`), expired login, customer login
 required, and login-saved-to-disk (`orig/src/i18n/authMessages.ts:11-63`).
 `[observed]`
@@ -724,9 +724,9 @@ with no retry; the caller sees no token and does not fall back to another
 source (`orig/packages/runtime/auth/src/auth/workos/refresh.ts:18-36`;
 `orig/packages/runtime/auth/src/auth/source.ts:333-360`). `[observed]`
 
-**B100** `droid exec` exits 1 on a refused invocation and on a startup failure;
+**B100** `droide exec` exits 1 on a refused invocation and on a startup failure;
 lightweight subcommands report an auth failure by writing the auth message to
-stderr and setting exit code 1; `droid deployment` returns 0 or 1
+stderr and setting exit code 1; `droide deployment` returns 0 or 1
 (`orig/src/entrypoints/exec/run.ts:585-590,660-680`;
 `orig/src/entrypoints/wiki-search/run.ts:85-92`;
 `orig/src/entrypoints/deployment/command.ts:94-112`). `[observed]`
@@ -737,41 +737,41 @@ context limit, request too large, invalid request (thinking-signature or PDF
 page limit), authentication, forbidden, gone (410), throttling, overloaded,
 network, then the generic 4xx→invalid-request and ≥500→internal-error fallback,
 then unknown. Provider-controlled text never becomes the reason
-(`orig/packages/droid-core/src/llms/errors/utils.ts:1034-1156`). `[observed]`
+(`orig/packages/core/src/llms/errors/utils.ts:1034-1156`). `[observed]`
 
 **B102** Model-call user-facing messages are fixed per class (throttling,
 overloaded, network, provider internal error, invalid request, content
 moderation, context limit, request too large, text fields too large, host
 duration limit, output degeneration, empty response)
-(`orig/packages/droid-core/src/llms/errors/constants.ts:1-44`). `[observed]`
+(`orig/packages/core/src/llms/errors/constants.ts:1-44`). `[observed]`
 
 **B103** Retryability is part of the error class: throttling, overloaded,
 network, stream, internal and unknown errors are retryable; a host-duration cut
 is retryable only when its thrower allows the single retry (a repeated cut is
 not); invalid request, content moderation, context limit, request too
 large, text-fields-too-large and output degeneration are not
-(`orig/packages/droid-core/src/llms/errors/errors.ts:125-545`). `[observed]`
+(`orig/packages/core/src/llms/errors/errors.ts:125-545`). `[observed]`
 
-**B104** The Factory proxy's gate failures have stable identities: 403 with
+**B104** The inference proxy's gate failures have stable identities: 403 with
 code `content_policy_rejected` (or legacy `{"detail":"Forbidden"}`), 402 with
 code `no_active_subscription`, and any provider error it forwards is marked by
 `x-factory-upstream-error`. Gate detection excludes firewall block pages and
 upstream-marked errors (`orig/packages/common/src/api/llm-proxy/constants.ts:24-58`;
-`orig/packages/droid-core/src/llms/errors/utils.ts:1185-1213`). `[observed]`
+`orig/packages/core/src/llms/errors/utils.ts:1185-1213`). `[observed]`
 
 ### J. LLM transport
 
 **B105** A turn has one provider-agnostic shape — an ordered message history of
 text, image, document, tool-use and tool-result blocks, a system prompt, and a
 tool catalogue — which each adapter converts to its wire dialect
-(`orig/packages/droid-core/src/llms/client/converters.ts:102,1393,2080`;
-`orig/packages/droid-core/src/llms/client/sendMessage.ts:2676-2696`).
+(`orig/packages/core/src/llms/client/converters.ts:102,1393,2080`;
+`orig/packages/core/src/llms/client/sendMessage.ts:2676-2696`).
 `[observed]`
 
 **B106** The Anthropic request carries `model`, `max_tokens`, `messages`,
 `tools` and `system`, is sent streaming, and adds optional `tool_choice` and any
 custom-model `extraArgs`; `max_tokens` is clamped to the model capability's
-ceiling (`orig/packages/droid-core/src/llms/client/sendMessage.ts:2683-2704`).
+ceiling (`orig/packages/core/src/llms/client/sendMessage.ts:2683-2704`).
 `[observed]`
 
 **B107** A managed model call's URL is the managed route resolved through the
@@ -780,17 +780,17 @@ same dialect to its own host (`orig/src/api/BackendClient.ts:658-712,795-806`).
 `[observed]`
 
 **B108** Routing selects the dialect: Google → Gemini; Bedrock Converse →
-Converse; Factory-managed models → Anthropic when the catalogue's API provider is
+Converse; managed models → Anthropic when the catalogue's API provider is
 Anthropic, else Responses for the Responses endpoint and Chat Completions
 otherwise; generic Chat-Completions providers → Chat; OpenAI and xAI →
 Responses, except image models; Anthropic → Anthropic
-(`orig/packages/droid-core/src/llms/client/providerRouting.ts:60-102`).
+(`orig/packages/core/src/llms/client/providerRouting.ts:60-102`).
 `[observed]`
 
 **B109** Proxy path families are chosen from the provider: Anthropic-wire and
 Fireworks-Anthropic-compatible models use the `/a` base; OpenAI-compatible and
 Google (whose client is a placeholder) use the `/o/v1` base
-(`orig/packages/droid-core/src/llms/client/providerRouting.ts:320-352`).
+(`orig/packages/core/src/llms/client/providerRouting.ts:320-352`).
 `[observed]`
 
 **B110** SSE framing in the generic reader: only `data:` lines are payloads;
@@ -809,25 +809,25 @@ Aborting cancels the body and releases the lock
 split lines, ignores non-`data:` lines and `[DONE]`, parses each payload, and
 routes an in-band Gemini error envelope through the same mapper as an HTTP
 failure so the retry loop classifies both alike
-(`orig/packages/droid-core/src/llms/client/sendMessage.ts:5040-5135`).
+(`orig/packages/core/src/llms/client/sendMessage.ts:5040-5135`).
 `[observed]`
 
 **B113** Chat Completions tolerates a chunk without `choices` (reasoning-only
 chunks), treats `finish_reason` as terminal, and treats `[DONE]` as a
-non-payload (`orig/packages/droid-core/src/llms/client/chunk-processing.ts:2150-2155,2410-2416`;
-`orig/packages/droid-core/src/llms/client/sendMessage.ts:5083`). `[observed]`
+non-payload (`orig/packages/core/src/llms/client/chunk-processing.ts:2150-2155,2410-2416`;
+`orig/packages/core/src/llms/client/sendMessage.ts:5083`). `[observed]`
 
 **B114** The Anthropic event order handled is `message_start`,
 `content_block_start`, `content_block_delta` (`text_delta`, `thinking_delta`,
 `signature_delta`, `input_json_delta`), `content_block_stop`, `message_delta`,
 `message_stop`; an unknown type is ignored
-(`orig/packages/droid-core/src/llms/client/chunk-processing.ts:735-1030`).
+(`orig/packages/core/src/llms/client/chunk-processing.ts:735-1030`).
 `[observed]`
 
 **B115** `message_delta.stop_reason` is terminal: the stream is finalized — tool
 input flushed, usage emitted once, completion signalled — without waiting for
 `message_stop` or transport EOF, so an intermediary holding the body open cannot
-hang the turn (`orig/packages/droid-core/src/llms/client/chunk-processing.ts:699-733,1008-1020`).
+hang the turn (`orig/packages/core/src/llms/client/chunk-processing.ts:699-733,1008-1020`).
 `[observed]`
 
 **B116** The Responses event order handled is `response.created`,
@@ -836,26 +836,26 @@ hang the turn (`orig/packages/droid-core/src/llms/client/chunk-processing.ts:699
 `response.custom_tool_call_input.delta`/`.done`, `response.completed` /
 `response.incomplete`, `response.failed`, and `error`. Completed and incomplete
 both finalize, with incomplete mapping to a max-output-tokens stop
-(`orig/packages/droid-core/src/llms/client/chunk-processing.ts:1177-1740`).
+(`orig/packages/core/src/llms/client/chunk-processing.ts:1177-1740`).
 `[observed]`
 
 **B117** Anthropic tool-call deltas: a `tool_use` block start assigns a client
 tool-call id derived from the assistant message id and the block index, and
 `input_json_delta` fragments accumulate per block index into that call's input
-(`orig/packages/droid-core/src/llms/client/chunk-processing.ts:782-812,914-945`).
+(`orig/packages/core/src/llms/client/chunk-processing.ts:782-812,914-945`).
 `[observed]`
 
 **B118** Chat-Completions tool-call deltas: the provider `index` is used when
 present; a delta without an index is grouped by its id; a different non-empty id
 arriving at an already-occupied index is a new call, and the earlier call is
 kept, not concatenated
-(`orig/packages/droid-core/src/llms/client/chunk-processing.ts:2238-2310`).
+(`orig/packages/core/src/llms/client/chunk-processing.ts:2238-2310`).
 `[observed]`
 
 **B119** Responses tool calls take the call id from the output item and, when a
 `…arguments.done` payload is non-empty, that payload replaces the buffered
 deltas; an empty done payload does not erase them
-(`orig/packages/droid-core/src/llms/client/chunk-processing.ts:1035-1050,1551-1596`).
+(`orig/packages/core/src/llms/client/chunk-processing.ts:1035-1050,1551-1596`).
 `[observed]`
 
 **B120** Usage is reported with disjoint buckets: `inputTokens` excludes both
@@ -863,7 +863,7 @@ cache read and cache write tokens, which are reported separately as
 `cacheReadTokens` and `cacheCreationTokens`; `outputTokens` and optional
 `thinkingTokens` complete the record. OpenAI's inclusive `input_tokens` is split
 by subtracting cached and cache-write counts
-(`orig/packages/droid-core/src/llms/client/chunk-processing.ts:1144-1175,2123-2145`).
+(`orig/packages/core/src/llms/client/chunk-processing.ts:1144-1175,2123-2145`).
 `[observed]`
 
 **B121** Anthropic usage arrives twice: `message_start` seeds input and cache
@@ -871,18 +871,19 @@ counts, `message_delta` overwrites them. Thinking tokens are estimated from the
 streamed character count and replaced by the provider's breakdown when present.
 Streaming never commits session totals; the send loop commits one billed attempt
 at a time, and an attempt that was retried, cut, resampled or aborted after
-reporting prompt tokens still counts (`orig/packages/droid-core/src/llms/client/chunk-processing.ts:704-733,742-757,959-1000`;
+reporting prompt tokens still counts (`orig/packages/core/src/llms/client/chunk-processing.ts:704-733,742-757,959-1000`;
 `orig/src/services/SessionService.ts:8430-8497`). `[observed]`
 
 **B122** Streaming usage is a live-display snapshot only: `onTokenUsage(usage,
 isStreaming=true)` updates the current-call numbers without accumulating; the
-session's durable totals and `factoryCredits` are updated once per attempt by
-the commit path (`orig/packages/droid-core/src/llms/client/sendMessage.ts:1330-1332`;
+session's durable totals and `credits` (vendor prefix elided) are updated once
+per attempt by the commit path
+(`orig/packages/core/src/llms/client/sendMessage.ts:1330-1332`;
 `orig/src/services/SessionService.ts:8430-8497`). `[observed]`
 
 **B123** Chat Completions falls back to the `fireworks-cached-prompt-tokens`
 response header for cache-read counts when the chunk omits them
-(`orig/packages/droid-core/src/llms/client/chunk-processing.ts:2117-2127`).
+(`orig/packages/core/src/llms/client/chunk-processing.ts:2117-2127`).
 `[observed]`
 
 **B124** The Bedrock Converse adapter consumes the Converse event union
@@ -890,13 +891,13 @@ response header for cache-read counts when the chunk omits them
 `messageStop`, metadata) and maps the five event-stream error members
 (`internalServerException`, `modelStreamErrorException`, `validationException`,
 `throttlingException`, `serviceUnavailableException`) into typed LLM errors so
-the retry policy applies (`orig/packages/droid-core/src/llms/client/bedrock/converse.ts:333-420`).
+the retry policy applies (`orig/packages/core/src/llms/client/bedrock/converse.ts:333-420`).
 `[observed]`
 
 **B125** Converse stop reasons map as: `end_turn`/`stop_sequence` → stop,
 `tool_use` → tool calls, `max_tokens` → length,
 `guardrail_intervened`/`content_filtered` → content filter, anything else →
-unknown (`orig/packages/droid-core/src/llms/client/bedrock/converse.ts:266-287`).
+unknown (`orig/packages/core/src/llms/client/bedrock/converse.ts:266-287`).
 `[observed]`
 
 **B126** The Responses WebSocket is a managed transport only for routes whose
@@ -908,10 +909,10 @@ reasons are not replayed on a fresh connection
 
 ### K. The CLI's authentication surface
 
-**B127** 1.9.0 has **no `droid auth` command**. The root help lists `resume`,
+**B127** The CLI has **no `droide auth` command**. The root help lists `resume`,
 `exec`, `daemon`, `search|find`, `update`, `mcp`, `plugin`, `computer`,
 `doctor` and `help`; sign-in and sign-out are TUI slash commands, and deployment
-selection is `droid deployment set` (`evidence/cli/help.txt`;
+selection is `droide deployment set` (`evidence/cli/help.txt`;
 `orig/src/commands/loginCommand.ts:11-31`). `[observed]`
 
 **B128** `/login` opens the login selector; on a host without one it reports the
@@ -923,7 +924,7 @@ caches, resets cloud-preferences auth state, and rotates the daemon's
 authentication context after starting a close of the local session
 (`orig/src/commands/logoutCommand.ts:39-138`). `[observed]`
 
-**B130** `droid doctor --checks auth` reports four checks by id —
+**B130** `droide doctor --checks auth` reports four checks by id —
 `auth.credentials`, `auth.tokenExpiry`, `auth.workosRefresh` and `auth.verify` —
 and exits non-zero when any selected check fails
 (`orig/src/entrypoints/doctor/checks/auth.ts:147,234,260,403-427`;
@@ -935,22 +936,22 @@ and exits non-zero when any selected check fails
 
 | Name | Type / domain | Default | Absent / malformed | Clause |
 |---|---|---|---|---|
-| `FACTORY_API_BASE_URL` | absolute http(s) URL, no trailing `/` | baked build define | a release build fails config validation | B3, B7 |
-| `FACTORY_API_BASE_URL_EU` | absolute http(s) URL, no trailing `/` | baked build define | EU region falls back to `FACTORY_API_BASE_URL` | B1, B3 |
-| `FACTORY_API_KEY` | opaque key, prefix `fk-` | none | falls through to WorkOS/Prem | B52, B53 |
-| `FACTORY_WORKOS_BASE_URL` | URL | `https://api.workos.com/user_management` | default used | B59 |
-| `FACTORY_ENV` | `development` \| `production` | `development` | invalid value throws | B60 |
-| `FACTORY_DISABLE_KEYRING` | `true` \| `1` | false | any other value is false | B47 |
-| `FACTORY_AIRGAP_ENABLED` | `true` \| `1`; baked define wins | false | any other value is false | B89, B58 |
-| `FACTORY_HOME_OVERRIDE` | absolute path | OS home | ignored when empty | B45 |
-| `FACTORY_EXTRA_CA_CERTS`, `NODE_EXTRA_CA_CERTS` | inline PEM, or `path.delimiter` file list | none | unreadable entries contribute nothing | B85 |
+| `DROIDE_API_BASE_URL` | absolute http(s) URL, no trailing `/` | baked build define | a release build fails config validation | B3, B7 |
+| `DROIDE_API_BASE_URL_EU` | absolute http(s) URL, no trailing `/` | baked build define | EU region falls back to `DROIDE_API_BASE_URL` | B1, B3 |
+| `DROIDE_API_KEY` | opaque key, prefix `fk-` | none | falls through to WorkOS/Prem | B52, B53 |
+| `DROIDE_WORKOS_BASE_URL` | URL | `https://api.workos.com/user_management` | default used | B59 |
+| `DROIDE_ENV` | `development` \| `production` | `development` | invalid value throws | B60 |
+| `DROIDE_DISABLE_KEYRING` | `true` \| `1` | false | any other value is false | B47 |
+| `DROIDE_AIRGAP_ENABLED` | `true` \| `1`; baked define wins | false | any other value is false | B89, B58 |
+| `DROIDE_HOME_OVERRIDE` | absolute path | OS home | ignored when empty | B45 |
+| `DROIDE_EXTRA_CA_CERTS`, `NODE_EXTRA_CA_CERTS` | inline PEM, or `path.delimiter` file list | none | unreadable entries contribute nothing | B85 |
 | `NODE_TLS_REJECT_UNAUTHORIZED` | `0` disables verification | verification on | doctor warns | B87 |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (either case) | proxy URLs / host list | none | direct connection | B84 |
 | `CLI_VERSION` | version string | unset | `X-Client-Version` is not sent | B11 |
 
 ### Files
 
-| Path (relative to the Factory home + env directory) | Format | Owner | Clause |
+| Path (relative to the credential base directory) | Format | Owner | Clause |
 |---|---|---|---|
 | `auth-deployment.json` | JSON `{version:1, revision:uuid, deployment}` | deployment selection | B70 |
 | `auth.v2.keyring` | encrypted credentials JSON | WorkOS v2 (keyring) | B46 |
@@ -983,17 +984,17 @@ status of their own.
 |---|---|---|---|
 | No credential at all | `AuthenticationError` / `notAuthenticatedMessage` | "Not authenticated…" | no (needs `/login` or key) |
 | Configured key rejected (400/401/403) | `ResponseError400/401/403`, reason `apiKeyRejected` | invalid-key copy | no |
-| Key validation could not run (≥500 / network) | reason `FactoryApiUnavailable` | "Factory API is not accessible…" | yes, later |
+| Key validation could not run (≥500 / network) | reason `ApiUnavailable` | "API is not accessible…" | yes, later |
 | Key validation malformed 2xx | `ResponseError` (502) | validation-failed copy | no |
 | Expired session, refresh unreachable | transient `TokenRefreshError`, null token for nullable readers | expired/again-later copy | yes |
 | Refresh rejected (4xx ≠ 429) | permanent `TokenRefreshError` | expired-login copy | no; session ends |
 | Customer deployment signed out | `AuthenticationError('Sign in to this customer deployment.')` | customer-login copy | after sign-in |
 | Customer deployment awaiting org | `AuthenticationError('Choose an organization…')` | same | after choice |
 | Selection file malformed/unreadable | `AuthDeploymentSelectionError` | message + exit 1 at startup | no (repair file) |
-| Expected Prem pin mismatch | `ExpectedPremDeploymentError` | `droid deployment set --private-origin` | no |
+| Expected Prem pin mismatch | `ExpectedPremDeploymentError` | `droide deployment set --private-origin` | no |
 | Prem auth in airgap | `ResponseError403Forbidden` | "Prem authentication is unavailable…" | no |
 | Prem network/TLS failure | `ResponseError` (status preserved) | generic Prem auth failure | yes |
-| Factory call in airgap | `AirgapBlockedError` | "Outbound request blocked…" | no |
+| Backend call in airgap | `AirgapBlockedError` | "Outbound request blocked…" | no |
 | Hosted path on customer deployment | `MetaError` | "This hosted operation is unavailable…" / "This operation is unavailable…" | no |
 | Backend non-2xx | `FetchError` `${status} ${body}` | status + server text (hosted) | 5xx/429 only if caller retries |
 | Customer backend non-2xx | `FetchError('Customer request failed')` | status only | as above |
@@ -1033,9 +1034,9 @@ status of their own.
 ### Test specifications
 
 **`test_base_url_matrix`** — table-driven over `resolveCliApiBaseUrl(config,
-region)`. Rows: (deployment factory, region global, base
+region)`. Rows: (deployment `factory`, region global, base
 `https://api.example`, eu `https://eu.example`) → `https://api.example`;
-(factory, eu, both) → `https://eu.example`; (factory, eu, eu absent) →
+(`factory`, eu, both) → `https://eu.example`; (`factory`, eu, eu absent) →
 `https://api.example`; (customer-prem `https://prem.example`, eu, both) →
 `https://prem.example`. Also asserts `getRegion` returns `global` with no
 credential and with a customer deployment, and that `getPremBaseHost` returns
@@ -1102,7 +1103,7 @@ scoped refresh.
 **`test_deployment_selection`** — missing file → `{kind:'factory'}`; malformed
 JSON → `AuthDeploymentSelectionError`; load of a customer deployment
 canonicalizes the origin; save preserves unknown metadata, bumps `revision`;
-`droid deployment set` with both flags → 400 message; in airgap → 403; expected
+`droide deployment set` with both flags → 400 message; in airgap → 403; expected
 origin mismatch → `ExpectedPremDeploymentError`; success prints the restart
 notice and exits 0.
 
@@ -1124,16 +1125,16 @@ failed` and no body; request init carries `redirect:'error'` and
 
 **`test_http_error_messages`** — table of (status, configured key?) → error
 type/message/exit: 400/401/403 → `ResponseError400/401/403` +
-`Factory API key was rejected.` + `apiKeyRejected`; 500 → unavailable copy;
+`API key was rejected.` + `apiKeyRejected`; 500 → unavailable copy;
 418 → validation-failed copy; malformed 200 (`ResponseError`) → validation
 failed; transport `TypeError` → unavailable. Also asserts `FetchError.message`
-is `${status} ${body}`; `ResponseError.toPublicObject()` shape; `droid exec`
+is `${status} ${body}`; `ResponseError.toPublicObject()` shape; `droide exec`
 exit 1 on a refused invocation; wiki-search-style subcommand exit 1 on auth
-failure; `droid deployment` maps non-zero to 1.
+failure; `droide deployment` maps non-zero to 1.
 
 **`test_llm_transport_routing`** — `resolveProviderRoute` table for every
-`ModelProvider` member (Google, Converse, Factory+anthropic, Factory+responses
-endpoint, Factory+chat endpoint, generic, OpenAI, xAI, OpenAI image model,
+`ModelProvider` member (Google, Converse, managed+anthropic, managed+responses
+endpoint, managed+chat endpoint, generic, OpenAI, xAI, OpenAI image model,
 Anthropic, e2e mock); `getProxyBaseURL` picks `/a` for Fireworks-Anthropic
 models and `/o/v1` for OpenAI-compatible/Google; SDK base URLs strip the
 suffixes; the Anthropic request body carries `stream: true` and clamps
@@ -1161,7 +1162,7 @@ reasons and raises on each error member.
 cacheReadTokens:40, cacheCreationTokens:10}`; Anthropic `message_start` +
 `message_delta` overwrite; thinking estimate replaced by provider breakdown;
 `isStreaming=true` does not change session totals; one committed attempt adds
-exactly once; `factoryCredits` accumulated.
+exactly once; `credits` accumulated.
 
 **`test_converse_and_ws`** — Converse event union mapping and the five error
 members; WebSocket close reasons enum values; connection-scoped reasons not
@@ -1169,7 +1170,7 @@ replayed.
 
 **`test_cli_auth_surface`** — root help contains no `auth` command; `/login`
 without a selector emits the `notAvailable` notification; `/logout` clears the
-credential and rotates daemon auth; `droid doctor --checks auth` emits the four
+credential and rotates daemon auth; `droide doctor --checks auth` emits the four
 check ids and exits non-zero when one is forced to `fail`.
 
 ## Evidence
@@ -1177,26 +1178,26 @@ check ids and exits non-zero when one is forced to `fail`.
 | Evidence | Supports | Method |
 |---|---|---|
 | `ev_transport_1` | B1–B9 | `orig/packages/runtime/auth/src/auth/common/resolveCliApiBaseUrl.ts:13-21`, `orig/src/environment.ts:285-317`, `orig/src/environmentResolution.ts:90-127,189-197`, `orig/packages/runtime/auth/src/auth/common/cache.ts:617-620,665-703`, `orig/packages/utils/src/api/config.ts:7-40`, `orig/packages/utils/src/api/fetch.ts:11-29,200-218`, `orig/src/api/config.ts:302-334`; direct reading |
-| `ev_transport_2` | B10–B22 | `orig/src/api/config.ts:149-242,302-334`, `orig/packages/runtime/auth/src/auth/common/whoami.ts:19-56`, `orig/packages/droid-sdk-core/src/protocol/droid/schemas/constants.ts:7-36`, `orig/src/api/BackendClient.ts:60-99,807-886`, `orig/src/llm-proxy/utils.ts:235-296`, `orig/packages/utils/src/api/fetch.ts:32-96,255-296`, `orig/packages/daemon-core/src/services/ApiClient.ts:129-260,430-480`, `orig/packages/utils/src/api/constants.ts:6-9`, `orig/packages/runtime/auth/src/auth/prem/client.ts:107-140`; direct reading |
+| `ev_transport_2` | B10–B22 | `orig/src/api/config.ts:149-242,302-334`, `orig/packages/runtime/auth/src/auth/common/whoami.ts:19-56`, `orig/packages/sdk-core/src/protocol/schemas/constants.ts:7-36`, `orig/src/api/BackendClient.ts:60-99,807-886`, `orig/src/llm-proxy/utils.ts:235-296`, `orig/packages/utils/src/api/fetch.ts:32-96,255-296`, `orig/packages/daemon-core/src/services/ApiClient.ts:129-260,430-480`, `orig/packages/utils/src/api/constants.ts:6-9`, `orig/packages/runtime/auth/src/auth/prem/client.ts:107-140`; direct reading |
 | `ev_transport_3` | B23–B32 | `orig/src/api/BackendClient.ts:191-593,610-660,724-806,888-916`, `orig/packages/common/src/api/backend/enums.ts:9-83`, `orig/packages/common/src/api/llm-proxy/enums.ts:10-44`, `orig/packages/common/src/api/prem/constants/index.ts:34-38`, `orig/packages/common/src/api/cli/schemas.ts:34-100`; route table read exhaustively |
-| `ev_transport_4` | B33–B44 | `orig/packages/utils/src/api/fetch.ts:298-320`, `orig/packages/runtime/auth/src/auth/common/constants.ts:24-35`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:18-89`, `orig/packages/runtime/auth/src/auth/prem/client.ts:45-62`, `orig/packages/droid-core/src/llms/client/retryPolicy/index.ts:14-203`, `orig/packages/droid-core/src/llms/client/sendMessage.ts:484-491,3076-3081`, `orig/packages/common/src/api/llm-proxy/constants.ts:59-70`, `orig/packages/utils/src/api/httpStatus.ts:10-12`; constants and branches read |
+| `ev_transport_4` | B33–B44 | `orig/packages/utils/src/api/fetch.ts:298-320`, `orig/packages/runtime/auth/src/auth/common/constants.ts:24-35`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:18-89`, `orig/packages/runtime/auth/src/auth/prem/client.ts:45-62`, `orig/packages/core/src/llms/client/retryPolicy/index.ts:14-203`, `orig/packages/core/src/llms/client/sendMessage.ts:484-491,3076-3081`, `orig/packages/common/src/api/llm-proxy/constants.ts:59-70`, `orig/packages/utils/src/api/httpStatus.ts:10-12`; constants and branches read |
 | `ev_transport_5` | B45–B58 | `orig/packages/runtime/auth/src/credentials/presence.ts:16-19`, `orig/packages/runtime/auth/src/credentials/constants.ts:1-3`, `orig/packages/runtime/auth/src/credentials/CredentialsStorage.ts:50-74,150-186,320-322,512-541,653-704,717-838`, `orig/packages/runtime/auth/src/auth/source.ts:83-160,234-320,579-663`, `orig/packages/runtime/auth/src/credentials/schemas.ts:10-42`, `orig/packages/runtime/auth/src/auth/common/cache.ts:50-95,506-593`, `orig/packages/runtime/auth/src/auth/common/constants.ts:8-24`; storage code read |
 | `ev_transport_6` | B59–B69 | `orig/packages/runtime/auth/src/auth/workos/base-url.ts:3-9`, `orig/packages/runtime/auth/src/auth/workos/config/index.ts:11-40`, `orig/packages/runtime/auth/src/auth/workos/login/device-code.ts:34-246`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:39-62`, `orig/packages/runtime/auth/src/auth/source.ts:531-605`, `orig/packages/runtime/auth/src/auth/active-organization.ts:88-126,180-234`, `orig/packages/runtime/auth/src/auth/resolve-org.ts:15-61`; flow code read |
 | `ev_transport_7` | B70–B74 | `orig/packages/runtime/auth/src/deployment/index.ts:25-95`, `schemas.ts:4-25`, `constants.ts:1`, `errors.ts:6-36`, `orig/packages/runtime/auth/src/auth/prem/config.ts:11-77,101-116`, `orig/src/entrypoints/deployment/command.ts:30-112`, `orig/src/environment.ts:285-317`, `orig/src/index.ts:186-196`; files and command read |
 | `ev_transport_8` | B75–B83 | `orig/packages/runtime/auth/src/auth/prem/client.ts:107-360,460-483`, `login.ts:47-171`, `storage.ts:80-104,224-300`, `schemas.ts`, `constants.ts:1-2`, `orig/packages/runtime/auth/src/auth/get.ts:36-91,165-190`, `orig/packages/runtime/auth/src/auth/active-organization.ts:50-70`; flow code read |
 | `ev_transport_9` | B84–B91 | `orig/src/constants/constants.ts:87-94`, `orig/src/utils/certificates/parseCertificates.ts:8-20`, `orig/src/utils/systemCertificates.ts:46,640-700`, `orig/src/entrypoints/doctor/checks/proxy.ts:17-20`, `certificates.ts:21-47,120-130`, `connectivity.ts:170-182`, `orig/packages/utils/src/api/fetch.ts:54,250,308-315`, `orig/packages/utils/src/api/errors.ts:40-56`, `orig/src/api/fetchBackend.ts:14-30`, `orig/packages/utils/src/api/constants.ts:1-9`; source read |
-| `ev_transport_10` | B92–B104 | `orig/packages/logging/src/errors/errors.ts:13-46`, `orig/packages/logging/src/errors/responses/errors.ts:7-68`, `orig/packages/runtime/auth/src/auth/api-key/verify.ts:47-127`, `orig/src/commands/authHelpers.ts:41-148`, `orig/src/i18n/authMessages.ts:11-63`, `orig/src/entrypoints/exec/run.ts:585-590,660-680`, `orig/src/entrypoints/wiki-search/run.ts:85-92`, `orig/packages/droid-core/src/llms/errors/utils.ts:1034-1213`, `errors/constants.ts:1-44`, `errors/errors.ts:125-545`, `orig/packages/common/src/api/llm-proxy/constants.ts:24-58`; classification and copy read |
-| `ev_transport_11` | B105–B126 | `orig/packages/droid-core/src/llms/client/converters.ts:102,1393,2080`, `sendMessage.ts:484-491,1330-1332,2676-2704,3076-3081,5040-5135`, `providerRouting.ts:60-102,320-352`, `chunk-processing.ts:699-1050,1144-1175,1177-1740,2117-2150,2151-2160,2238-2310,2410-2416`, `bedrock/converse.ts:266-287,333-420`, `orig/packages/common/src/api/llm-proxy/enums.ts:47-88`, `orig/packages/utils/src/api/response.ts:139-280`, `orig/src/api/BackendClient.ts:212-220`, `orig/src/services/SessionService.ts:8430-8497`; stream processors and adapters read |
+| `ev_transport_10` | B92–B104 | `orig/packages/logging/src/errors/errors.ts:13-46`, `orig/packages/logging/src/errors/responses/errors.ts:7-68`, `orig/packages/runtime/auth/src/auth/api-key/verify.ts:47-127`, `orig/src/commands/authHelpers.ts:41-148`, `orig/src/i18n/authMessages.ts:11-63`, `orig/src/entrypoints/exec/run.ts:585-590,660-680`, `orig/src/entrypoints/wiki-search/run.ts:85-92`, `orig/packages/core/src/llms/errors/utils.ts:1034-1213`, `errors/constants.ts:1-44`, `errors/errors.ts:125-545`, `orig/packages/common/src/api/llm-proxy/constants.ts:24-58`; classification and copy read |
+| `ev_transport_11` | B105–B126 | `orig/packages/core/src/llms/client/converters.ts:102,1393,2080`, `sendMessage.ts:484-491,1330-1332,2676-2704,3076-3081,5040-5135`, `providerRouting.ts:60-102,320-352`, `chunk-processing.ts:699-1050,1144-1175,1177-1740,2117-2150,2151-2160,2238-2310,2410-2416`, `bedrock/converse.ts:266-287,333-420`, `orig/packages/common/src/api/llm-proxy/enums.ts:47-88`, `orig/packages/utils/src/api/response.ts:139-280`, `orig/src/api/BackendClient.ts:212-220`, `orig/src/services/SessionService.ts:8430-8497`; stream processors and adapters read |
 | `ev_transport_12` | B127–B130 | `evidence/cli/help.txt`, `orig/src/commands/loginCommand.ts:11-31`, `orig/src/commands/logoutCommand.ts:39-138`, `orig/src/entrypoints/doctor/checks/auth.ts:147,234,260,403-427`, `orig/src/entrypoints/doctor/run.ts:406-421`; help capture and command code read |
 
 ## Open questions
 
 1. **The hosted session-batch path literal.** B24 cites
-   `@factory/common/api/sessions`'s `SESSION_BATCH_PATH` without its value;
+   `common/api/sessions`'s `SESSION_BATCH_PATH` without its value;
    the module is absent from the recovered tree (barrel elision). Settle by
    locating the constant in a source map or by reading the backend route table
    in a build with source maps. Blocks the exact cell only.
-2. **`FactoryApiConfig` field set.** `packages/utils/src/api/types.ts` is absent,
+2. **`ApiConfig` field set** (vendor prefix elided). `packages/utils/src/api/types.ts` is absent,
    so B8/B9 describe the fields the implementation reads (`baseUrl`,
    `getBaseUrl`, `getHeaders`, `requestPolicy`, `airgapEnabled`) rather than a
    declared interface. A recovered `types.ts` would confirm field optionality.
@@ -1208,7 +1209,7 @@ check ids and exits non-zero when one is forced to `fail`.
    the propagation format (W3C vs custom) is not read. Settle by reading the
    tracing package. Blocks the header value, not its presence.
 5. **Secure-storage service/account strings per platform.** B46/B48 establish
-   the file names and the `-dev` suffix; the keyring service is `Factory CLI`
+   the file names and the `-dev` suffix; the keyring service is `Droide CLI`
    and the account `auth-encryption-key`/`auth-encryption-key-security-cli`
    (`CredentialsStorage.ts:50-52`), but each OS backend's storage encoding is
    not read. Settle by reading `KeyringClient`/`SecurityCliKeyring` adapters.
@@ -1217,13 +1218,13 @@ check ids and exits non-zero when one is forced to `fail`.
    retry-policy comment (`retryPolicy/index.ts:148-153`). Confirm with
    `isProviderCapacityError`'s body, which is not in the recovered files.
 7. **Responses WebSocket frame contract.** B126 covers close reasons and route
-   selection only. The `response.create` frame, the `_factory` extension key and
+   selection only. The `response.create` frame, the `_droide` extension key and
    the idle/deadline recovery rules live in `responsesWebSocket.ts` and are not
    specified here. Blocks a future websocket clause.
 8. **Whether any hidden `auth` command exists.** B127 is based on the captured
    root help plus a grep of command registrations; a fully hidden command
    registered under a different name would be invisible to both. Settle by
-   running the oracle's completion/command catalogue.
+   running the reference build's completion/command catalogue.
 9. **Exact `X-Factory-Client` values.** B11 names the header and the `cli`
    default; the full `ClientType` value set (daemon, SDK, desktop, …) is in a
    module not read. Settle from the protocol enum.
@@ -1235,12 +1236,12 @@ check ids and exits non-zero when one is forced to `fail`.
 - The base-URL precedence: customer origin, then EU base on EU region, then
   global base; per-request resolution through the same precedence.
 - Deployment selection as a separate, restart-scoped file that can only be
-  changed through `droid deployment set`, with missing = Factory and malformed =
-  hard startup failure.
+  changed through `droide deployment set`, with missing = `factory` deployment
+  and malformed = hard startup failure.
 - The literal credential file names, their base directory, the `0600` mode,
-  secure-then-keyfile load order, `FACTORY_DISABLE_KEYRING` behaviour, key
+  secure-then-keyfile load order, `DROIDE_DISABLE_KEYRING` behaviour, key
   retention across logout, and the atomic/lock-guarded write.
-- The credential lookup order and the invariant that `FACTORY_API_KEY` wins over
+- The credential lookup order and the invariant that `DROIDE_API_KEY` wins over
   any stored session and reports its own organization.
 - The identity endpoint (`/api/cli/whoami`), its extended-response header, its
   10 s deadline, its lenient schema, and its role as the single verifier for all
@@ -1278,7 +1279,7 @@ check ids and exits non-zero when one is forced to `fail`.
 - The internal shape of the encrypted ciphertext (algorithm, key derivation) —
   only that it is encrypted at rest, pinned to a backend, and unreadable without
   the key.
-- The `getBaseUrl`/`getHeaders` callback indirection; a reimplementation may
+- The `getBaseUrl`/`getHeaders` callback indirection; a conforming build may
   resolve the same values eagerly per request.
 - The specific TypeScript class names (`FetchError`, `ResponseError`,
   `LLMThrottlingError`, …) provided the error identity, message, status and

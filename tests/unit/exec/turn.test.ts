@@ -18,7 +18,7 @@ const INIT =
 const ECHO =
   '{"type":"message","role":"user","id":"u1","text":"read fixture.txt","timestamp":0,"session_id":"sid"}';
 const COMPLETION =
-  '{"type":"completion","finalText":"Done.","numTurns":2,"durationMs":0,"session_id":"sid","timestamp":0,"usage":{"input_tokens":11,"output_tokens":7,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"factory_credits":0,"thinking_tokens":0}}';
+  '{"type":"completion","finalText":"Done.","numTurns":2,"durationMs":0,"session_id":"sid","timestamp":0,"usage":{"input_tokens":11,"output_tokens":7,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"droide_credits":0,"thinking_tokens":0}}';
 
 test("one successful turn writes init, echo, blocks and one completion", async () => {
   const stream = new CollectingStream();
@@ -279,7 +279,7 @@ test("-o json success is one object with the eight documented keys", async () =>
       output_tokens: 7,
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
-      factory_credits: 0,
+      droide_credits: 0,
       thinking_tokens: 0,
     },
   });
@@ -310,7 +310,7 @@ test("-o json failure is one object with subtype failure and zero turns", async 
       output_tokens: 0,
       cache_read_input_tokens: 0,
       cache_creation_input_tokens: 0,
-      factory_credits: 0,
+      droide_credits: 0,
       thinking_tokens: 0,
     },
   });

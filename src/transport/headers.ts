@@ -141,7 +141,7 @@ export function buildHeaders(
 /**
  * B22: a customer-Prem authentication request carries exactly the bearer
  * credential, the selected organization and a JSON content type when a body is
- * present. It is deliberately not `buildHeaders`: the Factory client
+ * present. It is deliberately not `buildHeaders`: the CLI client
  * attribution and version headers do not belong on the Prem authority.
  */
 export function buildCustomerPremAuthHeaders(

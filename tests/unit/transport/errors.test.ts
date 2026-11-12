@@ -138,7 +138,7 @@ test("transport messages name the operation and never a credential", () => {
   assert.match(network.message, /^list-sessions: /);
   const certificate = new TlsTrustError("whoami", "CERT_HAS_EXPIRED");
   assert.match(certificate.message, /^whoami: certificate chain not trusted/);
-  assert.match(certificate.message, /FACTORY_EXTRA_CA_CERTS/);
+  assert.match(certificate.message, /DROIDE_EXTRA_CA_CERTS/);
 });
 
 test("deployment refusals use the exact spec messages", () => {

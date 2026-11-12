@@ -28,7 +28,7 @@ const USAGE: ExecUsage = {
   output_tokens: 7,
   cache_read_input_tokens: 1,
   cache_creation_input_tokens: 2,
-  factory_credits: 3,
+  droide_credits: 3,
   thinking_tokens: 4,
 };
 
@@ -142,7 +142,7 @@ test("error and completion records keep their documented keys", () => {
   });
   assert.equal(
     JSON.stringify(completion),
-    '{"type":"completion","finalText":"Done.","numTurns":2,"durationMs":30,"session_id":"sid","timestamp":9,"usage":{"input_tokens":11,"output_tokens":7,"cache_read_input_tokens":1,"cache_creation_input_tokens":2,"factory_credits":3,"thinking_tokens":4}}',
+    '{"type":"completion","finalText":"Done.","numTurns":2,"durationMs":30,"session_id":"sid","timestamp":9,"usage":{"input_tokens":11,"output_tokens":7,"cache_read_input_tokens":1,"cache_creation_input_tokens":2,"droide_credits":3,"thinking_tokens":4}}',
   );
 });
 
@@ -157,7 +157,7 @@ test("ttft_ms is the only optional usage counter and comes last", () => {
   });
   assert.equal(
     JSON.stringify(record.usage),
-    '{"input_tokens":11,"output_tokens":7,"cache_read_input_tokens":1,"cache_creation_input_tokens":2,"factory_credits":3,"thinking_tokens":4,"ttft_ms":12}',
+    '{"input_tokens":11,"output_tokens":7,"cache_read_input_tokens":1,"cache_creation_input_tokens":2,"droide_credits":3,"thinking_tokens":4,"ttft_ms":12}',
   );
 });
 
@@ -189,7 +189,7 @@ test("the json summary has exactly eight keys in order", () => {
     "output_tokens",
     "cache_read_input_tokens",
     "cache_creation_input_tokens",
-    "factory_credits",
+    "droide_credits",
     "thinking_tokens",
   ]);
 });

@@ -333,7 +333,7 @@ async function copyIntoPlace(
   io.makeDirectory(dirname(installPath));
   try {
     // TODO(spec B42): the Claude Code layout translation (.claude-plugin to
-    // .factory-plugin, agents to droids, .mcp.json to mcp.json) is not
+    // .droide-plugin, agents to droids, .mcp.json to mcp.json) is not
     // applied, so the plugin directory is copied verbatim.
     await cp(sourceDirectory, staging, { recursive: true });
     adoptDirectory(staging, installPath, io);

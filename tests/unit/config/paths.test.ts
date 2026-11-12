@@ -3,9 +3,9 @@ import { test } from "node:test";
 
 import {
   expandTilde,
-  factoryDir,
-  factoryDirName,
-  factoryHome,
+  stateDir,
+  stateDirName,
+  stateHome,
   projectLocalSettingsFile,
   projectSettingsFile,
   resolvePath,
@@ -29,84 +29,84 @@ function environment(overrides: Partial<Environment> = {}): Environment {
 }
 
 test("factory dir follows the platform separator", () => {
-  assert.equal(factoryDir(environment()), "/home/tester/.factory");
+  assert.equal(stateDir(environment()), "/home/tester/.droide");
   assert.equal(
-    factoryDir(
+    stateDir(
       environment({
         platform: "darwin",
         home: "/Users/tester",
         cwd: "/Users/tester/work",
       }),
     ),
-    "/Users/tester/.factory",
+    "/Users/tester/.droide",
   );
   assert.equal(
-    factoryDir(
+    stateDir(
       environment({
         platform: "win32",
         home: "C:\\Users\\tester",
         cwd: "C:\\work",
       }),
     ),
-    "C:\\Users\\tester\\.factory",
+    "C:\\Users\\tester\\.droide",
   );
 });
 
 test("sessions, cache and settings paths are placed under the factory dir", () => {
   const linux = environment();
-  assert.equal(sessionsDir(linux), "/home/tester/.factory/sessions");
+  assert.equal(sessionsDir(linux), "/home/tester/.droide/sessions");
   assert.equal(
     sessionIndexDatabase(linux),
-    "/home/tester/.factory/cache/session-index/index.db",
+    "/home/tester/.droide/cache/session-index/index.db",
   );
-  assert.equal(userSettingsFile(linux), "/home/tester/.factory/settings.json");
+  assert.equal(userSettingsFile(linux), "/home/tester/.droide/settings.json");
   assert.equal(
     projectSettingsFile(linux),
-    "/work/project/.factory/settings.json",
+    "/work/project/.droide/settings.json",
   );
   assert.equal(
     projectLocalSettingsFile(linux),
-    "/work/project/.factory/settings.local.json",
+    "/work/project/.droide/settings.local.json",
   );
-  assert.equal(tempPath(linux, "run", "x"), "/home/tester/.factory/temp/run/x");
-  assert.equal(tempDir(linux), "/home/tester/.factory/temp");
+  assert.equal(tempPath(linux, "run", "x"), "/home/tester/.droide/temp/run/x");
+  assert.equal(tempDir(linux), "/home/tester/.droide/temp");
 
   const windows = environment({
     platform: "win32",
     home: "C:\\Users\\tester",
     cwd: "C:\\work\\project",
   });
-  assert.equal(sessionsDir(windows), "C:\\Users\\tester\\.factory\\sessions");
+  assert.equal(sessionsDir(windows), "C:\\Users\\tester\\.droide\\sessions");
   assert.equal(
     projectSettingsFile(windows),
-    "C:\\work\\project\\.factory\\settings.json",
+    "C:\\work\\project\\.droide\\settings.json",
   );
 });
 
-test("FACTORY_HOME_OVERRIDE wins over the injected home", () => {
+test("DROIDE_HOME_OVERRIDE wins over the injected home", () => {
   const env = environment({
-    env: { FACTORY_HOME_OVERRIDE: "/isolated/home" },
+    env: { DROIDE_HOME_OVERRIDE: "/isolated/home" },
   });
-  assert.equal(factoryHome(env), "/isolated/home");
-  assert.equal(factoryDir(env), "/isolated/home/.factory");
+  assert.equal(stateHome(env), "/isolated/home");
+  assert.equal(stateDir(env), "/isolated/home/.droide");
 
-  const empty = environment({ env: { FACTORY_HOME_OVERRIDE: "" } });
-  assert.equal(factoryHome(empty), "/home/tester");
+  const empty = environment({ env: { DROIDE_HOME_OVERRIDE: "" } });
+  assert.equal(stateHome(empty), "/home/tester");
 });
 
-test("FACTORY_ENV selects the development directory name", () => {
-  assert.equal(factoryDirName(environment()), ".factory");
+test("DROIDE_ENV selects the development directory name", () => {
+  assert.equal(stateDirName(environment()), ".droide");
   assert.equal(
-    factoryDirName(environment({ env: { FACTORY_ENV: "production" } })),
-    ".factory",
+    stateDirName(environment({ env: { DROIDE_ENV: "production" } })),
+    ".droide",
   );
   assert.equal(
-    factoryDirName(environment({ env: { FACTORY_ENV: "development" } })),
-    ".factory-dev",
+    stateDirName(environment({ env: { DROIDE_ENV: "development" } })),
+    ".droide-dev",
   );
   assert.equal(
-    factoryDir(environment({ env: { FACTORY_ENV: "development" } })),
-    "/home/tester/.factory-dev",
+    stateDir(environment({ env: { DROIDE_ENV: "development" } })),
+    "/home/tester/.droide-dev",
   );
 });
 
@@ -139,12 +139,12 @@ test("settings paths are expanded and anchored at the launch directory", () => {
 
 test("worktrees default under the factory dir and accept only absolute overrides", () => {
   const env = environment();
-  assert.equal(worktreesRoot(env), "/home/tester/.factory/worktrees");
+  assert.equal(worktreesRoot(env), "/home/tester/.droide/worktrees");
   assert.equal(worktreesRoot(env, "/mnt/worktrees"), "/mnt/worktrees");
   assert.equal(worktreesRoot(env, "~/worktrees"), "/home/tester/worktrees");
   assert.equal(
     worktreesRoot(env, "relative/worktrees"),
-    "/home/tester/.factory/worktrees",
+    "/home/tester/.droide/worktrees",
   );
-  assert.equal(worktreesRoot(env, ""), "/home/tester/.factory/worktrees");
+  assert.equal(worktreesRoot(env, ""), "/home/tester/.droide/worktrees");
 });

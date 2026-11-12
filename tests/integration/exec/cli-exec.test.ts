@@ -321,7 +321,7 @@ test(
         const result = await runCli(
           directory,
           execArgs(settingsPath, ["-m", "gpt-6.1-sol", "say hi"]),
-          { FACTORY_API_BASE_URL: server.url },
+          { DROIDE_API_BASE_URL: server.url },
         );
         assert.equal(result.code, 1);
         assert.equal(result.stdout, "");

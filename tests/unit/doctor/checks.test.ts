@@ -13,7 +13,7 @@ function context(
 ): DoctorContext {
   return {
     settings: {},
-    paths: { factoryDir: join(tmpdir(), "droide-doctor-provider") },
+    paths: { stateDir: join(tmpdir(), "droide-doctor-provider") },
     environment: {
       platform: "linux",
       nodeVersion: "24.0.0",

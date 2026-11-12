@@ -28,8 +28,8 @@ async function fixture(): Promise<{
   const home = join(root, "home");
   const project = join(root, "project");
   await mkdir(home, { recursive: true });
-  await mkdir(join(project, ".factory"), { recursive: true });
-  await mkdir(join(home, ".factory"), { recursive: true });
+  await mkdir(join(project, ".droide"), { recursive: true });
+  await mkdir(join(home, ".droide"), { recursive: true });
   const environment: Environment = {
     env: {},
     home,
@@ -45,7 +45,7 @@ test("the user layer is read from the injected home", async () => {
   const { root, home, environment } = await fixture();
   try {
     await writeFile(
-      join(home, ".factory", "settings.json"),
+      join(home, ".droide", "settings.json"),
       JSON.stringify({ skills: ["user"] }),
     );
 
@@ -58,7 +58,7 @@ test("the user layer is read from the injected home", async () => {
     );
     assert.equal(
       context.paths.userSettingsFile,
-      join(home, ".factory", "settings.json"),
+      join(home, ".droide", "settings.json"),
     );
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -69,11 +69,11 @@ test("the project layer wins over the user layer", async () => {
   const { root, home, project, environment } = await fixture();
   try {
     await writeFile(
-      join(home, ".factory", "settings.json"),
+      join(home, ".droide", "settings.json"),
       JSON.stringify({ skills: ["user"] }),
     );
     await writeFile(
-      join(project, ".factory", "settings.json"),
+      join(project, ".droide", "settings.json"),
       JSON.stringify({ skills: ["project"] }),
     );
 
@@ -110,7 +110,7 @@ test("--settings wins over both layers and points at the overlay file", async ()
   }
 });
 
-test("FACTORY_RUNTIME_SETTINGS_PATH applies when --settings is absent", async () => {
+test("DROIDE_RUNTIME_SETTINGS_PATH applies when --settings is absent", async () => {
   const { root, project, environment } = await fixture();
   try {
     const overlay = join(project, "env-overlay.json");
@@ -119,7 +119,7 @@ test("FACTORY_RUNTIME_SETTINGS_PATH applies when --settings is absent", async ()
     const context = await createAppContext({
       environment: {
         ...environment,
-        env: { FACTORY_RUNTIME_SETTINGS_PATH: overlay },
+        env: { DROIDE_RUNTIME_SETTINGS_PATH: overlay },
       },
     });
 
@@ -152,13 +152,13 @@ test("--cwd moves the project layer and paths but not the user layer", async () 
   const { root, home, project, environment } = await fixture();
   try {
     const other = join(root, "other");
-    await mkdir(join(other, ".factory"), { recursive: true });
+    await mkdir(join(other, ".droide"), { recursive: true });
     await writeFile(
-      join(home, ".factory", "settings.json"),
+      join(home, ".droide", "settings.json"),
       JSON.stringify({ skills: ["user"] }),
     );
     await writeFile(
-      join(other, ".factory", "settings.json"),
+      join(other, ".droide", "settings.json"),
       JSON.stringify({ skills: ["other"] }),
     );
 
@@ -166,10 +166,10 @@ test("--cwd moves the project layer and paths but not the user layer", async () 
 
     assert.deepEqual(context.settings.skills, ["other"]);
     assert.equal(context.environment.cwd, other);
-    assert.equal(context.paths.projectDir, join(other, ".factory"));
+    assert.equal(context.paths.projectDir, join(other, ".droide"));
     assert.equal(
       context.paths.userSettingsFile,
-      join(home, ".factory", "settings.json"),
+      join(home, ".droide", "settings.json"),
     );
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -181,22 +181,19 @@ test("derived paths stay inside the injected home and project", async () => {
   try {
     const context = await createAppContext({ environment });
 
-    assert.equal(context.paths.factoryDir, join(home, ".factory"));
+    assert.equal(context.paths.stateDir, join(home, ".droide"));
     assert.equal(
-      context.paths.sessionsDir.startsWith(join(home, ".factory")),
+      context.paths.sessionsDir.startsWith(join(home, ".droide")),
       true,
     );
     assert.equal(
-      context.paths.cacheDir.startsWith(join(home, ".factory")),
+      context.paths.cacheDir.startsWith(join(home, ".droide")),
       true,
     );
-    assert.equal(
-      context.paths.logsDir.startsWith(join(home, ".factory")),
-      true,
-    );
+    assert.equal(context.paths.logsDir.startsWith(join(home, ".droide")), true);
     assert.equal(
       context.paths.projectSettingsFile,
-      join(project, ".factory", "settings.json"),
+      join(project, ".droide", "settings.json"),
     );
     assert.equal(context.paths.worktreesRoot.includes(home), true);
   } finally {
@@ -207,7 +204,7 @@ test("derived paths stay inside the injected home and project", async () => {
 test("a malformed project settings file fails the context, naming the file", async () => {
   const { root, project, environment } = await fixture();
   try {
-    const file = join(project, ".factory", "settings.json");
+    const file = join(project, ".droide", "settings.json");
     await writeFile(file, "{ not json");
 
     await assert.rejects(

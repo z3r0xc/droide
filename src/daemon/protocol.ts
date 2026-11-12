@@ -6,7 +6,7 @@
  * Every envelope is parsed before it is used: the transport hands this module
  * text or bytes from an untrusted peer, and the parser either returns a typed
  * envelope or a typed `DaemonProtocolError`. The envelope shape is frozen
- * (`jsonrpc`, `factoryApiVersion`, optional `factoryProtocolVersion`), ids are
+ * (`jsonrpc`, `droideApiVersion`, optional `droideProtocolVersion`), ids are
  * UUID v4 strings, and a response carries `result` xor `error` — never both.
  */
 
@@ -18,9 +18,9 @@ import { DaemonProtocolError } from "./errors.ts";
 /** The only JSON-RPC version this protocol accepts. */
 export const JSONRPC_VERSION = "2.0";
 /** Frozen legacy field; never used for compatibility decisions (B13). */
-export const LEGACY_FACTORY_API_VERSION = "1.0.0";
-/** The protocol version v1.9.0 emits. */
-export const FACTORY_PROTOCOL_VERSION = "1.321.0";
+export const LEGACY_DROIDE_API_VERSION = "1.0.0";
+/** The protocol version the recorded build emits. */
+export const DROIDE_PROTOCOL_VERSION = "1.321.0";
 /** First byte of a compressed binary frame (B12). */
 export const COMPRESSED_PAYLOAD_TAG = 0x01;
 /** The only encoding a client may negotiate. */
@@ -68,8 +68,8 @@ export interface JsonRpcErrorObject {
 export interface DaemonRequestEnvelope {
   readonly type: "request";
   readonly jsonrpc: "2.0";
-  readonly factoryApiVersion: string;
-  readonly factoryProtocolVersion?: string;
+  readonly droideApiVersion: string;
+  readonly droideProtocolVersion?: string;
   readonly id: string;
   readonly method: string;
   readonly params?: unknown;
@@ -79,8 +79,8 @@ export interface DaemonRequestEnvelope {
 export interface DaemonSuccessResponse {
   readonly type: "response";
   readonly jsonrpc: "2.0";
-  readonly factoryApiVersion: string;
-  readonly factoryProtocolVersion?: string;
+  readonly droideApiVersion: string;
+  readonly droideProtocolVersion?: string;
   readonly id: string;
   readonly result: unknown;
   readonly _meta?: unknown;
@@ -89,8 +89,8 @@ export interface DaemonSuccessResponse {
 export interface DaemonErrorResponse {
   readonly type: "response";
   readonly jsonrpc: "2.0";
-  readonly factoryApiVersion: string;
-  readonly factoryProtocolVersion?: string;
+  readonly droideApiVersion: string;
+  readonly droideProtocolVersion?: string;
   /** `null` only when the frame could not be parsed, so it has no request. */
   readonly id: string | null;
   readonly error: JsonRpcErrorObject;
@@ -103,8 +103,8 @@ export type DaemonResponseEnvelope =
 export interface DaemonNotificationEnvelope {
   readonly type: "notification";
   readonly jsonrpc: "2.0";
-  readonly factoryApiVersion: string;
-  readonly factoryProtocolVersion?: string;
+  readonly droideApiVersion: string;
+  readonly droideProtocolVersion?: string;
   readonly method: string;
   readonly params?: unknown;
   readonly _meta?: unknown;
@@ -131,9 +131,9 @@ export interface ProtocolVersionContext {
 
 /** Options shared by the envelope builders. */
 export interface EnvelopeOptions {
-  /** Defaults to {@link FACTORY_PROTOCOL_VERSION}. */
+  /** Defaults to {@link DROIDE_PROTOCOL_VERSION}. */
   readonly protocolVersion?: string;
-  /** Defaults to {@link LEGACY_FACTORY_API_VERSION}. */
+  /** Defaults to {@link LEGACY_DROIDE_API_VERSION}. */
   readonly apiVersion?: string;
   readonly meta?: unknown;
 }
@@ -173,13 +173,13 @@ function requireNonEmptyString(value: unknown, field: string): string {
 
 function envelopeBase(options: EnvelopeOptions): {
   readonly jsonrpc: "2.0";
-  readonly factoryApiVersion: string;
-  readonly factoryProtocolVersion: string;
+  readonly droideApiVersion: string;
+  readonly droideProtocolVersion: string;
 } {
   return {
     jsonrpc: JSONRPC_VERSION,
-    factoryApiVersion: options.apiVersion ?? LEGACY_FACTORY_API_VERSION,
-    factoryProtocolVersion: options.protocolVersion ?? FACTORY_PROTOCOL_VERSION,
+    droideApiVersion: options.apiVersion ?? LEGACY_DROIDE_API_VERSION,
+    droideProtocolVersion: options.protocolVersion ?? DROIDE_PROTOCOL_VERSION,
   };
 }
 
@@ -342,24 +342,24 @@ export function parseEnvelopeValue(value: unknown): DaemonEnvelope {
   if (value["jsonrpc"] !== JSONRPC_VERSION) {
     throw parseFailure(`jsonrpc must be "${JSONRPC_VERSION}"`);
   }
-  const factoryApiVersion = value["factoryApiVersion"];
-  if (typeof factoryApiVersion !== "string") {
-    throw parseFailure("factoryApiVersion must be a string");
+  const droideApiVersion = value["droideApiVersion"];
+  if (typeof droideApiVersion !== "string") {
+    throw parseFailure("droideApiVersion must be a string");
   }
-  const factoryProtocolVersion = value["factoryProtocolVersion"];
+  const droideProtocolVersion = value["droideProtocolVersion"];
   if (
-    factoryProtocolVersion !== undefined &&
-    typeof factoryProtocolVersion !== "string"
+    droideProtocolVersion !== undefined &&
+    typeof droideProtocolVersion !== "string"
   ) {
-    throw parseFailure("factoryProtocolVersion must be a string");
+    throw parseFailure("droideProtocolVersion must be a string");
   }
   const meta = value["_meta"];
   if (meta !== undefined && !isJsonObject(meta)) {
     throw parseFailure("_meta must be an object");
   }
   const fields: EnvelopeFields = {
-    factoryApiVersion,
-    factoryProtocolVersion,
+    droideApiVersion,
+    droideProtocolVersion,
     meta,
   };
 
@@ -378,23 +378,23 @@ export function parseEnvelopeValue(value: unknown): DaemonEnvelope {
 }
 
 interface EnvelopeFields {
-  readonly factoryApiVersion: string;
-  readonly factoryProtocolVersion: string | undefined;
+  readonly droideApiVersion: string;
+  readonly droideProtocolVersion: string | undefined;
   readonly meta: unknown;
 }
 
 function withFields(fields: EnvelopeFields): {
   readonly jsonrpc: "2.0";
-  readonly factoryApiVersion: string;
-  readonly factoryProtocolVersion?: string;
+  readonly droideApiVersion: string;
+  readonly droideProtocolVersion?: string;
   readonly _meta?: unknown;
 } {
   return {
     jsonrpc: JSONRPC_VERSION,
-    factoryApiVersion: fields.factoryApiVersion,
-    ...(fields.factoryProtocolVersion === undefined
+    droideApiVersion: fields.droideApiVersion,
+    ...(fields.droideProtocolVersion === undefined
       ? {}
-      : { factoryProtocolVersion: fields.factoryProtocolVersion }),
+      : { droideProtocolVersion: fields.droideProtocolVersion }),
     ...(fields.meta === undefined ? {} : { _meta: fields.meta }),
   };
 }
@@ -510,7 +510,7 @@ export function envelopeVersionMismatch(
 ): ProtocolVersionMismatch | undefined {
   return protocolVersionMismatch(
     localFactoryProtocolVersion,
-    envelope.factoryProtocolVersion,
+    envelope.droideProtocolVersion,
     {
       messageType: envelope.type,
       ...(envelope.type === "request"

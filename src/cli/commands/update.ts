@@ -2,22 +2,18 @@
 import { Command } from "commander";
 
 import { DISPLAY, PRODUCT_VERSION } from "../brand.ts";
-import {
-  factoryDir,
-  joinPath,
-  processEnvironment,
-} from "../../config/paths.ts";
+import { stateDir, joinPath, processEnvironment } from "../../config/paths.ts";
 import { defaultInstallProbe } from "../../update/install.ts";
 import { runUpdateCommand } from "../update-commands.ts";
 
 /**
- * The managed installation tree. It lives under the Factory directory so the
+ * The managed installation tree. It lives under the state directory so the
  * installer never guesses at (or overwrites) the directory of the running
  * script; staging is `<installDir>/update/<version>` (ADR 0009).
  */
 function installDirectory(): string {
   const environment = processEnvironment();
-  return joinPath(environment.platform, factoryDir(environment), "install");
+  return joinPath(environment.platform, stateDir(environment), "install");
 }
 
 export function makeUpdateCommand(): Command {

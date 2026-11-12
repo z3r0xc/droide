@@ -38,9 +38,9 @@ const ANSWER: readonly MockResponse[] = [
 
 function providerEnvironment(server: { readonly url: string }): {
   readonly DROIDE_API_KEY: string;
-  readonly FACTORY_API_BASE_URL: string;
+  readonly DROIDE_API_BASE_URL: string;
 } {
-  return { DROIDE_API_KEY: "test", FACTORY_API_BASE_URL: server.url };
+  return { DROIDE_API_KEY: "test", DROIDE_API_BASE_URL: server.url };
 }
 
 test(

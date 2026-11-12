@@ -417,7 +417,7 @@ function finish(
     rendered.note === undefined
       ? rendered.text
       : `${rendered.text}\n\n${rendered.note}`;
-  // `TODO(spec B12)`: the spill file under `<factory>/tool-outputs` is not
+  // `TODO(spec B12)`: the spill file under `<state dir>/tool-outputs` is not
   // written by this build; the notice names how to ask for the rest instead.
   return boundText(text, budget, `${filePath} (read it with offset and limit)`)
     .text;

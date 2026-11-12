@@ -47,11 +47,11 @@ import type { CheckResult, DoctorCheck, DoctorContext } from "./types.ts";
 const UPDATE_REPOSITORY = "z3r0xc/droide";
 
 /**
- * The baked managed base URL (50 B3); `FACTORY_API_BASE_URL` overrides it.
+ * The baked managed base URL (50 B3); `DROIDE_API_BASE_URL` overrides it.
  * `exec` keeps its own copy for the same reason: the constant is a build
  * define, not a shared module's state.
  */
-const DEFAULT_API_BASE_URL = "https://api.factory.ai";
+const DEFAULT_API_BASE_URL = "https://api.droide.ai";
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -159,34 +159,31 @@ const filesystem: DoctorCheck = {
   name: "filesystem",
   title: "Filesystem",
   async run(context) {
-    const factoryDir = context.paths["factoryDir"];
-    if (factoryDir === undefined)
+    const stateDir = context.paths["stateDir"];
+    if (stateDir === undefined)
       return { status: "fail", summary: "factory directory is unknown" };
-    const probe = join(factoryDir, `.doctor-${randomUUID()}`);
+    const probe = join(stateDir, `.doctor-${randomUUID()}`);
     try {
       // The app creates its home lazily, so a missing directory is not a
       // failure: make it, then prove it is writable.
-      await mkdir(factoryDir, { recursive: true });
-      await access(factoryDir, constants.W_OK);
+      await mkdir(stateDir, { recursive: true });
+      await access(stateDir, constants.W_OK);
       await writeFile(probe, "ok", "utf8");
       await rm(probe, { force: true });
       return {
         status: "ok",
         summary: "factory directory is writable",
-        details: [
-          `factoryDir: ${factoryDir}`,
-          `cwd: ${context.environment.cwd}`,
-        ],
+        details: [`stateDir: ${stateDir}`, `cwd: ${context.environment.cwd}`],
       };
     } catch (error) {
       return {
         status: "fail",
         summary: "factory directory is not writable",
         details: [
-          factoryDir,
+          stateDir,
           error instanceof Error ? error.message : String(error),
         ],
-        fixes: [`ensure ${factoryDir} exists and is writable`],
+        fixes: [`ensure ${stateDir} exists and is writable`],
       };
     }
   },
@@ -380,7 +377,7 @@ const mcp: DoctorCheck = {
   title: "MCP",
   async run(context) {
     const sources = mcpConfigFileSources(
-      context.paths["factoryDir"] ?? "",
+      context.paths["stateDir"] ?? "",
       context.environment.cwd,
     );
     const configuration = loadMcpConfiguration(sources);
@@ -575,7 +572,7 @@ const connectivity: DoctorCheck = {
         summary: `backend unreachable: ${host} did not resolve`,
         details,
         fixes: [
-          "check DNS and VPN state, or point FACTORY_API_BASE_URL at a reachable backend",
+          "check DNS and VPN state, or point DROIDE_API_BASE_URL at a reachable backend",
         ],
         metadata: {
           baseUrl,
@@ -981,7 +978,7 @@ const exec: DoctorCheck = {
   name: "exec",
   title: "Exec",
   async run(context) {
-    if ((context.paths["factoryDir"] ?? "") === "") {
+    if ((context.paths["stateDir"] ?? "") === "") {
       return {
         status: "fail",
         summary: "exec cannot start: the factory directory is not resolved",

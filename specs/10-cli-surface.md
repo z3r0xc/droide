@@ -1,6 +1,6 @@
-# CLI surface — the `droid` command line
+# CLI surface — the `droide` command line
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft
 - **Owner:** CLI
 - **Related:** `00-context.md`; specs for `exec` runtime, TUI, daemon, MCP,
@@ -8,10 +8,10 @@
 
 ## Purpose
 
-`droid` is a commander-routed single executable. This spec fixes the whole
+`droide` is a commander-routed single executable. This spec fixes the whole
 command-line contract a user or a script can observe: the root usage line, the
 help and version surfaces, every option and subcommand (including the hidden
-ones that other Factory surfaces invoke), how a bare word is classified as a
+ones that other product surfaces invoke), how a bare word is classified as a
 command or as prompt text, what the process exits with, and which of the four
 configuration sources wins when they disagree. It exists because the CLI is the
 only stable integration point for shells, editors, CI jobs, the desktop app and
@@ -42,7 +42,7 @@ citation means `orig/src/…`.
 
 | Term | Meaning |
 |---|---|
-| **root program** | The single `Command` named `droid` that owns `[prompt...]`, the twelve startup options and every subcommand (`orig/src/cli.ts:427-480`). |
+| **root program** | The single `Command` named `droide` that owns `[prompt...]`, the twelve startup options and every subcommand (`orig/src/cli.ts:427-480`). |
 | **startup options** | The twelve options returned by `makeTuiOptions()`; the root program and `resume` both accept them (`orig/src/entrypoints/tui/options.ts:10-53`). |
 | **dispatch chain** | The root program plus each command nested down to the one whose action runs, root first (`orig/src/cli.ts:97-106`). |
 | **default command** | The hidden `tui` command registered with `{ isDefault: true }` (`orig/src/cli.ts:478`); it runs when no word matches a command. |
@@ -51,29 +51,29 @@ citation means `orig/src/…`.
 | **launch directory** | `process.cwd()` at process start, before `--cwd` is entered. |
 | **launch path** | An option or argument value marked with `markLaunchPath`, which is made absolute at the launch directory when the run moves (`orig/src/utils/commanderParsers.ts:88-98`). |
 | **hidden** | Registered with `{ hidden: true }` or `.hideHelp()`: absent from every help page but still dispatchable. |
-| **flag-gated** | A hidden command admitted only when a Factory feature flag is on; otherwise it fails as an unknown command (`orig/src/entrypoints/bootstrap/gatedCommand.ts:16-40`). |
+| **flag-gated** | A hidden command admitted only when a product feature flag is on; otherwise it fails as an unknown command (`orig/src/entrypoints/bootstrap/gatedCommand.ts:16-40`). |
 
 ## Observable behaviour
 
 ### Root program surface
 
-**B1** `droid --help` (also `-h`, and `droid help`) writes the root help page to
+**B1** `droide --help` (also `-h`, and `droide help`) writes the root help page to
 stdout and exits 0. It is byte-exact in `tests/parity/expected/help.json`. The
-first line is `Usage: droid [options] [command] [prompt...]`, produced from the
+first line is `Usage: droide [options] [command] [prompt...]`, produced from the
 program name, its options, its subcommands and its `[prompt...]` argument
 (`orig/src/cli.ts:428-431`). `[observed]`
 
 **B2** The one-line description under the usage line is
-`Droid - Factory's AI coding agent in your terminal`
+`Droide - a terminal coding agent for your repository`
 (`orig/src/cli.ts:428`). `[observed]`
 
 **B3** `-v` / `--version` prints the version and exits 0. The value is
-`process.env.CLI_VERSION`, or the literal `unknown` when unset; the recorded
-build prints `1.9.0` (`orig/src/cli.ts:429`;
+`process.env.CLI_VERSION`, or the literal `unknown` when unset; the CLI reports
+`0.4.0` (`orig/src/cli.ts:429`;
 `tests/parity/expected/version.json`). `[observed]`
 
 **B4** The help page ends with an `Examples:` block of six lines followed by the
-line `For more details, see: https://docs.factory.ai/cli/getting-started/overview`
+line `For more details, see: https://github.com/z3r0xc/droide#readme`
 and a final newline; the block is attached with `addHelpText('after', …)` and
 contains no other trailing text (`orig/src/cli.ts:432-446`;
 `tests/parity/expected/help.json`). `[observed]`
@@ -111,8 +111,8 @@ and becomes prompt text, not an error: `tui` sets `.allowUnknownOption(true)`
 and `.allowExcessArguments(true)`, so option-shaped tokens are operands too
 (`orig/src/entrypoints/tui/command.ts:159-166`). `[observed]`
 
-**B10** Because of B9, `droid definitely-not-a-command` and
-`droid --definitely-not-a-flag` both reach the same refusal path with the token
+**B10** Because of B9, `droide definitely-not-a-command` and
+`droide --definitely-not-a-flag` both reach the same refusal path with the token
 in the prompt word, and the recorded goldens differ only in that word
 (`tests/parity/expected/unknown-command.json`,
 `tests/parity/expected/unknown-flag.json`). `[observed]`
@@ -133,9 +133,9 @@ entrypoint before the router exists and runs its own commander program, so it
 never appears in or reaches the root dispatch
 (`orig/src/index.ts:119-126`, `orig/src/entrypoints/deployment/command.ts:92-112`). `[observed]`
 
-**B14** `droid help <command>` prints that command's help and exits 0. For a
+**B14** `droide help <command>` prints that command's help and exits 0. For a
 flag-gated command the shortcut fails closed: the admission check is attached to
-`beforeHelp`, so `droid help space` reports the command as unknown when the flag
+`beforeHelp`, so `droide help space` reports the command as unknown when the flag
 is off (`orig/src/entrypoints/bootstrap/gatedCommand.ts:16-40`). `[observed]`
 
 ### The default command and the non-TTY refusal
@@ -154,10 +154,10 @@ process writes the refusal to **stderr** and exits **1**; nothing is started
 `evidence/extracted/windows-x64/chunk-j2hk0tf4.js` key `tui`): `[observed]`
 
 ```
-droid requires a terminal for interactive mode, but stdin is not one.
-  • Over SSH, add -t to allocate one: ssh -t <host> droid
-  • To run a prompt without a terminal, use droid exec: droid exec "<prompt>"
-  • "<word>" is not a droid command, so droid read it as a prompt. Run droid --help to list commands.
+droide requires a terminal for interactive mode, but stdin is not one.
+  • Over SSH, add -t to allocate one: ssh -t <host> droide
+  • To run a prompt without a terminal, use droide exec: droide exec "<prompt>"
+  • "<word>" is not a droide command, so droide read it as a prompt. Run droide --help to list commands.
 ```
 
 **B18** When `process.env.TERM_PROGRAM === 'mintty'` a fourth-shaped hint line is
@@ -179,10 +179,10 @@ resolved before any other startup work (`orig/src/entrypoints/tui/command.ts:35-
 
 ### `resume`
 
-**B22** `droid resume [sessionId] [prompt...]` resumes the named session, opens
+**B22** `droide resume [sessionId] [prompt...]` resumes the named session, opens
 the session picker when no id is given, and sends any remaining operands as the
 prompt. Usage line:
-`droid resume [options] [sessionId] [prompt...]`
+`droide resume [options] [sessionId] [prompt...]`
 (`orig/src/entrypoints/tui/command.ts:184-190`;
 `tests/parity/expected/help-resume.json`). `[observed]`
 
@@ -191,7 +191,7 @@ prompt. Usage line:
 in registration order (`orig/src/entrypoints/tui/command.ts:191-208`;
 `tests/parity/expected/help-resume.json`). `[observed]`
 
-**B24** `resume <id> --fork` is exactly `droid --fork <id>`: the id is moved into
+**B24** `resume <id> --fork` is exactly `droide --fork <id>`: the id is moved into
 the root `fork` slot and the TUI runs (`orig/src/entrypoints/tui/command.ts:228-234`). `[observed]`
 
 **B25** Root `--settings` and `--cwd` are inherited by `resume` when `resume` was
@@ -207,7 +207,7 @@ through the message catalogue
 
 ### `exec`
 
-**B26** `droid exec [options] [prompt]` runs non-interactively. Its help is
+**B26** `droide exec [options] [prompt]` runs non-interactively. Its help is
 **curated text**, not commander's rendering: `.helpOption(false)` is set and
 `-h, --help` is an ordinary option whose action loads local state and prints
 `printExecHelp()` (`orig/src/entrypoints/exec/command.ts:47-51,237-252`;
@@ -221,9 +221,9 @@ Model:`, `Authentication:` and `Examples:`
 (`orig/src/entrypoints/exec/help.ts:115-303`). `[observed]`
 
 **B28** The `-m, --model` line's `(default: …)` is computed at help time from
-`resolveDefaultFactoryModel` over the models available to the signed-in
-identity; the recorded build shows `gpt-6.1-sol`. The parsed option itself has no
-default (`orig/src/entrypoints/exec/help.ts:81-113`;
+`resolveDefaultModel` (vendor prefix elided) over the models available to the
+signed-in identity; the recorded build shows `gpt-6.1-sol`. The parsed option
+itself has no default (`orig/src/entrypoints/exec/help.ts:81-113`;
 `orig/src/entrypoints/exec/command.ts:99`). `[observed]`
 
 **B29** `--output-format` defaults to `text`; `--list-tools`, `--mission`,
@@ -266,10 +266,10 @@ curated help (`tests/parity/expected/help-exec.json`). `[observed]`
 
 ### `daemon`
 
-**B35** `droid daemon [options]` exposes
+**B35** `droide daemon [options]` exposes
 `-p, --port <number>`, `--host <address>` (default `127.0.0.1`),
 `--unix <path>`, `-d, --debug` (default `false`),
-`--listen <websocket|ipc>` (default `websocket`), `--droid-path <path>`,
+`--listen <websocket|ipc>` (default `websocket`), `--droide-path <path>`,
 `--liveness-fd <fd>`, `--parent-pid <pid>`, `--remote-control`,
 `--remote-access` (default `false`) and `--settings <path>`
 (`orig/src/entrypoints/daemon/command.ts:20-83`;
@@ -286,12 +286,12 @@ registered as a hidden no-op so existing units keep working
 (`orig/src/entrypoints/daemon/command.ts:44-74`). `[observed]`
 
 **B38** `daemon` forwards the root `--settings` when it was given none itself,
-and exports the surviving value as `FACTORY_RUNTIME_SETTINGS_PATH` for the
+and exports the surviving value as `DROIDE_RUNTIME_SETTINGS_PATH` for the
 children it spawns (`orig/src/entrypoints/daemon/command.ts:85-95`). `[observed]`
 
 ### `search` / `find`
 
-**B39** `droid search|find [options] <query>` requires the `query` argument; the
+**B39** `droide search|find [options] <query>` requires the `query` argument; the
 help's usage line renders the alias as `search|find`
 (`orig/src/entrypoints/search/command.ts:9-13`;
 `tests/parity/expected/help-search.json`). `[observed]`
@@ -305,7 +305,7 @@ help's usage line renders the alias as `search|find`
 
 ### `update`
 
-**B41** `droid update [options]` takes `-c, --check` and
+**B41** `droide update [options]` takes `-c, --check` and
 `-v, --version <version>` (`tests/parity/expected/help-update.json`;
 `orig/src/entrypoints/update/command.ts:4-13`). The `-v` here shadows the root
 `-v` version flag inside that command. `[observed]`
@@ -316,7 +316,7 @@ leading `v` (`orig/src/entrypoints/update/run.ts:148-166`). `[observed]`
 
 ### `mcp`
 
-**B43** `droid mcp` groups `add`, `remove`, `list`, `auth` and `permissions`
+**B43** `droide mcp` groups `add`, `remove`, `list`, `auth` and `permissions`
 (`orig/src/entrypoints/mcp/command.ts:8-113`;
 `tests/parity/expected/help-mcp.json`). `[observed]`
 
@@ -330,7 +330,7 @@ was given (`orig/src/entrypoints/mcp/command.ts:18-47`). `[observed]`
 
 ### `plugin`
 
-**B46** `droid plugin` groups `marketplace` (`add <url>`, `remove <name>`,
+**B46** `droide plugin` groups `marketplace` (`add <url>`, `remove <name>`,
 `list`, `update [name]`), `install|i <plugin>`, `uninstall|remove <plugin>`,
 `update [plugin]` and `list`; every install/uninstall/update/list accepts
 `-s, --scope <user|project>` (`orig/src/entrypoints/plugin/command.ts:13-119`;
@@ -338,7 +338,7 @@ was given (`orig/src/entrypoints/mcp/command.ts:18-47`). `[observed]`
 
 ### `computer`
 
-**B47** `droid computer` groups `register [name]` (`-y, --yes`),
+**B47** `droide computer` groups `register [name]` (`-y, --yes`),
 `remove` (`-y, --yes`), `list`, `ssh <computer-name> [command...]`
 (`--debug`, `--proxy`, `--port <port>` default `22`) and
 `port-forward <computer-name> <mappings...>` (`--address <addr>` default
@@ -351,7 +351,7 @@ used by managed-computer provisioning; it bootstraps with `skipAuth`
 
 ### `doctor`
 
-**B49** `droid doctor [options]` takes `--json`, `--verbose`,
+**B49** `droide doctor [options]` takes `--json`, `--verbose`,
 `--timeout <ms>` and `--checks <names>`, and appends a four-line trailer after
 its option list (`orig/src/entrypoints/doctor/command.ts:49-72`;
 `tests/parity/expected/help-doctor.json`). `[observed]`
@@ -397,7 +397,7 @@ Hidden because it is machine-driven and prints unlocalized JSON
 **B55** `automation` — flag-gated (`AutomationMemoryTools`): `memory
 {list,read,edit,write,append,delete}` over an automation's `memory/` files,
 every subcommand taking the automation as `[automation]` (defaulting to
-`FACTORY_AUTOMATION_ID`) and `--json`. Hidden because its callers are automation
+`DROIDE_AUTOMATION_ID`) and `--json`. Hidden because its callers are automation
 scripts (`orig/src/entrypoints/automation/command.ts:1-9,36-163`). `[observed]`
 
 **B56** `wiki-read`, `wiki-search`, `wiki-upload` — read, search and upload wiki
@@ -414,9 +414,9 @@ generation flow, not by hand (`orig/src/entrypoints/wiki-read/command.ts:4-19`,
 (`orig/src/entrypoints/pull-request/command.ts:5-97`). `[observed]`
 
 **B58** `record-triage-input` — reports the consumed-message count for a triage
-run (Software Factory SIGNAL metric) with required `--automation-id`,
-`--run-id`, `--messages-consumed` and optional `--occurred-at`. Hidden because a
-platform automation invokes it (`orig/src/entrypoints/record-triage-input/command.ts:4-24`). `[observed]`
+run (a platform signal metric) with required `--automation-id`, `--run-id`,
+`--messages-consumed` and optional `--occurred-at`. Hidden because a platform
+automation invokes it (`orig/src/entrypoints/record-triage-input/command.ts:4-24`). `[observed]`
 
 **B59** `exit-courier` — delivers the network work exited sessions handed off,
 then exits. Hidden because the TUI spawns it at exit
@@ -471,7 +471,7 @@ the operating system's reason, through commander's error path (exit 1)
 `exec.errorChangingDirectory`). `[observed]`
 
 **B68** Launch-relative environment variables (including
-`FACTORY_RUNTIME_SETTINGS_PATH`) are made absolute at the launch directory before
+`DROIDE_RUNTIME_SETTINGS_PATH`) are made absolute at the launch directory before
 the first configuration read, so a parent's relative paths keep their meaning
 after the move (`orig/src/environment.ts:484-521`;
 `orig/src/index.ts:180-190`). `[observed]`
@@ -487,8 +487,8 @@ option — exit 1 with the text on stderr
 (`orig/src/cli.ts:570-592`;
 `vendor/node_modules/commander/lib/command.js:2035,2058-2060,2114-2136,721`). `[observed]`
 
-**B71** A command group invoked with no subcommand (`droid mcp`, `droid plugin`,
-`droid computer`, `droid doctor` is excluded because it has an action) prints its
+**B71** A command group invoked with no subcommand (`droide mcp`, `droide plugin`,
+`droide computer`, `droide doctor` is excluded because it has an action) prints its
 help to **stderr** and exits 1, because commander treats a command with children
 and no action as a usage error (`vendor/node_modules/commander/lib/command.js:1632-1635,2622-2633`). `[derived]` — see Q2.
 
@@ -517,7 +517,7 @@ on success (`orig/src/entrypoints/deployment/command.ts:96-112`). `[observed]`
 
 **B77** For the runtime-settings overlay there are exactly two sources on the
 command line's side of the chain: the `--settings` flag, then the inherited
-`FACTORY_RUNTIME_SETTINGS_PATH` environment variable. Each entrypoint resolves
+`DROIDE_RUNTIME_SETTINGS_PATH` environment variable. Each entrypoint resolves
 `options.settings ?? getRuntimeSettingsPathFromEnv()`
 (`orig/src/entrypoints/exec/run.ts:320-325`;
 `orig/src/entrypoints/daemon/run.ts:275-282`;
@@ -525,7 +525,7 @@ command line's side of the chain: the `--settings` flag, then the inherited
 
 **B78** The overlay file, when it resolves, becomes the `Runtime` level of the
 settings hierarchy and sits directly beneath org policy and above the automation
-folder, `.factory` folders, project settings, user settings, dynamic config and
+folder, `.droide` folders, project settings, user settings, dynamic config and
 builtin defaults — in that order (`orig/packages/runtime/settings/src/SettingsManager.ts:3923-4013`). `[observed]`
 
 **B79** A path that does not exist, is not a regular file or is unreadable does
@@ -534,7 +534,7 @@ so no child inherits it) and the failure is recorded
 (`orig/src/utils/runtimeSettingsBootstrap.ts:98-140`). `[observed]`
 
 **B80** `--append-system-prompt` / `--append-system-prompt-file` win over the
-inherited `FACTORY_APPEND_SYSTEM_PROMPT`; the process then re-exports the
+inherited `DROIDE_APPEND_SYSTEM_PROMPT`; the process then re-exports the
 resolved text to its children. File contents precede the inline text, joined by a
 blank line (`orig/src/entrypoints/exec/run.ts:306-318`;
 `orig/src/utils/appendSystemPromptArgs.ts:68-91`). `[observed]`
@@ -592,11 +592,11 @@ refuse an empty list; `--tag <spec>` accumulates; `--depth <number>` `parseInt`
 | Variable | Read where | Effect |
 |---|---|---|
 | `CLI_VERSION` | `orig/src/cli.ts:429` | version string, else `unknown` |
-| `FACTORY_RUNTIME_SETTINGS_PATH` | `orig/src/environment.ts:530-534` | overlay path when `--settings` is absent |
-| `FACTORY_APPEND_SYSTEM_PROMPT` | `orig/src/environment.ts:558-562` | inherited append text |
+| `DROIDE_RUNTIME_SETTINGS_PATH` | `orig/src/environment.ts:530-534` | overlay path when `--settings` is absent |
+| `DROIDE_APPEND_SYSTEM_PROMPT` | `orig/src/environment.ts:558-562` | inherited append text |
 | `TERM_PROGRAM` | `orig/src/entrypoints/tui/command.ts:39` | adds the mintty hint to the refusal |
-| `FACTORY_SESSION_ID` | `orig/src/entrypoints/space/command.ts:16-18` | default `--session` for `space` |
-| `FACTORY_AUTOMATION_ID` | `orig/src/entrypoints/automation/command.ts:5-8` | default `[automation]` |
+| `DROIDE_SESSION_ID` | `orig/src/entrypoints/space/command.ts:16-18` | default `--session` for `space` |
+| `DROIDE_AUTOMATION_ID` | `orig/src/entrypoints/automation/command.ts:5-8` | default `[automation]` |
 
 ### Settings files
 
@@ -605,7 +605,7 @@ refuse an empty list; `--tag <spec>` accumulates; `--depth <number>` `parseInt`
 plain settings, and the result is merged as the `Runtime` level
 (`orig/packages/runtime/settings/src/RuntimeSettingsOverlay.ts:22-29,58-80`).
 The hierarchy merges, lowest priority last-wins order, Org → Runtime → automation
-folder → `.factory` folders → project settings → project `.agent` → project
+folder → `.droide` folders → project settings → project `.agent` → project
 plugins → user settings → user `.agent` → user plugins → dynamic config → builtin
 defaults (`orig/packages/runtime/settings/src/SettingsManager.ts:3923-4013`).
 
@@ -613,7 +613,7 @@ defaults (`orig/packages/runtime/settings/src/SettingsManager.ts:3923-4013`).
 
 | # | Trigger | Message (exact where recorded) | Exit | State |
 |---|---|---|---|---|
-| E1 | prompt given, stdin not a TTY | `droid requires a terminal for interactive mode, but stdin is not one.` + two hints + `"<word>" is not a droid command, so droid read it as a prompt. Run droid --help to list commands.` on stderr | 1 | nothing initialized |
+| E1 | prompt given, stdin not a TTY | `droide requires a terminal for interactive mode, but stdin is not one.` + two hints + `"<word>" is not a droide command, so droide read it as a prompt. Run droide --help to list commands.` on stderr | 1 | nothing initialized |
 | E2 | `resume <id> <prompt>`, stdin not a TTY | first line + hints only | 1 | nothing initialized |
 | E3 | unknown option on a command that does not allow it | `error: unknown option '--x'` (plus `Did you mean …?` suggestion) | 1 | untouched |
 | E4 | option value refused by an arg parser | `error: option '<flags>' argument '<value>' is invalid. <parser message>` | 1 | untouched |
@@ -691,7 +691,7 @@ column says so.
 | `["-h"]` | — | — | — | 0, help.json |
 | `["help"]` | `help` | `[]` | — | 0, help.json |
 | `["help","exec"]` | `help` | `["exec"]` | — | 0, exec help |
-| `["--version"]` / `["-v"]` | — | — | — | 0, `1.9.0\n` |
+| `["--version"]` / `["-v"]` | — | — | — | 0, `0.4.0\n` |
 | `["exec","hi"]` | `exec` | `["hi"]` | — | run |
 | `["exec","-f","p.txt"]` | `exec` | `[]` | `file="p.txt"` | run |
 | `["exec","--model","m","hi"]` | `exec` | `["hi"]` | `model="m"` | run |
@@ -723,10 +723,10 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
 | argv | TERM_PROGRAM | stderr lines | exit |
 |---|---|---|---|
 | `[]` | any | none — TUI starts | — |
-| `["hi"]` | unset | `requiresTerminal` (3 lines) + `"hi" is not a droid command …` | 1 |
+| `["hi"]` | unset | `requiresTerminal` (3 lines) + `"hi" is not a droide command …` | 1 |
 | `["hi","there"]` | unset | same, word `hi` | 1 |
 | `["--definitely-not-a-flag"]` | unset | same, word `--definitely-not-a-flag` | 1 |
-| `["hi"]` | `mintty` | 3 lines + mintty hint + `"hi" is not a droid command …` | 1 |
+| `["hi"]` | `mintty` | 3 lines + mintty hint + `"hi" is not a droide command …` | 1 |
 | `["resume"]` | any | none — picker starts | — |
 | `["resume","abc"]` | any | none | — |
 | `["resume","abc","hi"]` | unset | 3 lines only, no `notACommand` | 1 |
@@ -735,15 +735,15 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
 
 ### Help-text invariants
 
-1. `droid --help` stdout is byte-identical to `tests/parity/expected/help.json`,
+1. `droide --help` stdout is byte-identical to `tests/parity/expected/help.json`,
    exit 0, stderr empty.
 2. Its last line is
-   `For more details, see: https://docs.factory.ai/cli/getting-started/overview`
+   `For more details, see: https://github.com/z3r0xc/droide#readme`
    followed by exactly one newline.
-3. `droid <cmd> --help` is byte-identical to each recorded golden for
+3. `droide <cmd> --help` is byte-identical to each recorded golden for
    `resume`, `exec`, `daemon`, `search`, `update`, `mcp`, `plugin`, `computer`,
    `doctor`; exit 0 and stderr empty in every case.
-4. `droid doctor --help` ends with **two** newlines (the appended trailer ends in
+4. `droide doctor --help` ends with **two** newlines (the appended trailer ends in
    `\n`, plus the renderer's).
 5. No help page contains any of these strings: `tui`, `space`, `dataset`,
    `automation`, `wiki-read`, `wiki-search`, `wiki-upload`, `pull-request`,
@@ -751,9 +751,9 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
    `session-index-refresh`, `rules`, `deployment`, `trust-repos`,
    `--enable-child-ipc`, `--tool-execution-mode`, `--session-title`,
    `--request-id`, `--enabled-tools`, `--all`.
-6. `droid exec --help` names `-m, --model` with a `(default: …)` suffix and
+6. `droide exec --help` names `-m, --model` with a `(default: …)` suffix and
    contains the ten section headings of B27.
-7. Every `Usage:` line begins `Usage: droid` and repeats the command path; the
+7. Every `Usage:` line begins `Usage: droide` and repeats the command path; the
    `search` and `plugin install`/`uninstall` pages render aliases as
    `search|find`, `install|i`, `uninstall|remove`.
 
@@ -780,14 +780,14 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
 ## Open questions
 
 1. **Trailing root options after a prompt.** B11 predicts that
-   `droid "fix it" --auto high` treats `--auto high` as prompt text because
+   `droide "fix it" --auto high` treats `--auto high` as prompt text because
    `enablePositionalOptions()` stops root option parsing at the first operand and
-   `tui` allows unknown options. Settle by running the original with a TTY and
+   `tui` allows unknown options. Settle by running the reference build with a TTY and
    inspecting the resulting session's autonomy level, or by a unit test of the
    router. Blocks the `[derived]` part of B11 only.
-2. **`droid mcp` / `droid plugin` / `droid computer` with no subcommand.** B71 is
+2. **`droide mcp` / `droide plugin` / `droide computer` with no subcommand.** B71 is
    derived from commander's `else if (this.commands.length) help({ error: true })`
-   branch. A run of the original with no TTY would confirm both the stream
+   branch. A run of the reference build with no TTY would confirm both the stream
    (stderr) and exit 1. Blocks B71.
 3. **Locale resolution for E1/E2.** B21 is inferred from
    `initI18nFromLocalSettings()`; the exact locale files consulted (user settings
@@ -823,9 +823,9 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
 - Launch-path anchoring and `--cwd` entry semantics, including the
   `Error changing to directory:` refusal and the argv-token rewriting that lets a
   sealed child be re-executed from the new directory.
-- The precedence `--settings` → `FACTORY_RUNTIME_SETTINGS_PATH` → runtime overlay
+- The precedence `--settings` → `DROIDE_RUNTIME_SETTINGS_PATH` → runtime overlay
   level inside the settings hierarchy, and
-  `--append-system-prompt[-file]` → `FACTORY_APPEND_SYSTEM_PROMPT`.
+  `--append-system-prompt[-file]` → `DROIDE_APPEND_SYSTEM_PROMPT`.
 
 **Explicitly not part of the contract:**
 
@@ -838,5 +838,5 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
 - The full text of every validation message for `exec` flag conflicts; only the
   `Invalid flags: …` shape and the traffic-light conditions are contract.
 - Localization of messages other than the refusal.
-- Any behaviour of `droid exec` once the run starts (agent loop, streaming
+- Any behaviour of `droide exec` once the run starts (agent loop, streaming
   frames, tool selection resolution) — see the exec spec.

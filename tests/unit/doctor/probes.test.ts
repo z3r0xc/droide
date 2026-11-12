@@ -22,14 +22,14 @@ interface ProbeContextOptions {
   readonly fetch?: typeof fetch;
   readonly resolveHost?: (hostname: string) => Promise<readonly string[]>;
   readonly daemon?: DoctorDaemonProbe;
-  readonly factoryDir?: string;
+  readonly stateDir?: string;
   readonly cwd?: string;
 }
 
 function probeContext(options: ProbeContextOptions = {}): DoctorContext {
   return {
     settings: options.settings ?? {},
-    paths: { factoryDir: options.factoryDir ?? "/tmp/factory" },
+    paths: { stateDir: options.stateDir ?? "/tmp/factory" },
     environment: {
       platform: "linux",
       nodeVersion: "24.0.0",
@@ -101,11 +101,11 @@ test("connectivity reports DNS, TLS and HTTP separately", async () => {
   assert.equal(result.status, "ok");
   assert.deepEqual(
     recorder.calls.map((call) => call.url),
-    ["https://api.factory.ai/"],
+    ["https://api.droide.ai/"],
   );
   assert.equal(recorder.calls[0]?.init.method, "HEAD");
   assert.deepEqual(result.details, [
-    "base: https://api.factory.ai/",
+    "base: https://api.droide.ai/",
     "DNS: 203.0.113.10",
     "TLS: handshake ok",
     "HTTP: 204",
@@ -121,7 +121,7 @@ test("connectivity: a DNS failure is a warn with the reason, never a fail", asyn
   const result = await check("connectivity").run(
     probeContext({
       resolveHost: async () => {
-        throw codeError("getaddrinfo ENOTFOUND api.factory.ai", "ENOTFOUND");
+        throw codeError("getaddrinfo ENOTFOUND api.droide.ai", "ENOTFOUND");
       },
       fetch: recorder.fetch,
     }),
@@ -164,12 +164,12 @@ test("connectivity: a TLS failure is a warn naming the TLS stage", async () => {
 
 test("connectivity: a malformed base URL fails naming the variable", async () => {
   const result = await check("connectivity").run(
-    probeContext({ env: { FACTORY_API_BASE_URL: "https://api.factory.ai/" } }),
+    probeContext({ env: { DROIDE_API_BASE_URL: "https://api.droide.ai/" } }),
   );
 
   assert.equal(result.status, "fail");
   assert.match(result.summary, /must not end with \//);
-  assert.match(result.fixes?.[0] ?? "", /FACTORY_API_BASE_URL/);
+  assert.match(result.fixes?.[0] ?? "", /DROIDE_API_BASE_URL/);
 });
 
 /* -------------------------------------------------------------------------- */
@@ -306,7 +306,7 @@ test("inference: the default run never probes a model", async () => {
     const report = await runDoctor({
       checks: parseChecks(undefined),
       context: probeContext({
-        factoryDir: directory,
+        stateDir: directory,
         cwd: directory,
         env: { DROIDE_API_KEY: "fk-test-value" },
         fetch: recorder.fetch,
@@ -344,7 +344,7 @@ test("inference: a selected check sends one tiny completion", async () => {
   const call = recorder.calls[0];
   assert.equal(
     call?.url,
-    "https://api.factory.ai/api/llm/o/v1/chat/completions",
+    "https://api.droide.ai/api/llm/o/v1/chat/completions",
   );
   assert.equal(call?.init.method, "POST");
   const body: unknown = JSON.parse(String(call?.init.body));
@@ -410,7 +410,7 @@ test("exec: resolvable settings, model and tools are ok", async () => {
     result.details?.some(
       (line) =>
         line ===
-        "endpoint: https://api.factory.ai/api/llm/o/v1/chat/completions",
+        "endpoint: https://api.droide.ai/api/llm/o/v1/chat/completions",
     ),
     true,
   );
@@ -419,7 +419,7 @@ test("exec: resolvable settings, model and tools are ok", async () => {
 
 test("exec: an unresolved settings path fails before the model", async () => {
   const result = await check("exec").run(
-    probeContext({ factoryDir: "", env: { DROIDE_API_KEY: "fk-test-value" } }),
+    probeContext({ stateDir: "", env: { DROIDE_API_KEY: "fk-test-value" } }),
   );
 
   assert.equal(result.status, "fail");
@@ -460,7 +460,7 @@ test("--checks all consults only the injected HTTP client", async () => {
     const report = await runDoctor({
       checks: parseChecks("all"),
       context: probeContext({
-        factoryDir: directory,
+        stateDir: directory,
         cwd: directory,
         fetch: recorder.fetch,
         resolveHost: async () => ["203.0.113.10"],
@@ -469,7 +469,7 @@ test("--checks all consults only the injected HTTP client", async () => {
 
     assert.equal(globalCalls, 0);
     assert.deepEqual(recorder.calls.map((call) => call.url).sort(), [
-      "https://api.factory.ai/",
+      "https://api.droide.ai/",
       "https://api.github.com/repos/z3r0xc/droide/releases/latest",
     ]);
     assert.deepEqual(

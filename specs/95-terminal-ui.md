@@ -1,12 +1,12 @@
 # Terminal UI (interactive TUI)
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft
 - **Owner:** terminal-UI slice
 - **Related:** `specs/00-context.md`, `specs/10-cli-surface.md` (mode selection, exit codes),
   `specs/80-exec-and-streaming.md` (what streams into the transcript),
   `specs/40-sessions-and-storage.md` (persisted message shapes),
-  `docs/adr/0005-project-name-and-parity-normalisation.md` (program name is the only
+  `docs/adr/0010-own-brand-and-snapshot-harness.md` (program name is the only
   permitted difference; everything else here is parity-normalised)
 
 ## Purpose
@@ -28,7 +28,7 @@ Does **not** cover:
 
 - which command starts the TUI, `--resume`/`--continue` selection, or exit codes → `specs/10-cli-surface.md`
 - the daemon/session protocol that produces messages → `specs/80-exec-and-streaming.md`, `specs/40-sessions-and-storage.md`
-- the Mission Control, Droids View, Workstream Control and plugin/marketplace full-screen
+- the Mission Control, custom-agents view, Workstream Control and plugin/marketplace full-screen
   surfaces. They are listed only as region owners the composer can be handed to (B2).
 - native rendering (Kitty graphics, SVG→PNG rasterisation internals) beyond the tokens they consume.
 - non-English locales. English strings are normative here because the parity harness runs with
@@ -55,7 +55,7 @@ spec pins only the primitive (`MenuContainer`, `SelectableList`).
 | **OSC palette override** | Writing `ESC ] 4;n;#rrggbb BEL` etc. so the terminal's own ANSI 0–15 slots take the theme's colours `[src/theme/ThemeEngine.ts:403-441]`. |
 | **marker** | The one-column bold glyph that starts a transcript row (`⛬`, `>`, `●`). |
 | **clamp** | Truncation at a display-width boundary, by grapheme cluster, never mid-cluster. |
-| **`${PROGRAM}`** | The subject's own program token. Strings are quoted exactly as the subject prints them; wherever the program names itself the token is written `${PROGRAM}`, per `docs/adr/0005-project-name-and-parity-normalisation.md` §2. |
+| **`${PROGRAM}`** | The program-name token, from `src/cli/brand.ts`. Strings are quoted exactly as the program prints them; wherever the program names itself the token is written `${PROGRAM}`, per `docs/adr/0010-own-brand-and-snapshot-harness.md` point 1. |
 
 ## Observable behaviour
 
@@ -101,8 +101,8 @@ Row budget: `logoLines + 2 + (dev?1:0) + (version?2:0) + 5`
 
 - `marginTop = 2`, `marginBottom = 1` normally; **both 0 when `height <= 24`**
   (`COMPACT_HEADER_MAX_HEIGHT = 24`) `[src/components/HeaderFrame.ts:59]`, `[src/components/HeaderFrame.ts:583-587]`.
-- logo = the 6-row block-letter `DROID_HEADER_LOGO` when `!isHeightCompact && leftColWidth >= 58`,
-  else the 3-row `DROID_HEADER_LOGO_MINI` `[src/components/HeaderFrame.ts:399-402]`,
+- logo = the 6-row block-letter `HEADER_LOGO` (vendor prefix elided) when `!isHeightCompact && leftColWidth >= 58`,
+  else the 3-row `HEADER_LOGO_MINI` `[src/components/HeaderFrame.ts:399-402]`,
   `[src/components/chat/constants.ts:153-166]`.
 - logo is horizontally centred in `leftColWidth`; the `[DEV]` tag, version, tip, two shortcut
   lines and the status line are centred **under the logo** (`logoCol + floor((logoWidth-w)/2)`)
@@ -111,7 +111,7 @@ Row budget: `logoLines + 2 + (dev?1:0) + (version?2:0) + 5`
 - version row: `v<cliVersion>` in `text.secondary` bold; airflow mode appends a suffix
   `[src/components/HeaderFrame.ts:428-429]`.
 - tip row: `TIP: <tooltip>` where the tooltip is drawn uniformly at random from
-  `HEADER_TOOLTIPS` with `FACTORY_ROUTER_TOOLTIP` weighted 3× and Missions tips withheld when
+  `HEADER_TOOLTIPS` with `DROIDE_ROUTER_TOOLTIP` weighted 3× and Missions tips withheld when
   Missions are hidden; clamped with a trailing `…` at `leftColWidth - 4`
   `[src/components/HeaderFrame.ts:60-80]`, `[src/components/HeaderFrame.ts:455-463]`,
   `[src/components/chat/constants.ts:168-215]`.
@@ -126,7 +126,7 @@ Exact short-form row strings for the English build:
 | Row | Text (literal) | Source |
 |---|---|---|
 | dev | `[DEV]` | `[src/components/HeaderFrame.ts:423]` |
-| version | `v1.9.0` | `[src/components/HeaderFrame.ts:429]` |
+| version | `v0.4.0` | `[src/components/HeaderFrame.ts:429]` |
 | tip prefix | `TIP: ` | `en:header.tip` |
 | shortcuts 1 | `shift+tab to cycle modes · ctrl+N to cycle models` | `en:header.shortcutsLine1` |
 | shortcuts 2 | `ctrl+L for autonomy · tab for reasoning` | `en:header.shortcutsLine2` |
@@ -281,7 +281,7 @@ preset is `DotsClockwise`, except where a status pins its own preset
 The footer is one row: left block then right block, separated by at least one space
 `[src/components/FooterStatusRow.tsx:846-876]`. Left block = timer `[⏱ <duration>, context: N%]`
 (when enabled) → pending-question count `N question set pending · /answer` → primary label →
-side-chat tag → droids hint → next-loop summary, joined by ` | `; the first hint is separated by a
+side-chat tag → custom-agents hint → next-loop summary, joined by ` | `; the first hint is separated by a
 single space when there is no pending-question segment. Right block = archived indicator → pull
 request / branch → `SANDBOX` → MCP → IDE. On Windows-like terminals the "right" block is appended
 to the left block instead, separated by ` | ` `[src/components/FooterStatusRow.tsx:740-790]`,
@@ -353,7 +353,7 @@ theme switch repaints the whole surface `[src/components/chat/themedColors.ts:1-
 `[src/theme/themeColorState.ts:1-30]`.
 
 The active theme is `factory-dark` or `factory-light`, or `auto` resolved from the detected terminal
-appearance (light background → light theme), or a user theme from `~/.factory/themes/*.json`
+appearance (light background → light theme), or a user theme from `~/.droide/themes/*.json`
 validated by a Zod schema (`name`, `appearance`, `colors` required)
 `[src/theme/ThemeEngine.ts:265-300]`, `[src/theme/themeLoader.ts:1-40]`.
 
@@ -439,16 +439,16 @@ interval `[src/components/Spinner.tsx:22-30]`.
 | Variable | Meaning | Source |
 |---|---|---|
 | `NO_COLOR`, `FORCE_COLOR`, `CI` | colour probing policy (B18) | `[src/utils/trueColorDetector/index.ts:78-86]` |
-| `DROID_DISABLE_TRUECOLOR_PROBE` | force-off truecolour probing | `[src/utils/trueColorDetector/index.ts:78-86]` |
+| `DISABLE_TRUECOLOR_PROBE` | force-off truecolour probing | `[src/utils/trueColorDetector/index.ts:78-86]` |
 | `COLORFGBG` | appearance fallback | `[src/utils/terminalAppearanceDetector/index.ts:40-58]` |
 | `TMUX` / `STY` | multiplexer; extended keys, 700 ms escape resolution, `TERM`-independent paste framing | `[src/utils/interactiveTerminalState.ts:26-34]`, `[src/hooks/repeatedKeySequence.ts:8-14]` |
 | `TERM` | `dumb` disables hyperlinks | `[src/utils/hyperlinks.ts:100-112]` |
-| `FACTORY_E2E_CLOCK_FILE` | pins the clock for deterministic timer/footer output | `[src/utils/e2eClock.ts:1-40]` |
-| `FACTORY_DISABLE_EARLY_INPUT_SHELL`, `DROID_FORCE_BLOCKING_UPDATE` | opt out of the raw early-input shell | `[src/entrypoints/tui/bootstrap.ts:312-320]` |
+| `DROIDE_E2E_CLOCK_FILE` | pins the clock for deterministic timer/footer output | `[src/utils/e2eClock.ts:1-40]` |
+| `DROIDE_DISABLE_EARLY_INPUT_SHELL`, `FORCE_BLOCKING_UPDATE` | opt out of the raw early-input shell | `[src/entrypoints/tui/bootstrap.ts:312-320]` |
 
 ### User theme file
 
-`~/.factory/themes/<name>.json` (or `~/.factory-dev/themes/`), max 1 MiB per file, max 64 files;
+`~/.droide/themes/<name>.json` (or `~/.droide-dev/themes/`), max 1 MiB per file, max 64 files;
 `{ name, appearance: "dark"|"light", colors: {...} }`, unknown palette sections passed through,
 invalid files skipped with a deferred warning `[src/theme/themeLoader.ts:1-45]`.
 
@@ -471,7 +471,7 @@ carries an ANSI-256 index comment, it is reproduced; the light theme does not us
 | `missionV2` | `terminal.ansi.blue` → `#5fafd7` | `#0057a8` | workstream accents (fallback when unset) |
 | `btw` | `#8fb9c9` | `#3d7a92` | `/btw` side-chat tag |
 | `asciiArt` | `#d75f00` | `#d75f00` | `[DEV]` tag, changelog divider |
-| `headerLogo` | `#eeeeee` (255) | `#000000` | DROID logo |
+| `headerLogo` | `#eeeeee` (255) | `#000000` | header logo |
 | `toolName` | `#d7875f` (173) | `#b35900` | tool header name |
 | `toolParam` | `#b2b2b2` (249) | `#5a5a5a` | tool header params, counts |
 | `hookBadgeBg` / `hookBadgeFg` | `#af87ff` / `#000000` | `#7b1fa2` / `#ffffff` | hook badge |
@@ -655,7 +655,7 @@ status-line output and the unfocused composer frame.
 | Diff line-number divider | `│` (documented position) | `[src/components/DiffRenderer.tsx:195-205]` |
 | Header changelog divider | `│` in `asciiArt` | `[src/components/HeaderFrame.ts:578-581]` |
 | Mini logo | `╔═══╗ / ║ D R O I D ║ / ╚═══╝` (21 columns) | `[src/components/chat/constants.ts:159-164]` |
-| Full logo | 6-row block-letter word (the subject spells `${PROGRAM}`) in `█`, 59 columns wide for the subject, exact shape at `DROID_ASCII` | `[src/components/chat/constants.ts:133-153]` |
+| Full logo | 6-row block-letter word (spells `${PROGRAM}`) in `█`, 59 columns wide, exact shape at `ASCII` | `[src/components/chat/constants.ts:133-153]` |
 
 ### D12 — Glyph and icon set
 
@@ -725,7 +725,7 @@ row  1  ╔═══════════════════╗         
 row  2  ║     D R O I D     ║
 row  3  ╚═══════════════════╝
 row  4  (blank)
-row  5  v1.9.0                                   (centred under the logo)
+row  5  v0.4.0                                   (centred under the logo)
 row  6  (blank)
 row  7  TIP: <random tooltip>                    (centred in 80)
 row  8  (blank)
@@ -758,9 +758,9 @@ not Windows-like.
 
 ```
 row 1-2   (blank)
-row 3-8   DROID block logo, centred in 66 columns; right column: "New features" │ divider
+row 3-8   block-letter logo, centred in 66 columns; right column: "New features" │ divider
 row 9     (blank)
-row 10    v1.9.0
+row 10    v0.4.0
 row 11    (blank)
 row 12    TIP: …
 row 13    (blank)
@@ -828,7 +828,7 @@ Two spelling systems exist and both are contractual: the **footer/help** spellin
 | open mission control | `Ctrl+T` | — | `[src/app.tsx:6340-6352]` |
 | open side chat | `Ctrl+Y` | no blocking overlay | `[src/app.tsx:6467-6490]` |
 | dismiss / restore changelog | `Ctrl+J` | changelog present | `[src/app.tsx:6520-6540]` |
-| open Droids view | `Alt/Option+S`, or `←` from an empty composer | — | `[src/keyboard/keyboardChords.ts:455-462]`, `[src/components/FooterStatusRow.tsx:90-93]` |
+| open custom-agents view | `Alt/Option+S`, or `←` from an empty composer | — | `[src/keyboard/keyboardChords.ts:455-462]`, `[src/components/FooterStatusRow.tsx:90-93]` |
 | toggle auto-compaction | `Alt+X` | — | `[src/keyboard/keyboardChords.ts:465-470]` |
 | inspect approval details | `Alt/Option+E` | approval open | `[src/keyboard/keyboardChords.ts:470-480]` |
 | transcript scroll (one row / one turn / page) | `Alt+↑/↓`, `Alt+PageUp/PageDown`, `Alt/Option+Shift+↑/↓` jump oldest/newest | — | `[src/keyboard/keyboardChords.ts:400-440]` |
@@ -865,7 +865,7 @@ File completion: `@` opens a debounced (100 ms) search; results list up to 6 row
 | Image pasted while the model cannot take images | `⚠ <model> doesn't support images. Please switch models to attach images.` `en:imageAttachment.modelNoImageSupport` |
 | Tool cancelled by user | `⎿ Interrupted` (tool rows) / `Cancelled by user` `en:toolDisplay.cancelledByUser` |
 | All models blocked | error row under the mode/model row: `All models are blocked based on your settings. …` `en:appMessages.allModelsBlocked` |
-| Daemon startup failed (empty session) | header banner `⚠ Daemon startup failed` + body naming `~/.factory/logs/daemon-stderr.log` `[src/app.tsx:10177-10186]` |
+| Daemon startup failed (empty session) | header banner `⚠ Daemon startup failed` + body naming `~/.droide/logs/daemon-stderr.log` `[src/app.tsx:10177-10186]` |
 
 ## Acceptance tests
 
@@ -901,7 +901,7 @@ in index order. Failure message names the slot and both values.
 `fixtures/ui/transcript.jsonl` (one user message `hello`, one assistant text block `Hi there.`, one
 `Read` tool call on `src/a.ts` with a 2-line result, one completed `TodoWrite` with two todos
 `wire the reader` (completed) and `write the test` (in progress)), 80×24, `factory-dark`, English,
-`placeholders.prompt0` pinned, clock pinned by `FACTORY_E2E_CLOCK_FILE`. Expected: the exact frame
+`placeholders.prompt0` pinned, clock pinned by `DROIDE_E2E_CLOCK_FILE`. Expected: the exact frame
 `fixtures/ui/golden-80x24.txt`. Structural assertions that must also hold: every row ≤ 80 columns;
 header rows identical to the row list in "Screen layout"; the user row starts with one
 `text.userBg`-coloured column then two spaces; the assistant row starts `⛬ `; the tool header row
@@ -953,7 +953,7 @@ probe; 16-colour mode writes the palette OSC only when `overrideTerminalColors` 
 ## Evidence
 
 All `src/…` and `packages/…` paths below resolve under `evidence/original/windows-x64/`; all
-`en:…` references are the English locale bundle recovered from the shipped chunk
+`en:…` references are the English locale bundle in the chunk
 `evidence/extracted/windows-x64/chunk-j2hk0tf4.js` (the `common` namespace).
 
 | Evidence | Supports | Method |
@@ -1075,14 +1075,14 @@ All `src/…` and `packages/…` paths below resolve under `evidence/original/wi
 **Explicitly not part of the contract.**
 
 - The program name, banner text that names the product, and the ASCII logo's letters: replaced by
-  the parity-normalised name per `docs/adr/0005-project-name-and-parity-normalisation.md`. Glyph
+  the program name from `src/cli/brand.ts`. Glyph
   shapes and centring rules stay.
 - Which random tooltip/placeholder appears on a given launch (uniform choice is the contract, the
   outcome is not).
 - Exact timing of frames (only intervals and windows are contractual) and terminal-specific
   rendering of the same SGR bytes.
 - i18n for non-English locales: the string *sets* exist, but this spec pins English only.
-- Mission Control, Droids View, Workstream Control, plugin and marketplace surfaces, and every
+- Mission Control, the custom-agents view, Workstream Control, plugin and marketplace surfaces, and every
   `MenuContainer` submenu's own copy.
 - Native image protocols, SVG→PNG rasterisation quality, and the fonts' internal metrics.
 - Persisted settings file location and merge rules → `specs/40-sessions-and-storage.md`.

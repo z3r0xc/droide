@@ -57,7 +57,7 @@ export const KNOWN_MARKETPLACES_FILE = "known_marketplaces.json";
 export const MARKETPLACES_DIR = "marketplaces";
 /** Manifest locations, most specific first (B32). */
 export const MARKETPLACE_MANIFEST_PATHS = [
-  ".factory-plugin/marketplace.json",
+  ".droide-plugin/marketplace.json",
   ".claude-plugin/marketplace.json",
 ] as const;
 
@@ -657,7 +657,7 @@ export function parseMarketplaceManifest(
 
 /**
  * Load the manifest under a marketplace root, preferring
- * `.factory-plugin/marketplace.json` (B32). No manifest at either location is
+ * `.droide-plugin/marketplace.json` (B32). No manifest at either location is
  * `manifest-invalid`: a registered marketplace without one is not usable.
  */
 export function loadMarketplaceManifest(
@@ -988,7 +988,7 @@ async function runGitChecked(
 // ---------------------------------------------------------------------------
 
 export interface MarketplaceDeps {
-  /** The user scope root: `<factoryDir>` (B31). */
+  /** The user scope root: `<stateDir>` (B31). */
   readonly scopeRoot: string;
   readonly io?: PluginIo;
   readonly runGit?: GitRunner;
@@ -1191,6 +1191,11 @@ export async function ensureConfiguredMarketplace(
   source: PluginSource,
   deps: MarketplaceDeps,
 ): Promise<MarketplaceEntry> {
+  if (!isUsableName(name))
+    throw new PluginOperationError(
+      "settings-invalid",
+      `"${name}" is not a marketplace name, so extraKnownMarketplaces cannot register it.`,
+    );
   const io = deps.io ?? defaultPluginIo;
   const registry = readKnownMarketplaces(deps.scopeRoot, io);
   const existing = registry.entries.get(name);
@@ -1235,6 +1240,11 @@ async function refreshMarketplace(
   entry: MarketplaceEntry,
   deps: MarketplaceDeps,
 ): Promise<MarketplaceEntry> {
+  if (!isSourceAllowed(deps.policy?.allowedSources, entry.source))
+    throw new PluginOperationError(
+      "source-denied",
+      MARKETPLACE_NOT_APPROVED_ERROR,
+    );
   const io = deps.io ?? defaultPluginIo;
   const lastUpdated = (deps.now ?? (() => new Date()))().toISOString();
   if (entry.source.source === "local") {

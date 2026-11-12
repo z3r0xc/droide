@@ -7,7 +7,7 @@ genuinely empty, and say in Scope why. Header fields are required.
 
 # <Subsystem>
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft | review | stable | blocked
 - **Owner:** <role>
 - **Related:** <ADR ids, other specs, tool ids>
@@ -25,8 +25,8 @@ why.
 
 ## Terms
 
-Every domain term used below, defined once. Prefer the target's own vocabulary
-where the evidence establishes it; otherwise say the term is ours. Note
+Every domain term used below, defined once. Prefer the vocabulary the evidence
+establishes; otherwise say the term is ours. Note
 spelling, casing, and on-disk key names exactly as they appear.
 
 ## Observable behaviour
@@ -71,7 +71,7 @@ fixture each test needs:
 | B1 | `tests/<area>/test_<name>` | `fixtures/<name>` |
 
 Every clause above must appear at least once. Fixtures are synthesised, never
-copies of proprietary artefacts.
+copies of a proprietary artefact.
 
 ## Evidence
 

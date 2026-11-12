@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="880" height="300"
      viewBox="0 0 880 300" role="img" aria-labelledby="hero-title hero-desc">
-  <title id="hero-title">Droide — a terminal coding agent rebuilt from its specification</title>
-  <desc id="hero-desc">Droide, a clean-room reimplementation of the droid CLI v1.9.0. On the right, one real chain from the repository: the terminal UI specification, the token table that implements it, and the test that pins it.</desc>
+  <title id="hero-title">Droide — a terminal coding agent</title>
+  <desc id="hero-desc">Droide, a terminal coding agent. On the right, one real chain from the repository: the terminal UI specification, the token table that implements it, and the test that pins it.</desc>
 
   <style>
     /* Palette: src/ui/tokens.ts — ansi.background, text.primary, text.secondary,
@@ -27,12 +27,12 @@
   <rect class="bg" width="880" height="300" rx="16"/>
 
   <g id="title-block" transform="translate(40 0)">
-    <text class="mono muted" x="0" y="56" font-size="16" letter-spacing="1.8">CLEAN-ROOM REBUILD · droid v1.9.0</text>
+    <text class="mono muted" x="0" y="56" font-size="16" letter-spacing="1.8">TERMINAL CODING AGENT · v0.4.0</text>
 
     <text class="sans fg" x="-2" y="132" font-size="68" font-weight="700" letter-spacing="-1.6">Droide</text>
 
     <text class="sans sec" x="0" y="180" font-size="21">A terminal coding agent,</text>
-    <text class="sans sec" x="0" y="208" font-size="21">rebuilt from its specification.</text>
+    <text class="sans sec" x="0" y="208" font-size="21">built against its specification.</text>
 
     <text class="mono muted" x="0" y="256" font-size="16">TypeScript · Rust · no build step</text>
   </g>

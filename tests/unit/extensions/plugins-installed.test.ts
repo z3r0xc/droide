@@ -31,7 +31,7 @@ function entry(installPath: string, version: string): Record<string, string> {
 test("both scopes are read and project entries shadow user entries", async () => {
   const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
   try {
-    const factoryDir = await scope(root, "home", {
+    const stateDir = await scope(root, "home", {
       schemaVersion: 1,
       plugins: {
         shared: [entry("/u/shared", "1.0.0")],
@@ -43,7 +43,7 @@ test("both scopes are read and project entries shadow user entries", async () =>
       plugins: { shared: [entry("/p/shared", "2.0.0")] },
     });
 
-    const result = loadInstalledPlugins({ factoryDir, projectDir });
+    const result = loadInstalledPlugins({ stateDir, projectDir });
 
     assert.equal(result.plugins.length, 2);
     const shared = result.plugins.find((plugin) => plugin.id === "shared");
@@ -62,7 +62,7 @@ test("both scopes are read and project entries shadow user entries", async () =>
 test("the highest version wins when an id has several entries", async () => {
   const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
   try {
-    const factoryDir = await scope(root, "home", {
+    const stateDir = await scope(root, "home", {
       schemaVersion: 1,
       plugins: {
         demo: [
@@ -75,7 +75,7 @@ test("the highest version wins when an id has several entries", async () => {
     await mkdir(join(root, "project"), { recursive: true });
 
     const record = loadInstalledPlugins({
-      factoryDir,
+      stateDir,
       projectDir: join(root, "project"),
     }).plugins[0];
 
@@ -89,7 +89,7 @@ test("the highest version wins when an id has several entries", async () => {
 test("enabledPlugins false disables a plugin, absent means enabled", async () => {
   const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
   try {
-    const factoryDir = await scope(root, "home", {
+    const stateDir = await scope(root, "home", {
       schemaVersion: 1,
       plugins: {
         on: [entry("/p/on", "1.0.0")],
@@ -99,7 +99,7 @@ test("enabledPlugins false disables a plugin, absent means enabled", async () =>
     await mkdir(join(root, "project"), { recursive: true });
 
     const result = loadInstalledPlugins({
-      factoryDir,
+      stateDir,
       projectDir: join(root, "project"),
       enabledPlugins: { off: false },
     });
@@ -129,7 +129,7 @@ test("a malformed registry is a diagnostic, and the other scope still loads", as
     await mkdir(join(home, "plugins"), { recursive: true });
     await writeFile(join(home, "plugins", "installed_plugins.json"), "{ nope");
 
-    const result = loadInstalledPlugins({ factoryDir: home, projectDir });
+    const result = loadInstalledPlugins({ stateDir: home, projectDir });
 
     assert.equal(result.plugins.length, 1);
     assert.equal(result.plugins[0]?.id, "fine");
@@ -144,14 +144,14 @@ test("a malformed registry is a diagnostic, and the other scope still loads", as
 test("an entry without installPath is skipped with a diagnostic", async () => {
   const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
   try {
-    const factoryDir = await scope(root, "home", {
+    const stateDir = await scope(root, "home", {
       schemaVersion: 1,
       plugins: { bad: [{ version: "1.0.0" }] },
     });
     await mkdir(join(root, "project"), { recursive: true });
 
     const result = loadInstalledPlugins({
-      factoryDir,
+      stateDir,
       projectDir: join(root, "project"),
     });
 
@@ -169,7 +169,7 @@ test("a missing registry is normal, not a diagnostic", async () => {
   const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
   try {
     const result = loadInstalledPlugins({
-      factoryDir: join(root, "home"),
+      stateDir: join(root, "home"),
       projectDir: join(root, "project"),
     });
     assert.deepEqual(result.plugins, []);
@@ -183,7 +183,7 @@ test("a missing registry is normal, not a diagnostic", async () => {
 test("the scope filter narrows the listing", async () => {
   const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
   try {
-    const factoryDir = await scope(root, "home", {
+    const stateDir = await scope(root, "home", {
       schemaVersion: 1,
       plugins: { u: [entry("/u", "1.0.0")] },
     });
@@ -191,7 +191,7 @@ test("the scope filter narrows the listing", async () => {
       schemaVersion: 1,
       plugins: { p: [entry("/p", "1.0.0")] },
     });
-    const result = loadInstalledPlugins({ factoryDir, projectDir });
+    const result = loadInstalledPlugins({ stateDir, projectDir });
 
     assert.match(
       renderPluginList(result, { scope: "project" }),

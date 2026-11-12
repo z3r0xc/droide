@@ -63,13 +63,13 @@ function contextFor(directory: string): AppContext {
       cwd: join(directory, "project"),
     },
     paths: {
-      factoryDir: join(directory, "factory"),
+      stateDir: join(directory, "factory"),
       userSettingsFile: join(directory, "factory", "settings.json"),
       projectDir: join(directory, "project"),
       projectSettingsFile: join(
         directory,
         "project",
-        ".factory",
+        ".droide",
         "settings.json",
       ),
       sessionsDir: join(directory, "factory", "sessions"),
@@ -281,14 +281,14 @@ function recordsOf(
 test("a bare uuid, an app link and a deep link all name the session", () => {
   assert.equal(parseSessionArgument(ID_A), ID_A);
   assert.equal(
-    parseSessionArgument(`  https://app.factory.ai/sessions/${ID_A}  `),
+    parseSessionArgument(`  https://app.droide.ai/sessions/${ID_A}  `),
     ID_A,
   );
   assert.equal(parseSessionArgument(`droide://sessions/${ID_A}`), ID_A);
   assert.equal(parseSessionArgument(ID_A.toUpperCase()), null);
   assert.equal(parseSessionArgument("not-a-session"), null);
   assert.equal(
-    parseSessionArgument("https://app.factory.ai/sessions/nope"),
+    parseSessionArgument("https://app.droide.ai/sessions/nope"),
     null,
   );
 });
@@ -388,7 +388,7 @@ test("a session link resumes the session it names", async () => {
     seed(store, context, { sessionId: ID_A, title: "Alpha" });
     const captured = harness(context);
     await runResumeCommand(
-      options({ sessionId: `https://app.factory.ai/sessions/${ID_A}` }),
+      options({ sessionId: `https://app.droide.ai/sessions/${ID_A}` }),
       captured.deps,
     );
 

@@ -5,7 +5,7 @@
  * - `specs/40-sessions-and-storage.md` Terms ("State root", "State dir
  *   name", "Sessions dir", "Cache database") and "On-disk layout".
  * - `specs/10-cli-surface.md` B81 (`worktreeDirectory` defaults to
- *   `~/.factory/worktrees`) and B68 (launch-relative paths resolve at the
+ *   `~/.droide/worktrees`) and B68 (launch-relative paths resolve at the
  *   launch directory).
  *
  * This is the **only** module allowed to read `process.env`, `os.homedir()` or
@@ -33,12 +33,12 @@ export interface Environment {
 }
 
 /**
- * The state directory names — and every `FACTORY_*` variable named below — are
+ * The state directory names — and every `DROIDE_*` variable named below — are
  * contract data: an existing installation keeps its state and its environment
  * names where they are, so a rename here would move a user's files.
  */
-export const FACTORY_DIR_PRODUCTION = ".factory";
-export const FACTORY_DIR_DEVELOPMENT = ".factory-dev";
+export const DROIDE_DIR_PRODUCTION = ".droide";
+export const DROIDE_DIR_DEVELOPMENT = ".droide-dev";
 
 const SETTINGS_FILE = "settings.json";
 const SETTINGS_LOCAL_FILE = "settings.local.json";
@@ -49,7 +49,7 @@ function isPlatform(value: string): value is Platform {
 
 /**
  * The process environment, read exactly once at the boundary. Callers that
- * need a different home (tests, `FACTORY_HOME_OVERRIDE` fixtures) build their
+ * need a different home (tests, `DROIDE_HOME_OVERRIDE` fixtures) build their
  * own {@link Environment} instead.
  */
 export function processEnvironment(): Environment {
@@ -98,7 +98,7 @@ export function expandTilde(environment: Environment, value: string): string {
 /**
  * `value` with a leading tilde expanded and made absolute at the launch
  * directory — the anchoring rule for `--settings` and
- * `FACTORY_RUNTIME_SETTINGS_PATH` (`specs/10-cli-surface.md` B65, B68).
+ * `DROIDE_RUNTIME_SETTINGS_PATH` (`specs/10-cli-surface.md` B65, B68).
  */
 export function resolvePath(environment: Environment, value: string): string {
   return pathFor(environment.platform).resolve(
@@ -108,48 +108,48 @@ export function resolvePath(environment: Environment, value: string): string {
 }
 
 /**
- * The state root: `FACTORY_HOME_OVERRIDE` when set and non-empty, else the
+ * The state root: `DROIDE_HOME_OVERRIDE` when set and non-empty, else the
  * injected home (`specs/40-sessions-and-storage.md` Terms).
  */
-export function factoryHome(environment: Environment): string {
-  const override = environment.env.FACTORY_HOME_OVERRIDE;
+export function stateHome(environment: Environment): string {
+  const override = environment.env.DROIDE_HOME_OVERRIDE;
   return override !== undefined && override !== ""
     ? override
     : environment.home;
 }
 
 /**
- * `.factory` for the production tier and `.factory-dev` otherwise. The
- * Windows install is production, so an absent `FACTORY_ENV` means production;
+ * `.droide` for the production tier and `.droide-dev` otherwise. The
+ * Windows install is production, so an absent `DROIDE_ENV` means production;
  * any other value means development (`specs/40-sessions-and-storage.md`,
  * "State dir name").
  */
-export function factoryDirName(environment: Environment): string {
-  const tier = environment.env.FACTORY_ENV?.trim();
+export function stateDirName(environment: Environment): string {
+  const tier = environment.env.DROIDE_ENV?.trim();
   return tier === undefined || tier === "" || tier === "production"
-    ? FACTORY_DIR_PRODUCTION
-    : FACTORY_DIR_DEVELOPMENT;
+    ? DROIDE_DIR_PRODUCTION
+    : DROIDE_DIR_DEVELOPMENT;
 }
 
 /** `<state root>/<state dir name>`: the base every stored file lives under. */
-export function factoryDir(environment: Environment): string {
+export function stateDir(environment: Environment): string {
   return joinPath(
     environment.platform,
-    factoryHome(environment),
-    factoryDirName(environment),
+    stateHome(environment),
+    stateDirName(environment),
   );
 }
 
 /** The user settings file: `<base>/settings.json`. */
 export function userSettingsFile(environment: Environment): string {
-  return joinPath(environment.platform, factoryDir(environment), SETTINGS_FILE);
+  return joinPath(environment.platform, stateDir(environment), SETTINGS_FILE);
 }
 
 /** The user's local override file: `<base>/settings.local.json`. */
 export function userLocalSettingsFile(environment: Environment): string {
   return joinPath(
     environment.platform,
-    factoryDir(environment),
+    stateDir(environment),
     SETTINGS_LOCAL_FILE,
   );
 }
@@ -159,21 +159,21 @@ export function projectRoot(environment: Environment): string {
   return environment.cwd;
 }
 
-/** `<project root>/.factory`: project-scoped configuration. */
+/** `<project root>/.droide`: project-scoped configuration. */
 export function projectDir(environment: Environment): string {
   return joinPath(
     environment.platform,
     projectRoot(environment),
-    FACTORY_DIR_PRODUCTION,
+    DROIDE_DIR_PRODUCTION,
   );
 }
 
-/** The project settings file: `<project root>/.factory/settings.json`. */
+/** The project settings file: `<project root>/.droide/settings.json`. */
 export function projectSettingsFile(environment: Environment): string {
   return joinPath(environment.platform, projectDir(environment), SETTINGS_FILE);
 }
 
-/** The project local override: `<project root>/.factory/settings.local.json`. */
+/** The project local override: `<project root>/.droide/settings.local.json`. */
 export function projectLocalSettingsFile(environment: Environment): string {
   return joinPath(
     environment.platform,
@@ -184,12 +184,12 @@ export function projectLocalSettingsFile(environment: Environment): string {
 
 /** `<base>/sessions` (`specs/40-sessions-and-storage.md` Terms). */
 export function sessionsDir(environment: Environment): string {
-  return joinPath(environment.platform, factoryDir(environment), "sessions");
+  return joinPath(environment.platform, stateDir(environment), "sessions");
 }
 
 /** `<base>/cache`. */
 export function cacheDir(environment: Environment): string {
-  return joinPath(environment.platform, factoryDir(environment), "cache");
+  return joinPath(environment.platform, stateDir(environment), "cache");
 }
 
 /** `<base>/cache/session-index`. */
@@ -208,7 +208,7 @@ export function sessionIndexDatabase(environment: Environment): string {
 
 /** `<base>/logs`. */
 export function logsDir(environment: Environment): string {
-  return joinPath(environment.platform, factoryDir(environment), "logs");
+  return joinPath(environment.platform, stateDir(environment), "logs");
 }
 
 /**
@@ -219,7 +219,7 @@ export function logsDir(environment: Environment): string {
 export function nativeHelperFile(environment: Environment): string {
   return joinPath(
     environment.platform,
-    factoryDir(environment),
+    stateDir(environment),
     "bin",
     environment.platform === "win32" ? "droide-native.exe" : "droide-native",
   );
@@ -227,7 +227,7 @@ export function nativeHelperFile(environment: Environment): string {
 
 /** `<base>/temp`: scratch space under the operational root. */
 export function tempDir(environment: Environment): string {
-  return joinPath(environment.platform, factoryDir(environment), "temp");
+  return joinPath(environment.platform, stateDir(environment), "temp");
 }
 
 /** A path inside `<base>/temp`. */
@@ -250,7 +250,7 @@ export function worktreesRoot(
 ): string {
   const fallback = joinPath(
     environment.platform,
-    factoryDir(environment),
+    stateDir(environment),
     "worktrees",
   );
   if (worktreeDirectory === undefined) return fallback;

@@ -37,7 +37,7 @@ sections and ADRs.
 |---|---|---|---|
 | M0 | Evidence & recovery (done) | — | `tools/*` test suites green; recovery manifest reproducible |
 | M1 | CLI surface: root command, `--version`, `--help`, subcommand help, non-TTY refusal, argument classification | `specs/10-cli-surface.md` | `tests/parity/run.mjs --check` green (13 cases today, extended as specs land) |
-| M2 | Settings & paths: config resolution order, env vars, project config, `--settings` merge, worktree/cwd anchoring | `specs/10-cli-surface.md`, `specs/40-sessions-and-storage.md` | unit tests for precedence matrix; parity cases for `droid doctor`-style read-only paths |
+| M2 | Settings & paths: config resolution order, env vars, project config, `--settings` merge, worktree/cwd anchoring | `specs/10-cli-surface.md`, `specs/40-sessions-and-storage.md` | unit tests for precedence matrix; parity cases for `droide doctor`-style read-only paths |
 | M3 | Session store: SQLite schema at head, migrations, transcript append/read, tags, search index | `specs/40-sessions-and-storage.md` | migrate-empty-db snapshot, append/read round-trip, index planner, indexed-vs-literal search parity |
 | M4 | Provider transport & auth: base-URL resolution, headers, SSE parsing, error mapping, token handling | `specs/50-transport-and-auth.md` | SSE fixture tests, error-mapping table test, no network in CI |
 | M5 | Agent loop: message model, tool-call cycle, permissions, context assembly, compaction | `specs/20-agent-loop.md`, `specs/30-tools-and-sandbox.md` | scripted-provider transcript tests; permission matrix |
@@ -55,8 +55,8 @@ sections and ADRs.
 2. Tests written and failing for the documented behaviour (red).
 3. Implementation added; tests pass (green); no retries, no sleeps, no network.
 4. `npm run format:check` clean; `tsc --noEmit` clean.
-5. Commit on `re/factory-droid-v1.9.0` with `feat(<area>): …`; PR opened when a
-   milestone completes, with the spec diff and test names in the description.
+5. Commit on `feat/<slug>` with `feat(<area>): …`; PR opened when a milestone
+   completes, with the spec diff and test names in the description.
 
 ## Parallelism
 
@@ -75,5 +75,5 @@ shared types in `src/contracts/`) is owned by the orchestrator only.
 - **Rust toolchain.** Repaired: `.cargo/config.toml` pins rust-lld with Rust's
   self-contained libraries, so `cargo test --workspace` runs locally. The
   remaining native work (pty, secrets) needs audited `unsafe` FFI modules.
-- **Version drift.** The subject is pinned at v1.9.0; a newer release means a
-  new recovery run and a golden re-record, never silent behaviour changes.
+- **Version drift.** A behaviour change means a new clause, a re-recorded case
+  and a release bump — never a silent change.

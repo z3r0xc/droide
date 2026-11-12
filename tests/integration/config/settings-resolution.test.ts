@@ -21,7 +21,7 @@ async function withTree(
   await fs.mkdir(cwd, { recursive: true });
   try {
     await run({
-      env: { FACTORY_HOME_OVERRIDE: home },
+      env: { DROIDE_HOME_OVERRIDE: home },
       home,
       platform:
         process.platform === "win32"

@@ -5,9 +5,9 @@
  * Precedence is fixed and total:
  *
  * 1. a `customer-prem` deployment's origin (it is the authentication authority);
- * 2. the explicit per-process override, then `FACTORY_API_BASE_URL_EU`; the EU
+ * 2. the explicit per-process override, then `DROIDE_API_BASE_URL_EU`; the EU
  *    value wins only when the resolved region is `eu` and it is configured;
- * 3. the explicit per-process override, then `FACTORY_API_BASE_URL`, then the
+ * 3. the explicit per-process override, then `DROIDE_API_BASE_URL`, then the
  *    baked build define.
  *
  * The environment beats the baked define (B3). An explicit override is the
@@ -20,8 +20,8 @@
 
 import { TransportError } from "./errors.ts";
 
-export const API_BASE_URL_ENV = "FACTORY_API_BASE_URL";
-export const API_BASE_URL_EU_ENV = "FACTORY_API_BASE_URL_EU";
+export const API_BASE_URL_ENV = "DROIDE_API_BASE_URL";
+export const API_BASE_URL_EU_ENV = "DROIDE_API_BASE_URL_EU";
 
 /** B4's region domain. */
 export type FactoryRegion = "global" | "eu";
@@ -255,7 +255,7 @@ export function createApiUrlConfig(input: ApiUrlConfigInput): ApiUrlConfig {
 }
 
 /**
- * B1: the destination of a Factory API request. The customer origin wins by
+ * B1: the destination of a backend API request. The customer origin wins by
  * construction; otherwise the EU base wins on `eu` when configured; otherwise
  * the global base.
  */

@@ -88,7 +88,7 @@ export class TlsTrustError extends TransportError {
     options: TransportErrorOptions = {},
   ) {
     super(
-      `${operation}: certificate chain not trusted${code === null ? "" : `: ${code}`}. Export the appliance root CA (PEM) and point FACTORY_EXTRA_CA_CERTS at it, or delete the certificate cache under the state directory on Windows.`,
+      `${operation}: certificate chain not trusted${code === null ? "" : `: ${code}`}. Export the appliance root CA (PEM) and point DROIDE_EXTRA_CA_CERTS at it, or delete the certificate cache under the state directory on Windows.`,
       operation,
       options,
     );
@@ -190,10 +190,10 @@ export class InvalidResponseError extends TransportError {
 export const MAX_ERROR_BODY_CHARS = 2048;
 
 export interface FetchErrorInit extends TransportErrorOptions {
-  /** The request that failed, for the "factory backend" marker (B92). */
+  /** The request that failed, for the "backend" marker (B92). */
   readonly requestUrl?: URL;
   /** B92's factory-backend marker; defaults to `true`. */
-  readonly factoryBackend?: boolean;
+  readonly droideBackend?: boolean;
   /** B93: customer bodies may carry secrets or user content, so they are not quoted. */
   readonly customerDeployment?: boolean;
 }
@@ -223,7 +223,7 @@ export class FetchError extends Error {
   readonly statusCode: number;
   readonly operation: Operation;
   readonly requestUrl: string | null;
-  readonly factoryBackend: boolean;
+  readonly droideBackend: boolean;
   readonly requestHeaders: RedactedHeaders;
 
   constructor(
@@ -243,7 +243,7 @@ export class FetchError extends Error {
     this.statusCode = statusCode;
     this.operation = operation;
     this.requestUrl = safeUrl(init.requestUrl);
-    this.factoryBackend = init.factoryBackend ?? true;
+    this.droideBackend = init.droideBackend ?? true;
     this.requestHeaders = init.requestHeaders ?? {};
   }
 }
