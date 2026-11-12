@@ -98,7 +98,13 @@ export async function checkForUpdate(
     });
 
     if (response.status === 404) {
-      return { kind: "unavailable", reason: "no releases published yet" };
+      // GitHub answers 404 both for "no releases" and for a repository an
+      // anonymous client cannot see (private): say both, do not guess.
+      return {
+        kind: "unavailable",
+        reason:
+          "no release feed visible to an anonymous client (no releases yet, or a private repository)",
+      };
     }
     if (!response.ok) {
       return {

@@ -69,11 +69,12 @@ test("the same or an older release means up to date", async () => {
   );
 });
 
-test("no releases published is reported, not treated as up to date", async () => {
+test("a 404 is reported as an invisible feed, not as up to date", async () => {
   const result = await check(async () => new Response("", { status: 404 }));
   assert.deepEqual(result, {
     kind: "unavailable",
-    reason: "no releases published yet",
+    reason:
+      "no release feed visible to an anonymous client (no releases yet, or a private repository)",
   });
 });
 
@@ -188,7 +189,7 @@ test("update --check exits 1 when the feed is unavailable", async () => {
     },
   );
   assert.equal(read().code, 1);
-  assert.match(read().out, /no releases published yet/);
+  assert.match(read().out, /no release feed visible/);
 });
 
 test("an available release prints the version and the page", async () => {
