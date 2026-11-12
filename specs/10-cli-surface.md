@@ -192,10 +192,18 @@ in registration order (`orig/src/entrypoints/tui/command.ts:191-208`;
 `tests/parity/expected/help-resume.json`). `[observed]`
 
 **B24** `resume <id> --fork` is exactly `droid --fork <id>`: the id is moved into
-the root `fork` slot and the TUI runs (`orig/src/entrypoints/tui/command.ts:225-234`). `[observed]`
+the root `fork` slot and the TUI runs (`orig/src/entrypoints/tui/command.ts:228-234`). `[observed]`
 
 **B25** Root `--settings` and `--cwd` are inherited by `resume` when `resume` was
-given neither (`orig/src/entrypoints/tui/command.ts:218-224`). `[observed]`
+given neither (`orig/src/entrypoints/tui/command.ts:218-226`). `[observed]`
+
+**B82** Before any session work, the interactive path validates the root flag
+combination and refuses it with exit 1: `--resume` with `--fork`; `--last` unless
+`--resume` was given bare; a boolean `--fork` without `--last`; `--fork` with
+`--worktree`; `--worktree` with `--cwd`; and an `--auto` value outside
+`low|medium|high`. The `--worktree`/`--cwd` pair is the one message not routed
+through the message catalogue
+(`orig/src/entrypoints/tui/run.ts:549-600`). `[observed]`
 
 ### `exec`
 
@@ -592,8 +600,10 @@ refuse an empty list; `--tag <spec>` accumulates; `--depth <number>` `parseInt`
 
 ### Settings files
 
-`--settings` names one JSON/JSONC object; its readable keys are merged as the
-`Runtime` level (`orig/../../packages/runtime/settings/src/RuntimeSettingsOverlay.ts:22-29`).
+`--settings` names one JSON/JSONC object; `mcp`, `hooks`, `droids`, `skills`,
+`outputStyles` and `commands` are parsed as structured sections and the rest as
+plain settings, and the result is merged as the `Runtime` level
+(`orig/packages/runtime/settings/src/RuntimeSettingsOverlay.ts:22-29,58-80`).
 The hierarchy merges, lowest priority last-wins order, Org → Runtime → automation
 folder → `.factory` folders → project settings → project `.agent` → project
 plugins → user settings → user `.agent` → user plugins → dynamic config → builtin
@@ -616,8 +626,8 @@ defaults (`orig/packages/runtime/settings/src/SettingsManager.ts:3923-4013`).
 | E11 | `exec -f <missing>` / empty file / unreadable | `Prompt file not found: <path>` / `Prompt file is empty: <path>` / `Permission denied reading prompt file: <path>` / `Could not read prompt file <path>: <message>` | 1 | no session |
 | E12 | `exec` piped stdin empty | `No prompt received on stdin (the input was empty). …` | 1 | no session |
 | E13 | `exec` prompt in a streaming input mode | `Cannot use prompt argument in streaming mode. Messages are read from stdin.` | 1 | no session |
-| E14 | `exec --auto x` with a bad level | `Invalid --auto value. Allowed values: low, medium, high.` | 1 | no session |
-| E15 | `exec` flag conflict (B33) | `Invalid flags: …` (one message per pair) | 1 | no session |
+| E14 | `--auto` with a level other than `low`, `medium`, `high` (root TUI or `exec`) | `Invalid --auto value. Allowed values: low, medium, high.` | 1 | no session, no TUI mount |
+| E15 | a flag conflict — `exec` pairs from B33, or the TUI pairs given here | `Invalid flags: --auto and --skip-permissions-unsafe cannot be used together. …`; `Invalid flags: --resume and --fork cannot be used together.`; `Invalid flags: --last requires resume without a session id.`; `Invalid flags: resume --fork requires a session id or --last.`; `Invalid flags: --fork cannot be used with --worktree.`; `Error: --worktree and --cwd cannot be used together.` | 1 | no session |
 | E16 | `exec` model blocked by org policy | `Model blocked by organization policy: …` | 1 | no session |
 | E17 | `doctor --timeout 0` | `error: option '--timeout <ms>' argument '0' is invalid. Timeout must be a positive integer no greater than 2147483647 milliseconds.` | 1 | no check ran |
 | E18 | `doctor --checks nope` | `… is invalid. Unknown doctor check. Use --help for the supported check names.` | 1 | no check ran |
@@ -650,7 +660,7 @@ the parity harness invariants (`tests/parity/README.md`).
 | B14, B63 | `tests/cli/test_gated_help_fails_closed` | `fixtures/flags-off` |
 | B15–B20 | `tests/cli/test_non_tty_refusal_matrix` | `fixtures/no-tty` |
 | B21 | `tests/cli/test_refusal_locale` | `fixtures/settings-ja` |
-| B22–B25 | `tests/cli/test_resume_command` | `tests/parity/expected/help-resume.json` |
+| B22–B25, B82 | `tests/cli/test_resume_command`, `tests/cli/test_tui_flag_conflicts` | `tests/parity/expected/help-resume.json` |
 | B26–B29 | `tests/cli/test_exec_help_exact` | `tests/parity/expected/help-exec.json` |
 | B30 | `tests/cli/test_exec_undocumented_options` | — |
 | B31 | `tests/cli/test_exec_prompt_sources` | `fixtures/prompts` |
@@ -755,7 +765,7 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
 | `ev_cli_2` | B8–B11, B64 | `orig/src/entrypoints/tui/command.ts:159-166`, `orig/src/cli.ts:258-289`; goldens `unknown-command`, `unknown-flag` |
 | `ev_cli_3` | B12–B14, B76 | `orig/src/cli.ts:492-506`, `orig/src/index.ts:119-126`, `orig/src/entrypoints/bootstrap/gatedCommand.ts:16-40` |
 | `ev_cli_4` | B15–B21 | `orig/src/entrypoints/tui/command.ts:33-49,167-170,215-217`; English catalogue `chunk-j2hk0tf4.js` |
-| `ev_cli_5` | B22–B25 | `orig/src/entrypoints/tui/command.ts:184-238`; `help-resume.json` |
+| `ev_cli_5` | B22–B25 | `orig/src/entrypoints/tui/command.ts:184-238`; `orig/src/entrypoints/tui/run.ts:549-600`; `help-resume.json` |
 | `ev_cli_6` | B26–B34, B72 | `orig/src/entrypoints/exec/command.ts:24-271`, `help.ts:81-303`, `assertValidOptions.ts:23-367`, `handler.ts:325-379,1280-1333`, `constants.ts:11-53` |
 | `ev_cli_7` | B35–B38 | `orig/src/entrypoints/daemon/command.ts:20-127`, `constants.ts:3-6` |
 | `ev_cli_8` | B39, B40, B73 | `orig/src/entrypoints/search/command.ts:9-66`, `run.ts:150-172`, `orig/src/utils/commanderParsers.ts:16-33` |

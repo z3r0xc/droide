@@ -61,7 +61,7 @@ not in the recovered source; see Open question 1).
   (`packages/runtime/session-index/src/cache.ts:38-40`) plus its `-wal` and
   `-shm` sidecars.
 - **Annotations database** — a second, separate SQLite file with its own
-  migration ledger; see B36. Path is not present in the recovered source
+  migration ledger; see B37. Path is not present in the recovered source
   (Open question 2).
 - **Cache migration** — one numbered, append-only SQL asset applied in place;
   **annotations migration** — the same for the other file, independent ledger.
@@ -126,10 +126,17 @@ half-life, reclaimed immediately when the recorded pid is not alive; a second
 refresher returns without reading (`constants.ts:132-146`,
 `lease.ts:29-82`).
 
-**B5.** Reads tolerate a peer that holds the writer slot by returning
-"unavailable" and falling back (the listing then reads the plain JSON
-directory); a failed open is retried at most once every 10000 ms, while a
-`busy` outcome is retried immediately (`access.ts:119`, `747-800`, `918-925`).
+**B5.** With the index, a listing answers from the index or rejects; it never
+walks the sessions directory. A listing waits out a busy peer for up to 10000 ms
+(other outcomes are final) and then fails with
+`Session index unavailable for listing` / `Could not list sessions from the
+session index` (`state: unavailable`, `reason` = error class)
+(`listing.ts:284-310`, `373-421`). A failed open is retried at most once every
+10000 ms; a `busy` outcome is retried immediately (`access.ts:119`, `747-800`,
+`918-925`). When the disk is full the listing is served from an
+`immutable=1` snapshot of the main file, missing whatever is still in the WAL
+(`listing.ts:313-340`, `398-403`). Writes never fail a session: a refused write
+is retried by the caller after it yields (`record.ts:697-740`).
 
 ### Migrations and downgrade
 
@@ -352,9 +359,15 @@ version string built from `PRAGMA data_version` and `total_changes()`; an
 unchanged version returns the previous array without re-reading
 (`record.ts:545-556`, `945-968`, `driver.ts:1024-1031`).
 
+**B42.** A file no covering refresh has reached (no `last_full_refresh_at`) is
+still listed as it stands, after one shared wait of up to 2000 ms (polled every
+50 ms) for the rebuild the open requested; a listing that times out returns what
+is there, and later listings on that store do not wait again
+(`listing.ts:216-270`, `360-372`).
+
 ### `droid search` / `find`
 
-**B42.** Syntax: `droid search [options] <query>` (`find` is an alias). Options
+**B43.** Syntax: `droid search [options] <query>` (`find` is an alias). Options
 and defaults: `--kind <message_text|document|tool_use|tool_result|all>` default
 `all` (any other value is rejected); `--limit-sessions <n>` default 20;
 `--limit-hits <n>` default 3; `--context-chars <n>` default 80; `--json`;
@@ -363,23 +376,23 @@ and defaults: `--kind <message_text|document|tool_use|tool_result|all>` default
 and are refused with `Expected a positive integer.`; context is refused with
 `Expected a non-negative integer.` (`src/utils/commanderParsers.ts:12-32`).
 
-**B43.** Bounds are clamped by the shared rule: sessions to
+**B44.** Bounds are clamped by the shared rule: sessions to
 `[1, ∞)` for this command (it opts out of the shared 100 ceiling), hits to
 `[1, 20]`, context to `[0, 1000]`, and the query is trimmed; a query over 500
 characters is rejected (`packages/utils/src/session-search/query.ts:44-73`,
 `packages/common/src/session/constants.ts:77-86`, `src/entrypoints/search/run.ts:150-166`).
 
-**B44.** The CLI searches in `regex` mode, so the query is a pattern over a
+**B45.** The CLI searches in `regex` mode, so the query is a pattern over a
 supported subset; an unsupported or unconstrained pattern is rejected before
 any scan (`run.ts:150-156`, `utils/src/session-search/query.ts:464-503`).
 
-**B45.** Scope filters: `--include-archived` (default excludes
+**B46.** Scope filters: `--include-archived` (default excludes
 `sessions.archived_at IS NOT NULL`), `--exclude-children` (default includes
 sessions whose `calling_session_id` is set), `--include-hidden` (default excludes
 `sessions.has_user_visible_messages = 0`), plus the org rule of B39 and the
 optional `since`/`until`/`projectKey` windows (`search.ts:289-320`).
 
-**B46.** Searched text is the file's raw JSONL, matched by a bundled `ripgrep`
+**B47.** Searched text is the file's raw JSONL, matched by a bundled `ripgrep`
 (`--no-config --no-messages --text`, `--fixed-strings` for literal mode,
 `--ignore-case` unless case-sensitive). A match counts only where it lies inside
 a searchable value: the summary line's `title` and `cwd`; `message.content`
@@ -389,30 +402,30 @@ block's `source.data` when that source is text. Ids, signatures and base64
 sources are not searchable (`utils/src/session-search/extract.ts:278-340`,
 `search.ts:782-900`).
 
-**B47.** A match in injected harness text inside a user message is discarded
+**B48.** A match in injected harness text inside a user message is discarded
 (`search.ts:1560-1564`). Matches in titles do not count when `--kind` is set
 (`search.ts:392-394`, `2143-2145`).
 
-**B48.** Session order: title tier (exact title match, then title contains,
+**B49.** Session order: title tier (exact title match, then title contains,
 then the rest), then "a user wrote a match" (`message_text` in a `user` message,
 not a summary field), then `last_event_at` descending, then `session_id`
 descending (`utils/src/session-search/rank.ts:13-67`, `search.ts:2611-2626`).
 
-**B49.** Hits within a session are the **newest** matching messages, scanned
+**B50.** Hits within a session are the **newest** matching messages, scanned
 newest-first, capped at `--limit-hits`; with `--kind` only blocks of that kind
 count (`search.ts:2116-2196`).
 
-**B50.** A result reports `sessionCount.count` plus `exact`, and `complete:
+**B51.** A result reports `sessionCount.count` plus `exact`, and `complete:
 false` (with a coverage reason) when a scan budget (10 000 ms), a matcher
 failure or a candidate source cut the page short
 (`search.ts:126`, `3038-3064`; `src/search/sessionSearch.ts:229-240`).
 
-**B51.** Snippets are the matched value trimmed to `--context-chars` on each
+**B52.** Snippets are the matched value trimmed to `--context-chars` on each
 side (default radius 140 when the field is absent), prefixed/suffixed with `…`
 when truncated, with `<mark>` around the match in the legacy engine and SGR
 highlighting in the index engine (`search.ts:93`, `1584-1610`).
 
-**B52.** Human output, index engine: one header line carrying a session count
+**B53.** Human output, index engine: one header line carrying a session count
 (the `compactSessions` message when the count is exact and equals what is shown,
 the `compactShowing` message with `count`/`shown`/`bound` otherwise), then one
 block per session — `<sessionId> <title ≤60 chars> · <matchCount>` — then one
@@ -422,19 +435,19 @@ shown per hit, control sequences are stripped, and a `, <compactPartial>` suffix
 marks an incomplete result (`src/search/sessionSearch.ts:200-341`). The literal
 words come from `common:sessionSearch.*` and are Open question 1.
 
-**B53.** `--json` writes `JSON.stringify(result, null, 2)` of the federated
+**B54.** `--json` writes `JSON.stringify(result, null, 2)` of the federated
 result (sessions with `sessionId`, optional `title`, optional `updatedAt`,
 `hits[{docId, kind, toolName?, messageRole?, snippets[]}]`, optional totals and
 `sessionCount`) (`run.ts:167-170`).
 
-**B54.** With the `session_index_search` flag off, `--include-archived`,
+**B55.** With the `session_index_search` flag off, `--include-archived`,
 `--exclude-children` and `--include-hidden` are refused with
 `--include-archived, --exclude-children and --include-hidden need the session
 index, which is off`, and everything else runs the legacy on-disk engine, whose
 human output is the grouped-by-kind rendering (`run.ts:143-149`,
 `src/search/sessionSearch.ts:26-190`).
 
-**B55.** A query rejected by the planner prints `sessionSearch.queryRejected` to
+**B56.** A query rejected by the planner prints `sessionSearch.queryRejected` to
 stderr and sets exit status 1; an abort (Ctrl-C) sets 130; any other failure
 prints the search-failed message and sets 1 (`run.ts:160-173`).
 
@@ -609,9 +622,10 @@ cache SQL assets (their contents are the contract), plus
 | B35, B36 | `tests/session_index/test_spans_and_vector_epoch` | spans inserted, re-upserted with changed text |
 | B37 | `tests/session_index/test_annotations_schema` | `fixtures/migrations/annotations/` |
 | B38, B39, B40, B41 | `tests/session_index/test_listing_order_and_scope` | `fixtures/sessions/` with two orgs, an archived row, a BTW fork |
-| B42, B43, B44, B55 | `tests/cli/test_search_option_contract` | `fixtures/search/` (help text + argument parsing harness) |
-| B45, B46, B47, B48, B49, B50, B51 | `tests/cli/test_search_results` | `fixtures/search/` |
-| B52, B53, B54 | `tests/cli/test_search_output_format` | `fixtures/search/` + a `--json` golden |
+| B42 | `tests/session_index/test_listing_coverage_wait` | `fixtures/sessions/` with `meta` cleared of `last_full_refresh_at` |
+| B43, B44, B45, B56 | `tests/cli/test_search_option_contract` | `fixtures/search/` (help text + argument parsing harness) |
+| B46, B47, B48, B49, B50, B51, B52 | `tests/cli/test_search_results` | `fixtures/search/` |
+| B53, B54, B55 | `tests/cli/test_search_output_format` | `fixtures/search/` + a `--json` golden |
 
 Three tests carry the load and must be exact:
 
@@ -648,7 +662,7 @@ Three tests carry the load and must be exact:
    matches as `message_text`/`assistant`; the base64 `document` source and the
    tool-call `id` never match; `--kind tool_result` returns only that block;
    `--limit-sessions 0` and `--context-chars -1` are rejected by the argument
-   parser; the same query with `--json` parses as the B53 shape.
+   parser; the same query with `--json` parses as the B54 shape.
 
 ## Evidence
 
@@ -662,14 +676,14 @@ Three tests carry the load and must be exact:
 | `ev_record_writes` | B17–B22 | Reading `record.ts:92-741`, `ingest.ts:1181-1235` [observed] |
 | `ev_refresh_plan` | B23–B31, B34 | Reading `discovery.ts:43-300`, `ingest.ts:212-330`, `567-632`, `1310-1360`, `2147-2230` [observed] |
 | `ev_lease` | B4 | Reading `lease.ts:1-120` [observed] |
-| `ev_listing` | B38–B41 | Reading `record.ts:239-400`, `925-968`, `listing.ts:71-145`, `driver.ts:1024-1031` [observed] |
-| `ev_search_cli` | B42–B45, B52–B55 | Reading `src/entrypoints/search/command.ts:8-66`, `run.ts:36-173`, `src/search/sessionSearch.ts:1-341` [observed] |
-| `ev_search_engine` | B46–B51 | Reading `search.ts:289-400`, `640-900`, `1400-1700`, `2116-2196`, `2333-3064`; `utils/src/session-search/extract.ts:257-340`, `rank.ts:13-67` [observed] |
-| `ev_search_bounds` | B43, B50 | Reading `utils/src/session-search/query.ts:44-73`, `packages/common/src/session/constants.ts:77-86` [observed] |
+| `ev_listing` | B38–B42 | Reading `record.ts:239-400`, `925-968`, `listing.ts:71-145`, `driver.ts:1024-1031` [observed] |
+| `ev_search_cli` | B43–B46, B53–B56 | Reading `src/entrypoints/search/command.ts:8-66`, `run.ts:36-173`, `src/search/sessionSearch.ts:1-341` [observed] |
+| `ev_search_engine` | B47–B52 | Reading `search.ts:289-400`, `640-900`, `1400-1700`, `2116-2196`, `2333-3064`; `utils/src/session-search/extract.ts:257-340`, `rank.ts:13-67` [observed] |
+| `ev_search_bounds` | B44, B51 | Reading `utils/src/session-search/query.ts:44-73`, `packages/common/src/session/constants.ts:77-86` [observed] |
 | `ev_session_paths` | B17, Data & config | Reading `session-paths/src/index.ts:36-160`, `280-381` [observed] |
 | `ev_factory_home` | Terms, layout | Reading `cli/src/home/index.ts:13-29`, `environment/src/constants/index.ts:6-9` [derived: `getFactoryDirName` is an accessor over `getBaseEnv()`] |
 | `ev_schema_version` | B32–B33 | Reading `ingest.ts:212-325`, `record.ts:833-868` [observed] |
-| `ev_daemon_search` | B48, B53 | Reading `daemon-search.ts:30-130`, `283-400`; protocol schema `droid-sdk-core/.../droid.ts:893-963` [observed] |
+| `ev_daemon_search` | B49, B54 | Reading `daemon-search.ts:30-130`, `283-400`; protocol schema `droid-sdk-core/.../droid.ts:893-963` [observed] |
 
 Inferred only: the human strings behind the i18n keys (message catalogs are
 absent from the recovered tree), and the annotations database path.
@@ -678,12 +692,12 @@ absent from the recovered tree), and the annotations database path.
 
 1. **Human-facing wording.** `common:sessionSearch.*` message texts are not in
    the recovered source (only `t('common:sessionSearch.…')` calls). The
-   *structure* of B52 is observed; the literal words are not. Settle by running
+   *structure* of B53 is observed; the literal words are not. Settle by running
    `droid search x --help`/a search against a seeded home capture. Blocks the
-   exact-text half of B52/B55.
+   exact-text half of B53/B56.
 2. **Annotations database path and writer.** Only its DDL, its generated
    manifest and the `preserveQuarantine` flag are present; the module that opens
-   it, and its file name, were elided. Blocks B36's path and the write rules of
+   it, and its file name, were elided. Blocks B37's path and the write rules of
    the annotations file. Settle from a captured home directory (`find` under
    `<base>` for `*.db` after an annotating run) or from the packaging manifest.
 3. **`CacheOpenOutcome` / `SchemaFault` / `SessionIndexStatus` literal values.**
@@ -695,7 +709,7 @@ absent from the recovered tree), and the annotations database path.
    for `droid search` (`run.ts:56-62`), and `refresh` is passed through to
    `searchEverywhere` (`run.ts:99`). Whether `--reindex` performs a full refresh
    or a per-session one before scanning is not visible in the shipped code
-   path. Blocks the timing claims of B45; does not affect result shape.
+   path. Blocks the timing claims of B46; does not affect result shape.
 5. **Search when the index is unavailable mid-command.** `access.ts` reports
    `unavailable` and the CLI has no JSON-directory fallback (unlike the listing);
    the observable result is an empty, incomplete result, but the sequence that
