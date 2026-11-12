@@ -56,18 +56,18 @@ export class SchemaTooNewError extends SessionStoreError {
 /** A released migration was edited: the ledger identity no longer matches. */
 export class MigrationChecksumMismatchError extends SessionStoreError {
   readonly version: number;
-  readonly name: string;
+  readonly migrationName: string;
   readonly recorded: string;
   readonly expected: string;
 
-  constructor(version: number, name: string, recorded: string, expected: string) {
+  constructor(version: number, migrationName: string, recorded: string, expected: string) {
     super(
       "migration-checksum-mismatch",
-      `session index migration checksum mismatch for ${version}:${name}`,
+      `session index migration checksum mismatch for ${version}:${migrationName}`,
     );
     this.name = "MigrationChecksumMismatchError";
     this.version = version;
-    this.name = name;
+    this.migrationName = migrationName;
     this.recorded = recorded;
     this.expected = expected;
   }
@@ -95,7 +95,7 @@ export class DuplicateMigrationVersionError extends SessionStoreError {
 
 export class MigrationFailedError extends SessionStoreError {
   readonly version: number;
-  readonly name: string;
+  readonly migrationName: string;
 
   constructor(migration: { readonly version: number; readonly name: string }, cause: unknown) {
     super("migration-failed", `session index migration ${migration.version}:${migration.name} failed`, {
@@ -103,7 +103,7 @@ export class MigrationFailedError extends SessionStoreError {
     });
     this.name = "MigrationFailedError";
     this.version = migration.version;
-    this.name = migration.name;
+    this.migrationName = migration.name;
   }
 }
 

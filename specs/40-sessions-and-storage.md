@@ -109,7 +109,7 @@ beginning `packages/` means `evidence/original/windows-x64/packages/`; and a
 **B1.** Opening the index creates `<base>/cache/session-index/` if absent and
 writes an empty `.metadata_never_index` marker beside the database (best
 effort; a failure never blocks the open)
-(`packages/runtime/session-index/src/cache.ts:56-66`, `148-166`).
+(`packages/runtime/session-index/src/cache.ts:56-66`, `148-166`). `[observed]`
 
 **B2.** Every open applies the connection PRAGMAs in this order:
 `journal_mode = WAL`, `wal_autocheckpoint = 0`,
@@ -120,7 +120,7 @@ effort; a failure never blocks the open)
 raised only for the duration of work a caller is waiting on: 5000 ms for
 migrations, the refresh and lease claims (`DELIBERATE_BUSY_TIMEOUT_MS`), 25 ms
 for a mutation/append write (`MUTATION_BUSY_TIMEOUT_MS`), then restored to 0
-(`constants.ts:158-200`, `driver.ts:911-919`).
+(`constants.ts:158-200`, `driver.ts:911-919`). `[observed]`
 
 **B3.** The write-ahead log is checkpointed explicitly, never by SQLite's page
 threshold: `PASSIVE` at most once per 64 writes (`WAL_CHECKPOINT_WRITE_INTERVAL`),
@@ -128,13 +128,13 @@ scheduled off the writing frame; after 128 un-checkpointed writes a write is
 declined (returned as "refused", retried by the caller) rather than
 checkpointing inline; `TRUNCATE` after a migration batch and on
 `close()`; every 1024 files during a refresh (`constants.ts:237-302`,
-`record.ts:620-698`, `driver.ts:955-970`, `migrate.ts:368-386`).
+`record.ts:620-698`, `driver.ts:955-970`, `migrate.ts:368-386`). `[observed]`
 
 **B4.** One refresh runs at a time per file. The claim is a `meta` row
 `refresh_lease_until` holding `<untilMs>:<pid>`, leased for 60000 ms, renewed at
 half-life, reclaimed immediately when the recorded pid is not alive; a second
 refresher returns without reading (`constants.ts:116-146`,
-`lease.ts:29-82`).
+`lease.ts:29-82`). `[observed]`
 
 **B5.** With the index, a listing answers from the index or rejects; it never
 walks the sessions directory. A listing waits out a busy peer for up to 10000 ms
@@ -146,7 +146,7 @@ session index` (`state: unavailable`, `reason` = error class)
 `918-925`). When the disk is full the listing is served from an
 `immutable=1` snapshot of the main file, missing whatever is still in the WAL
 (`listing.ts:313-340`, `398-403`). Writes never fail a session: a refused write
-is retried by the caller after it yields (`record.ts:697-740`).
+is retried by the caller after it yields (`record.ts:697-740`). `[observed]`
 
 ### Migrations and downgrade
 
@@ -154,31 +154,31 @@ is retried by the caller after it yields (`record.ts:697-740`).
 and are applied in ascending order; a list containing a duplicate version or a
 version below 1 fails at import time with `Duplicate session index migration
 version` / `Session index migration version must be positive`
-(`migrate.ts:40-65`, `src/migrations.generated.ts:15-61`).
+(`migrate.ts:40-65`, `src/migrations.generated.ts:15-61`). `[observed]`
 
 **B7.** A migration's identity in the ledger is
 `sha256("<version>\0<name>\0<normalized sql>")[0..16)`, where normalization strips
 `--` and `/* */` comments, collapses runs of whitespace and removes whitespace
 adjacent to `(`, `)`, `,` and `;`, while copying quoted literals verbatim
 (`migrate.ts:87-183`). Consequently reformatting or commenting a released
-migration keeps its identity; changing a statement does not.
+migration keeps its identity; changing a statement does not. `[observed]`
 
 **B8.** A database with no pending migrations is not written to at all — but its
-ledger is still validated (`migrate.ts:315-325`).
+ledger is still validated (`migrate.ts:315-325`). `[observed]`
 
 **B9.** Each pending migration runs in its own `BEGIN IMMEDIATE` transaction
 that re-reads the ledger, re-checks compatibility, skips if a peer already
 committed that version (logged as `applied-by-peer`), executes the SQL and
-inserts the ledger row with `Date.now()` (`migrate.ts:315-366`).
+inserts the ledger row with `Date.now()` (`migrate.ts:315-366`). `[observed]`
 
 **B10.** A ledger row whose version this build knows but whose checksum differs
 fails the open with `Session index migration checksum mismatch`; the file is
-left in place (`migrate.ts:209-235`).
+left in place (`migrate.ts:209-235`). `[observed]`
 
 **B11.** A ledger row whose version this build does **not** know is tolerated
 ("the file is ahead"): an older binary keeps opening a newer file. Only unknown
 versions are tolerated — known versions are still checksum-checked
-(`migrate.ts:186-195`, `cache.ts:72-78`).
+(`migrate.ts:186-195`, `cache.ts:72-78`). `[observed]`
 
 **B12.** After migrations, the open compares the file's catalog with the shape
 this build's migrations produce in a throwaway `:memory:` database
@@ -190,10 +190,10 @@ expected count is a fault unless the ledger is ahead. First failure wins, in
 table → column → index → foreign-object order, and the open fails with
 `Session index database is not shaped like this build` whose `key` names
 `table`, `table.column` or the index (`schema.ts:29-45`, `142-197`,
-`cache.ts:104-131`).
+`cache.ts:104-131`). `[observed]`
 
 **B13.** Only the tables this build owns have their columns read; a foreign
-table is recorded as present and not described (`schema.ts:111-140`).
+table is recorded as present and not described (`schema.ts:111-140`). `[observed]`
 
 **B14.** A file whose pages SQLite reports as unusable (`SQLITE_CORRUPT`,
 `SQLITE_CORRUPT_VTAB`, `SQLITE_CORRUPT_SEQUENCE`, `SQLITE_CORRUPT_INDEX`,
@@ -205,15 +205,15 @@ database are kept. The open then retries once on a fresh file; a second failure
 propagates and leaves the fresh file where it is (`driver.ts:700-765`,
 `293-305`, `migrate.ts:407-470`). A move the filesystem refuses (a peer holds
 the file on Windows) logs `database quarantine failed` and rethrows the original
-failure (`driver.ts:777-806`).
+failure (`driver.ts:777-806`). `[observed]`
 
 **B15.** Every other open failure — checksum mismatch, pre-ledger file, a shape
 the statements cannot use, `SQLITE_FULL`, permissions, a lock — leaves the file
-exactly where it is and propagates (`migrate.ts:389-398`, `452-468`).
+exactly where it is and propagates (`migrate.ts:389-398`, `452-468`). `[observed]`
 
 **B16.** A read-only snapshot open (`immutable=1`, no locks, no sidecars) exists
 for a full disk and reads only the main file, missing whatever is still in the
-WAL (`driver.ts:1015-1022`).
+WAL (`driver.ts:1015-1022`). `[observed]`
 
 ### Row write rules
 
@@ -223,7 +223,7 @@ the transcript's file name (`src/utils/uuid.ts:1-9`,
 `(sessions dir, project_key, session id)`, never stored; a row whose derivation
 would escape the sessions dir is rejected with
 `Indexed session resolves outside the sessions dir` and only the session id is
-reported (`session-paths/src/index.ts:126-160`, `record.ts:313-325`).
+reported (`session-paths/src/index.ts:126-160`, `record.ts:313-325`). `[observed]`
 
 **B18.** A mutation write inserts the row when absent and otherwise updates it,
 with these monotonic rules: `project_key` always takes the new value; the
@@ -231,7 +231,7 @@ summary-derived columns (`cwd`, `title`, `org_id`, `owner`, `host_id`, `parent`,
 `calling_session_id`, `calling_tool_use_id`) are overwritten **only** when the
 producer states it read or wrote the summary line; `first_event_at` only rises
 from NULL (`COALESCE`); `has_user_visible_messages` and `last_event_at` and
-`messages_count` take `MAX` of old and new (`record.ts:92-174`).
+`messages_count` take `MAX` of old and new (`record.ts:92-174`). `[observed]`
 
 **B19.** The settings-derived columns (`mission`, `tags` as JSONB, `archived_at`,
 `worktree`, `artifacts`, `settings_write_seq`) are written only when the
@@ -239,18 +239,18 @@ writer's settings read is at least as new as the mtime the row records; a
 writer that saw no settings file wins only over a row that records no read, and
 the unread marker `-1` loses to any read. After the columns are written the
 invoking write records `session_ingest.settings_mtime_ms`
-(`record.ts:392-489`, `206-211`).
+(`record.ts:392-489`, `206-211`). `[observed]`
 
 **B20.** An append write updates only an existing row: `messages_count` grows by
 the number of the append's lines that end past `session_ingest.transcript_offset`,
 `last_event_at` takes the max, and `has_user_visible_messages` is set to 1 when
 the append reports visible content (never cleared) (`record.ts:186-194`,
-`220-233`, `912-924`).
+`220-233`, `912-924`). `[observed]`
 
 **B21.** All writes of one call are one `BEGIN IMMEDIATE` transaction under the
 mutation `busy_timeout`; a corruption error reports corruption to the owner and
 a busy/locked error returns "refused" (the caller retries after yielding); any
-other error throws (`record.ts:697-740`).
+other error throws (`record.ts:697-740`). `[observed]`
 
 **B22.** Writing `tags`, `mission` or `archived_at` on `sessions` fires
 `sessions_settings_rewritten`, which sets that row's `settings_mtime_ms = -1`
@@ -258,29 +258,29 @@ other error throws (`record.ts:697-740`).
 `sessions_daemon_fields_stale`, which nulls `settings_write_seq` when the write
 did not itself advance it (`0004_daemon_session_fields*.sql:27-33`). A build
 that knows the rule records the settings mtime afterwards, in the same
-transaction, so it is not re-read.
+transaction, so it is not re-read. `[observed]`
 
 ### Refresh, compaction and fingerprint
 
 **B23.** Discovery decides a file is unchanged without reading it when
 `mtime == ctime`, and the stored mtime, size and `project_key` all still match
 and a fingerprint is stored — because renaming a session rewrites line 1 and can
-restore the old mtime, but cannot restore ctime (`discovery.ts:195-224`).
+restore the old mtime, but cannot restore ctime (`discovery.ts:195-224`). `[observed]`
 
 **B24.** A row is **restarted** (transcript read from byte 0) when: the summary
 line is unusable; the row was never ingested; the file shrank; the size matches
-but the mtime differs; the `project_key` changed (`ingest.ts:567-580`).
+but the mtime differs; the `project_key` changed (`ingest.ts:567-580`). `[observed]`
 
 **B25.** When only the summary line changed and the row had been fully read
 (`transcript_offset == transcript_size`, message counts equal, no backfill or
 projection rebuild pending) the refresh **shifts** rather than restarts: it
 re-reads the summary line and adjusts the offset by the size delta, trusting the
-canonical append-only body (`ingest.ts:591-612`).
+canonical append-only body (`ingest.ts:591-612`). `[observed]`
 
 **B26.** Otherwise the transcript is resumed from `transcript_offset`; a
 projection rebuild (missing or untrusted term filter, a filter smaller than the
 file needs, a span tail beyond the offset) or a migration backfill restarts the
-transcript in place while keeping the row (`ingest.ts:580-632`).
+transcript in place while keeping the row (`ingest.ts:580-632`). `[observed]`
 
 Every rewrite a transcript writer performs — a compaction that replaces the
 history, a fork that copies it, a rename that replaces line 1 — is classified by
@@ -294,57 +294,57 @@ minimal `(session_id, project_key)` row before writing the recomputed columns; a
 restart in place keeps the row so settings-derived columns survive. A file that
 fails as a skipped session (no summary, unusable summary) has its existing row
 deleted under the same `skipIfMoved` fence (`ingest.ts:1600-1616`,
-`1748-1775`).
+`1748-1775`). `[observed]`
 
 **B28.** The refresh writes one row per file in a single transaction:
 `sessions` (the same rules as B18/B19) plus the `session_ingest` upsert of
 `transcript_mtime_ms`, `transcript_size`, `transcript_summary_fingerprint`,
 `transcript_offset`, `transcript_skipped_lines`, `transcript_messages_count`,
 `settings_mtime_ms`, the three span-tail columns and `schema_version`
-(`ingest.ts:1208-1235`).
+(`ingest.ts:1208-1235`). `[observed]`
 
 **B29.** A per-session refresh requested with `skipIfMoved` leaves the row alone
 when another writer committed it since the pass read its state; the comparison
-is made inside the write's transaction (`ingest.ts:1310-1355`).
+is made inside the write's transaction (`ingest.ts:1310-1355`). `[observed]`
 
 **B30.** At the end of a **complete** discovery pass, rows whose transcript no
 longer exists are deleted — each only after re-`stat` and only while the row is
 still exactly as the pass stored it — inside one deliberate-timeout
 transaction; a verification failure leaves the rows and marks the pass
-incomplete (`ingest.ts:2147-2230`).
+incomplete (`ingest.ts:2147-2230`). `[observed]`
 
 **B31.** `session_ingest` is deleted with its session
 (`ON DELETE CASCADE`), so a re-ingest of that id starts from byte zero
 (`0001_baseline*.sql:176-179`). `session_spans` and `session_term_filters`
-cascade the same way (`0006_spans_and_search*.sql:8-10`, `81-82`, `130-132`).
+cascade the same way (`0006_spans_and_search*.sql:8-10`, `81-82`, `130-132`). `[observed]`
 
 **B32.** Each row carries `session_ingest.schema_version`, stamped on every
 refresh write with `max(latest cache migration, 7)`; a mutation write that finds
 a *higher* stamp lowers it to this build's version and lowers
 `meta.last_full_refresh_schema_version` with it, so a newer build backfills what
-this write may have rewritten (`ingest.ts:212-216`, `303-325`).
+this write may have rewritten (`ingest.ts:212-216`, `303-325`). `[observed]`
 
 **B33.** `meta` keys written by the refresh: `last_full_refresh_at` (epoch ms,
 set when a pass reached every transcript), `last_full_refresh_schema_version`
 (set only when no row was left to backfill), `last_integrity_check_at`,
-`vector_epoch` (`constants.ts:66-84`, `record.ts:833-868`).
+`vector_epoch` (`constants.ts:66-84`, `record.ts:833-868`). `[observed]`
 
 **B34.** A term filter is trusted only on a row whose `schema_version` is at
 least 7, with a filter present, and with `messages_count` not exceeding
 `transcript_messages_count`; an untrusted filter is rebuilt from the whole
 transcript by the next refresh that builds projections
-(`search.ts:355-380`, `constants.ts:466-474`).
+(`search.ts:355-380`, `constants.ts:466-474`). `[observed]`
 
 **B35.** Spans are upserted by `(session_id, span_index)`; when the text
 changes the embedding columns (`scale`, `vector`, `text_sha256`) are cleared,
 and unchanged text keeps them. `CHECK` constraints forbid a vector without its
 scale and text hash, and forbid `synced_at` / `embedding_space` without a vector
-(`0006_spans_and_search*.sql:81-112`).
+(`0006_spans_and_search*.sql:81-112`). `[observed]`
 
 **B36.** `session_spans` insert/delete/update triggers on vector-bearing columns
 increment `meta.vector_epoch`, so a semantic search may reuse its loaded matrix
 while the epoch is unchanged; a write that touches no vector does not move it
-(`0009_vector_bookkeeping*.sql:22-48`).
+(`0009_vector_bookkeeping*.sql:22-48`). `[observed]`
 
 **B37.** The annotations file uses its own ledger and one migration creating
 `session_annotations` (primary key `(session_id, annotator, subject)`) and
@@ -352,34 +352,35 @@ while the epoch is unchanged; a write that touches no vector does not move it
 0), plus four indexes, one of which is a partial index over unsettled rows
 (`0001_session_annotations*.sql:3-37`). Quarantining that file must not prune
 its copies, because paid output cannot be recomputed (`driver.ts:762-764`,
-`migrate.ts:392-394`).
+`migrate.ts:392-394`). `[observed]`
 
 ### Listing
 
 **B38.** A listing row carries `modified_time_ms =
 NULLIF(MAX(session_ingest.transcript_mtime_ms, sessions.last_event_at), 0)`, so
 an append the mutation path reported after the last ingest still orders
-correctly (`record.ts:239-264`).
+correctly (`record.ts:239-264`). `[observed]`
 
 **B39.** Row visibility uses the tenant rule: unless the airgap flag is on, rows
 are `org_id IS NULL OR org_id = <active org>`, so with no active organization
-only unattributed rows are visible (`record.ts:925-943`, `266-277`).
+only unattributed rows are visible (`record.ts:925-943`, `266-277`). `[derived]`
+— two readers and a migration comment agree on the clause; see Open question 6.
 
 **B40.** Listed sessions are ordered newest-first by `modifiedTime`, ties broken
 in favour of the session whose `cwd` equals the current directory; BTW forks are
 never listed; archived sessions appear only when requested
-(`listing.ts:71-108`). `createdTime` is `first_event_at` when known.
+(`listing.ts:71-108`). `createdTime` is `first_event_at` when known. `[observed]`
 
 **B41.** The entry listing (the daemon's) is cached in-process against a
 version string built from `PRAGMA data_version` and `total_changes()`; an
 unchanged version returns the previous array without re-reading
-(`record.ts:545-556`, `945-968`, `driver.ts:1024-1031`).
+(`record.ts:545-556`, `945-968`, `driver.ts:1024-1031`). `[observed]`
 
 **B42.** A file no covering refresh has reached (no `last_full_refresh_at`) is
 still listed as it stands, after one shared wait of up to 2000 ms (polled every
 50 ms) for the rebuild the open requested; a listing that times out returns what
 is there, and later listings on that store do not wait again
-(`listing.ts:216-270`, `360-372`).
+(`listing.ts:216-270`, `360-372`). `[observed]`
 
 ### `droid search` / `find`
 
@@ -390,23 +391,23 @@ and defaults: `--kind <message_text|document|tool_use|tool_result|all>` default
 `--reindex`; `--include-archived`; `--exclude-children`; `--include-hidden`
 (`src/entrypoints/search/command.ts:8-55`). The two limits accept digits only
 and are refused with `Expected a positive integer.`; context is refused with
-`Expected a non-negative integer.` (`src/utils/commanderParsers.ts:12-32`).
+`Expected a non-negative integer.` (`src/utils/commanderParsers.ts:12-32`). `[observed]`
 
 **B44.** Bounds are clamped by the shared rule: sessions to
 `[1, ∞)` for this command (it opts out of the shared 100 ceiling), hits to
 `[1, 20]`, context to `[0, 1000]`, and the query is trimmed; a query over 500
 characters is rejected (`packages/utils/src/session-search/query.ts:44-73`,
-`packages/common/src/session/constants.ts:77-86`, `src/entrypoints/search/run.ts:150-166`).
+`packages/common/src/session/constants.ts:77-86`, `src/entrypoints/search/run.ts:150-166`). `[observed]`
 
 **B45.** The CLI searches in `regex` mode, so the query is a pattern over a
 supported subset; an unsupported or unconstrained pattern is rejected before
-any scan (`run.ts:150-156`, `utils/src/session-search/query.ts:464-503`).
+any scan (`run.ts:150-156`, `utils/src/session-search/query.ts:464-503`). `[observed]`
 
 **B46.** Scope filters: `--include-archived` (default excludes
 `sessions.archived_at IS NOT NULL`), `--exclude-children` (default includes
 sessions whose `calling_session_id` is set), `--include-hidden` (default excludes
 `sessions.has_user_visible_messages = 0`), plus the org rule of B39 and the
-optional `since`/`until`/`projectKey` windows (`search.ts:289-320`).
+optional `since`/`until`/`projectKey` windows (`search.ts:289-320`). `[observed]`
 
 **B47.** Searched text is the file's raw JSONL, matched by a bundled `ripgrep`
 (`--no-config --no-messages --text`, `--fixed-strings` for literal mode,
@@ -416,30 +417,30 @@ text; `text`/`thinking` blocks; a `tool_use` block's `name` and every value unde
 its `input`; a `tool_result` block's `content` (text parts only); a `document`
 block's `source.data` when that source is text. Ids, signatures and base64
 sources are not searchable (`utils/src/session-search/extract.ts:278-340`,
-`search.ts:782-900`).
+`search.ts:782-900`). `[observed]`
 
 **B48.** A match in injected harness text inside a user message is discarded
 (`search.ts:1560-1564`). Matches in titles do not count when `--kind` is set
-(`search.ts:392-394`, `2143-2145`).
+(`search.ts:392-394`, `2143-2145`). `[observed]`
 
 **B49.** Session order: title tier (exact title match, then title contains,
 then the rest), then "a user wrote a match" (`message_text` in a `user` message,
 not a summary field), then `last_event_at` descending, then `session_id`
-descending (`utils/src/session-search/rank.ts:13-67`, `search.ts:2611-2626`).
+descending (`utils/src/session-search/rank.ts:13-67`, `search.ts:2611-2626`). `[observed]`
 
 **B50.** Hits within a session are the **newest** matching messages, scanned
 newest-first, capped at `--limit-hits`; with `--kind` only blocks of that kind
-count (`search.ts:2116-2196`).
+count (`search.ts:2116-2196`). `[observed]`
 
 **B51.** A result reports `sessionCount.count` plus `exact`, and `complete:
 false` (with a coverage reason) when a scan budget (10 000 ms), a matcher
 failure or a candidate source cut the page short
-(`search.ts:126`, `3038-3064`; `src/search/sessionSearch.ts:229-240`).
+(`search.ts:126`, `3038-3064`; `src/search/sessionSearch.ts:229-240`). `[observed]`
 
 **B52.** Snippets are the matched value trimmed to `--context-chars` on each
 side (default radius 140 when the field is absent), prefixed/suffixed with `…`
 when truncated, with `<mark>` around the match in the legacy engine and SGR
-highlighting in the index engine (`search.ts:93`, `1584-1610`).
+highlighting in the index engine (`search.ts:93`, `1584-1610`). `[observed]`
 
 **B53.** Human output, index engine: one header line carrying a session count
 (the `compactSessions` message when the count is exact and equals what is shown,
@@ -451,23 +452,23 @@ for a `line:` docId and `@<id>` for an `event:` one), where `kind` is chosen by
 `compactDocument`. At most 120 characters of snippet are
 shown per hit, control sequences are stripped, and a `, <compactPartial>` suffix
 marks an incomplete result (`src/search/sessionSearch.ts:200-341`). The literal
-words come from `common:sessionSearch.*` and are Open question 1.
+words come from `common:sessionSearch.*` and are Open question 1. `[observed]`
 
 **B54.** `--json` writes `JSON.stringify(result, null, 2)` of the federated
 result (sessions with `sessionId`, optional `title`, optional `updatedAt`,
 `hits[{docId, kind, toolName?, messageRole?, snippets[]}]`, optional totals and
-`sessionCount`) (`run.ts:167-170`).
+`sessionCount`) (`run.ts:167-170`). `[observed]`
 
 **B55.** With the `session_index_search` flag off, `--include-archived`,
 `--exclude-children` and `--include-hidden` are refused with
 `--include-archived, --exclude-children and --include-hidden need the session
 index, which is off`, and everything else runs the legacy on-disk engine, whose
 human output is the grouped-by-kind rendering (`run.ts:143-149`,
-`src/search/sessionSearch.ts:26-190`).
+`src/search/sessionSearch.ts:26-190`). `[observed]`
 
 **B56.** A query rejected by the planner prints `sessionSearch.queryRejected` to
 stderr and sets exit status 1; an abort (Ctrl-C) sets 130; any other failure
-prints the search-failed message and sets 1 (`run.ts:160-173`).
+prints the search-failed message and sets 1 (`run.ts:160-173`). `[observed]`
 
 ## Data & config
 

@@ -410,7 +410,8 @@ never wins, never shadows, and surfaces as invalid (`evidence/original/windows-x
 **B51 — Disable ledger.** `general.disabledSkills` is a union across levels: once a name is listed at any
 level it stays disabled, with no lower-level re-enable. Frontmatter `enabled: false` also disables. A
 disabled winner is reported as `disabled` with its cause (`ledger` or `frontmatter`) and other skills of
-the same name remain shadowed by it (`evidence/original/windows-x64/src/skills/resolveEffectiveSkills.ts:168-193`, `:222-240`).
+the same name remain shadowed by it (`evidence/original/windows-x64/src/skills/resolveEffectiveSkills.ts:168-193`, `:222-240`;
+union semantics documented at `evidence/original/windows-x64/packages/common/src/settings/schema.ts:1473-1480`).
 
 **B52 — Builtin skills are code, not user files.** Builtins are parsed once from embedded `SKILL.md` text
 (or built from code constants) on first use; a builtin's `filePath` is `builtin:<name>` unless its bundle
@@ -446,7 +447,8 @@ are announced in a delta reminder under
 and names the earlier list showed that can no longer be activated are announced under
 `Skills no longer available (drop them from the earlier skills list; the Skill tool no longer activates these names):`.
 A baseline is never rewritten (`evidence/original/windows-x64/src/skills/constants.ts:11-26`,
-`evidence/original/windows-x64/src/skills/availableSkillsReminder.ts:99-140`).
+`evidence/original/windows-x64/src/skills/availableSkillsReminder.ts:99-140`,
+`evidence/original/windows-x64/src/core/AgentLoop.ts:4622-4650`).
 
 **B56 — Activation.** The `Skill` tool takes `{ skill }`, resolves it by sanitized name among the
 effective skills, and refuses with a not-found, disabled, or invalid error identity. On success it

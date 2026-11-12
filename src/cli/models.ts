@@ -9,16 +9,8 @@
 
 import type { ExecHelpModels } from "./exec-help.ts";
 
-
 export type ReasoningEffort =
-  | "none"
-  | "minimal"
-  | "off"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max";
+  "none" | "minimal" | "off" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface ModelEntry {
   readonly id: string;
@@ -44,7 +36,6 @@ export const STREAM_JSONRPC_IGNORED_FLAGS: readonly string[] = [
   "--tag",
   "--session-title",
 ];
-
 
 export const MODEL_CATALOGUE: readonly ModelEntry[] = [
   {
@@ -164,49 +155,105 @@ export const MODEL_CATALOGUE: readonly ModelEntry[] = [
   {
     id: "gpt-6-sol",
     displayName: "GPT-6 Sol",
-    supportedReasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "medium",
   },
   {
     id: "gpt-6-sol-fast",
     displayName: "GPT-6 Sol Fast Mode",
-    supportedReasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "medium",
   },
   {
     id: "gpt-5.6-sol",
     displayName: "GPT-5.6 Sol",
-    supportedReasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "medium",
   },
   {
     id: "gpt-5.6-sol-fast",
     displayName: "GPT-5.6 Sol Fast Mode",
-    supportedReasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "medium",
   },
   {
     id: "gpt-6-luna",
     displayName: "GPT-6 Luna",
-    supportedReasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "medium",
   },
   {
     id: "gpt-6-luna-fast",
     displayName: "GPT-6 Luna Fast Mode",
-    supportedReasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "medium",
   },
   {
     id: "gpt-5.6-luna",
     displayName: "GPT-5.6 Luna",
-    supportedReasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "medium",
   },
   {
     id: "gpt-5.6-terra",
     displayName: "GPT-5.6 Terra",
-    supportedReasoningEfforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "none",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "medium",
   },
   {
@@ -308,7 +355,15 @@ export const MODEL_CATALOGUE: readonly ModelEntry[] = [
   {
     id: "inkling",
     displayName: "Inkling",
-    supportedReasoningEfforts: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
+    supportedReasoningEfforts: [
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+    ],
     defaultReasoningEffort: "high",
   },
   {
@@ -418,11 +473,16 @@ export const MODEL_CATALOGUE: readonly ModelEntry[] = [
 /** Project the catalogue into the two views the help page renders. */
 export function execHelpModels(): ExecHelpModels {
   return {
-    models: MODEL_CATALOGUE.map((model) => ({ id: model.id, name: model.displayName })),
+    models: MODEL_CATALOGUE.map((model) => ({
+      id: model.id,
+      name: model.displayName,
+    })),
     defaultModelId: DEFAULT_MODEL_ID,
     modelDetails: MODEL_CATALOGUE.map((model) => ({
       name: model.displayName,
-      supportsReasoning: model.supportedReasoningEfforts.some((effort) => effort !== "none"),
+      supportsReasoning: model.supportedReasoningEfforts.some(
+        (effort) => effort !== "none",
+      ),
       supported: model.supportedReasoningEfforts,
       defaultReasoningEffort: model.defaultReasoningEffort,
     })),

@@ -1,13 +1,21 @@
 /**
  * `exec` command. Contract: `specs/80-exec-and-streaming.md`.
  *
- * The subject prints a bespoke help page for this command (`printExecHelp`)
- * rather than Commander's layout; that page is specified in 80-exec and is the
- * remaining gap for `help-exec` in the parity suite.
+ * The subject prints a curated help page for this command rather than
+ * Commander's layout, so `-h, --help` is an ordinary option: Commander's
+ * built-in help option would otherwise print the wrong page and exit before
+ * the action runs. `droid help exec` deliberately keeps Commander's rendering
+ * (specs/10-cli-surface.md B26).
  */
 import { Command, InvalidArgumentError, Option } from "commander";
 
+import { renderExecHelp } from "../exec-help.ts";
+import { execHelpModels } from "../models.ts";
 import { notImplemented } from "../not-implemented.ts";
+
+interface ExecInvocationOptions {
+  readonly help?: boolean;
+}
 
 function parseToolList(value: string, previous: string[] = []): string[] {
   const parts = value

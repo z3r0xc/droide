@@ -782,8 +782,7 @@ deprecation warning (B41).
 - The four output modes' byte-level shape: `text` = final answer + `\n`;
   `json` = one object with exactly the eight keys (B21) and a `usage` of six
   counters plus optional `ttft_ms`; `stream-json` = the seven record kinds,
-  their exact key
-  names and casing (`session_id`, `finalText`, `numTurns`, `durationMs`,
+  their exact key names and casing (`session_id`, `finalText`, `numTurns`, `durationMs`,
   `isError`, `toolName`, `messageId`), one record per line, `system/init` first,
   one `completion` last on success, an `error` instead on failure.
 - Ordering within a message (B27), the progress-update special case (B28), the
@@ -795,7 +794,7 @@ deprecation warning (B41).
 - Session continuation and forking as observable through `session_id`, plus the
   rule that `-s` replays nothing on stdout.
 - Exit codes `0`, `1`, `130`/`143` and their precedence (a signal outranks a
-  turn outcome; streaming-json and ACP modes do not take signal codes).
+  turn outcome; the `--input-format stream-json` mode reports `0` instead).
 - Stdout purity, console redirection, and broken-pipe tolerance.
 - One-shot owed-work draining before the terminal record.
 
