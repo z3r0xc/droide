@@ -185,18 +185,17 @@ function guidance(context: PermissionContext): string {
   }
   if (level === "low") {
     if (maximum === "low") return organizationMaximum;
-    return maximum === "medium"
-      ? "Re-run with --auto medium to allow this tool."
-      : "Re-run with --auto medium or --auto high to allow this tool.";
+    // Spec 80 §B14 `guidanceLow`.
+    return "Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.";
   }
   if (level === "medium") {
-    return maximum === "high"
-      ? "Re-run with --auto high to allow this tool."
-      : organizationMaximum;
+    if (maximum !== "high") return organizationMaximum;
+    // Spec 80 §B14 `guidanceMedium`.
+    return "Re-run with --auto high. For destructive commands, use --skip-permissions-unsafe.";
   }
-  return maximum === "high"
-    ? "Re-run with --skip-permissions-unsafe to allow this tool."
-    : organizationMaximum;
+  if (maximum !== "high") return organizationMaximum;
+  // Spec 80 §B14 `guidanceHigh`.
+  return "Re-run with --skip-permissions-unsafe.";
 }
 
 /**

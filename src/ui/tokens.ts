@@ -283,6 +283,25 @@ export function themeColor(
   return paletteFor(theme)[slot];
 }
 
+/**
+ * D6 — Subagent badge slots, in order. D6 introduces no new hex; each slot
+ * names the palette slots it uses. The type→slot mapping (worker 0,
+ * explorer 1, otherwise `hash(type) mod 8`) belongs to the subagent renderer.
+ */
+export const SUBAGENT_BADGE_SLOTS = [
+  { bg: "toolBadgeBg", fg: "toolBadgeFg" },
+  { bg: "spec", fg: "toolBadgeFg" },
+  { bg: "hookBadgeBg", fg: "hookBadgeFg" },
+  { bg: "success", fg: "text.primary" },
+  { bg: "warning", fg: "toolBadgeFg" },
+  { bg: "error", fg: "text.primary" },
+  { bg: "primary", fg: "toolBadgeFg" },
+  { bg: "highlight", fg: "toolBadgeFg" },
+] as const satisfies readonly {
+  readonly bg: PaletteSlot;
+  readonly fg: PaletteSlot;
+}[];
+
 /** D12 — Glyph and icon set. `N` marks the counted notices. */
 export const GLYPHS = {
   assistantMarker: "⛬",

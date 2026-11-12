@@ -23,6 +23,7 @@ import {
   PALETTE_LIGHT,
   SPACING,
   SPINNERS,
+  SUBAGENT_BADGE_SLOTS,
   SYNTAX_PALETTE,
   TEXT_PALETTE,
   TIMINGS,
@@ -234,6 +235,19 @@ test("D4 markdown palette matches the spec", () => {
 
 test("D5 mission-control palette matches the spec (light inherits dark)", () => {
   assertPairs("D5", MISSION_CONTROL_PALETTE, MISSION_ROWS);
+});
+
+test("D6 subagent badge slots match the spec order and palette references", () => {
+  assert.deepEqual(SUBAGENT_BADGE_SLOTS, [
+    { bg: "toolBadgeBg", fg: "toolBadgeFg" },
+    { bg: "spec", fg: "toolBadgeFg" },
+    { bg: "hookBadgeBg", fg: "hookBadgeFg" },
+    { bg: "success", fg: "text.primary" },
+    { bg: "warning", fg: "toolBadgeFg" },
+    { bg: "error", fg: "text.primary" },
+    { bg: "primary", fg: "toolBadgeFg" },
+    { bg: "highlight", fg: "toolBadgeFg" },
+  ]);
 });
 
 test("D7 syntax palette matches the spec (light inherits dark)", () => {

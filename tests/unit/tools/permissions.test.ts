@@ -235,7 +235,7 @@ test("a non-interactive prompt becomes the early-exit denial", () => {
   assert.equal(
     outcome.message,
     "Exec ended early: insufficient permission to proceed. " +
-      "Re-run with --auto medium or --auto high to allow this tool.",
+      "Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.",
   );
 });
 
@@ -248,7 +248,7 @@ test("an MCP denial in exec mode names the MCP tool", () => {
   assert.equal(
     mcpRefusal(request, { ...contextFor("high"), interactive: false }),
     "Exec ended early: MCP tool github___create requires higher autonomy to proceed. " +
-      "Re-run with --skip-permissions-unsafe to allow this tool.",
+      "Re-run with --skip-permissions-unsafe.",
   );
 });
 
