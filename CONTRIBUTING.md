@@ -2,6 +2,9 @@
 
 ## The gate
 
+`npm run verify` runs every TypeScript-side gate below in order; `npm run verify:rust`
+runs the Rust side, including the contract test against the compiled helper.
+
 Every change must pass, in this order:
 
 ```sh

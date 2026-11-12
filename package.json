@@ -21,7 +21,9 @@
     "gaps": "node tools/gaps.mjs",
     "gaps:check": "node tools/gaps.mjs --check",
     "native:build": "cargo build -p droide-native",
-    "test:native": "node tools/run-native-tests.mjs"
+    "test:native": "node tools/run-native-tests.mjs",
+    "verify": "npm run typecheck && npm run format:check && npm run gaps:check && npm test && npm run test:parity",
+    "verify:rust": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && npm run test:native"
   },
   "dependencies": {
     "commander": "^14.0.3",
