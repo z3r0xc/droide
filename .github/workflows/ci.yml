@@ -38,6 +38,34 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
 
+  rust-windows:
+    # The same workspace on the platform most users run it on. `.cargo/config.toml`
+    # pins rust-lld so no mingw sysroot is needed.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: No reverse-engineering artefacts are tracked
+        run: |
+          if git ls-files | grep -E '^(raw|evidence|\.work)/' ; then
+            echo "::error::tracked reverse-engineering artefacts"
+            exit 1
+          fi
+
   parity:
     # The parity suite compares our CLI against goldens recorded from the
     # subject. Goldens are local artefacts (never committed), so this job only
