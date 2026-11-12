@@ -139,7 +139,9 @@ export function buildWhoamiHeaders(
  * different only in case is never duplicated. `Map` is used for the
  * case-folded key; insertion order follows the first group to mention it.
  */
-export function mergeHeaders(...groups: readonly HeaderGroup[]): Record<string, string> {
+export function mergeHeaders(
+  ...groups: readonly HeaderGroup[]
+): Record<string, string> {
   const merged = new Map<string, { name: string; value: string }>();
   for (const group of groups) {
     for (const [name, value] of Object.entries(group)) {
@@ -159,10 +161,15 @@ export function mergeHeaders(...groups: readonly HeaderGroup[]): Record<string, 
 }
 
 /** B12: remove caller-supplied attribution from a usage-route header record. */
-export function stripAttributionHeaders<T extends HeaderGroup>(headers: T): Record<string, string> {
+export function stripAttributionHeaders<T extends HeaderGroup>(
+  headers: T,
+): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
-    if (value === undefined || ATTRIBUTION_HEADER_NAMES[name.toLowerCase()] === true) {
+    if (
+      value === undefined ||
+      ATTRIBUTION_HEADER_NAMES[name.toLowerCase()] === true
+    ) {
       continue;
     }
     result[name] = value;

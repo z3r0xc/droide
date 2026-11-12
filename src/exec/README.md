@@ -1,7 +1,6 @@
 # `src/exec/` — non-interactive output protocols
 
 Contract: `specs/80-exec-and-streaming.md` (B18-B34, B54-B57).
-
 `records.ts` builds the seven stream-json records and the `-o json` summary and
 validates `--input-format stream-json` lines. `writer.ts` writes one JSON object
 per `\n`-terminated line to an injected `Writable`. `turn.ts` owns the

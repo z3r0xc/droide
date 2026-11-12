@@ -68,8 +68,11 @@ function payloadEvent(state: SseState): SseEvent | null {
     return null;
   }
   const data = state.dataLines.join("\n");
-  const name = state.eventLines.length === 0 ? null : state.eventLines.join("\n");
-  return data === SSE_DONE_PAYLOAD ? { kind: "done" } : { kind: "data", event: name, data };
+  const name =
+    state.eventLines.length === 0 ? null : state.eventLines.join("\n");
+  return data === SSE_DONE_PAYLOAD
+    ? { kind: "done" }
+    : { kind: "data", event: name, data };
 }
 
 /**
@@ -213,9 +216,14 @@ export async function* parseSse(
   }
 }
 
-function abortReason(signal: AbortSignal | undefined, operation: string): unknown {
+function abortReason(
+  signal: AbortSignal | undefined,
+  operation: string,
+): unknown {
   const reason = signal?.reason;
-  return reason instanceof Error ? reason : new SseProtocolError(operation, "truncated", "aborted");
+  return reason instanceof Error
+    ? reason
+    : new SseProtocolError(operation, "truncated", "aborted");
 }
 
 /** Convenience for tests and recorded fixtures; bytes are UTF-8. */
@@ -240,7 +248,11 @@ export function parseSseResponse(
 ): AsyncGenerator<SseEvent, void, void> {
   if (response.body === null) {
     const operation = options.operation ?? "stream";
-    throw new SseProtocolError(operation, "truncated", "the response has no body");
+    throw new SseProtocolError(
+      operation,
+      "truncated",
+      "the response has no body",
+    );
   }
   return parseSse(response.body, options);
 }

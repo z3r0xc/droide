@@ -9,7 +9,9 @@
  */
 
 /** A plain JSON object: not `null`, not an array, not a primitive. */
-export function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+export function isRecord(
+  value: unknown,
+): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

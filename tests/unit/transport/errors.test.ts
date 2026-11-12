@@ -100,14 +100,8 @@ test("the response error classes carry the spec's fixed copy", () => {
   assert.deepEqual(unauthorized.toDisplayObject(), {
     error: unauthorized.toPublicObject(),
   });
-  assert.equal(
-    new ResponseError400BadRequest("x", "op").statusCode,
-    400,
-  );
-  assert.equal(
-    new ResponseError403Forbidden("x", "op").statusCode,
-    403,
-  );
+  assert.equal(new ResponseError400BadRequest("x", "op").statusCode, 400);
+  assert.equal(new ResponseError403Forbidden("x", "op").statusCode, 403);
 });
 
 test("a public code and retry-after survive the public object", () => {
@@ -149,7 +143,8 @@ test("absent credentials use the fixed not-authenticated copy", () => {
     "Not authenticated. Please log in using /login or set a valid FACTORY_API_KEY environment variable.",
   );
   assert.equal(
-    new AuthenticationError("prem", AUTH_MESSAGES.customerLoginRequired).message,
+    new AuthenticationError("prem", AUTH_MESSAGES.customerLoginRequired)
+      .message,
     "Sign in to this customer deployment.",
   );
 });

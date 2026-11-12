@@ -58,7 +58,6 @@ test("test_mcp_server_schema_by_transport: http and sse require url and accept h
     assert.equal(parsed.ok, true);
     if (!parsed.ok) return;
     assert.equal(parsed.config.type, type);
-    if (parsed.config.type === "stdio") return;
     assert.equal(parsed.config.url, "https://example.com/mcp");
     assert.deepEqual(parsed.config.headers, {
       Authorization: "Bearer ${TOKEN}",

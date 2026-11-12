@@ -3,10 +3,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 
-import {
-  HttpClient,
-  type FetchLike,
-} from "../../../src/transport/client.ts";
+import { HttpClient, type FetchLike } from "../../../src/transport/client.ts";
 import {
   ResponseTooLargeError,
   TransportTimeoutError,

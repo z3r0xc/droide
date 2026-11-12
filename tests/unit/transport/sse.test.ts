@@ -43,9 +43,7 @@ test("two events split across one-byte chunks parse identically", async () => {
 test("a chunk boundary inside a UTF-8 sequence is not observable", async () => {
   const bytes = Buffer.from('data: "héllo ✓"\n\n', "utf8");
   const events = await collect(parseSse(streamOf(chunkBytes(bytes, 1))));
-  assert.deepEqual(events, [
-    { kind: "data", event: null, data: '"héllo ✓"' },
-  ]);
+  assert.deepEqual(events, [{ kind: "data", event: null, data: '"héllo ✓"' }]);
 });
 
 test("event names and comments are read but comments never become payloads", async () => {
@@ -59,6 +57,7 @@ test("event names and comments are read but comments never become payloads", asy
     ": another comment",
     "data: next",
     "",
+    "",
   ].join("\n");
   const events = await collect(parseSseText(text));
   assert.deepEqual(events, [
@@ -68,8 +67,12 @@ test("event names and comments are read but comments never become payloads", asy
 });
 
 test("multi-line data is joined with a newline and one leading space stripped", async () => {
-  const events = await collect(parseSseText("data: one\ndata:two\ndata:  three\n\n"));
-  assert.deepEqual(events, [{ kind: "data", event: null, data: "one\ntwo\n three" }]);
+  const events = await collect(
+    parseSseText("data: one\ndata:two\ndata:  three\n\n"),
+  );
+  assert.deepEqual(events, [
+    { kind: "data", event: null, data: "one\ntwo\n three" },
+  ]);
 });
 
 test("CRLF framing is tolerated", async () => {

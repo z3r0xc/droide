@@ -198,10 +198,7 @@ export function canonicalizeCustomerOrigin(value: string): URL {
   if (url.hostname === "") {
     throw new InvalidDeploymentOriginError("the customer origin has no host");
   }
-  if (
-    url.protocol === "http:" &&
-    LOCAL_HTTP_HOSTS[url.hostname] !== true
-  ) {
+  if (url.protocol === "http:" && LOCAL_HTTP_HOSTS[url.hostname] !== true) {
     throw new InvalidDeploymentOriginError(
       "http is allowed only for localhost, 127.0.0.1 or [::1]",
     );

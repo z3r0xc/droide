@@ -157,8 +157,9 @@ test("Anthropic tool-call turn: start, accumulated args and end", () => {
 });
 
 test("Anthropic: an unknown event type is ignored (B114)", () => {
+  const mapper = createStreamMapper("anthropic", { operation: "llm" });
   assert.deepEqual(
-    run("anthropic", [dataEvent({ type: "content_block_weird", index: 0 })]),
+    mapper.push(dataEvent({ type: "content_block_weird", index: 0 })),
     [],
   );
 });
@@ -213,7 +214,9 @@ test("Chat Completions tool calls: id grouping, index replacement, no concatenat
       choices: [
         {
           delta: {
-            tool_calls: [{ index: 0, id: "call_a", function: { arguments: '"x"}' } }],
+            tool_calls: [
+              { index: 0, id: "call_a", function: { arguments: '"x"}' } },
+            ],
           },
           finish_reason: null,
         },
@@ -266,8 +269,9 @@ test("Chat Completions tool calls: id grouping, index replacement, no concatenat
 });
 
 test("Chat Completions: a reasoning-only chunk without choices is tolerated", () => {
+  const mapper = createStreamMapper("chat", { operation: "llm" });
   assert.deepEqual(
-    run("chat", [dataEvent({ usage: { completion_tokens: 1 } })]),
+    mapper.push(dataEvent({ usage: { completion_tokens: 1 } })),
     [
       {
         kind: "usage",

@@ -280,9 +280,9 @@ test("joinApiPath keeps a base path prefix and refuses absolute paths", () => {
     "https://api.example/api/cli/whoami",
   );
   assert.throws(() => joinApiPath(base, "api/x"), InvalidBaseUrlError);
-  assert.throws(() => joinApiPath(base, "//evil.example/x"), InvalidBaseUrlError);
   assert.throws(
-    () => joinApiPath(base, "\\api\\x"),
+    () => joinApiPath(base, "//evil.example/x"),
     InvalidBaseUrlError,
   );
+  assert.throws(() => joinApiPath(base, "\\api\\x"), InvalidBaseUrlError);
 });

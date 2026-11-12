@@ -34,6 +34,7 @@ test("test_mcp_config_merge_precedence: the higher level wins the whole entry", 
   assert.equal(entry.level, "project-settings");
   assert.equal(entry.rawName, "shared");
   assert.equal(entry.config.type, "stdio");
+  if (entry.config.type !== "stdio") return;
   assert.equal(entry.config.command, "high");
   // Whole-entry override: the lower level's args and timeout are not merged.
   assert.deepEqual(entry.config.args, []);
@@ -56,7 +57,9 @@ test("test_mcp_config_merge_precedence: aliases canonicalize with the higher lev
   const entry = merged.servers.get("my-server");
   assert.equal(entry?.level, "project-settings");
   assert.equal(entry?.rawName, "my server");
-  assert.equal(entry?.config.command, "project");
+  assert.equal(entry?.config.type, "stdio");
+  if (entry?.config.type !== "stdio") return;
+  assert.equal(entry.config.command, "project");
 });
 
 test("test_mcp_config_merge_precedence: an alias pair inside one level keeps the later spelling", () => {
@@ -72,7 +75,9 @@ test("test_mcp_config_merge_precedence: an alias pair inside one level keeps the
 
   const entry = merged.servers.get("a-b");
   assert.equal(entry?.rawName, "a.b");
-  assert.equal(entry?.config.command, "second");
+  assert.equal(entry?.config.type, "stdio");
+  if (entry?.config.type !== "stdio") return;
+  assert.equal(entry.config.command, "second");
 });
 
 test("test_mcp_config_merge_precedence: an invalid higher entry does not fall back", () => {
@@ -137,10 +142,11 @@ test("test_mcp_config_discovery_and_tolerance: two files merge project over user
       "shared",
       "user-only",
     ]);
-    assert.equal(
-      configuration.servers.get("shared")?.config.command,
-      "project",
-    );
+    const shared = configuration.servers.get("shared");
+    assert.ok(shared);
+    assert.equal(shared.config.type, "stdio");
+    if (shared.config.type !== "stdio") return;
+    assert.equal(shared.config.command, "project");
     assert.equal(
       configuration.servers.get("user-only")?.level,
       "user-settings",

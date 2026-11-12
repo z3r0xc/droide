@@ -97,15 +97,18 @@ test("the default policy is exactly one request (B33)", async () => {
 
 test("one request, no retry: a 500 becomes FetchError with the status and body", async () => {
   const testHarness = harness([new Response("boom", { status: 500 })]);
-  await assert.rejects(testHarness.client.request(request()), (error: unknown) => {
-    assert.ok(error instanceof FetchError);
-    assert.equal(error.message, "500 boom");
-    assert.equal(error.statusCode, 500);
-    assert.equal(error.operation, "list-sessions");
-    assert.equal(error.factoryBackend, true);
-    assert.equal(error.requestUrl, "https://api.example/api/sessions/v2");
-    return true;
-  });
+  await assert.rejects(
+    testHarness.client.request(request()),
+    (error: unknown) => {
+      assert.ok(error instanceof FetchError);
+      assert.equal(error.message, "500 boom");
+      assert.equal(error.statusCode, 500);
+      assert.equal(error.operation, "list-sessions");
+      assert.equal(error.factoryBackend, true);
+      assert.equal(error.requestUrl, "https://api.example/api/sessions/v2");
+      return true;
+    },
+  );
   assert.equal(testHarness.calls.length, 1);
 });
 
@@ -113,7 +116,8 @@ test("an empty error body reads as `<status> Fetch failed`", async () => {
   const testHarness = harness([new Response("", { status: 503 })]);
   await assert.rejects(
     testHarness.client.request(request()),
-    (error: unknown) => error instanceof FetchError && error.message === "503 Fetch failed",
+    (error: unknown) =>
+      error instanceof FetchError && error.message === "503 Fetch failed",
   );
 });
 
@@ -191,7 +195,9 @@ test("retry-after-ms is read in milliseconds", async () => {
 });
 
 test("an HTTP-date Retry-After is read against the injected clock", () => {
-  const headers = new Headers({ "retry-after": "Wed, 21 Oct 2015 07:28:00 GMT" });
+  const headers = new Headers({
+    "retry-after": "Wed, 21 Oct 2015 07:28:00 GMT",
+  });
   const now = Date.parse("Wed, 21 Oct 2015 07:27:58 GMT");
   assert.equal(parseRetryAfter(headers, now), 2000);
   assert.equal(parseRetryAfter(new Headers(), now), null);
@@ -264,7 +270,9 @@ test("exponential backoff grows by the factor and is capped", () => {
 });
 
 test("a response over the byte cap is refused before it is fully read", async () => {
-  const testHarness = harness([new Response("0123456789abcdefghij", { status: 200 })]);
+  const testHarness = harness([
+    new Response("0123456789abcdefghij", { status: 200 }),
+  ]);
   await assert.rejects(
     testHarness.client.request(request({ maxResponseBytes: 10 })),
     (error: unknown) =>
@@ -273,7 +281,10 @@ test("a response over the byte cap is refused before it is fully read", async ()
 });
 
 test("requestJson validates the body and returns the parsed value", async () => {
-  const testHarness = harness([jsonResponse({ value: "yes" }), jsonResponse({ value: "yes" })]);
+  const testHarness = harness([
+    jsonResponse({ value: "yes" }),
+    jsonResponse({ value: "yes" }),
+  ]);
   const parsed = await testHarness.client.requestJson(request(), (value) => {
     if (!isRecord(value)) {
       throw new Error("not an object");
@@ -289,7 +300,8 @@ test("requestJson refuses invalid JSON and an empty body without quoting them", 
   await assert.rejects(
     invalid.client.requestJson(request(), () => null),
     (error: unknown) =>
-      error instanceof InvalidResponseError && error.detail === "not valid JSON",
+      error instanceof InvalidResponseError &&
+      error.detail === "not valid JSON",
   );
 
   const empty = harness([new Response("", { status: 200 })]);
@@ -362,7 +374,10 @@ test("a same-origin redirect is followed", async () => {
   assert.equal(response.status, 200);
   assert.equal(new URL(response.url).pathname, "/next");
   assert.equal(testHarness.calls.length, 2);
-  assert.equal(new URL(testHarness.calls[1]?.url ?? "").href, "https://api.example/next");
+  assert.equal(
+    new URL(testHarness.calls[1]?.url ?? "").href,
+    "https://api.example/next",
+  );
 });
 
 test("a redirect to another origin is refused before the second request", async () => {
@@ -422,7 +437,10 @@ test("error paths carry redacted request headers and never the token", async () 
       assert.ok(error instanceof FetchError);
       assert.equal(error.requestHeaders.Authorization, REDACTED);
       assert.equal(error.requestHeaders["X-Factory-Org-Id"], "org");
-      assert.equal(JSON.stringify(error.requestHeaders).includes("super-secret"), false);
+      assert.equal(
+        JSON.stringify(error.requestHeaders).includes("super-secret"),
+        false,
+      );
       assert.equal(error.message.includes("super-secret"), false);
       return true;
     },
@@ -436,7 +454,10 @@ test("error paths carry redacted request headers and never the token", async () 
 });
 
 test("request headers are sent verbatim, bodies only when provided", async () => {
-  const testHarness = harness([jsonResponse({ ok: true }), jsonResponse({ ok: true })]);
+  const testHarness = harness([
+    jsonResponse({ ok: true }),
+    jsonResponse({ ok: true }),
+  ]);
   await testHarness.client.request(
     request({ method: "GET", headers: { "X-Factory-Client": "cli" } }),
   );

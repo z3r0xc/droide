@@ -195,7 +195,7 @@ async function scanLineWindow(
       if (line === startLine) startByte = lineStartByte;
       line += 1;
       lineStartByte = breakEnd;
-      if (line >= endLine && startByte !== -1) {
+      if (endLine >= 0 && line >= endLine && startByte !== -1) {
         endByte = breakEnd;
         if (endByte - startByte > maxWindowBytes) return true;
       }
@@ -236,7 +236,7 @@ async function scanLineWindow(
       position += bytesRead;
     }
     if (pendingCR) onBreak(size);
-    if (startByte === -1) startByte = Math.min(lineStartByte, size);
+    if (startByte === -1) startByte = endLine === -1 ? 0 : size;
     if (endByte === -1) endByte = size;
     return { startByte, endByte, totalLines: line + 1 };
   } finally {
@@ -309,16 +309,18 @@ export async function readText(
       );
     }
     const zeroBasedOffset = offset > 0 ? offset - 1 : offset;
-    const scanStart =
-      zeroBasedOffset < 0 ? 0 : zeroBasedOffset;
-    const scanEnd = Number.isFinite(limit)
-      ? scanStart + limit
-      : Number.POSITIVE_INFINITY;
+    // A negative offset needs the file's line count first; the counting pass
+    // records no window, so it never loads the file.
+    const counted = await scanLineWindow(filePath, stats.size, 0, -1, 0);
+    const startLine =
+      zeroBasedOffset < 0
+        ? Math.max(0, counted.totalLines + zeroBasedOffset)
+        : Math.max(0, zeroBasedOffset);
     const window = await scanLineWindow(
       filePath,
       stats.size,
-      scanStart,
-      scanEnd,
+      startLine,
+      Number.isFinite(limit) ? startLine + limit : -1,
       DIRECT_READ_WINDOW_MAX_BYTES,
     );
     if (window.endByte - window.startByte > DIRECT_READ_WINDOW_MAX_BYTES) {
@@ -329,10 +331,6 @@ export async function readText(
           "very long lines with Execute (for example head -c or cut -c)",
       );
     }
-    const startLine =
-      zeroBasedOffset < 0
-        ? Math.max(0, window.totalLines + zeroBasedOffset)
-        : Math.max(0, zeroBasedOffset);
     const handle = await fs.promises.open(filePath, "r");
     try {
       const buffer = Buffer.alloc(window.endByte - window.startByte);
@@ -356,8 +354,8 @@ export async function readText(
       startLine,
       limit,
       includeLineNumbers,
-      window.totalLines,
-      window.startLineForContent(startLine),
+      counted.totalLines,
+      startLine,
       programmatic,
     );
     context.reads?.record(filePath, {
@@ -390,14 +388,6 @@ export async function readText(
   );
   return finish(rendered, filePath, budget);
 }
-
-/** The selected window's first line, used as the slice offset for a scan. */
-interface WindowStart {
-  startLineForContent(startLine: number): number;
-}
-// The scanned window begins at the first requested line, so the renderer's
-// content offset is that line (0-based inside the window).
-declare module "./read.ts" {}
 
 function finish(
   rendered: RenderedLines,

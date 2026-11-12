@@ -5,11 +5,11 @@ Reads and resolves the extension configuration a session sees. Contract:
 runs a plugin or spawns a process: paths, file readers and clocks are injected,
 and every name is derived deterministically.
 
-| Mechanism | Config and assets | Merge direction |
-|---|---|---|
-| MCP | `<factoryDir>/mcp.json`, `<projectRoot>/.factory/mcp.json` (`mcpServers.<name>`) | Levels lowest-first; the first in `MCP_SETTINGS_LEVELS_HIGHEST_FIRST` wins. Whole entry per raw name (no field merge), then re-keyed by canonical name; the higher alias wins. |
-| Plugins | `.factory-plugin/plugin.json`, falling back to `.claude-plugin/plugin.json` | Manifest is optional JSONC; only `hooks` is read. Enablement (`general.enabledPlugins`) belongs to settings resolution. |
-| Skills | `<settingsFolder>/skills/<name>/SKILL.md`, `.agent/skills`, `.agents/skills`, `<mission>/skills` | Eleven buckets highest-first; the first bucket to claim a sanitized name wins; within a bucket the first input wins. The `disabledSkills` ledger is a union: it can only disable. |
+| Mechanism | Config and assets                                                                                | Merge direction                                                                                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MCP       | `<factoryDir>/mcp.json`, `<projectRoot>/.factory/mcp.json` (`mcpServers.<name>`)                 | Levels lowest-first; the first in `MCP_SETTINGS_LEVELS_HIGHEST_FIRST` wins. Whole entry per raw name (no field merge), then re-keyed by canonical name; the higher alias wins.    |
+| Plugins   | `.factory-plugin/plugin.json`, falling back to `.claude-plugin/plugin.json`                      | Manifest is optional JSONC; only `hooks` is read. Enablement (`general.enabledPlugins`) belongs to settings resolution.                                                           |
+| Skills    | `<settingsFolder>/skills/<name>/SKILL.md`, `.agent/skills`, `.agents/skills`, `<mission>/skills` | Eleven buckets highest-first; the first bucket to claim a sanitized name wins; within a bucket the first input wins. The `disabledSkills` ledger is a union: it can only disable. |
 
 ## Modules
 

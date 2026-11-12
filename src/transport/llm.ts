@@ -179,11 +179,7 @@ function snapshotUsage(usage: MutableUsage): LlmUsage {
 
 /** B125's stop-reason vocabulary, reused for every dialect. */
 export type LlmStopReason =
-  | "stop"
-  | "tool-use"
-  | "length"
-  | "content-filter"
-  | "unknown";
+  "stop" | "tool-use" | "length" | "content-filter" | "unknown";
 
 export type LlmStreamDelta =
   | { readonly kind: "text"; readonly text: string }
@@ -252,10 +248,16 @@ export function parseStreamPayload(
   try {
     parsed = JSON.parse(event.data);
   } catch {
-    throw new LlmStreamError(operation, "the stream payload was not valid JSON");
+    throw new LlmStreamError(
+      operation,
+      "the stream payload was not valid JSON",
+    );
   }
   if (!isRecord(parsed)) {
-    throw new LlmStreamError(operation, "the stream payload was not a JSON object");
+    throw new LlmStreamError(
+      operation,
+      "the stream payload was not a JSON object",
+    );
   }
   return parsed;
 }
@@ -372,9 +374,16 @@ function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
               ended: false,
             };
             blocks.set(index, call);
-            deltas.push({ kind: "tool-call-start", index, id, name: call.name });
+            deltas.push({
+              kind: "tool-call-start",
+              index,
+              id,
+              name: call.name,
+            });
           } else {
-            blocks.set(index, { type: blockType === "thinking" ? "thinking" : "text" });
+            blocks.set(index, {
+              type: blockType === "thinking" ? "thinking" : "text",
+            });
           }
           return deltas;
         }
@@ -431,7 +440,8 @@ function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
         }
         case "message_delta": {
           const delta = readRecord(payload, "delta");
-          const reason = delta === null ? null : readString(delta, "stop_reason");
+          const reason =
+            delta === null ? null : readString(delta, "stop_reason");
           // B125's mapping applied to Anthropic's stop reasons.
           // TODO(spec B114): the spec states the handled event order only.
           stopReason =
@@ -527,7 +537,8 @@ function applyOpenAiUsage(
   const inclusiveInput =
     readNumber(source, "input_tokens") ?? readNumber(source, "prompt_tokens");
   const output =
-    readNumber(source, "output_tokens") ?? readNumber(source, "completion_tokens");
+    readNumber(source, "output_tokens") ??
+    readNumber(source, "completion_tokens");
   const thinking =
     details === null
       ? readNumber(source, "reasoning_tokens")
@@ -621,7 +632,12 @@ function createChatMapper(options: LlmStreamOptions): LlmStreamMapper {
     };
     callsByIndex.set(index, call);
     callsById.set(callId, call);
-    deltas.push({ kind: "tool-call-start", index, id: callId, name: call.name });
+    deltas.push({
+      kind: "tool-call-start",
+      index,
+      id: callId,
+      name: call.name,
+    });
     return call;
   };
 
@@ -917,7 +933,8 @@ function createResponsesMapper(options: LlmStreamOptions): LlmStreamMapper {
         case "response.completed":
         case "response.incomplete": {
           const response = readRecord(payload, "response");
-          const usageRecord = response === null ? null : readRecord(response, "usage");
+          const usageRecord =
+            response === null ? null : readRecord(response, "usage");
           if (usageRecord !== null) {
             applyOpenAiUsage(usage, usageRecord, null);
           }

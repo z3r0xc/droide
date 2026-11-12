@@ -13,6 +13,10 @@
  * {@link InvalidSettingsError} naming the dotted key path, and a key outside
  * the vocabulary is an {@link UnknownSettingError}. Both errors carry the file
  * that produced them.
+ *
+ * The vocabulary is closed on purpose: this build refuses a key it cannot
+ * honour instead of silently applying a subset of the file. Adding a setting
+ * is therefore a spec change, never a parser relaxation.
  */
 import { InvalidSettingsError, UnknownSettingError } from "./errors.ts";
 

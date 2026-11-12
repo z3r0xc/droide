@@ -203,12 +203,14 @@ const TLS_TRUST_CODES: Readonly<Record<string, true>> = {
 function errorCode(error: unknown): string | null {
   let current: unknown = error;
   for (let depth = 0; depth < 4; depth += 1) {
-    if (typeof current !== "object" || current === null || !("code" in current)) {
+    if (typeof current !== "object" || current === null) {
       return null;
     }
-    const code: unknown = current.code;
-    if (typeof code === "string") {
-      return code;
+    if ("code" in current) {
+      const code: unknown = current.code;
+      if (typeof code === "string") {
+        return code;
+      }
     }
     if (!("cause" in current)) {
       return null;
@@ -300,11 +302,14 @@ export class HttpClient {
 
   async request(request: HttpRequest): Promise<HttpResponse> {
     if (!(request.timeoutMs > 0)) {
-      throw new RangeError("timeoutMs must be a positive number of milliseconds");
+      throw new RangeError(
+        "timeoutMs must be a positive number of milliseconds",
+      );
     }
     const policy = request.retry ?? NO_RETRY;
     const idempotent =
-      request.idempotent ?? (request.method === "GET" || request.method === "HEAD");
+      request.idempotent ??
+      (request.method === "GET" || request.method === "HEAD");
     const requestHeaders = redactHeaders(request.headers ?? {});
     const maxResponseBytes = request.maxResponseBytes ?? MAX_RESPONSE_BYTES;
     const random = this.#options.random ?? (() => 0);
@@ -312,7 +317,16 @@ export class HttpClient {
     let attempt = 0;
     while (attempt < policy.maxAttempts) {
       attempt += 1;
-      const result = await this.#attempt(request, requestHeaders, maxResponseBytes);
+      const result = await this.#attempt(
+        {
+          ...request,
+          redirects:
+            request.redirects ??
+            (request.customerDeployment === true ? "refuse" : "same-origin"),
+        },
+        requestHeaders,
+        maxResponseBytes,
+      );
 
       if (result.status >= 200 && result.status < 300) {
         return {
@@ -330,7 +344,10 @@ export class HttpClient {
         isRetryableStatus(result.status) &&
         attempt < policy.maxAttempts
       ) {
-        const serverDelay = parseRetryAfter(result.headers, this.#options.clock.now());
+        const serverDelay = parseRetryAfter(
+          result.headers,
+          this.#options.clock.now(),
+        );
         const computed = retryDelayMs(policy, attempt, random);
         await this.#options.sleep(Math.max(computed, serverDelay ?? 0));
         continue;

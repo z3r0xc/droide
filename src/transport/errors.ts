@@ -238,10 +238,7 @@ export class FetchError extends Error {
         : body.length === 0
           ? `${statusCode} Fetch failed`
           : `${statusCode} ${boundedBody(body)}`;
-    super(
-      message,
-      causeOption(init.cause),
-    );
+    super(message, causeOption(init.cause));
     this.name = "FetchError";
     this.statusCode = statusCode;
     this.operation = operation;
@@ -350,7 +347,8 @@ export const AUTH_MESSAGES = {
     "FACTORY_API_KEY validation failed. Try again or contact support if the problem continues.",
   apiKeyRejected: "Factory API key was rejected.",
   customerLoginRequired: "Sign in to this customer deployment.",
-  customerOrganizationRequired: "Choose an organization for this customer deployment.",
+  customerOrganizationRequired:
+    "Choose an organization for this customer deployment.",
   notAuthenticatedTitle: "Not authenticated.",
 } as const;
 
@@ -400,9 +398,7 @@ export class DeploymentUnavailableError extends TransportError {
 
 /** B96's three outcomes, spelled as the spec spells them. */
 export type ApiKeyValidationReason =
-  | "apiKeyRejected"
-  | "FactoryApiUnavailable"
-  | "FactoryApiValidationFailed";
+  "apiKeyRejected" | "FactoryApiUnavailable" | "FactoryApiValidationFailed";
 
 export interface ApiKeyValidationFailure {
   readonly reason: ApiKeyValidationReason;
@@ -428,7 +424,10 @@ function statusOf(error: unknown): number | null {
 export function classifyApiKeyValidationFailure(
   error: unknown,
 ): ApiKeyValidationFailure {
-  if (error instanceof TransportNetworkError || error instanceof TlsTrustError) {
+  if (
+    error instanceof TransportNetworkError ||
+    error instanceof TlsTrustError
+  ) {
     return {
       reason: "FactoryApiUnavailable",
       message: AUTH_MESSAGES.apiUnavailable,
@@ -503,26 +502,31 @@ export type LlmFailureReason =
  * TODO(spec B102): replace with the exact fixed copy from
  * `orig/packages/droid-core/src/llms/errors/constants.ts:1-44`.
  */
-export const LLM_FAILURE_MESSAGES: Readonly<Record<LlmFailureReason, string>> = {
-  "quota-exhausted": "The model provider quota for this account is exhausted.",
-  "payment-required": "No active subscription found.",
-  "content-moderation": "The model provider rejected the request under its content policy.",
-  "context-limit": "The conversation exceeds the model's context window.",
-  "request-too-large": "The request is too large for the model provider.",
-  "text-fields-too-large":
-    "One or more text fields in the request are larger than the model provider accepts.",
-  "invalid-request": "The model provider rejected the request as invalid.",
-  authentication: "The model provider rejected the credentials.",
-  forbidden: "The model provider refused the request.",
-  gone: "The requested model is no longer available from the provider.",
-  throttling: "The model provider is throttling requests for this account.",
-  overloaded: "The model provider is currently overloaded.",
-  network: "The model provider could not be reached because of network issues.",
-  "host-duration-limit": "The model provider stopped the request at its host duration limit.",
-  "output-degeneration": "The model response degenerated and was stopped.",
-  "internal-error": "The model provider reported an internal error.",
-  unknown: "The model call failed for an unknown reason.",
-};
+export const LLM_FAILURE_MESSAGES: Readonly<Record<LlmFailureReason, string>> =
+  {
+    "quota-exhausted":
+      "The model provider quota for this account is exhausted.",
+    "payment-required": "No active subscription found.",
+    "content-moderation":
+      "The model provider rejected the request under its content policy.",
+    "context-limit": "The conversation exceeds the model's context window.",
+    "request-too-large": "The request is too large for the model provider.",
+    "text-fields-too-large":
+      "One or more text fields in the request are larger than the model provider accepts.",
+    "invalid-request": "The model provider rejected the request as invalid.",
+    authentication: "The model provider rejected the credentials.",
+    forbidden: "The model provider refused the request.",
+    gone: "The requested model is no longer available from the provider.",
+    throttling: "The model provider is throttling requests for this account.",
+    overloaded: "The model provider is currently overloaded.",
+    network:
+      "The model provider could not be reached because of network issues.",
+    "host-duration-limit":
+      "The model provider stopped the request at its host duration limit.",
+    "output-degeneration": "The model response degenerated and was stopped.",
+    "internal-error": "The model provider reported an internal error.",
+    unknown: "The model call failed for an unknown reason.",
+  };
 
 /** B103: retryability is part of the class, not a caller decision. */
 const RETRYABLE_REASONS: Readonly<Partial<Record<LlmFailureReason, true>>> = {
@@ -611,14 +615,8 @@ export const LlmAuthenticationError = llmClass(
 );
 export const LlmForbiddenError = llmClass("LlmForbiddenError", "forbidden");
 export const LlmGoneError = llmClass("LlmGoneError", "gone");
-export const LlmThrottlingError = llmClass(
-  "LlmThrottlingError",
-  "throttling",
-);
-export const LlmOverloadedError = llmClass(
-  "LlmOverloadedError",
-  "overloaded",
-);
+export const LlmThrottlingError = llmClass("LlmThrottlingError", "throttling");
+export const LlmOverloadedError = llmClass("LlmOverloadedError", "overloaded");
 export const LlmNetworkError = llmClass("LlmNetworkError", "network");
 export const LlmHostDurationLimitError = llmClass(
   "LlmHostDurationLimitError",
@@ -628,10 +626,7 @@ export const LlmOutputDegenerationError = llmClass(
   "LlmOutputDegenerationError",
   "output-degeneration",
 );
-export const LlmInternalError = llmClass(
-  "LlmInternalError",
-  "internal-error",
-);
+export const LlmInternalError = llmClass("LlmInternalError", "internal-error");
 export const LlmUnknownError = llmClass("LlmUnknownError", "unknown");
 
 /** A stream frame violated the SSE contract or the dialect's event shape. */
@@ -728,7 +723,13 @@ export function classifyModelFailure(input: ModelFailureInput): LlmError {
   if (status === 429) {
     return new LlmThrottlingError(input.operation, options);
   }
-  if (status === 408 || status === 500 || status === 502 || status === 503 || status === 529) {
+  if (
+    status === 408 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 529
+  ) {
     return new LlmOverloadedError(input.operation, options);
   }
   if (status !== null && status >= 500) {
