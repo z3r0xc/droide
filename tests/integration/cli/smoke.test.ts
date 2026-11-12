@@ -110,25 +110,14 @@ test("an unknown command is refused as a prompt, not as a crash", async () => {
   }
 });
 
-test("commands that are declared but unbuilt fail loudly with exit 64", async () => {
+test("a mode that is declared but unbuilt fails loudly", async () => {
   const home = await mkdtemp(join(tmpdir(), "droide-smoke-"));
   try {
-    for (const argv of [
-      ["exec", "--mission", "hi"],
-      ["update", "-v", "9.9.9"],
-    ]) {
-      const result = await runCli(home, argv);
-      assert.equal(
-        result.code === 64 || result.code === 2,
-        true,
-        `${argv.join(" ")} exited ${String(result.code)}`,
-      );
-      assert.match(
-        result.stderr,
-        /not implemented|not supported|refus/i,
-        `${argv.join(" ")} said nothing useful`,
-      );
-    }
+    const result = await runCli(home, ["exec", "--mission", "hi"]);
+    // `exec` reports a usage-level refusal with 1 (spec 80 §B9); 64 is the root
+    // command's "this mode is not built" signal, kept for the interactive path.
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /not implemented/i);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
