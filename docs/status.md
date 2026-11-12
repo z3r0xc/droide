@@ -35,7 +35,8 @@ cargo test --workspace                   # native layer (CI only here)
 | `update --check` | **done** — read-only check against this repository's GitHub releases (ADR 0007); installing is refused with exit 2 |
 | `exec` | **done** for `text`/`json`/`stream-json` with custom and managed models; streaming input, mission, ACP and `--list-tools` are refused loudly |
 | `daemon` | **local transport/protocol/lifecycle done** (132 tests); Remote Control, relay and the port proxy are `TODO(spec B28/B29/B32/B33)` |
-| `mcp auth`, `resume`, `plugin install/uninstall/update/marketplace`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
+| `resume` | **done** — lists recent sessions, accepts a UUID or session link, continues through the same path as `exec -s`, forks with `--fork`, and refuses unknown/archived/invalid ids; the interactive picker is `TODO(spec 10 B22)` |
+| `mcp auth`, `plugin install/uninstall/update/marketplace`, `computer` | help and option parsing only; actions fail loudly (no silent success) |
 | bare `droide` | **launches the interactive shell on a TTY pair**; a prompt argument still exits 64 until the shell accepts one |
 
 ## Specs

@@ -177,6 +177,9 @@ export function makeRootCommand(
     .version(VERSION, "-v, --version", "output the version number")
     .allowUnknownOption(true)
     .allowExcessArguments(true)
+    // B11: root options are read only before the first operand; from the
+    // command word onward the tokens belong to the dispatched command.
+    .enablePositionalOptions()
     .option(
       "--settings <path>",
       "Path to runtime settings file merged for this process only",
