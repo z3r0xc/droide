@@ -197,6 +197,12 @@ fail validation for a malformed value; a missing `riskLevel` is denied separatel
 with its own guidance (`@packages/core/src/tools/definitions/cli/schema.ts:1075-1090`,
 `@src/agent/tools.ts:1629-1672`).
 
+The denial this build prints for a missing `riskLevel` is fixed:
+`Execute call rejected: missing required parameter "riskLevel". Declare the
+command's impact as low, medium or high.` (`src/tools/shell/exec.ts`; regression:
+`tests/unit/tools/exec.test.ts`). A malformed value of any of the three lenient
+fields is accepted and ignored, never a refusal. `[observed]`
+
 **B10 — Schema compile failure is not a refusal.** If a schema cannot compile, the
 call proceeds and a once-per-tool warning is logged
 (`@packages/core/src/tools/utils/validate-tool-parameters.ts:214-224`).
@@ -363,6 +369,15 @@ mission worker/validator, and shared-space files the sync service protects. The
 check runs both on the path as given and on the resolved write target; an
 unresolvable symlink chain is itself a refusal (`@src/tools/executors/client/utils/protectedWritePath.ts:182-268`).
 
+This build has no artifacts directory, mission system, automation runs or shared
+space, so those guards have nothing to protect and are not implemented. What it
+does guard, under the same rule — name relative to the state directory, checked
+on the path as given and on the resolved target, with a credential file also
+refused for reading — is: the trusted configuration files
+(`settings.json`, `settings.local.json`, `mcp.json`, `host.json`), the credential
+prefixes, and the whole state directory for writes from a tool
+(`src/tools/fs/paths.ts`, `TRUSTED_CONFIG_FILES`, `CREDENTIAL_FILES`). `[observed]`
+
 **B25 — Writes are atomic and bound to what was seen.** A write is temp-file +
 rename, preserving symlinks and permissions, refused if the file appeared,
 disappeared, or changed since the preview/approval (`@src/agent/file-edit/utils.ts:1069-1180`).
@@ -390,6 +405,12 @@ Windows: PowerShell (Windows PowerShell preferred), always
 callers, `shell:false`, stdin ignored, `windowsHide:true`. No `cmd.exe` fallback.
 A shell-less fallback (`shell:true`) exists only for the no-shell path
 (`@src/tools/executors/client/shell/shell-executor.ts:226-386`).
+
+A foreground run keeps `detached:false` on POSIX, as above. The background path
+is the one exception: it spawns with `detached:true` so the child leads its own
+process group, which is what the B31 watchdog signals; its stdin is ignored and
+its output is the log file. Windows never detaches — the wrapper is a normal
+child that reports the inner PID (`src/tools/shell/exec.ts`). `[observed]`
 
 **B29 — Shell environment.** The child inherits `process.env` plus
 `PYTHONUNBUFFERED=1`, non-interactive git/ssh variables
