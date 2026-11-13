@@ -134,6 +134,7 @@ export function formatGlobResult(result: string[] | string): string {
 export const globTool: ToolDefinition = defineTool<GlobInput, ToolContext>({
   id: "glob-search-cli",
   llmId: "Glob",
+  category: "Search",
   displayName: "Glob",
   description: "Find files whose paths match a glob pattern.",
   inputSchema: globInputSchema,

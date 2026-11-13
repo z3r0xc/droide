@@ -56,8 +56,8 @@ export interface ToolDefinition {
   /** Shown in UI tool selection (B4). */
   readonly visibleToUser?: boolean;
   /**
-   * Grouping for `--list-tools` (spec 80 §B53). The category names are not
-   * pinned yet, so every built-in reports `Other` until one is.
+   * Grouping for `--list-tools` (spec 80 §B53): `Files`, `Search`, `Shell` or
+   * `Tasks`; absent means `Other`.
    */
   readonly category?: string;
   /** Runs with input already validated by {@link ToolRegistry.dispatch}. */

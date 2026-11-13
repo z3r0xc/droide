@@ -426,6 +426,7 @@ function finish(
 export const readTool: ToolDefinition = defineTool<ReadInput, ToolContext>({
   id: "read-cli",
   llmId: "Read",
+  category: "Files",
   displayName: "Read",
   description: "Read a text file from the filesystem.",
   inputSchema: readInputSchema satisfies Schema,

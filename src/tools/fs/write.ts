@@ -180,6 +180,7 @@ function isExistingDirectory(resolved: string): boolean {
 export const createTool: ToolDefinition = defineTool<CreateInput, ToolContext>({
   id: "create-cli",
   llmId: "Create",
+  category: "Files",
   displayName: "Create",
   description: "Create or overwrite a file with the given content.",
   inputSchema: createInputSchema,

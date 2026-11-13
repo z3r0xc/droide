@@ -188,6 +188,7 @@ export async function editFile(
 export const editTool: ToolDefinition = defineTool<EditInput, ToolContext>({
   id: "edit-cli",
   llmId: "Edit",
+  category: "Files",
   displayName: "Edit",
   description: "Replace exact text in an existing file.",
   inputSchema: editInputSchema,

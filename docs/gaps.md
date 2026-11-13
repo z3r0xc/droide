@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **44** markers across **38** clauses.
+Total: **41** markers across **36** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -13,15 +13,13 @@ Total: **44** markers across **38** clauses.
 | `src/acp/protocol.ts:32` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
 | `src/acp/server.ts:582` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
 | `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
-| `src/cli/commands/resume.ts:67` | `10 B22` | the interactive shell cannot adopt a stored transcript yet, so the resumed session is named here but the shell still opens empty. |
 | `src/cli/mcp-mutations.ts:321` | `B7` | org MCP policy is remote-only and this build does not resolve it into AppContext, so a server the policy would block is not refused here. |
-| `src/cli/resume-commands.ts:419` | `10 B22` | the interactive session picker is not implemented, so a terminal gets the same bounded list as a pipe instead of a choice; --last is the one way to select without a picker. |
 | `src/daemon/client.ts:65` | `B19` | the spec pins the four budgets but not the method names that carry them; these daemon.* spellings are this build's map, and callers may replace it through methodTimeouts. |
 | `src/daemon/command.ts:170` | `B1` | --droide-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
 | `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
 | `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient DROIDE_API_KEY and reports a local identity. |
 | `src/daemon/server.ts:233` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
-| `src/daemon/web-socket.ts:574` | `B33` | the token-gated /port-proxy/<port> surface (query token, cookie exchange, traversal refusal) is not implemented, so those requests answer 404 instead of proxying or refusing with 401. |
+| `src/daemon/web-socket.ts:580` | `B33` | the token-gated /port-proxy/<port> surface (query token, cookie exchange, traversal refusal) is not implemented, so those requests answer 404 instead of proxying or refusing with 401. |
 | `src/exec/acp-runner.ts:310` | `B66` | the shared TurnOutcome has no distinct permission-rejection reason, so a call the user denied reaches this point as failed and answers with an internal error instead of end_turn. |
 | `src/exec/acp-runner.ts:373` | `B69` | the exec tool runner's confirm seam receives no tool-use id, so the permission card names the tool rather than the call ACP wants it to refer to; carrying the id is a change to src/tools/permissions.ts, outside this slice. |
 | `src/exec/acp-runner.ts:48` | `B65` | images are parsed, validated and carried here, but the shared TurnRequest has no image channel, so a plain exec runner drops them. Attaching them needs the agent loop's media port, which this slice does not own. |
@@ -34,8 +32,7 @@ Total: **44** markers across **38** clauses.
 | `src/extensions/mcp/oauth/flow.ts:458` | `B26` | B26 pins the published client metadata (B27) and the redirect coverage, but not the registration body's client_name, grant types or auth method for a dynamic client. This build registers a public client with the loopback redirect set. |
 | `src/extensions/mcp/oauth/flow.ts:618` | `B26` | B26 lists tokenEndpointAuthMethod without pinning the accepted values; only public auth and client_secret_basic are implemented (client_secret_post needs a form body this token client does not send). |
 | `src/extensions/mcp/transport.ts:871` | `B3` | an sse server's server-initiated event stream (a GET that stays open) is not opened, so it never delivers tools/list_changed; the POST response path is supported. |
-| `src/extensions/plugins/install.ts:335` | `B42` | the Claude Code layout translation (.claude-plugin to .droide-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
-| `src/extensions/plugins/install.ts:647` | `B37` | the flow stops at the registry write. The clause also says the install writes the enablement map, but this build has no settings writer (src/config reads settings.json and never rewrites it), so general.enabledPlugins is left alone and the plugin resolves as enabled by absence. A settings-write surface has to exist before this can land. |
+| `src/extensions/plugins/install.ts:342` | `B42` | the Claude Code layout translation (.claude-plugin to .droide-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
 | `src/extensions/plugins/installed.ts:240` | `B36` | strictEnabledPlugins is parsed but not enforced, so an entry below the policy level still resolves as enabled here. |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |

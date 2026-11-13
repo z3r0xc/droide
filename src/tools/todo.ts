@@ -168,6 +168,7 @@ export function createTodoTool(
   return defineTool<TodoInput, ToolContext>({
     id: "todo_write",
     llmId: "TodoWrite",
+    category: "Tasks",
     displayName: "TodoWrite",
     description: "Replace the session's todo list.",
     inputSchema: todoInputSchema,

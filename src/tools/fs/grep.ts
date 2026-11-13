@@ -415,6 +415,7 @@ export async function grepFiles(
 export const grepTool: ToolDefinition = defineTool<GrepInput, ToolContext>({
   id: "grep_tool_cli",
   llmId: "Grep",
+  category: "Search",
   displayName: "Grep",
   description: "Search file contents with a regular expression.",
   inputSchema: grepInputSchema,
