@@ -17,7 +17,7 @@ export const DISPLAY = "Droide";
  * feed. `tests/unit/cli/product-version.test.ts` keeps it equal to
  * `package.json`, so a bump cannot silently leave `update --check` lying.
  */
-export const PRODUCT_VERSION = "0.8.1";
+export const PRODUCT_VERSION = "0.9.0";
 
 /** One-line positioning, used in the root help and the shell header. */
 export const TAGLINE = "a terminal coding agent for your repository";

@@ -4,6 +4,34 @@ The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, which a
 unit test keeps equal to the package version; a release bumps both. The recorded
 CLI cases check the version line by shape, not by number. See `docs/release.md`.
 
+## 0.9.0 — 2026-11-13
+
+### Added
+
+- **`Execute` can ask for a terminal.** `pty: true` on a foreground call opens a
+  native PTY session — the login-shell environment minus the spec 90 B15
+  blocklist, `TERM=xterm-256color`, the same timeout and permission rules — so a
+  pager, an editor or an interactive prompt works. The result carries
+  `transport: "pty" | "pipe"` and, when it fell back, `ptyFallbackReason` naming
+  the cause (helper absent, with the path it looked for; a refusal; a background
+  call). A session can never outlive the call: the same exit hook that stops a
+  background group terminates the helper. Spec 30 B26/B27, 90 B13–B22.
+- **The daemon verifies a credential when it can.** With `DROIDE_API_BASE_URL`
+  set, authentication calls `GET /api/cli/whoami` and answers that account with
+  `verified: true`; without a base it answers the placeholder identity with
+  `verified: false`; a base that is configured but unusable refuses startup
+  instead of falling back quietly. `error.data.reason` separates
+  `invalid_credential` (re-authenticate) from `verification_unavailable`
+  (retryable), and the credential never reaches a message or a log. Spec 70
+  B15–B17, B31.
+- **MCP tools are listed under `MCP`**, not `Other`, so `--list-tools` says
+  where a call will go. Spec 80 B53.
+
+### Changed
+
+- Clients must treat an identity as an account only with `verified: true`; the
+  flag absent parses as `false`.
+
 ## 0.8.1 — 2026-11-13
 
 ### Fixed
