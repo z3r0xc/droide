@@ -24,7 +24,7 @@ Total: **38** markers across **33** clauses.
 | `src/exec/acp-runner.ts:48` | `B65` | images are parsed, validated and carried here, but the shared TurnRequest has no image channel, so a plain exec runner drops them. Attaching them needs the agent loop's media port, which this slice does not own. |
 | `src/exec/list-tools.ts:16` | `B53` | the source of defaultAllowed is not pinned by the clause; this build derives it from catalogue membership at autonomy off. |
 | `src/extensions/mcp/client.ts:420` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
-| `src/extensions/mcp/client.ts:431` | `B22` | image blocks are reported by type and size instead of being compressed, and an unsupported image MIME type keeps the same marker. |
+| `src/extensions/mcp/client.ts:431` | `B22` | image blocks are reported by type and size instead of being compressed; the two placeholders themselves are quoted by the clause. |
 | `src/extensions/mcp/client.ts:50` | `B11` | era negotiation is not attempted — no server/discover probe, no 2026-07-28 rescue after a -32022 refusal, no legacy verdict cache; the server's chosen revision is accepted as returned. |
 | `src/extensions/mcp/client.ts:709` | `B13` | the spec does not pin cursor following, so the page ceiling and the repeated-cursor refusal are this build's bounds. |
 | `src/extensions/mcp/oauth/flow.ts:419` | `B26` | B26 says the issuer comes from authorizationServerIssuer "or the server URL's well-known document" but does not pin which document, nor what happens when the server publishes none. This build falls back to the resource origin. |
