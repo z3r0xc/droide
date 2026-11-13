@@ -17,8 +17,8 @@ Total: **21** markers across **18** clauses.
 | `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
 | `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient DROIDE_API_KEY and reports a local identity. |
 | `src/daemon/server.ts:251` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
-| `src/exec/acp-runner.ts:309` | `B66` | the shared TurnOutcome has no distinct permission-rejection reason, so a call the user denied reaches this point as failed and answers with an internal error instead of end_turn. |
-| `src/exec/acp-runner.ts:372` | `B69` | the exec tool runner's confirm seam receives no tool-use id, so the permission card names the tool rather than the call ACP wants it to refer to; carrying the id is a change to src/tools/permissions.ts, outside this slice. |
+| `src/exec/acp-runner.ts:314` | `B66` | the shared TurnOutcome has no distinct permission-rejection reason, so a call the user denied reaches this point as failed and answers with an internal error instead of end_turn. |
+| `src/exec/acp-runner.ts:377` | `B69` | the exec tool runner's confirm seam receives no tool-use id, so the permission card names the tool rather than the call ACP wants it to refer to; carrying the id is a change to src/tools/permissions.ts, outside this slice. |
 | `src/extensions/mcp/client.ts:577` | `B22` | image blocks are reported by type and size instead of being compressed; the two placeholders themselves are quoted by the clause. |
 | `src/extensions/mcp/oauth/flow.ts:419` | `B26` | B26 says the issuer comes from authorizationServerIssuer "or the server URL's well-known document" but does not pin which document, nor what happens when the server publishes none. This build falls back to the resource origin. |
 | `src/extensions/mcp/oauth/flow.ts:458` | `B26` | B26 pins the published client metadata (B27) and the redirect coverage, but not the registration body's client_name, grant types or auth method for a dynamic client. This build registers a public client with the loopback redirect set. |
@@ -27,6 +27,6 @@ Total: **21** markers across **18** clauses.
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
 | `src/tools/fs/read.ts:278` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
 | `src/tools/shell/exec.ts:10` | `90 B15` | Execute keeps a pipe child. The pinned pseudo-terminal surface (B13-B22: login-shell environment, its blocklist and the PTY session lifecycle) belongs to the daemon terminal, which this build does not spawn, so there is no terminal to hand this command to. |
-| `src/tools/shell/exec.ts:506` | `B28` | the contract keeps detached:false on POSIX. |
-| `src/tools/shell/exec.ts:687` | `B9` | the exact wording is not quoted by the spec. |
+| `src/tools/shell/exec.ts:518` | `B28` | the contract keeps detached:false on POSIX. |
+| `src/tools/shell/exec.ts:699` | `B9` | the exact wording is not quoted by the spec. |
 | `src/transport/errors.ts:719` | `B101` | the body markers for quota-vs-payment (non-proxy), content moderation, context limit, request-too-large and thinking-signature/PDF invalidity are not quoted in the spec; only the proxy's two code values and the status bands are implemented. |
