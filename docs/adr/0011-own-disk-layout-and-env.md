@@ -29,7 +29,7 @@ two applications fighting over one state directory.
    - worktrees: `<state>/worktrees`, sessions `<state>/sessions`, index
      `<state>/sessions/index/index.db`, logs `<state>/logs`, plugins
      `<state>/plugins`, credentials `<state>/mcp-oauth.v2.sealed`,
-     installation root `<state>/install` — every path keeps its *shape*, only the
+     installation root `<state>/install` — every path keeps its _shape_, only the
      root name changes.
 2. **Environment variables are ours.** `DROIDE_API_KEY`,
    `DROIDE_HOME_OVERRIDE`, `DROIDE_RUNTIME_SETTINGS_PATH`, `DROIDE_ENV`,
@@ -47,10 +47,10 @@ two applications fighting over one state directory.
 
 ## Consequences
 
-- Existing installations of *this* build (0.4 and earlier) would lose their
+- Existing installations of _this_ build (0.4 and earlier) would lose their
   state; there are none in use, and the CHANGELOG says so.
 - The specifications that quoted the other product's paths and variables are
-  updated to ours; where a clause's *meaning* depends on the foreign name (a
+  updated to ours; where a clause's _meaning_ depends on the foreign name (a
   documented refusal of a foreign layout), it stays as a labelled note.
 - `pq`-style tooling and docs that referenced `~/.factory` are rewritten.
 

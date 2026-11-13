@@ -127,6 +127,7 @@ export async function listDirectory(
 export const lsTool: ToolDefinition = defineTool<LsInput, ToolContext>({
   id: "ls-cli",
   llmId: "LS",
+  category: "Files",
   displayName: "LS",
   description: "List the entries of a directory.",
   inputSchema: lsInputSchema,

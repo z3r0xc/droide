@@ -7,11 +7,13 @@
  */
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
+import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
 import type { AppContext } from "../../../src/app/context.ts";
+import type { SessionSeed } from "../../../src/app/session-seed.ts";
 import type { Platform } from "../../../src/config/paths.ts";
 import type { ExecArgv, ExecCommandDeps } from "../../../src/exec/command.ts";
 import {
@@ -19,10 +21,15 @@ import {
   FORK_WITHOUT_PROMPT,
   LAST_REQUIRES_TERMINAL,
   LAST_WITH_ID,
+  NO_SESSION_SELECTED,
   RESUME_LIST_LIMIT,
   archivedSession,
+  corruptTranscript,
   invalidSessionId,
+  missingTranscript,
+  orderSessions,
   parseSessionArgument,
+  renderPickerRows,
   runResumeCommand,
   unknownSession,
   type ResumedSession,
@@ -34,7 +41,10 @@ import {
   openSessionStore,
   type SessionStore,
 } from "../../../src/session/store.ts";
-import type { JsonObject } from "../../../src/session/transcript.ts";
+import {
+  transcriptPathFor,
+  type JsonObject,
+} from "../../../src/session/transcript.ts";
 
 const ID_A = "0f0e0d0c-0b0a-4a09-8807-060504030201";
 const ID_B = "1f0e0d0c-0b0a-4a09-8807-060504030201";
@@ -133,6 +143,11 @@ interface ExecCall {
 interface LaunchCall {
   readonly session: ResumedSession;
   readonly streams: ResumeStreams;
+  readonly seed: SessionSeed;
+}
+
+interface PickCall {
+  readonly labels: readonly string[];
 }
 
 interface Captured {
@@ -141,6 +156,7 @@ interface Captured {
   readonly closed: boolean[];
   readonly execs: ExecCall[];
   readonly launches: LaunchCall[];
+  readonly picks: PickCall[];
   stdout(): string;
   stderr(): string;
   code(): number;
@@ -151,6 +167,8 @@ interface HarnessOptions {
   readonly stdoutIsTTY?: boolean;
   readonly execCode?: number;
   readonly launchCode?: number;
+  /** What the picker returns: an index into the rows, or `null` to abort. */
+  readonly pick?: number | null;
   readonly nextId?: () => string;
 }
 
@@ -166,6 +184,7 @@ function harness(context: AppContext, options: HarnessOptions = {}): Captured {
   const closed: boolean[] = [];
   const execs: ExecCall[] = [];
   const launches: LaunchCall[] = [];
+  const picks: PickCall[] = [];
   const stdin = {
     isTTY: options.stdinIsTTY === true,
   } as unknown as NodeJS.ReadStream;
@@ -193,9 +212,13 @@ function harness(context: AppContext, options: HarnessOptions = {}): Captured {
       execs.push({ argv, deps: execDeps });
       return options.execCode ?? 0;
     },
-    launchInteractive: async (_context, streams, session) => {
-      launches.push({ session, streams });
+    launchInteractive: async (_context, streams, session, seed) => {
+      launches.push({ session, streams, seed });
       return options.launchCode ?? 0;
+    },
+    pickSession: async (labels) => {
+      picks.push({ labels });
+      return options.pick ?? null;
     },
     readStdin: async () => "",
     write: (text) => {
@@ -217,6 +240,7 @@ function harness(context: AppContext, options: HarnessOptions = {}): Captured {
     closed,
     execs,
     launches,
+    picks,
     stdout: () => out,
     stderr: () => err,
     code: () => codes.at(-1) ?? 0,
@@ -355,15 +379,85 @@ test("an empty store lists nothing and succeeds", async () => {
   });
 });
 
-test("a terminal without --last prints the same list, never a picker", async () => {
+test("a terminal without an id offers the sessions as a picker", async () => {
   await withFixture(async (context, store) => {
     seed(store, context, { sessionId: ID_A, title: "Alpha" });
+    const captured = harness(context, {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+      pick: 0,
+    });
+    await runResumeCommand(options(), captured.deps);
+
+    // The picker gets the same rows the list would print, newest first.
+    assert.equal(captured.picks.length, 1);
+    const expected = renderPickerRows(
+      orderSessions(store.listSessions({ limit: RESUME_LIST_LIMIT })),
+    );
+    assert.deepEqual(captured.picks[0]?.labels, expected);
+    // The picker owns the screen; the command only names what it resumed.
+    assert.equal(captured.stdout(), `Resumed session ${ID_A} (Alpha)\n`);
+    assert.equal(captured.launches.length, 1);
+    assert.equal(captured.launches[0]?.session.sessionId, ID_A);
+    assert.equal(captured.code(), 0);
+    assertAllClosed(captured);
+  });
+});
+
+test("the picker choosing the second row resumes that session", async () => {
+  await withFixture(async (context, store) => {
+    seed(store, context, {
+      sessionId: ID_B,
+      title: "Later",
+      timestamp: 9_000,
+    });
+    seed(store, context, {
+      sessionId: ID_A,
+      title: "Earlier",
+      timestamp: 1_000,
+    });
+    const captured = harness(context, {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+      pick: 1,
+    });
+    await runResumeCommand(options(), captured.deps);
+
+    assert.equal(captured.picks.length, 1);
+    // Newest first: the older row is the second one, and it is what resumed.
+    assert.equal(captured.picks[0]?.labels.length, 2);
+    assert.equal(captured.launches[0]?.session.sessionId, ID_A);
+    assert.equal(captured.code(), 0);
+    assertAllClosed(captured);
+  });
+});
+
+test("aborting the picker resumes nothing and still succeeds", async () => {
+  await withFixture(async (context, store) => {
+    seed(store, context, { sessionId: ID_A, title: "Alpha" });
+    const captured = harness(context, {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+      pick: null,
+    });
+    await runResumeCommand(options(), captured.deps);
+
+    assert.equal(captured.picks.length, 1);
+    assert.equal(captured.launches.length, 0);
+    assert.equal(captured.stdout(), "");
+    assert.equal(captured.stderr(), `${NO_SESSION_SELECTED}\n`);
+    assert.equal(captured.code(), 0);
+    assertAllClosed(captured);
+  });
+});
+
+test("a terminal with no stored sessions neither picks nor launches", async () => {
+  await withFixture(async (context) => {
     const captured = harness(context, { stdinIsTTY: true, stdoutIsTTY: true });
     await runResumeCommand(options(), captured.deps);
 
-    assert.match(captured.stdout(), /^Recent sessions:\n/);
-    assert.ok(captured.stdout().includes(ID_A));
-    assert.equal(captured.launches.length, 0);
+    assert.equal(captured.picks.length, 0);
+    assert.equal(captured.stdout(), "No sessions found.\n");
     assert.equal(captured.code(), 0);
     assertAllClosed(captured);
   });
@@ -582,7 +676,50 @@ test("a terminal resumes the named session by handing it to the shell", async ()
 
     assert.equal(captured.launches.length, 1);
     assert.equal(captured.launches[0]?.session.sessionId, ID_A);
+    // B22: the stored turns are the shell's first rows and its next context.
+    assert.deepEqual(captured.launches[0]?.seed.entries, [
+      { kind: "user", text: "hi", specMode: false },
+    ]);
+    assert.deepEqual(
+      captured.launches[0]?.seed.messages.map((message) => message.role),
+      ["user"],
+    );
     assert.equal(captured.code(), 0);
+    assertAllClosed(captured);
+  });
+});
+
+test("a missing transcript is refused by name, never an empty shell", async () => {
+  await withFixture(async (context, store) => {
+    seed(store, context, { sessionId: ID_A, title: "Alpha" });
+    rmSync(transcriptPathFor(context.paths.sessionsDir, "", ID_A));
+    const captured = harness(context, {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+    });
+    await runResumeCommand(options({ sessionId: ID_A }), captured.deps);
+
+    assert.equal(captured.stderr(), `${missingTranscript(ID_A)}\n`);
+    assert.equal(captured.launches.length, 0);
+    assert.equal(captured.code(), 1);
+    assertAllClosed(captured);
+  });
+});
+
+test("a corrupt transcript is refused by name with its line", async () => {
+  await withFixture(async (context, store) => {
+    seed(store, context, { sessionId: ID_A, title: "Alpha" });
+    const path = transcriptPathFor(context.paths.sessionsDir, "", ID_A);
+    writeFileSync(path, "{not json\n");
+    const captured = harness(context, {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+    });
+    await runResumeCommand(options({ sessionId: ID_A }), captured.deps);
+
+    assert.equal(captured.stderr(), `${corruptTranscript(ID_A, 1)}\n`);
+    assert.equal(captured.launches.length, 0);
+    assert.equal(captured.code(), 1);
     assertAllClosed(captured);
   });
 });

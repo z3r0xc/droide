@@ -1067,6 +1067,10 @@ function stripTrailingCommas(text: string): string {
   return chars.join("");
 }
 
-function stripJsonc(text: string): string {
+/**
+ * JSONC text reduced to JSON: comments removed and trailing commas dropped.
+ * The settings writer verifies an edit against it before touching the disk.
+ */
+export function stripJsonc(text: string): string {
   return stripTrailingCommas(stripComments(text));
 }

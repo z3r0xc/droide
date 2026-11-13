@@ -64,6 +64,18 @@ import {
 } from "./liveness.ts";
 import { systemTimers, type DaemonTimers } from "./timers.ts";
 import {
+  GET_PROXY_TOKEN_METHOD,
+  LIST_PORT_FORWARDS_METHOD,
+  REGISTER_PORT_FORWARD_METHOD,
+  UNREGISTER_PORT_FORWARD_METHOD,
+  PortProxyRegistry,
+  attachPortProxyUpgrade,
+  createPortProxyOptions,
+  createPortProxyToken,
+  readPortForwardPort,
+  type PortProxyOptions,
+} from "./port-proxy.ts";
+import {
   WS_CLOSE,
   attachWebSocketServer,
   createDaemonHttpServer,
@@ -166,6 +178,12 @@ export interface DaemonServerOptions {
   /** Defaults to {@link isProcessAlive}; a test seam. */
   readonly isProcessAlive?: (pid: number) => boolean;
   readonly remoteControl?: boolean;
+  /**
+   * The daemon's forwardable-port table (B33). Absent means the
+   * `/port-proxy` surface answers `404` with a reason and the registration
+   * methods are not offered.
+   */
+  readonly portProxy?: PortProxyRegistry;
   /** Injected `sd_notify`; called with `READY=1` after the bind (B5). */
   readonly notifyReady?: (state: string) => void;
   /** The banner sink. The CLI supplies stdout; tests collect lines. */
@@ -650,6 +668,8 @@ export class DaemonServer {
   private readonly parentPollIntervalMs: number;
   private readonly openLiveness: LivenessPipeOpener;
   private readonly isAlive: (pid: number) => boolean;
+  private readonly proxyTokenValue: string;
+  private readonly proxyOptions: PortProxyOptions | undefined;
   private livenessWatchers: LivenessWatcher[] = [];
 
   private httpServer: Server | undefined;
@@ -680,7 +700,32 @@ export class DaemonServer {
     this.version = options.version ?? DAEMON_VERSION;
     this.protocolVersion = options.protocolVersion ?? DROIDE_PROTOCOL_VERSION;
     this.pid = options.pid ?? process.pid;
-    this.methods = options.methods ?? {};
+    this.proxyTokenValue = createPortProxyToken();
+    this.proxyOptions =
+      options.portProxy === undefined
+        ? undefined
+        : createPortProxyOptions({
+            token: this.proxyTokenValue,
+            registry: options.portProxy,
+          });
+    const proxyMethods: Record<string, DaemonMethodHandler> = {
+      [GET_PROXY_TOKEN_METHOD]: () => ({ token: this.proxyTokenValue }),
+    };
+    if (options.portProxy !== undefined) {
+      const registry = options.portProxy;
+      proxyMethods[REGISTER_PORT_FORWARD_METHOD] = (params) => {
+        registry.register(readPortForwardPort(params));
+        return { ports: registry.list() };
+      };
+      proxyMethods[UNREGISTER_PORT_FORWARD_METHOD] = (params) => {
+        registry.unregister(readPortForwardPort(params));
+        return { ports: registry.list() };
+      };
+      proxyMethods[LIST_PORT_FORWARDS_METHOD] = () => ({
+        ports: registry.list(),
+      });
+    }
+    this.methods = { ...options.methods, ...proxyMethods };
     this.logger = options.logger ?? silentLogger;
     this.notifyReady = options.notifyReady;
     this.stdout = options.stdout;
@@ -721,6 +766,11 @@ export class DaemonServer {
   /** Connections currently open, for tests and diagnostics. */
   get connectionCount(): number {
     return this.connections.size;
+  }
+
+  /** The per-process proxy token (B33); never logged. */
+  get proxyToken(): string {
+    return this.proxyTokenValue;
   }
 
   /** Steps already stopped, in order, for tests and diagnostics. */
@@ -832,7 +882,13 @@ export class DaemonServer {
   ): Promise<DaemonEndpoint> {
     const delays = this.bindRetryDelaysMs;
     for (let attempt = 0; ; attempt += 1) {
-      const server = createDaemonHttpServer();
+      const server = createDaemonHttpServer(
+        this.proxyOptions === undefined ? {} : { portProxy: this.proxyOptions },
+      );
+      attachPortProxyUpgrade(
+        server,
+        this.proxyOptions === undefined ? {} : { portProxy: this.proxyOptions },
+      );
       attachWebSocketServer(server, (transport) =>
         this.acceptTransport(transport),
       );

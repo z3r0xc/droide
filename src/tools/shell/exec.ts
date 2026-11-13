@@ -392,6 +392,7 @@ export const executeTool: ToolDefinition = defineTool<
 >({
   id: "execute-cli",
   llmId: "Execute",
+  category: "Shell",
   displayName: "Execute",
   description: "Run a shell command.",
   inputSchema: executeInputSchema,

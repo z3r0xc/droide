@@ -477,7 +477,12 @@ single-line JSON **array** whose entries are
 currentlyAllowed}` (`entrypoints/exec/handler.ts:458-461`,
 `utils/toolCatalog.ts:138-169`). With any other format it is a text listing:
 `Available tools for <model>`, `Autonomy: <autonomy>`, then category sections
-with `  • <llmId> (<displayName>) - status: allowed|blocked[ override]`
+with `  • <llmId> (<displayName>) - status: allowed|blocked[ override]`.
+The categories this build declares are `Files` (`Read`, `Create`, `Edit`, `LS`),
+`Search` (`Glob`, `Grep`), `Shell` (`Execute`) and `Tasks` (`TodoWrite`); a tool
+that declares none is grouped under `Other`, which is also where an MCP tool
+lands, because a server does not publish a category. Sections are ordered by
+category name, entries by `llmId`
 (`entrypoints/exec/handler.ts:449-535`). Under `stream-json`/`debug` the text
 listing is used (`entrypoints/exec/handler.ts:800-809`). Selection warnings go
 to stderr (`:810-812`).

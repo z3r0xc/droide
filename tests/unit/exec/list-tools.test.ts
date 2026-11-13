@@ -109,3 +109,22 @@ test("the JSON listing is one line of the seven documented fields", () => {
   ]);
   assert.equal((first as { llmId: string }).llmId, "Grep");
 });
+
+test("every built-in tool declares one of the specified categories", async () => {
+  const { createCoreRegistry } = await import("../../../src/tools/index.ts");
+
+  const registry = createCoreRegistry();
+  const allowed = new Set(registry.all().map((tool) => tool.llmId));
+  const rows = buildToolListRows(registry.all(), allowed, allowed);
+
+  const known = new Set(["Files", "Search", "Shell", "Tasks", "Other"]);
+  for (const row of rows) {
+    assert.ok(known.has(row.category), `${row.llmId} has ${row.category}`);
+    assert.notEqual(row.category, "Other", `${row.llmId} declares no category`);
+  }
+
+  const files = rows
+    .filter((row) => row.category === "Files")
+    .map((row) => row.llmId);
+  assert.deepEqual(files, ["Create", "Edit", "LS", "Read"]);
+});

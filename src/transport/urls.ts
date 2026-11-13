@@ -57,8 +57,7 @@ export interface BakedApiUrls {
  * Explicit values for one process. `apiBaseUrlEu: null` means "explicitly no EU
  * base", distinct from absent (fall through to env/define).
  *
- * TODO(spec B3): the spec pins `environment > baked define`; an explicit
- * caller-supplied override is not covered and is placed above both.
+ * Precedence is override > environment > baked define (spec 50 B3).
  */
 export interface ApiUrlOverrides {
   readonly apiBaseUrl?: string;

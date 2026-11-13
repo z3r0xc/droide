@@ -329,12 +329,25 @@ export async function runPluginList(
     report(deps, error);
     return;
   }
+  // B36: with `strictEnabledPlugins` the level maps are what decides, so the
+  // list must see them unmerged; a lower level cannot re-enable a plugin a
+  // higher level disabled.
+  const levelMaps = deps.context.layers
+    .map((layer) => layer.settings.enabledPlugins)
+    .filter(
+      (map): map is Readonly<Record<string, boolean>> => map !== undefined,
+    );
+  const settings = deps.context.settings;
   const result: InstalledPluginsResult = loadInstalledPlugins({
     stateDir: deps.context.paths.stateDir,
     projectDir: deps.context.paths.projectDir,
-    ...(deps.context.settings.enabledPlugins === undefined
+    ...(settings.enabledPlugins === undefined
       ? {}
-      : { enabledPlugins: deps.context.settings.enabledPlugins }),
+      : { enabledPlugins: settings.enabledPlugins }),
+    ...(settings.strictEnabledPlugins === undefined
+      ? {}
+      : { strictEnabledPlugins: settings.strictEnabledPlugins }),
+    ...(levelMaps.length === 0 ? {} : { enabledPluginsByLevel: levelMaps }),
     ...(allowedSources === undefined ? {} : { allowedSources }),
   });
 

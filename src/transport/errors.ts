@@ -76,8 +76,7 @@ export class TransportNetworkError extends TransportError {
  * The certificate chain was not trusted (B88). Trust material is never
  * bypassed: the message points at the supported remediation instead.
  *
- * TODO(spec B88): the spec quotes only the `certificate chain not trusted: …`
- * prefix and the two remediations; the exact full sentence is not quoted.
+ * The sentence is quoted in spec 50 B88, from this file.
  */
 export class TlsTrustError extends TransportError {
   readonly code: string | null;
@@ -534,11 +533,7 @@ export type LlmFailureReason =
   | "unknown";
 
 /**
- * User-facing copy per class. B102 pins one message per class but the spec file
- * quotes none of them, so these are factual descriptions, not recoveries.
- *
- * TODO(spec B102): replace with the exact fixed copy recorded in the evidence
- * report for provider errors (constants module, see `evidence/INVENTORY.md`).
+ * User-facing copy per class, quoted row for row by spec 50 B102.
  */
 export const LLM_FAILURE_MESSAGES: Readonly<Record<LlmFailureReason, string>> =
   {

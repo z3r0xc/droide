@@ -12,10 +12,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  MAX_QUEUED_MESSAGES,
   createTurnDriver,
   type TurnDriver,
   type TurnTimers,
 } from "../../../src/app/interactive-turn.ts";
+import { queuedFullNotice } from "../../../src/ui/strings.ts";
 import type { Message, ToolResultBlock } from "../../../src/agent/messages.ts";
 import type {
   Provider,
@@ -543,5 +545,190 @@ test(
       "session",
     );
     assert.equal(driver.entries.at(-1)?.["text"], "both");
+  },
+);
+
+/** The text of the last user message a provider call received. */
+function lastUserText(messages: readonly Message[]): string {
+  const user = messages.filter((message) => message.role === "user").at(-1);
+  return (user?.content ?? [])
+    .filter((part) => part.type === "text")
+    .map((part) => (part.type === "text" ? part.text : ""))
+    .join("");
+}
+
+test(
+  "a submit during a turn queues FIFO and one entry starts the next turn",
+  { timeout: 8000 },
+  async () => {
+    const fake = fakeProvider((call) => ({
+      deltas: [
+        { type: "text", text: `answer ${String(call)}` },
+        { type: "done" },
+      ],
+      holdAfter: 0,
+    }));
+    const { driver } = harness(fake.provider);
+
+    driver.submit("first");
+    await tick();
+    assert.equal(driver.running, true);
+
+    assert.equal(driver.submit("also check the tests", "steer"), "steered");
+    assert.equal(driver.submit("then commit", "queue"), "queued");
+    assert.deepEqual(
+      driver.queued.map((message) => [message.text, message.mode]),
+      [
+        ["also check the tests", "steer"],
+        ["then commit", "queue"],
+      ],
+      "the queue is FIFO and keeps each line's mode",
+    );
+    assert.deepEqual(
+      driver.entries.map((entry) => entry.kind),
+      ["user"],
+      "a queued line adds no transcript row while it waits",
+    );
+
+    fake.release(0);
+    await driver.settled();
+    await tick();
+
+    assert.equal(fake.calls.length, 2, "one queued turn started");
+    assert.equal(
+      lastUserText(fake.calls[1] ?? []),
+      "then commit\n\nalso check the tests",
+      "the queued turn's prompt carries the steering line appended",
+    );
+    assert.deepEqual(driver.queued, [], "the drained entries left the queue");
+    assert.deepEqual(
+      driver.entries
+        .filter((entry) => entry.kind === "user")
+        .map((entry) => entry["text"]),
+      ["first", "then commit\n\nalso check the tests"],
+      "the user row carries exactly the prompt the model received",
+    );
+
+    fake.release(1);
+    await driver.settled();
+    assert.equal(driver.running, false);
+  },
+);
+
+test(
+  "steering alone starts no turn and rides the next submit",
+  { timeout: 8000 },
+  async () => {
+    const fake = fakeProvider((call) => ({
+      deltas: [
+        { type: "text", text: `answer ${String(call)}` },
+        { type: "done" },
+      ],
+      ...(call === 0 ? { holdAfter: 0 } : {}),
+    }));
+    const { driver } = harness(fake.provider);
+
+    driver.submit("first");
+    await tick();
+    driver.submit("remember the changelog", "steer");
+    fake.release(0);
+    await driver.settled();
+    await tick();
+
+    assert.equal(fake.calls.length, 1, "a steering line is not its own turn");
+    assert.deepEqual(driver.queued, [
+      { text: "remember the changelog", mode: "steer" },
+    ]);
+
+    driver.submit("next");
+    await driver.settled();
+    assert.equal(
+      lastUserText(fake.calls[1] ?? []),
+      "next\n\nremember the changelog",
+    );
+    assert.deepEqual(driver.queued, []);
+  },
+);
+
+test(
+  "the queue is bounded and a submit at the bound is refused with a notice",
+  { timeout: 8000 },
+  async () => {
+    const fake = fakeProvider(() => ({
+      deltas: [{ type: "text", text: "working" }],
+      hold: true,
+    }));
+    const { driver } = harness(fake.provider);
+
+    driver.submit("first");
+    await tick();
+    for (let index = 1; index <= MAX_QUEUED_MESSAGES; index += 1) {
+      assert.equal(driver.submit(`queued ${String(index)}`, "queue"), "queued");
+    }
+    assert.equal(driver.queued.length, MAX_QUEUED_MESSAGES);
+
+    assert.equal(driver.submit("overflow", "steer"), "refused");
+    assert.equal(driver.queued.length, MAX_QUEUED_MESSAGES);
+    const notice = driver.entries.at(-1);
+    assert.equal(notice?.kind, "notice");
+    assert.equal(notice?.["text"], queuedFullNotice(MAX_QUEUED_MESSAGES));
+    assert.equal(MAX_QUEUED_MESSAGES, 8);
+
+    driver.cancel();
+    await driver.settled();
+    assert.equal(driver.queued.length, 0);
+  },
+);
+
+test(
+  "cancel aborts the turn and clears the queue, so nothing drains",
+  { timeout: 8000 },
+  async () => {
+    const fake = fakeProvider(() => ({
+      deltas: [{ type: "text", text: "working" }],
+      hold: true,
+    }));
+    const { driver } = harness(fake.provider);
+
+    driver.submit("first");
+    await tick();
+    driver.submit("do not run", "queue");
+    assert.equal(driver.queued.length, 1);
+
+    driver.cancel();
+    await driver.settled();
+
+    assert.equal(driver.status, "idle");
+    assert.equal(driver.queued.length, 0, "the queue was cleared");
+    assert.equal(fake.calls.length, 1, "the queued turn never started");
+    assert.equal(driver.entries.at(-1)?.["text"], "Cancelled");
+  },
+);
+
+test(
+  "cancel with no turn running only clears the queue",
+  { timeout: 8000 },
+  async () => {
+    const fake = fakeProvider((call) => ({
+      deltas: [
+        { type: "text", text: `answer ${String(call)}` },
+        { type: "done" },
+      ],
+      holdAfter: 0,
+    }));
+    const { driver } = harness(fake.provider);
+
+    driver.submit("first");
+    await tick();
+    driver.submit("note", "steer");
+    fake.release(0);
+    await driver.settled();
+    await tick();
+    assert.equal(driver.queued.length, 1);
+
+    driver.cancel();
+    assert.equal(driver.queued.length, 0);
+    assert.equal(driver.running, false);
+    assert.equal(fake.calls.length, 1);
   },
 );

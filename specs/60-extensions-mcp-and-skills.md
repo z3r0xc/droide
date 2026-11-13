@@ -147,6 +147,22 @@ the two attempts cannot stack. Distinct failures are negative-cached for 60 s, a
 (retry, reconnect, `tools/list_changed`, config change) clears the entry immediately
 (`evidence/original/windows-x64/src/mcp/constants.ts:23-33`, `evidence/original/windows-x64/src/mcp/McpToolList.ts:29-62`).
 
+**B72 — Inbound event stream for `sse`.** An `sse` server's server-initiated channel is one `GET` to the
+configured URL, carrying the configured headers and `Accept: text/event-stream`, opened when the client
+subscribes to notifications — immediately after the handshake completes. The body is parsed as
+server-sent events: `event:` names the type (default `message`), repeated `data:` lines are joined with
+`\n`, a `:` line is a comment, `id:` is the resume id, and only a blank line dispatches. A frame is
+bounded by the 4 MiB frame ceiling; an oversized frame, a non-`text/event-stream` answer, or a redirect
+that leaves the configured origin ends the stream rather than being buffered or followed. Redirects on
+the same origin are followed, at most three. Exactly three notifications are delivered to the client,
+with their `params` — `notifications/tools/list_changed`, `notifications/resources/list_changed` and
+`notifications/resources/updated`; every other notification, event type or unreadable payload is
+discarded and counted. A `tools/list_changed` invalidates the cached listing, so the next listing re-reads
+the server once rather than once per call. A dropped stream reconnects with `Last-Event-ID` set to the
+last id seen, after a delay from an injectable policy — 1 s doubling to a 30 s cap, five attempts, with
+the count reset by any successful open; after the last attempt the stream stays closed and the POST path
+keeps working. `close()` aborts the stream and any pending reconnect.
+
 **B14 — Listing tolerance.** A strict `tools/list` that fails schema validation is retried with per-tool
 validation, and a single non-conforming tool does not discard the listing. On a 2025 server, a tool whose
 `outputSchema.type` is not `object` is skipped and reported rather than registered
@@ -205,6 +221,12 @@ content array with `structuredContent` renders that JSON (any type); otherwise i
 images are compressed; an unsupported image MIME type is replaced by a textual placeholder
 (`evidence/original/windows-x64/src/tools/executors/client/mcp/formatMcpResult.ts:12-125`,
 `evidence/original/windows-x64/src/tools/executors/client/mcp/McpToolExecutor.ts:40-110`).
+
+The placeholders this build renders are fixed, and they are what the model reads
+(`src/extensions/mcp/client.ts`, `renderBlock`): `[Image: <mimeType>, <n> base64
+bytes]` for an image — this build reports the size rather than compressing the
+bytes, which is the narrowing `TODO(spec B22)` records — and `[Unsupported
+content block: <blockType>]` for anything else. `[observed]`
 
 **B23 — Output-schema validation errors are rewritten.** When the SDK reports one of the three
 structured-output validation markers, the result text becomes
@@ -308,6 +330,23 @@ declares marketplaces that may be auto-registered; `strictKnownMarketplaces` nar
 configured at all; `pluginTokenHosts` is honored from user and org settings only
 (`evidence/original/windows-x64/packages/common/src/settings/schema.ts:1457-1489`).
 
+Enablement resolves per plugin id: an absent entry means enabled and `false` disables. Without
+`strictEnabledPlugins` the merged settings map answers. With `strictEnabledPlugins` the **unmerged**
+level maps are consulted from highest priority to lowest — the highest level that names a plugin
+decides, and a lower level cannot re-enable one the policy disabled. A settings document therefore has
+to reach the loader as levels, not only as a merge, or strict mode cannot be honoured.
+
+Writing enablement is a **textual** edit of `settings.json` (`enabledPlugins` sits at the document root,
+where this build's schema keeps general settings). The writer locates the key's span in the JSONC
+document, replaces or inserts only that span, and leaves comments, key order, indentation, trailing
+commas, line endings and a byte-order mark untouched; a new member is inserted in key order. The
+replacement is atomic (temporary file in the same directory, `fsync`, rename, original mode kept). It
+refuses rather than reformats: a duplicate target key (`ambiguous-key`), a document that does not parse
+or a key path that runs through a non-object (`invalid-document`), a missing file (`not-found`), and a
+read-only file, a path outside the scope directory or a symbolic link (`not-writable`). The edited text
+is parsed back and compared to the requested value before the rename, so a scanner mistake is a
+refusal, never a corrupted file. ADR 0013.
+
 **B37 — Install flow.** `droide plugin install <plugin@marketplace> [-s user|project]` parses the id on
 the first `@` at index ≥ 1, defaults the scope to `user`, looks the plugin up in the registered
 marketplace, refuses a marketplace whose recorded source no longer matches its configured source
@@ -316,10 +355,20 @@ marketplace, refuses a marketplace whose recorded source no longer matches its c
 the install cache and writes the enablement map
 (`evidence/original/windows-x64/src/entrypoints/plugin/install.ts:11-49`,
 `evidence/original/windows-x64/packages/runtime/settings/src/PluginMarketplaceManager.ts:1707-1795`).
+The order is settings first: `enabledPlugins[<plugin-id>] = true` is written into the scope's
+`settings.json` (created as `{}` when absent, member inserted in key order) **before** the copy, because
+a plugin that is on disk but not enabled, or enabled but not on disk, is a half-install. A copy or
+registry failure restores the previous enablement (the old value, or removal of the member, or removal
+of the file the install created) and rethrows; a settings file that cannot be written refuses the
+install before anything is copied (`settings-not-writable`), and one that cannot be understood or
+edited safely refuses it as `settings-invalid`.
 
 **B38 — Uninstall flow.** Without `-s`, uninstall resolves the scope by looking for the plugin at user
 scope first, then project; it fails with a "not installed" message when neither holds it. The
-enablement entry is removed rather than set to `false`
+enablement entry is removed rather than set to `false` — from every settings file that names it
+(`settings.json` and `settings.local.json` at both scopes), keeping the rest of each document byte for
+byte. A settings file that cannot be read or written aborts the uninstall before the registry entry or
+the plugin's files are touched
 (`evidence/original/windows-x64/src/entrypoints/plugin/uninstall.ts:16-45`,
 `evidence/original/windows-x64/packages/runtime/settings/src/PluginMarketplaceManager.ts:2172-2200`, `:3900-3910`).
 
@@ -716,6 +765,7 @@ credentials, no wall clock, no dependence on the reference build.
 | B10, B11 | `tests/extensions/test_mcp_connect_budget_and_era_plan`         | `fixtures/mcp/connect/`                                 |
 | B12      | `tests/extensions/test_mcp_era_cache_ttl_and_ignored_files`     | `fixtures/mcp/era-cache/`                               |
 | B13, B14 | `tests/extensions/test_mcp_tool_list_timeout_and_lenient_retry` | `fixtures/mcp/tool-list/`                               |
+| B72      | `tests/integration/extensions/mcp-sse-inbound.test.ts`          | `tests/unit/extensions/mcp-sse-parser.test.ts`          |
 | B15      | `tests/extensions/test_mcp_tool_filters`                        | `fixtures/mcp/tool-filters/`                            |
 | B16      | `tests/extensions/test_mcp_tool_registration_identity`          | `fixtures/mcp/registration/`                            |
 | B17      | `tests/extensions/test_mcp_tool_name_collision`                 | `fixtures/mcp/name-collision/`                          |

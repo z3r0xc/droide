@@ -6,8 +6,9 @@
  * - `specs/20-agent-loop.md` §B1–B5 (one turn at a time, one reason per turn),
  *   §B20–B30 (streaming events, the tool cycle, the permission gates) and
  *   §B46–B49 (compaction, when a limit is supplied);
- * - `specs/95-terminal-ui.md` §B12 (the running status) and R11/R12 (the
- *   approval prompt and the system notice).
+ * - `specs/95-terminal-ui.md` §B10 (the composer's queue and steering),
+ *   §B12 (the running status) and R11/R12 (the approval prompt and the system
+ *   notice).
  *
  * Everything is injected — the model wiring, the loop's tool port, the clock,
  * the frame timer and the paint callback — so this module never reads
@@ -36,8 +37,8 @@ import type { KeyAction } from "../ui/keys.ts";
 import {
   APPROVAL_OPTION_LABELS,
   STATUS_TEXTS,
-  TURN_ALREADY_RUNNING,
   TURN_CANCELLED,
+  queuedFullNotice,
   withStopHint,
 } from "../ui/strings.ts";
 import type {
@@ -79,6 +80,21 @@ export type TurnStatus =
 
 /** A ceiling, not a policy: enough iterations for a tool-using answer. */
 export const DEFAULT_INTERACTIVE_MAX_TURNS = 64;
+
+/** B10: the queue's bound — one compact block, never the whole composer. */
+export const MAX_QUEUED_MESSAGES = 8;
+
+/** How a line that arrives during a turn joins the queue (B10). */
+export type SubmitMode = "steer" | "queue";
+
+/** One line waiting for the running turn (B10). */
+export interface QueuedMessage {
+  readonly text: string;
+  readonly mode: SubmitMode;
+}
+
+/** What a submit did (B10). */
+export type SubmitOutcome = "submitted" | "steered" | "queued" | "refused";
 
 /** One paint per ~60 Hz frame at most. */
 export const DEFAULT_FRAME_MS = 16;
@@ -142,12 +158,15 @@ export interface TurnDriver {
   readonly running: boolean;
   /** True while an approval prompt owns the keyboard. */
   readonly approvalOpen: boolean;
+  /** The lines waiting for the running turn, oldest first (B10). */
+  readonly queued: readonly QueuedMessage[];
   /**
-   * Submit one line: append the user row and start the turn. A submit while a
-   * turn runs appends a notice instead (steering/queueing are not implemented).
+   * Submit one line: start a turn when idle, join the queue while one runs.
+   * `mode` only matters during a turn — `steer` rides the next prompt,
+   * `queue` starts the next turn. Idle, both are the same submit.
    */
-  submit(text: string): void;
-  /** Esc: abort the in-flight turn; the loop settles as `cancelled`. */
+  submit(text: string, mode?: SubmitMode): SubmitOutcome;
+  /** Esc: abort the in-flight turn and clear the queue; the loop settles as `cancelled`. */
   cancel(): void;
   /** Route one resolved key to an open approval; false when none is open. */
   handleApprovalAction(action: KeyAction): boolean;
@@ -239,6 +258,8 @@ export function createTurnDriver(options: TurnDriverOptions): TurnDriver {
   let assistantText = "";
   let callRows = new Map<string, number>();
   let selected = 0;
+  /** B10: lines typed while a turn runs, oldest first. */
+  let queue: QueuedMessage[] = [];
   let pending:
     | {
         readonly key: string;
@@ -552,21 +573,41 @@ export function createTurnDriver(options: TurnDriverOptions): TurnDriver {
     }
   }
 
-  function submit(text: string): void {
-    if (disposed) return;
-    if (turn !== undefined) {
-      // TODO(spec 95 B10): steering and the queued-message list are not
-      // implemented, so a second submit is refused with a notice instead of
-      // being queued or delivered to the running turn.
-      appendNotice(TURN_ALREADY_RUNNING);
-      return;
+  /** B10: steering lines ride the next turn; they never start one. */
+  function takeSteering(): string[] {
+    const steering: string[] = [];
+    while (queue[0]?.mode === "steer") {
+      steering.push(queue[0].text);
+      queue = queue.slice(1);
     }
-    entries = [...entries, { kind: "user", text, specMode: false }];
+    return steering;
+  }
+
+  /** B10: one completed turn drains one queued turn; steering alone waits. */
+  function drainQueue(): void {
+    if (disposed || turn !== undefined) return;
+    const next = queue.findIndex((message) => message.mode === "queue");
+    if (next === -1) return;
+    const steering = queue.slice(0, next).map((message) => message.text);
+    const queued = queue[next];
+    if (queued === undefined) return;
+    queue = queue.slice(next + 1);
+    startTurn(queued.text, steering);
+  }
+
+  /**
+   * Start one turn. Steering lines are appended to its prompt after one blank
+   * line, so the user row carries exactly the text the model receives (B10).
+   */
+  function startTurn(text: string, steering: readonly string[] = []): void {
+    const prompt =
+      steering.length === 0 ? text : [text, ...steering].join("\n\n");
+    entries = [...entries, { kind: "user", text: prompt, specMode: false }];
     const at = options.clock();
     const userMessage: Message = {
       id: nextId("user"),
       role: "user",
-      content: [{ type: "text", text }],
+      content: [{ type: "text", text: prompt }],
       createdAt: at,
       updatedAt: at,
     };
@@ -584,15 +625,37 @@ export function createTurnDriver(options: TurnDriverOptions): TurnDriver {
       assistantRow = undefined;
       assistantText = "";
       publish(true);
+      drainQueue();
     });
     turn = { controller, promise };
+  }
+
+  function submit(text: string, mode: SubmitMode = "steer"): SubmitOutcome {
+    if (disposed) return "refused";
+    if (turn !== undefined) {
+      if (queue.length >= MAX_QUEUED_MESSAGES) {
+        // The draft stays in the composer; the notice says how to make room.
+        appendNotice(queuedFullNotice(MAX_QUEUED_MESSAGES));
+        return "refused";
+      }
+      queue = [...queue, { text, mode }];
+      publish(true);
+      return mode === "queue" ? "queued" : "steered";
+    }
+    startTurn(text, takeSteering());
+    return "submitted";
   }
 
   function cancel(): void {
     if (disposed) return;
     if (pending !== undefined) {
+      // R11: an open approval owns Esc; the queue is not the user's target.
       settlePending("deny");
       return;
+    }
+    if (queue.length > 0) {
+      queue = [];
+      publish(true);
     }
     if (turn === undefined) return;
     if (status !== "cancelling") {
@@ -666,6 +729,9 @@ export function createTurnDriver(options: TurnDriverOptions): TurnDriver {
     },
     get approvalOpen() {
       return pending !== undefined;
+    },
+    get queued() {
+      return queue;
     },
     submit,
     cancel,

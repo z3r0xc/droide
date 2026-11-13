@@ -171,7 +171,7 @@ export function decide(
   }
 }
 
-/** B46's level-specific guidance. `TODO(spec B46)` for the exact sentences. */
+/** B46's level-specific guidance; the sentences are quoted in spec 30 B46. */
 function guidance(context: PermissionContext): string {
   const maximum = context.maxAutonomy ?? "high";
   const level = effectiveAutonomy(context);

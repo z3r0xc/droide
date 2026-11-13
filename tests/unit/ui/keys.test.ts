@@ -74,6 +74,10 @@ const BYTES: Readonly<Record<string, KeyInput>> = {
   "alt+shift+up": "\u001b[1;4A",
   "alt+shift+down": "\u001b[1;4B",
   "alt+shift+v": "\u001bV",
+  // Kitty's CSI-u form, which is how a modern terminal reports Ctrl+Enter.
+  "ctrl+enter": "\u001b[13;5u",
+  // The legacy Meta-Enter a terminal sends when it cannot encode Ctrl+Enter.
+  "alt+enter": "\u001b\r",
 };
 
 const EVENTS: Readonly<Record<string, KeyInput>> = {

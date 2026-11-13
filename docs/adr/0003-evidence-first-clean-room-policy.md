@@ -16,7 +16,7 @@ requires precise knowledge of behaviour, not guesses.
 
 ## Decision
 
-Separate *evidence* from *contract* from *implementation*:
+Separate _evidence_ from _contract_ from _implementation_:
 
 1. **Evidence (untracked).** Raw binaries, extracted bundles, recovered source,
    decoded maps and generated indexes live under `evidence/` and `raw/`, which
@@ -31,7 +31,7 @@ Separate *evidence* from *contract* from *implementation*:
    file path, a JSON key or an error string are contract data and may appear
    verbatim; functions, control flow and comments are not.
 4. **Tests (tracked).** Every acceptance criterion in a spec maps to at least
-   one deterministic test. Fixtures are synthesised. Tests may *observe* the
+   one deterministic test. Fixtures are synthesised. Tests may _observe_ the
    original binary (see ADR 0004) but must not depend on it to pass by default.
 
 A change that breaks parity must fail a test that names the spec section it

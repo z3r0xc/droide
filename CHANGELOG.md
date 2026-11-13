@@ -4,6 +4,45 @@ The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, which a
 unit test keeps equal to the package version; a release bumps both. The recorded
 CLI cases check the version line by shape, not by number. See `docs/release.md`.
 
+## 0.6.0 — 2026-11-13
+
+### Added
+
+- **`droide resume` adopts the stored transcript.** The shell opens with the
+  session's turns rendered and the next prompt carries that history; a missing
+  or corrupt transcript is a named error instead of an empty shell. On a TTY a
+  bare `resume` opens a picker (id, first prompt, updated time); a pipe still
+  gets the bounded list. Spec 10 B22.
+- **Settings are written safely.** A textual, atomic writer edits
+  `settings.json`/JSONC in place — comments and formatting survive, a document
+  that does not parse or a duplicate key is refused — and a plugin install now
+  records `general.enabledPlugins`, rolling the settings back if the copy fails.
+  `strictEnabledPlugins` is enforced: the highest level that names a plugin
+  decides. ADR 0013, spec 60 B36/B37/B38.
+- **The interactive shell queues what you type during a turn**: FIFO, bounded,
+  shown with its position, drained one entry per completed turn, cleared by Esc
+  together with the running turn. Spec 95 B10.
+- **The daemon's `/port-proxy/<port>` surface** is real: token in the query, an
+  HttpOnly SameSite=Strict cookie for subsequent requests, WebSocket upgrades,
+  loopback only, and distinct refusals for a missing token (401), an
+  unregistered port (403), a traversal attempt (400), an oversized body (413)
+  and a bad method (405). Spec 70 B33.
+- **An `sse` MCP server's inbound stream is opened**: `tools/list_changed`
+  and `resources/updated` arrive, `Last-Event-ID` resumes after a drop under an
+  injectable backoff policy, a cross-origin redirect is refused, and the cached
+  tool list is re-read once per notification. Spec 60 B3.
+
+### Changed — the specification caught up with the code
+
+- `TlsTrustError`'s full sentence and the seventeen provider messages are quoted
+  in spec 50 (B88, B102) instead of described.
+- Spec 30 B20 lists the `type` table `Grep` ships; B46 quotes the five
+  permission-guidance sentences.
+- Spec 50 B3 states the override precedence (`override > environment > baked`).
+- One marker was withdrawn rather than closed: spec 30 B7 says MCP servers own
+  their argument grammar, so forwarding the arguments unvalidated is the
+  specified behaviour, not a gap.
+
 ## 0.5.0 — 2026-11-13
 
 ### Added
@@ -24,7 +63,7 @@ CLI cases check the version line by shape, not by number. See `docs/release.md`.
   `connectivity` check reports `skip` (`no API endpoint configured`) instead of
   resolving a host of ours, and `droide exec` exits 1 with
   `no API endpoint configured: set DROIDE_API_BASE_URL (or choose a custom model
-  in settings)`.
+in settings)`.
 - `exec --list-tools` answers before a model target, session, socket or API key
   is resolved, so it needs no credential.
 - The settings key for the agent model is `model`.

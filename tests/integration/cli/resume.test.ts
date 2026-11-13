@@ -7,10 +7,15 @@
  * session's transcript (or in a copy of it after `--fork`).
  */
 import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { LAST_REQUIRES_TERMINAL } from "../../../src/cli/resume-commands.ts";
+import { sessionsDir } from "../../../src/config/paths.ts";
+import { projectKeyFor } from "../../../src/exec/session.ts";
+import { transcriptPathFor } from "../../../src/session/transcript.ts";
 import {
+  fixtureEnvironment,
   runCli,
   seedSession,
   storedRecords,
@@ -189,5 +194,36 @@ test(
       },
       () => ({}),
     );
+  },
+);
+
+test(
+  "a corrupt transcript refuses the continuation instead of starting empty",
+  { timeout: 60_000 },
+  async () => {
+    await withHarness(ANSWER, async ({ directory, settingsPath, server }) => {
+      seedSession(directory, {
+        sessionId: OLD_SESSION,
+        records: [textMessageRecord("old", "user", "hello", 1_000)],
+      });
+      const environment = fixtureEnvironment(directory);
+      const path = transcriptPathFor(
+        sessionsDir(environment),
+        projectKeyFor(directory, environment.platform),
+        OLD_SESSION,
+      );
+      writeFileSync(path, "{not a record\n");
+
+      const result = await runCli(
+        directory,
+        ["resume", "--settings", settingsPath, OLD_SESSION, "next"],
+        providerEnvironment(server),
+      );
+
+      // The broken line is named; nothing was appended after it.
+      assert.equal(result.code, 1);
+      assert.match(result.stderr, /transcript line 1/u);
+      assert.equal(readFileSync(path, "utf8"), "{not a record\n");
+    });
   },
 );

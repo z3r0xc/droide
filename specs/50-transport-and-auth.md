@@ -100,6 +100,13 @@ endpoint configured` rather than probing a host of ours
 (`orig/src/environmentResolution.ts:90-127,189-197`; `src/transport/urls.ts`,
 `src/exec/command.ts`). `[observed]`
 
+Precedence is: an explicit per-process override supplied by a caller, then the
+environment, then the baked define. The override exists so a test or an
+embedding can pin a loopback endpoint without touching the environment, and it
+can never introduce a URL the validator would reject: every source passes the
+same parse and the same credential/query refusal (`src/transport/urls.ts`,
+`createApiUrlConfig`). `[observed]`
+
 **B4** The region used by B1 is `global` whenever a customer Prem is selected,
 whenever no credential resolves, or when the cached identity has no region;
 otherwise it is the region the identity reports (`Region.global|eu`; vendor
@@ -656,8 +663,16 @@ the appliance root through `DROIDE_EXTRA_CA_CERTS` instead
 **B88** TLS interception is diagnosed as `certificate chain not trusted: …`
 with the remediation to export the appliance root CA (PEM) and point
 `DROIDE_EXTRA_CA_CERTS` at it, and on Windows to delete the certificate cache
-under the state directory (`orig/src/entrypoints/doctor/checks/connectivity.ts:170-182`).
-`[observed]`
+under the state directory (`orig/src/entrypoints/doctor/checks/
+connectivity.ts:170-182`). `[observed]`
+
+The full sentence this build prints is
+`certificate chain not trusted: <cause>. Export the appliance's root CA as PEM
+and point DROIDE_EXTRA_CA_CERTS at it` followed, on Windows, by
+`; if it persists, delete the certificate cache under the state directory`
+(`src/transport/errors.ts`, `TlsTrustError`). No certificate is ever bypassed
+for the caller, and the cause is the sanitized TLS code, never the peer's
+certificate bytes. `[observed]`
 
 **B89** Airgap vetoes every backend-bound request with `AirgapBlockedError`
 whose message is `Outbound request blocked because Airgap Mode is enabled; only
@@ -744,11 +759,33 @@ network, then the generic 4xx→invalid-request and ≥500→internal-error fall
 then unknown. Provider-controlled text never becomes the reason
 (`orig/packages/core/src/llms/errors/utils.ts:1034-1156`). `[observed]`
 
-**B102** Model-call user-facing messages are fixed per class (throttling,
-overloaded, network, provider internal error, invalid request, content
-moderation, context limit, request too large, text fields too large, host
-duration limit, output degeneration, empty response)
-(`orig/packages/core/src/llms/errors/constants.ts:1-44`). `[observed]`
+**B102** Model-call user-facing messages are fixed per class
+(`orig/packages/core/src/llms/errors/constants.ts:1-44`). This build's copy is
+fixed too, and it is what a user reads (`src/transport/errors.ts`,
+`LLM_FAILURE_MESSAGES`):
+
+| class                   | message                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `quota-exhausted`       | The model provider quota for this account is exhausted.                            |
+| `payment-required`      | No active subscription found.                                                      |
+| `content-moderation`    | The model provider rejected the request under its content policy.                  |
+| `context-limit`         | The conversation exceeds the model's context window.                               |
+| `request-too-large`     | The request is too large for the model provider.                                   |
+| `text-fields-too-large` | One or more text fields in the request are larger than the model provider accepts. |
+| `invalid-request`       | The model provider rejected the request as invalid.                                |
+| `authentication`        | The model provider rejected the credentials.                                       |
+| `forbidden`             | The model provider refused the request.                                            |
+| `gone`                  | The requested model is no longer available from the provider.                      |
+| `throttling`            | The model provider is throttling requests for this account.                        |
+| `overloaded`            | The model provider is currently overloaded.                                        |
+| `network`               | The model provider could not be reached because of network issues.                 |
+| `host-duration-limit`   | The model provider stopped the request at its host duration limit.                 |
+| `output-degeneration`   | The model response degenerated and was stopped.                                    |
+| `internal-error`        | The model provider reported an internal error.                                     |
+| `unknown`               | The model call failed for an unknown reason.                                       |
+
+The class list is closed: a provider refusal the classifier cannot place is
+`unknown`, never a new class. `[observed]`
 
 **B103** Retryability is part of the error class: throttling, overloaded,
 network, stream, internal and unknown errors are retryable; a host-duration cut

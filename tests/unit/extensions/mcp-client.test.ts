@@ -31,6 +31,7 @@ import {
   type McpServerTools,
 } from "../../../src/extensions/mcp/tools.ts";
 import type {
+  McpServerNotification,
   McpTimers,
   McpTransport,
   McpTransportRequestOptions,
@@ -70,6 +71,7 @@ class FakeTransport implements McpTransport {
   handler: Handler = async () => ({});
   closed = false;
   notifications: string[] = [];
+  serverNotifications: ((notification: McpServerNotification) => void)[] = [];
 
   async request(
     method: string,
@@ -86,6 +88,19 @@ class FakeTransport implements McpTransport {
 
   async close(): Promise<void> {
     this.closed = true;
+  }
+
+  setNotificationHandler(
+    handler: (notification: McpServerNotification) => void,
+  ): void {
+    this.serverNotifications.push(handler);
+  }
+
+  /** Deliver a server notification the way a transport's stream would. */
+  deliver(method: McpServerNotification["method"]): void {
+    for (const handler of this.serverNotifications) {
+      handler({ method, params: {} });
+    }
   }
 }
 
@@ -315,6 +330,58 @@ test("cursor pages are requested in order and merged", async () => {
       .map((entry) => entry.params),
     [{}, { cursor: "p2" }],
   );
+  await client.close();
+});
+
+test("a repeated listing is served from the cache until it is invalidated", async () => {
+  let listings = 0;
+  const transport = connectOnly(new FakeTransport(), async () => {
+    listings += 1;
+    return { tools: [toolInfo(`tool-${listings}`)] };
+  });
+  const client = await connectedClient(transport);
+
+  assert.deepEqual(
+    (await client.listTools()).tools.map((tool) => tool.name),
+    ["tool-1"],
+  );
+  assert.deepEqual(
+    (await client.listTools()).tools.map((tool) => tool.name),
+    ["tool-1"],
+  );
+  assert.equal(listings, 1, "the second call reused the cached listing");
+
+  transport.deliver("notifications/tools/list_changed");
+  assert.deepEqual(
+    (await client.listTools()).tools.map((tool) => tool.name),
+    ["tool-2"],
+  );
+  assert.deepEqual(
+    (await client.listTools()).tools.map((tool) => tool.name),
+    ["tool-2"],
+  );
+  assert.equal(
+    listings,
+    2,
+    "one re-read after the notification, not one per call",
+  );
+
+  await client.listTools({ refresh: true });
+  assert.equal(listings, 3, "refresh bypasses the cache");
+  await client.close();
+});
+
+test("a resources notification leaves the tool listing cache alone", async () => {
+  let listings = 0;
+  const transport = connectOnly(new FakeTransport(), async () => {
+    listings += 1;
+    return { tools: [] };
+  });
+  const client = await connectedClient(transport);
+  await client.listTools();
+  transport.deliver("notifications/resources/updated");
+  await client.listTools();
+  assert.equal(listings, 1);
   await client.close();
 });
 

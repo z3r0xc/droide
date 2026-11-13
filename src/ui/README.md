@@ -43,8 +43,10 @@ unmounted in `finally`, and the frame tests render twice to prove determinism.
   `isTTY` (`specs/10-cli-surface.md` §B16, `specs/95-terminal-ui.md` §B18).
 - `launchInteractive(context, streams)` is the production launcher;
   `runInteractiveShell(options)` is the session. Size, capabilities, clock,
-  timers, the signal source and the mount are options: the module never reads
-  `process`.
+  timers, the signal source, the mount and the resumed session's `seed` are
+  options: the module never reads `process`. A `seed`
+  (`src/app/session-seed.ts`) becomes the shell's first rows and the next
+  request's history, so a resume renders the transcript without replaying it.
 - `src/cli/commands/root.ts` dispatches through `DefaultCommandRuntime`. The
   production runtime reads `process` exactly once and loads this module with a
   dynamic `import()` only on a terminal launch, so `--help`, `--version`, the
@@ -88,8 +90,8 @@ A submitted line is one agent turn. `src/app/interactive-turn.ts` owns it and
 `interactive.ts` owns only the surface around it:
 
 1. **Submit.** The driver appends the user row, builds the user message and sets
-   the status to `Thinking...`. A submit while a turn runs is refused with a `●`
-   notice; steering and the queued-message list are not implemented.
+   the status to `Thinking...`. A submit while a turn runs joins the queue
+   (B10, below) instead of starting a second turn.
 2. **Connect.** The first turn resolves the injected wiring (model target,
    system prompt, registry, exec's tool runner). A failure — no credential, a
    broken tool server — becomes a `● Error: …` notice; the shell stays usable.
@@ -107,7 +109,8 @@ A submitted line is one agent turn. `src/app/interactive-turn.ts` owns it and
 6. **End.** The loop reports exactly one reason. `completed` appends nothing;
    `cancelled` appends `● Cancelled`; `error` appends `● Error: <message>`;
    `max_turns` names the ceiling. The status line disappears and the turn's
-   frame timer is cleared, so a completed turn leaves no timer scheduled.
+   frame timer is cleared, so a completed turn leaves no timer scheduled. The
+   queue then drains one entry (see below).
 7. **Quit or unmount.** The shell marks itself settled, disposes the driver
    (deny an open approval, abort the turn's `AbortController`, await the turn),
    then awaits the last paint, unmounts Ink and tears the terminal down. No
@@ -117,6 +120,29 @@ While a turn runs the status line prints one of `Thinking...`,
 `Streaming...`, `Invoking tools...`, `Waiting for tool confirmation...` or
 `Cancelling tools...` followed by `(Press ESC to stop)` (B12). The spinner and
 the reserved idle banner row are the animation slice's.
+
+## Queue and steering
+
+While a turn runs, a submitted line joins one FIFO queue instead of starting a
+second turn (B10; `specs/20-agent-loop.md` §B3). `Enter` marks the line
+`steer`: it starts no turn of its own and is appended to the next turn's prompt
+after one blank line. `Ctrl+Enter` marks it `queue`: when the running turn ends
+for any reason but cancellation, one entry starts the next turn — that entry's
+text first, then any steering lines queued before it, joined by a blank line.
+An idle `Ctrl+Enter` is an ordinary submit.
+
+The queue is bounded at `MAX_QUEUED_MESSAGES` (8). A submit at the bound is
+refused: the draft stays in the composer and the transcript appends
+`The queue is full (8 messages). Press Esc to cancel the turn and clear the
+queue.` The list paints directly above the mode row: `│ <n>. <text>` for a
+queued turn, `↳ <n>. <text>` for a steering line, at most three rows plus
+`... N more queued`, and no rows at all when the queue is empty.
+`tests/unit/ui/queued.test.ts` asserts those rows in a rendered frame.
+
+`Esc` cancels the running turn and clears the queue in the same press; with no
+turn running it only clears the queue. While an approval is open, `Esc` answers
+the prompt instead and leaves the queue alone. `Ctrl+C` keeps its B15 meaning
+(clear the draft, arm the exit window) and never touches the turn or the queue.
 
 ## Approval keys
 

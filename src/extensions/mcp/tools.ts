@@ -33,8 +33,10 @@ import {
  * passed to the server intact rather than approximated (B14 pins the listing
  * shape, not the argument grammar).
  *
- * TODO(spec 30 B7): arguments are not validated against the server's JSON
- * Schema before the call.
+ * Spec 30 B7 says MCP tools are *not* pre-validated: the server owns its
+ * argument grammar. This build therefore forwards the object the model produced
+ * and lets the server refuse it, which keeps a stricter local reading from
+ * rejecting a call the server would have accepted.
  */
 export const MCP_TOOL_INPUT_SCHEMA: Schema = {
   kind: "any",

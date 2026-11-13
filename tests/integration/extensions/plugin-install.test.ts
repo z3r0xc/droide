@@ -8,7 +8,7 @@
  * temporary root is removed in `finally`.
  */
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -170,6 +170,7 @@ test("unknown marketplaces and plugins are refused and nothing is written", asyn
         error.code === "plugin-id-invalid",
     );
     assert.equal(existsSync(installedPluginsPath(bench.stateDir)), false);
+    assert.equal(existsSync(join(bench.stateDir, "settings.json")), false);
   } finally {
     root.cleanup();
   }
@@ -248,7 +249,124 @@ test("a source that climbs out of the marketplace is refused", async () => {
   }
 });
 
-test("uninstall refuses while a settings file references the plugin", async () => {
+test("install writes the enablement entry, sorted, and is idempotent", async () => {
+  const root = createTempRoot();
+  try {
+    const bench = await sandbox(root.path, { plugins: ["demo", "second"] });
+    writeAt(
+      bench.stateDir,
+      "settings.json",
+      '{\n  "enabledPlugins": {\n    "mike@team-tools": true\n  }\n}\n',
+    );
+    await installPlugin("second@team-tools", {}, bench.deps);
+    await installPlugin("demo@team-tools", {}, bench.deps);
+    await installPlugin("demo@team-tools", {}, bench.deps);
+
+    assert.equal(
+      readFileSync(join(bench.stateDir, "settings.json"), "utf8"),
+      [
+        "{",
+        '  "enabledPlugins": {',
+        '    "demo@team-tools": true,',
+        '    "mike@team-tools": true,',
+        '    "second@team-tools": true',
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+    );
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("install into a JSONC settings file leaves every other byte in place", async () => {
+  const root = createTempRoot();
+  try {
+    const bench = await sandbox(root.path);
+    const text = [
+      "{",
+      "  // my settings",
+      '  "theme": "dark", /* keep */',
+      '  "enabledPlugins": {},',
+      "  // a trailing note",
+      '  "strictEnabledPlugins": false',
+      "}",
+      "",
+    ].join("\n");
+    writeAt(bench.stateDir, "settings.json", text);
+
+    await installPlugin("demo@team-tools", {}, bench.deps);
+
+    assert.equal(
+      readFileSync(join(bench.stateDir, "settings.json"), "utf8"),
+      [
+        "{",
+        "  // my settings",
+        '  "theme": "dark", /* keep */',
+        '  "enabledPlugins": {',
+        '    "demo@team-tools": true',
+        "  },",
+        "  // a trailing note",
+        '  "strictEnabledPlugins": false',
+        "}",
+        "",
+      ].join("\n"),
+    );
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("install at project scope records enablement in project settings", async () => {
+  const root = createTempRoot();
+  try {
+    const bench = await sandbox(root.path);
+    await addMarketplace(bench.repo.path, {}, { scopeRoot: bench.projectDir });
+    await installPlugin("demo@team-tools", { scope: "project" }, bench.deps);
+
+    assert.equal(existsSync(join(bench.stateDir, "settings.json")), false);
+    assert.equal(
+      readFileSync(join(bench.projectDir, "settings.json"), "utf8"),
+      '{\n  "enabledPlugins": {\n    "demo@team-tools": true\n  }\n}\n',
+    );
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("a settings file that cannot be written refuses the install outright", async () => {
+  const root = createTempRoot();
+  try {
+    const bench = await sandbox(root.path);
+    const path = writeAt(
+      bench.stateDir,
+      "settings.json",
+      '{ "theme": "dark" }\n',
+    );
+    chmodSync(path, 0o444);
+    try {
+      await assert.rejects(
+        installPlugin("demo@team-tools", {}, bench.deps),
+        (error: unknown) =>
+          error instanceof PluginOperationError &&
+          error.code === "settings-not-writable",
+      );
+      assert.equal(readFileSync(path, "utf8"), '{ "theme": "dark" }\n');
+      assert.equal(existsSync(installedPluginsPath(bench.stateDir)), false);
+      assert.equal(
+        existsSync(join(bench.stateDir, "plugins", "demo@team-tools")),
+        false,
+      );
+    } finally {
+      chmodSync(path, 0o644);
+    }
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("uninstall removes the enablement entry and keeps the rest of the file", async () => {
   const root = createTempRoot();
   try {
     const bench = await sandbox(root.path);
@@ -256,21 +374,35 @@ test("uninstall refuses while a settings file references the plugin", async () =
     writeAt(
       bench.stateDir,
       "settings.json",
-      `${JSON.stringify({ enabledPlugins: { "demo@team-tools": true } })}\n`,
+      [
+        "{",
+        '  "theme": "dark",',
+        "  // enablement",
+        '  "enabledPlugins": {',
+        '    "demo@team-tools": true,',
+        '    "other@team-tools": false',
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
     );
 
-    await assert.rejects(
-      uninstallPlugin("demo@team-tools", {}, bench.deps),
-      (error: unknown) =>
-        error instanceof PluginOperationError &&
-        error.code === "plugin-referenced",
-    );
-    assert.equal(existsSync(entry.installPath), true);
-
-    writeAt(bench.stateDir, "settings.json", "{}\n");
     const removed = await uninstallPlugin("demo@team-tools", {}, bench.deps);
     assert.equal(removed.scope, "user");
     assert.equal(existsSync(entry.installPath), false);
+    assert.equal(
+      readFileSync(join(bench.stateDir, "settings.json"), "utf8"),
+      [
+        "{",
+        '  "theme": "dark",',
+        "  // enablement",
+        '  "enabledPlugins": {',
+        '    "other@team-tools": false',
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+    );
     const plugins = registryDocument(installedPluginsPath(bench.stateDir))[
       "plugins"
     ];
@@ -383,6 +515,15 @@ test("a throwing registry rename leaves installed_plugins.json untouched", async
         error instanceof PluginOperationError && error.code === "write-failed",
     );
     assert.equal(readFileSync(path, "utf8"), before);
+    // The enablement entry was written before the copy; the failed install
+    // must not leave the plugin named in settings, and the earlier plugin's
+    // entry must survive the undo.
+    const settings = readFileSync(
+      join(bench.stateDir, "settings.json"),
+      "utf8",
+    );
+    assert.doesNotMatch(settings, /second@team-tools/u);
+    assert.match(settings, /demo@team-tools/u);
   } finally {
     root.cleanup();
   }

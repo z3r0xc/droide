@@ -62,11 +62,39 @@ export interface McpTransport {
   /**
    * Optional inbound channel. Server notifications are advisory (the client
    * only clears its listing cache on `tools/list_changed`), so a transport that
-   * has no inbound stream simply never calls the handler.
+   * has no inbound stream simply never calls the handler. Subscribing is also
+   * what opens an `sse` transport's stream: the client subscribes once the
+   * handshake has completed (B72).
    */
   setNotificationHandler?(
-    handler: (method: string, params: unknown) => void,
+    handler: (notification: McpServerNotification) => void,
   ): void;
+}
+
+/** The server notifications this build acts on; everything else is ignored. */
+export type McpServerNotificationMethod =
+  | "notifications/tools/list_changed"
+  | "notifications/resources/list_changed"
+  | "notifications/resources/updated";
+
+export interface McpServerNotification {
+  readonly method: McpServerNotificationMethod;
+  /**
+   * The frame's `params`, unvalidated beyond the JSON-RPC frame shape: a
+   * `resources/updated` carries `{ uri }`, the list notifications carry none.
+   */
+  readonly params: unknown;
+}
+
+/** Whether a notification method is one the client acts on (B72). */
+export function isMcpServerNotificationMethod(
+  method: string,
+): method is McpServerNotificationMethod {
+  return (
+    method === "notifications/tools/list_changed" ||
+    method === "notifications/resources/list_changed" ||
+    method === "notifications/resources/updated"
+  );
 }
 
 /** One frame's ceiling, matching the 4 MiB catalog cap (B19). */
@@ -89,7 +117,11 @@ export type McpIncomingFrame =
       readonly code: number;
       readonly message: string;
     }
-  | { readonly kind: "notification"; readonly method: string }
+  | {
+      readonly kind: "notification";
+      readonly method: string;
+      readonly params?: unknown;
+    }
   | { readonly kind: "request"; readonly id: number; readonly method: string };
 
 export interface McpFrameContext {
@@ -137,20 +169,25 @@ export function parseMcpFrame(
   }
 
   const rawId = payload["id"];
-  if (rawId === null && !Object.hasOwn(payload, "method")) {
+  const method = payload["method"];
+  if (typeof method === "string") {
+    // A notification carries no id (B72 relies on this for the inbound stream);
+    // a request carries one.
+    if (!Object.hasOwn(payload, "id") || rawId === null) {
+      return { kind: "notification", method, params: payload["params"] };
+    }
+    if (!isRequestId(rawId)) {
+      return fail("sent a frame whose id is not a non-negative integer");
+    }
+    return { kind: "request", id: rawId, method };
+  }
+  if (rawId === null) {
     const body = payload["error"];
     if (!isJsonObject(body)) return fail("sent a null-id frame with no error");
     return errorFrame(body, null, context);
   }
   if (!isRequestId(rawId)) {
     return fail("sent a frame whose id is not a non-negative integer");
-  }
-
-  const method = payload["method"];
-  if (typeof method === "string") {
-    return Object.hasOwn(payload, "id")
-      ? { kind: "request", id: rawId, method }
-      : { kind: "notification", method };
   }
 
   const hasResult = Object.hasOwn(payload, "result");
@@ -275,7 +312,7 @@ export class StdioMcpTransport implements McpTransport {
   private exitDescription = "";
   private killPromise: Promise<void> | undefined;
   private notificationHandler:
-    ((method: string, params: unknown) => void) | undefined;
+    ((notification: McpServerNotification) => void) | undefined;
   private readonly exitWaiters = new Set<() => void>();
 
   constructor(options: McpStdioTransportOptions) {
@@ -378,7 +415,7 @@ export class StdioMcpTransport implements McpTransport {
   }
 
   setNotificationHandler(
-    handler: (method: string, params: unknown) => void,
+    handler: (notification: McpServerNotification) => void,
   ): void {
     this.notificationHandler = handler;
   }
@@ -651,7 +688,12 @@ export class StdioMcpTransport implements McpTransport {
 
     switch (frame.kind) {
       case "notification": {
-        this.notificationHandler?.(frame.method, undefined);
+        if (isMcpServerNotificationMethod(frame.method)) {
+          this.notificationHandler?.({
+            method: frame.method,
+            params: frame.params,
+          });
+        }
         return;
       }
       case "request": {
@@ -854,6 +896,163 @@ export class StdioMcpTransport implements McpTransport {
 
 export type McpFetch = typeof fetch;
 
+/** One dispatched server-sent event (B72). */
+export interface McpSseEvent {
+  /** The `event:` field; `message` when the frame named none. */
+  readonly type: string;
+  /** Every `data:` line of the frame, joined with `\n`. */
+  readonly data: string;
+  /** The resume id in effect when the frame dispatched. */
+  readonly id: string | undefined;
+}
+
+const SSE_LINE_END = /\r\n|\r|\n/;
+
+/**
+ * An incremental server-sent-events parser: `push` takes what a byte stream
+ * decoded to and returns the frames completed by it. Field parsing follows the
+ * SSE grammar — `event:`, `data:` (repeatable, joined with newlines), `id:`
+ * (kept for `Last-Event-ID`), `:` comments, blank-line dispatch — and only
+ * `data:` payloads are size-bounded, so a comment flood cannot grow memory
+ * either: a single line over the cap is an unreadable frame.
+ *
+ * A frame that never sees its blank line is dropped by `end()`: a truncated
+ * stream delivers nothing rather than half an event.
+ */
+export class McpSseParser {
+  private readonly server: string;
+  private readonly maxFrameBytes: number;
+  private buffer = "";
+  private type: string | undefined;
+  private data: string[] = [];
+  private dataSize = 0;
+  private pendingId: string | undefined;
+  private lastEventIdValue: string | undefined;
+
+  constructor(options: {
+    readonly server: string;
+    readonly maxFrameBytes: number;
+  }) {
+    this.server = options.server;
+    this.maxFrameBytes = options.maxFrameBytes;
+  }
+
+  /** The last id the stream delivered, for the next `Last-Event-ID`. */
+  get lastEventId(): string | undefined {
+    return this.lastEventIdValue;
+  }
+
+  /** Feed the next decoded chunk; returns every frame it completed. */
+  push(chunk: string): McpSseEvent[] {
+    this.buffer += chunk;
+    const events: McpSseEvent[] = [];
+    for (;;) {
+      const match = SSE_LINE_END.exec(this.buffer);
+      if (match === null) break;
+      // A trailing `\r` may be the first half of a `\r\n`: wait for the rest.
+      if (match[0] === "\r" && match.index === this.buffer.length - 1) break;
+      const line = this.buffer.slice(0, match.index);
+      this.buffer = this.buffer.slice(match.index + match[0].length);
+      this.line(line, events);
+    }
+    if (this.buffer.length > this.maxFrameBytes) {
+      throw new McpProtocolError(
+        `inbound event stream sent a line over the ${this.maxFrameBytes}-byte cap`,
+        { server: this.server },
+      );
+    }
+    return events;
+  }
+
+  /** A stream that ended without its terminating blank line dispatches nothing. */
+  end(): void {
+    this.buffer = "";
+    this.reset();
+    this.pendingId = undefined;
+  }
+
+  private line(line: string, events: McpSseEvent[]): void {
+    if (line === "") {
+      this.dispatch(events);
+      return;
+    }
+    if (line.startsWith(":")) return;
+    const colon = line.indexOf(":");
+    const field = colon === -1 ? line : line.slice(0, colon);
+    let value = colon === -1 ? "" : line.slice(colon + 1);
+    if (value.startsWith(" ")) value = value.slice(1);
+    switch (field) {
+      case "event": {
+        this.type = value;
+        return;
+      }
+      case "data": {
+        this.dataSize += value.length + (this.data.length === 0 ? 0 : 1);
+        if (this.dataSize > this.maxFrameBytes) {
+          throw new McpProtocolError(
+            `inbound event frame is over the ${this.maxFrameBytes}-byte cap`,
+            { server: this.server },
+          );
+        }
+        this.data.push(value);
+        return;
+      }
+      case "id": {
+        // The SSE grammar disallows NUL in an id; a value that has one is ignored.
+        if (!value.includes("\u0000")) this.pendingId = value;
+        return;
+      }
+      default: {
+        // `retry:` and unknown fields carry nothing this build consumes.
+        return;
+      }
+    }
+  }
+
+  private dispatch(events: McpSseEvent[]): void {
+    if (this.pendingId !== undefined) {
+      this.lastEventIdValue = this.pendingId;
+    }
+    if (this.data.length > 0) {
+      events.push({
+        type: this.type ?? "message",
+        data: this.data.join("\n"),
+        id: this.lastEventIdValue,
+      });
+    }
+    this.reset();
+  }
+
+  private reset(): void {
+    this.type = undefined;
+    this.data = [];
+    this.dataSize = 0;
+    this.pendingId = undefined;
+  }
+}
+
+/** How long to wait before reconnect attempt N; `undefined` stops retrying. */
+export interface McpSseReconnectPolicy {
+  /** `attempt` counts from 1. Return `undefined` to leave the stream closed. */
+  delayMs(attempt: number): number | undefined;
+}
+
+/**
+ * This build's reconnect policy: five attempts, 1 s doubling to a 30 s cap.
+ * A drop triggers it; a stream that opens resets the attempt count, and a
+ * protocol failure (a redirect off-origin, an oversized frame) does not
+ * reconnect at all.
+ */
+export const DEFAULT_MCP_SSE_RECONNECT_POLICY: McpSseReconnectPolicy = {
+  delayMs(attempt: number): number | undefined {
+    if (attempt > 5) return undefined;
+    return Math.min(30_000, 1_000 * 2 ** (attempt - 1));
+  },
+};
+
+/** Redirects one inbound `GET` may follow, all staying on the configured origin. */
+export const MAX_MCP_SSE_REDIRECTS = 3;
+
 export interface McpHttpTransportOptions {
   readonly server: string;
   readonly kind: "http" | "sse";
@@ -861,16 +1060,21 @@ export interface McpHttpTransportOptions {
   readonly headers: Readonly<Record<string, string>>;
   readonly fetch: McpFetch;
   readonly maxFrameBytes?: number;
+  /** Injected so reconnect delays are testable without sleeping. */
+  readonly timers?: McpTimers;
+  /** Replaces {@link DEFAULT_MCP_SSE_RECONNECT_POLICY} (B72). */
+  readonly reconnect?: McpSseReconnectPolicy;
 }
+
+/** Where the inbound stream stands; `idle` until the client subscribes. */
+export type McpInboundStreamState =
+  "idle" | "connecting" | "open" | "waiting" | "failed" | "closed";
 
 /**
  * A streamable-HTTP server: one POST per request, one JSON-RPC frame in the
- * body. `sse` uses the same request path; its long-lived inbound stream is not
- * part of the enabled path (see the TODO in `requestHeaders`).
- *
- * TODO(spec B3): an `sse` server's server-initiated event stream (a GET that
- * stays open) is not opened, so it never delivers `tools/list_changed`; the
- * POST response path is supported.
+ * body. An `sse` server additionally has a server-initiated channel: a `GET`
+ * that stays open, opened when the client subscribes after the handshake, and
+ * resumed with `Last-Event-ID` after a drop (B72).
  */
 export class HttpMcpTransport implements McpTransport {
   readonly server: string;
@@ -881,9 +1085,22 @@ export class HttpMcpTransport implements McpTransport {
   private readonly headers: Readonly<Record<string, string>>;
   private readonly fetchImpl: McpFetch;
   private readonly maxFrameBytes: number;
+  private readonly timers: McpTimers;
+  private readonly reconnect: McpSseReconnectPolicy;
   private nextId = 1;
   private readonly inFlight = new Set<AbortController>();
   private state: "open" | "closed" = "open";
+  private notificationHandler:
+    ((notification: McpServerNotification) => void) | undefined;
+  private inbound: Promise<void> | undefined;
+  private inboundDone: Promise<void> = Promise.resolve();
+  private inboundController: AbortController | undefined;
+  private cancelReconnect: (() => void) | undefined;
+  private reconnectAttempt = 0;
+  private lastEventIdValue: string | undefined;
+  private ignoredCount = 0;
+  private inboundStateValue: McpInboundStreamState = "idle";
+  private inboundErrorValue: Error | undefined;
 
   constructor(options: McpHttpTransportOptions) {
     this.server = options.server;
@@ -892,6 +1109,33 @@ export class HttpMcpTransport implements McpTransport {
     this.headers = options.headers;
     this.fetchImpl = options.fetch;
     this.maxFrameBytes = options.maxFrameBytes ?? MAX_MCP_FRAME_BYTES;
+    this.timers = options.timers ?? systemMcpTimers;
+    this.reconnect = options.reconnect ?? DEFAULT_MCP_SSE_RECONNECT_POLICY;
+  }
+
+  /** Where the inbound stream stands (B72). */
+  get inboundState(): McpInboundStreamState {
+    return this.inboundStateValue;
+  }
+
+  /** Why the stream stopped for good, when it did. */
+  get inboundError(): Error | undefined {
+    return this.inboundErrorValue;
+  }
+
+  /** Notifications the stream could not use: unknown methods, events, payloads. */
+  get ignoredNotifications(): number {
+    return this.ignoredCount;
+  }
+
+  /** The id a reconnect would resume from. */
+  get lastEventId(): string | undefined {
+    return this.lastEventIdValue;
+  }
+
+  /** Settles when the inbound stream stops, whether it opened or not. */
+  get inboundSettled(): Promise<void> {
+    return this.inboundDone;
   }
 
   async request(
@@ -1039,6 +1283,236 @@ export class HttpMcpTransport implements McpTransport {
     this.state = "closed";
     for (const controller of this.inFlight) controller.abort();
     this.inFlight.clear();
+    this.cancelReconnect?.();
+    this.cancelReconnect = undefined;
+    this.inboundController?.abort();
+    this.inboundStateValue = "closed";
+    await this.inbound;
+  }
+
+  /**
+   * Register the client's callback and open the inbound stream. Idempotent:
+   * only the first call (or a call after the stream stopped for good) opens a
+   * `GET`; the POST path is unaffected either way.
+   */
+  setNotificationHandler(
+    handler: (notification: McpServerNotification) => void,
+  ): void {
+    this.notificationHandler = handler;
+    if (this.kind !== "sse" || this.state === "closed") return;
+    if (this.inbound !== undefined) return;
+    this.reconnectAttempt = 0;
+    this.inbound = this.runInbound();
+    this.inboundDone = this.inbound;
+  }
+
+  /** Whether `close()` has run; a getter, so no `await` narrows it stale. */
+  private get closed(): boolean {
+    return this.state === "closed";
+  }
+
+  /**
+   * Read the stream until it ends. A drop reconnects through the injected
+   * policy; a protocol failure (off-origin redirect, oversized frame, non-SSE
+   * answer) stops for good. `close()` ends it without an error.
+   */
+  private async runInbound(): Promise<void> {
+    try {
+      for (;;) {
+        const outcome = await this.readInbound();
+        if (this.closed || outcome !== "dropped") return;
+        const delay = this.reconnect.delayMs((this.reconnectAttempt += 1));
+        if (delay === undefined) {
+          this.inboundStateValue = "failed";
+          return;
+        }
+        this.inboundStateValue = "waiting";
+        await this.waitForReconnect(delay);
+        if (this.closed) return;
+      }
+    } finally {
+      if (this.closed) this.inboundStateValue = "closed";
+      this.inbound = undefined;
+      this.inboundController = undefined;
+    }
+  }
+
+  /** One `GET` and its frames. `dropped` means reconnecting is allowed. */
+  private async readInbound(): Promise<"dropped" | "ended"> {
+    const controller = new AbortController();
+    this.inboundController = controller;
+    this.inboundStateValue = "connecting";
+    try {
+      let url = this.url;
+      let response: Response | undefined;
+      for (let hop = 0; hop <= MAX_MCP_SSE_REDIRECTS; hop += 1) {
+        response = await this.fetchImpl(url, {
+          method: "GET",
+          headers: this.streamHeaders(),
+          redirect: "manual",
+          signal: controller.signal,
+        });
+        if (response.status < 300 || response.status >= 400) break;
+        try {
+          url = this.redirectTarget(url, response);
+        } finally {
+          // A refused redirect must not leave the socket holding a body open.
+          await response.body?.cancel().catch(() => undefined);
+        }
+        response = undefined;
+      }
+      if (response === undefined) {
+        throw new McpProtocolError(
+          `inbound event stream redirected more than ${MAX_MCP_SSE_REDIRECTS} times`,
+          { server: this.server },
+        );
+      }
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
+        throw new McpProtocolError(
+          `inbound event stream answered HTTP ${response.status}`,
+          { server: this.server },
+        );
+      }
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("text/event-stream")) {
+        await response.body?.cancel().catch(() => undefined);
+        throw new McpProtocolError(
+          `inbound event stream answered with content-type "${contentType}", not text/event-stream`,
+          { server: this.server },
+        );
+      }
+
+      this.reconnectAttempt = 0;
+      this.inboundStateValue = "open";
+      await this.pump(response, controller);
+      return "dropped";
+    } catch (error) {
+      if (this.state === "closed" || controller.signal.aborted) return "ended";
+      if (error instanceof McpProtocolError) {
+        this.inboundErrorValue = error;
+        this.inboundStateValue = "failed";
+        return "ended";
+      }
+      // A socket that died under us is a drop, not a verdict.
+      return "dropped";
+    } finally {
+      if (this.inboundController === controller) {
+        this.inboundController = undefined;
+      }
+    }
+  }
+
+  private async pump(
+    response: Response,
+    controller: AbortController,
+  ): Promise<void> {
+    const body = response.body;
+    if (body === null) return;
+    const parser = new McpSseParser({
+      server: this.server,
+      maxFrameBytes: this.maxFrameBytes,
+    });
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+          parser.end();
+          return;
+        }
+        const chunk = decoder.decode(value, { stream: true });
+        for (const event of parser.push(chunk)) this.deliver(event);
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      throw error;
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+  }
+
+  /** Hand a frame to the client, or count it as something this build ignores. */
+  private deliver(event: McpSseEvent): void {
+    if (event.id !== undefined) this.lastEventIdValue = event.id;
+    if (event.type !== "message") {
+      this.ignoredCount += 1;
+      return;
+    }
+    let frame: McpIncomingFrame;
+    try {
+      frame = parseMcpFrame(event.data, { server: this.server });
+    } catch {
+      this.ignoredCount += 1;
+      return;
+    }
+    if (
+      frame.kind !== "notification" ||
+      !isMcpServerNotificationMethod(frame.method)
+    ) {
+      this.ignoredCount += 1;
+      return;
+    }
+    this.notificationHandler?.({
+      method: frame.method,
+      params: frame.params,
+    });
+  }
+
+  private streamHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    for (const [name, value] of Object.entries(this.headers)) {
+      headers[name] = value;
+    }
+    headers["accept"] = "text/event-stream";
+    if (this.lastEventIdValue !== undefined) {
+      headers["last-event-id"] = this.lastEventIdValue;
+    }
+    return headers;
+  }
+
+  /** The URL a redirect may continue at, or a refusal when the origin moved. */
+  private redirectTarget(from: string, response: Response): string {
+    const location = response.headers.get("location");
+    if (location === null || location === "") {
+      throw new McpProtocolError(
+        `inbound event stream answered HTTP ${response.status} without a location`,
+        { server: this.server },
+      );
+    }
+    let base: URL;
+    let next: URL;
+    try {
+      base = new URL(from);
+      next = new URL(location, from);
+    } catch (error) {
+      throw new McpProtocolError(
+        "inbound event stream redirected to an unreadable location",
+        { server: this.server, cause: error },
+      );
+    }
+    if (next.origin !== base.origin) {
+      throw new McpProtocolError(
+        `inbound event stream redirected from ${base.origin} to a different origin ${next.origin}`,
+        { server: this.server },
+      );
+    }
+    return next.href;
+  }
+
+  private waitForReconnect(ms: number): Promise<void> {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    const cancel = this.timers.set(() => {
+      this.cancelReconnect = undefined;
+      resolve();
+    }, ms);
+    this.cancelReconnect = () => {
+      cancel();
+      this.cancelReconnect = undefined;
+      resolve();
+    };
+    return promise;
   }
 
   private requestHeaders(): Record<string, string> {
@@ -1145,6 +1619,8 @@ export interface McpTransportDeps {
   readonly platform?: NodeJS.Platform;
   readonly closeGraceMs?: number;
   readonly maxFrameBytes?: number;
+  /** Replaces the `sse` inbound reconnect policy (B72). */
+  readonly sseReconnect?: McpSseReconnectPolicy;
 }
 
 /**
@@ -1185,6 +1661,10 @@ export function createMcpTransport(
     url: config.url,
     headers: config.headers,
     fetch: deps.fetch,
+    ...(deps.timers === undefined ? {} : { timers: deps.timers }),
+    ...(deps.sseReconnect === undefined
+      ? {}
+      : { reconnect: deps.sseReconnect }),
     ...(deps.maxFrameBytes === undefined
       ? {}
       : { maxFrameBytes: deps.maxFrameBytes }),

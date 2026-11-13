@@ -13,7 +13,10 @@ import {
   McpCancelledError,
   McpProtocolError,
 } from "../../../src/extensions/mcp/errors.ts";
-import { HttpMcpTransport } from "../../../src/extensions/mcp/transport.ts";
+import {
+  HttpMcpTransport,
+  parseMcpFrame,
+} from "../../../src/extensions/mcp/transport.ts";
 
 interface Call {
   readonly url: string;
@@ -213,4 +216,18 @@ test("a closed transport refuses a request before it is sent", async () => {
       error instanceof McpCancelledError && error.stage === "not_sent",
   );
   assert.equal(calls.length, 0);
+});
+
+test("an id-less notification frame parses with its params", () => {
+  assert.deepEqual(
+    parseMcpFrame(
+      '{"jsonrpc":"2.0","method":"notifications/resources/updated","params":{"uri":"file:///a"}}',
+      { server: "unit" },
+    ),
+    {
+      kind: "notification",
+      method: "notifications/resources/updated",
+      params: { uri: "file:///a" },
+    },
+  );
 });

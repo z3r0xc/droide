@@ -10,7 +10,7 @@ Semantic versioning on the product surface (`src/cli`):
 - **patch** — fixes that keep every documented contract intact.
 
 The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, and a
-unit test keeps it equal to the *package* version (`package.json`). A release
+unit test keeps it equal to the _package_ version (`package.json`). A release
 bumps both in the same commit; never "fix" one on its own.
 
 ## Gates before a release

@@ -811,3 +811,83 @@ test(
     assertNoLeaks(session.terminal, session.signals, session.clock);
   },
 );
+
+test(
+  "a submit during a turn steers through the queue and Esc clears it",
+  { timeout: 8000 },
+  async () => {
+    const scripted = scriptedProvider((call) =>
+      call === 0
+        ? "hold"
+        : [{ type: "text", text: "second answer" }, { type: "done" }],
+    );
+    const session = start(() => ({
+      provider: scripted.provider,
+      tools: () => silentToolRunner(),
+    }));
+    try {
+      await session.ready();
+      session.terminal.write("first\r");
+      await waitFor(() => scripted.active === 1, "first turn streaming");
+      session.clock.advanceBy(16);
+      await waitFor(
+        () => session.terminal.text().includes("partial"),
+        "streamed text",
+      );
+
+      session.terminal.write("check the tests");
+      await waitFor(
+        () => session.terminal.text().includes("check the tests"),
+        "draft",
+      );
+      session.terminal.write("\r");
+      await waitFor(
+        () =>
+          session.terminal
+            .lastFrame()
+            .some((line) => line === "↳ 1. check the tests"),
+        "steering row above the composer",
+      );
+      assert.equal(scripted.calls, 1, "a steering line starts no turn");
+      assert.equal(
+        session.terminal
+          .lastFrame()
+          .some((line) => line.includes("> check the tests")),
+        false,
+        "submitting cleared the composer",
+      );
+
+      // Esc cancels the turn and clears the queue in the same press.
+      session.terminal.write("\u001b");
+      session.clock.advanceBy(400);
+      await waitFor(
+        () => session.terminal.text().includes("Cancelled"),
+        "cancel notice",
+      );
+      await waitFor(
+        () =>
+          session.terminal.lastFrame().some((line) => line.startsWith("↳ ")) ===
+          false,
+        "queued row removed",
+      );
+      assert.equal(scripted.active, 0, "aborted stream closed");
+      assert.equal(scripted.aborts, 1, "the provider observed the abort");
+
+      session.terminal.write("again\r");
+      await waitFor(
+        () => session.terminal.text().includes("second answer"),
+        "second turn answered",
+      );
+      assert.equal(scripted.calls, 2, "the cleared queue started nothing");
+      assert.equal(
+        session.terminal.lastFrame().some((line) => line.startsWith("↳ ")),
+        false,
+        "the queue stayed empty",
+      );
+    } finally {
+      session.terminal.write("/quit\r");
+      assert.equal(await session.exits, 0);
+    }
+    assertNoLeaks(session.terminal, session.signals, session.clock);
+  },
+);

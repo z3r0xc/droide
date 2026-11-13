@@ -15,6 +15,7 @@
  * rewritten.
  */
 import { randomUUID } from "node:crypto";
+import { existsSync, rmSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import {
   dirname,
@@ -24,8 +25,14 @@ import {
   sep,
 } from "node:path";
 
+import {
+  lookupSettingsValue,
+  removeSettingsValue,
+  setSettingsValue,
+  SettingsWriteError,
+  type SettingsValueLookup,
+} from "../../config/write.ts";
 import { isRecord } from "../guards.ts";
-import { parseJsonc } from "../jsonc.ts";
 import { compareVersions, type PluginScope } from "./installed.ts";
 import {
   PluginError,
@@ -517,11 +524,62 @@ async function prepareArtifact(
 // Install
 // ---------------------------------------------------------------------------
 
+/** The settings file a scope's enablement lives in: `<scopeRoot>/settings.json`. */
+function enablementSettingsPath(root: string): string {
+  return join(root, "settings.json");
+}
+
+/**
+ * A settings-write refusal, translated into the plugin vocabulary. A document
+ * this writer will not edit safely is `settings-invalid`; a file it cannot
+ * replace is `settings-not-writable`. Neither ever leaves a partial install.
+ */
+function settingsWriteFailure(error: unknown): PluginOperationError {
+  if (error instanceof PluginOperationError) return error;
+  const detail =
+    error instanceof Error
+      ? error.message
+      : `Unexpected settings failure: ${String(error)}`;
+  const refusal =
+    error instanceof SettingsWriteError &&
+    (error.code === "ambiguous-key" || error.code === "invalid-document");
+  return new PluginOperationError(
+    refusal ? "settings-invalid" : "settings-not-writable",
+    detail,
+    { cause: error },
+  );
+}
+
+/** Undo the enablement entry an install added before the copy failed (B37). */
+function restoreEnablement(
+  path: string,
+  keyPath: readonly string[],
+  previous: SettingsValueLookup,
+  existed: boolean,
+  root: string,
+): void {
+  try {
+    if (!existed) {
+      rmSync(path, { force: true });
+      return;
+    }
+    if (previous.present && previous.value !== undefined)
+      setSettingsValue(path, keyPath, previous.value, { root });
+    else removeSettingsValue(path, keyPath, { root });
+  } catch {
+    // The install already failed and that error is what the caller needs; a
+    // targeted undo cannot promise more than its best effort here.
+  }
+}
+
 /**
  * `plugin install <plugin@marketplace> [-s user|project]` (B37). The plugin is
- * resolved in the marketplace registered for that scope, copied into the
- * install cache, and its entry is merged into the registry. An id installed in
- * the other scope is refused, because one plugin slot must have one owner.
+ * resolved in the marketplace registered for that scope, its enablement entry
+ * is written into the scope's settings, the files are copied into the install
+ * cache, and its entry is merged into the registry. A copy or registry failure
+ * restores the settings entry, so the enablement map never names a plugin that
+ * is not installed. An id installed in the other scope is refused, because one
+ * plugin slot must have one owner.
  */
 export async function installPlugin(
   rawSpec: string,
@@ -587,69 +645,99 @@ export async function installPlugin(
     resolved.id,
     artifact.version,
   );
+
+  // B37: the enablement entry is written first, so a plugin is never on disk
+  // without being enabled or enabled without being on disk. The undo below is
+  // the other half of that promise.
+  const settingsPath = enablementSettingsPath(root);
+  const enablementKey: readonly string[] = ["enabledPlugins", resolved.id];
+  let previousEnablement: SettingsValueLookup;
+  let settingsExisted: boolean;
   try {
-    await copyIntoPlace(artifact.sourceDirectory, installPath, io);
-  } finally {
+    previousEnablement = lookupSettingsValue(settingsPath, enablementKey, {
+      root,
+    });
+    settingsExisted = existsSync(settingsPath);
+    setSettingsValue(settingsPath, enablementKey, true, {
+      root,
+      sorted: true,
+      createIfMissing: true,
+    });
+  } catch (error) {
+    // Nothing was copied yet, but an external source may have been staged.
     artifact.cleanup?.();
+    throw settingsWriteFailure(error);
   }
 
-  const timestamp = (deps.now ?? (() => new Date()))().toISOString();
-  const entry: InstalledPluginEntry = {
-    id: resolved.id,
-    scope,
-    installPath,
-    version: artifact.version,
-    installedAt: timestamp,
-    lastUpdated: timestamp,
-    source: resolved.marketplace,
-    marketplaceSourceHash: hashMarketplaceSource(marketplace.source),
-    ...(artifact.externalSource === undefined
-      ? {}
-      : { externalSource: artifact.externalSource }),
-    ...(artifact.externalCommit === undefined
-      ? {}
-      : { externalCommit: artifact.externalCommit }),
-    ...(artifact.npm === undefined ? {} : { npm: artifact.npm }),
-  };
+  try {
+    try {
+      await copyIntoPlace(artifact.sourceDirectory, installPath, io);
+    } finally {
+      artifact.cleanup?.();
+    }
 
-  const registry = readInstalledRegistry(root, io);
-  const existing = registry.plugins[resolved.id];
-  if (existing !== undefined && !Array.isArray(existing)) {
-    throw new PluginOperationError(
-      "registry-invalid",
-      `${registry.path} stores "${resolved.id}" as something other than a list of entries.`,
+    const timestamp = (deps.now ?? (() => new Date()))().toISOString();
+    const entry: InstalledPluginEntry = {
+      id: resolved.id,
+      scope,
+      installPath,
+      version: artifact.version,
+      installedAt: timestamp,
+      lastUpdated: timestamp,
+      source: resolved.marketplace,
+      marketplaceSourceHash: hashMarketplaceSource(marketplace.source),
+      ...(artifact.externalSource === undefined
+        ? {}
+        : { externalSource: artifact.externalSource }),
+      ...(artifact.externalCommit === undefined
+        ? {}
+        : { externalCommit: artifact.externalCommit }),
+      ...(artifact.npm === undefined ? {} : { npm: artifact.npm }),
+    };
+
+    const registry = readInstalledRegistry(root, io);
+    const existing = registry.plugins[resolved.id];
+    if (existing !== undefined && !Array.isArray(existing)) {
+      throw new PluginOperationError(
+        "registry-invalid",
+        `${registry.path} stores "${resolved.id}" as something other than a list of entries.`,
+      );
+    }
+    const kept: unknown[] = [];
+    const replacedPaths: string[] = [];
+    for (const value of existing ?? []) {
+      if (isRecord(value) && value["scope"] === scope) {
+        const previousPath = value["installPath"];
+        if (typeof previousPath === "string") replacedPaths.push(previousPath);
+        continue;
+      }
+      kept.push(value);
+    }
+    writeInstalledRegistry(
+      registry,
+      { ...registry.plugins, [resolved.id]: [...kept, serialiseEntry(entry)] },
+      io,
     );
-  }
-  const kept: unknown[] = [];
-  const replacedPaths: string[] = [];
-  for (const value of existing ?? []) {
-    if (isRecord(value) && value["scope"] === scope) {
-      const previousPath = value["installPath"];
-      if (typeof previousPath === "string") replacedPaths.push(previousPath);
-      continue;
+    for (const previousPath of replacedPaths) {
+      if (
+        previousPath !== installPath &&
+        isInside(pluginsDirectory(root), previousPath)
+      ) {
+        io.remove(previousPath);
+      }
     }
-    kept.push(value);
-  }
-  writeInstalledRegistry(
-    registry,
-    { ...registry.plugins, [resolved.id]: [...kept, serialiseEntry(entry)] },
-    io,
-  );
-  for (const previousPath of replacedPaths) {
-    if (
-      previousPath !== installPath &&
-      isInside(pluginsDirectory(root), previousPath)
-    ) {
-      io.remove(previousPath);
-    }
-  }
 
-  // TODO(spec B37): the flow stops at the registry write. The clause also says
-  // the install writes the enablement map, but this build has no settings
-  // writer (src/config reads `settings.json` and never rewrites it), so
-  // `general.enabledPlugins` is left alone and the plugin resolves as enabled
-  // by absence. A settings-write surface has to exist before this can land.
-  return entry;
+    return entry;
+  } catch (error) {
+    restoreEnablement(
+      settingsPath,
+      enablementKey,
+      previousEnablement,
+      settingsExisted,
+      root,
+    );
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -666,50 +754,41 @@ export interface PluginUninstallResult {
   readonly installPaths: readonly string[];
 }
 
-function referencesPluginId(document: unknown, id: string): boolean {
-  if (!isRecord(document)) return false;
-  if (
-    isRecord(document["enabledPlugins"]) &&
-    Object.hasOwn(document["enabledPlugins"], id)
-  )
-    return true;
-  const general = document["general"];
-  return (
-    isRecord(general) &&
-    isRecord(general["enabledPlugins"]) &&
-    Object.hasOwn(general["enabledPlugins"], id)
-  );
+interface EnablementRemoval {
+  readonly path: string;
+  readonly root: string;
+  readonly keyPath: readonly string[];
 }
 
 /**
- * The first settings file that still names this plugin (B36 enablement). A
- * settings file that cannot be parsed makes the check impossible, so the
- * uninstall is refused rather than deleting configuration out from under it.
+ * Every settings file that names this plugin's enablement (B36), in both
+ * scopes and both spellings this layer has ever accepted. B38 removes the
+ * entry; the documents are only read here, and a refusal from the reader
+ * aborts the uninstall before anything is deleted.
  */
-function findReference(
+function planEnablementRemovals(
   id: string,
   roots: Readonly<Record<PluginScope, string>>,
-  io: PluginIo,
-): string | undefined {
+): readonly EnablementRemoval[] {
+  const removals: EnablementRemoval[] = [];
   for (const root of [roots.user, roots.project]) {
     for (const name of ["settings.json", "settings.local.json"]) {
       const path = join(root, name);
-      const text = io.readFile(path);
-      if (text === undefined) continue;
-      let parsed: unknown;
-      try {
-        parsed = parseJsonc(text);
-      } catch (error) {
-        throw new PluginOperationError(
-          "settings-invalid",
-          `${path} could not be read, so the plugin reference cannot be checked: ${error instanceof Error ? error.message : String(error)}`,
-          { cause: error },
-        );
+      for (const keyPath of [
+        ["enabledPlugins", id],
+        ["general", "enabledPlugins", id],
+      ] as const) {
+        let found: SettingsValueLookup;
+        try {
+          found = lookupSettingsValue(path, keyPath, { root });
+        } catch (error) {
+          throw settingsWriteFailure(error);
+        }
+        if (found.present) removals.push({ path, root, keyPath });
       }
-      if (referencesPluginId(parsed, id)) return path;
     }
   }
-  return undefined;
+  return removals;
 }
 
 function installedEntryPaths(entries: readonly unknown[]): readonly string[] {
@@ -724,10 +803,10 @@ function installedEntryPaths(entries: readonly unknown[]): readonly string[] {
 
 /**
  * `plugin uninstall <plugin@marketplace> [-s scope]` (B38). Without a scope
- * the user registry is checked first, then the project one. A settings file
- * that still references the plugin is refused rather than edited: removing
- * someone's enablement entry behind their back is worse than asking them to
- * drop the reference.
+ * the user registry is checked first, then the project one. The enablement
+ * entry is removed rather than set to `false`, from every settings file that
+ * names it; a settings file that cannot be read or written aborts the
+ * uninstall before the registry or the plugin's files are touched.
  */
 export async function uninstallPlugin(
   rawSpec: string,
@@ -767,12 +846,15 @@ export async function uninstallPlugin(
   const entries = registry.plugins[resolved.id];
   if (!Array.isArray(entries) || entries.length === 0) throw notInstalled();
 
-  const referencedBy = findReference(resolved.id, roots, io);
-  if (referencedBy !== undefined) {
-    throw new PluginOperationError(
-      "plugin-referenced",
-      `Plugin "${resolved.id}" is referenced by ${referencedBy}. Remove that reference before uninstalling it.`,
-    );
+  const removals = planEnablementRemovals(resolved.id, roots);
+  for (const removal of removals) {
+    try {
+      removeSettingsValue(removal.path, removal.keyPath, {
+        root: removal.root,
+      });
+    } catch (error) {
+      throw settingsWriteFailure(error);
+    }
   }
 
   const installPaths = installedEntryPaths(entries);

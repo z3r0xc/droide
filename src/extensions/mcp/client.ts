@@ -36,6 +36,8 @@ import {
   isAborted,
   systemMcpTimers,
   type McpFetch,
+  type McpServerNotification,
+  type McpSseReconnectPolicy,
   type McpTimers,
   type McpTransport,
 } from "./transport.ts";
@@ -427,7 +429,7 @@ function renderBlock(block: McpContentBlock): string {
  * `[No content returned]`, and an `isError` result renders `Error: ...`.
  *
  * TODO(spec B22): image blocks are reported by type and size instead of being
- * compressed, and an unsupported image MIME type keeps the same marker.
+ * compressed; the two placeholders themselves are quoted by the clause.
  */
 export function renderToolCallResult(
   result: McpCallToolResult,
@@ -505,6 +507,13 @@ export interface McpClientOptions {
   readonly now?: () => number;
   /** A prepared transport; the client owns it and closes it. */
   readonly transport?: McpTransport;
+  /**
+   * Observes the server notifications the client acts on, after its own
+   * invalidation ran (B72). The `sse` inbound stream is opened by subscribing.
+   */
+  readonly onServerNotification?: (notification: McpServerNotification) => void;
+  /** Replaces the `sse` inbound reconnect policy (B72). */
+  readonly sseReconnect?: McpSseReconnectPolicy;
 }
 
 interface ListingFailure {
@@ -530,9 +539,13 @@ export class McpClient {
   private readonly listTimeoutMs: number;
   private readonly callTimeoutMs: number;
   private readonly listingFailureTtlMs: number;
+  private readonly onServerNotification:
+    ((notification: McpServerNotification) => void) | undefined;
   private state: "new" | "connecting" | "open" | "closing" | "closed" = "new";
   private closePromise: Promise<void> | undefined;
   private listingFailure: ListingFailure | undefined;
+  /** The last successful listing, until a `tools/list_changed` invalidates it. */
+  private listing: McpToolList | undefined;
   private protocolVersionValue: string | undefined;
   private capabilitiesValue: Readonly<Record<string, unknown>> = {};
   private serverInfoValue: McpInitializeResult["serverInfo"];
@@ -551,6 +564,7 @@ export class McpClient {
       DEFAULT_MCP_CALL_TIMEOUT_MS;
     this.listingFailureTtlMs =
       options.listingFailureTtlMs ?? DEFAULT_MCP_LISTING_FAILURE_TTL_MS;
+    this.onServerNotification = options.onServerNotification;
     this.connectTimeoutMs =
       options.connectTimeoutMs ??
       options.config.connectTimeout ??
@@ -574,6 +588,9 @@ export class McpClient {
       ...(options.maxFrameBytes === undefined
         ? {}
         : { maxFrameBytes: options.maxFrameBytes }),
+      ...(options.sseReconnect === undefined
+        ? {}
+        : { sseReconnect: options.sseReconnect }),
     });
   }
 
@@ -667,17 +684,21 @@ export class McpClient {
     }
 
     this.state = "open";
-    this.transport.setNotificationHandler?.((method) => {
-      // B13: a listing-changed notification is manual recovery for the cache.
-      if (method === "notifications/tools/list_changed") {
+    this.transport.setNotificationHandler?.((notification) => {
+      // B13/B72: a listing-changed notification invalidates both caches, so the
+      // next listing re-reads once instead of reusing a stale answer.
+      if (notification.method === "notifications/tools/list_changed") {
         this.listingFailure = undefined;
+        this.listing = undefined;
       }
+      this.onServerNotification?.(notification);
     });
   }
 
-  /** Forget the negative-cached listing failure (B13's manual recovery). */
+  /** Forget the cached listing and the negative-cached failure (B13, B72). */
   clearListingFailure(): void {
     this.listingFailure = undefined;
+    this.listing = undefined;
   }
 
   /**
@@ -694,12 +715,20 @@ export class McpClient {
     } = {},
   ): Promise<McpToolList> {
     this.requireOpen("tools/list");
-    if (options.refresh === true) this.listingFailure = undefined;
+    if (options.refresh === true) {
+      this.listingFailure = undefined;
+      this.listing = undefined;
+    }
     const cached = this.listingFailure;
     if (cached !== undefined) {
       if (this.now() - cached.at < this.listingFailureTtlMs) throw cached.error;
       this.listingFailure = undefined;
     }
+    // The cache exists so one notification costs one re-read, not one per
+    // caller: a stale list is worse than a re-read, so nothing is reused after
+    // `tools/list_changed` (B72).
+    const remembered = this.listing;
+    if (remembered !== undefined) return remembered;
 
     const budget = this.listTimeoutMs;
     const deadline = this.now() + budget;
@@ -766,7 +795,9 @@ export class McpClient {
     }
 
     this.listingFailure = undefined;
-    return { tools, skipped };
+    const listing: McpToolList = { tools, skipped };
+    this.listing = listing;
+    return listing;
   }
 
   /**

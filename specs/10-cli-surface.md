@@ -192,6 +192,35 @@ or as the last path segment of an absolute link — `/sessions/<id>` pages and t
 refused rather than guessed (`src/cli/resume-commands.ts`, `src/session/ids.ts`).
 `[observed]`
 
+A resume that reaches the interactive shell is **seeded, never replayed**
+`[derived]` — `src/app/session-seed.ts`, `src/cli/resume-commands.ts`:
+
+- the shell's first screen is the stored transcript, oldest first: user and
+  assistant prose, and one row per tool call carrying its stored result (a call
+  with no stored result is shown as an interrupted error). No model call runs to
+  rebuild the screen, so a resume costs nothing until the user types;
+- the context the next turn sends is the stored messages in transcript order
+  plus the newly typed prompt, so the first request after a resume continues
+  that conversation instead of starting a new one;
+- a transcript that is missing or unparseable is a **named refusal**, never an
+  empty shell: `The transcript for session <id> is missing, so it cannot be
+resumed.` or `The transcript for session <id> is corrupt at line <n>, so it
+cannot be resumed.`, both exit 1 (B70) and write nothing.
+
+Without an id the command chooses `[derived]`:
+
+- on a terminal it opens a picker over the stored sessions, newest first, one
+  row per session naming its id, its title (or `(untitled)`) and its update
+  time; ↑/↓ (or `k`/`j`) move, Enter resumes, and `q` (or Ctrl+C) aborts with
+  exit 0 and `No session selected.` on stderr. The picker is a raw-mode surface,
+  not the shell: `resume` must not load React and Ink to print a list (ADR 0012,
+  `src/cli/session-picker.ts`);
+- on a pipe it prints the bounded newest-first list and exits 0, unchanged:
+  there is nothing to choose with.
+
+`--last` keeps its meaning — the newest session whose working directory is the
+current one, else the newest overall — and still requires a terminal (B82).
+
 **B23** Its option list is the two contextual flags `--fork` (boolean) and
 `--last`, then the whole startup set minus `--resume`, `--fork` and `--last`,
 in registration order (`orig/src/entrypoints/tui/command.ts:191-208`;
@@ -615,6 +644,12 @@ folder → `.droide` folders → project settings → project `.agent` → proje
 plugins → user settings → user `.agent` → user plugins → dynamic config → builtin
 defaults (`orig/packages/runtime/settings/src/SettingsManager.ts:3923-4013`).
 
+A settings file is read as JSONC and, when this build writes one, edited as text:
+only the affected key's span changes, so comments, key order and indentation
+survive; the replacement is atomic and a document the writer cannot edit safely
+is refused rather than reformatted (`specs/60-extensions-mcp-and-skills.md` B36,
+ADR 0012).
+
 ## Errors
 
 | #   | Trigger                                                                       | Message (exact where recorded)                                                                                                                                                                                                                                                                                                                                                                   | Exit | State                    |
@@ -653,37 +688,37 @@ Every clause maps to at least one test. `fixtures/` items are synthesized (temp
 `HOME`, `TZ=UTC`, `LANG=C`, `TERM=dumb`, `NO_COLOR=1`, unroutable proxy), matching
 the parity harness invariants (`tests/parity/README.md`).
 
-| Clause         | Test id                                                              | Fixture                                    |
-| -------------- | -------------------------------------------------------------------- | ------------------------------------------ |
-| B1, B4, B5, B6 | `tests/cli/test_root_help_exact`                                     | `tests/parity/expected/help.json`          |
-| B2, B7         | `tests/cli/test_root_usage_line`                                     | —                                          |
-| B3             | `tests/cli/test_version_flag`                                        | `tests/parity/expected/version.json`       |
-| B8             | `tests/cli/test_alias_dispatch`                                      | `fixtures/session-corpus`                  |
-| B9, B10        | `tests/cli/test_bare_words_become_prompt`                            | `tests/parity/expected/unknown-*.json`     |
-| B11            | `tests/cli/test_positional_options`                                  | —                                          |
-| B12            | `tests/cli/test_hook_words_shortcircuit`                             | —                                          |
-| B13            | `tests/cli/test_deployment_prerouter`                                | —                                          |
-| B14, B63       | `tests/cli/test_gated_help_fails_closed`                             | `fixtures/flags-off`                       |
-| B15–B20        | `tests/cli/test_non_tty_refusal_matrix`                              | `fixtures/no-tty`                          |
-| B21            | `tests/cli/test_refusal_locale`                                      | `fixtures/settings-ja`                     |
-| B22–B25, B82   | `tests/cli/test_resume_command`, `tests/cli/test_tui_flag_conflicts` | `tests/parity/expected/help-resume.json`   |
-| B26–B29        | `tests/cli/test_exec_help_exact`                                     | `tests/parity/expected/help-exec.json`     |
-| B30            | `tests/cli/test_exec_undocumented_options`                           | —                                          |
-| B31            | `tests/cli/test_exec_prompt_sources`                                 | `fixtures/prompts`                         |
-| B32, B34       | `tests/cli/test_exec_streaming_modes`                                | `fixtures/stream-jsonrpc`                  |
-| B33            | `tests/cli/test_exec_flag_conflicts`                                 | —                                          |
-| B35–B38        | `tests/cli/test_daemon_options`                                      | `tests/parity/expected/help-daemon.json`   |
-| B39, B40       | `tests/cli/test_search_options`                                      | `tests/parity/expected/help-search.json`   |
-| B41, B42, B75  | `tests/cli/test_update_options`                                      | `tests/parity/expected/help-update.json`   |
-| B43–B45        | `tests/cli/test_mcp_tree`                                            | `tests/parity/expected/help-mcp.json`      |
-| B46            | `tests/cli/test_plugin_tree`                                         | `tests/parity/expected/help-plugin.json`   |
-| B47, B48       | `tests/cli/test_computer_tree`                                       | `tests/parity/expected/help-computer.json` |
-| B49–B51, B74   | `tests/cli/test_doctor_options`                                      | `tests/parity/expected/help-doctor.json`   |
-| B52–B62        | `tests/cli/test_hidden_commands_absent`                              | `fixtures/flags-on`                        |
-| B64            | `tests/cli/test_dispatch_token_provenance`                           | —                                          |
-| B65–B68        | `tests/cli/test_launch_path_anchoring`                               | `fixtures/nested-dirs`                     |
-| B69–B73, B76   | `tests/cli/test_exit_codes`                                          | —                                          |
-| B77–B81        | `tests/cli/test_precedence_chain`                                    | `fixtures/settings-layers`                 |
+| Clause         | Test id                                                                                                                                                                                                                                                                                  | Fixture                                    |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| B1, B4, B5, B6 | `tests/cli/test_root_help_exact`                                                                                                                                                                                                                                                         | `tests/parity/expected/help.json`          |
+| B2, B7         | `tests/cli/test_root_usage_line`                                                                                                                                                                                                                                                         | —                                          |
+| B3             | `tests/cli/test_version_flag`                                                                                                                                                                                                                                                            | `tests/parity/expected/version.json`       |
+| B8             | `tests/cli/test_alias_dispatch`                                                                                                                                                                                                                                                          | `fixtures/session-corpus`                  |
+| B9, B10        | `tests/cli/test_bare_words_become_prompt`                                                                                                                                                                                                                                                | `tests/parity/expected/unknown-*.json`     |
+| B11            | `tests/cli/test_positional_options`                                                                                                                                                                                                                                                      | —                                          |
+| B12            | `tests/cli/test_hook_words_shortcircuit`                                                                                                                                                                                                                                                 | —                                          |
+| B13            | `tests/cli/test_deployment_prerouter`                                                                                                                                                                                                                                                    | —                                          |
+| B14, B63       | `tests/cli/test_gated_help_fails_closed`                                                                                                                                                                                                                                                 | `fixtures/flags-off`                       |
+| B15–B20        | `tests/cli/test_non_tty_refusal_matrix`                                                                                                                                                                                                                                                  | `fixtures/no-tty`                          |
+| B21            | `tests/cli/test_refusal_locale`                                                                                                                                                                                                                                                          | `fixtures/settings-ja`                     |
+| B22–B25, B82   | `tests/cli/test_resume_command`, `tests/cli/test_tui_flag_conflicts`; here: `tests/unit/cli/resume-commands.test.ts`, `tests/unit/cli/session-picker.test.ts`, `tests/unit/app/session-seed.test.ts`, `tests/integration/ui/resume-seed.test.ts`, `tests/integration/cli/resume.test.ts` | `tests/parity/expected/help-resume.json`   |
+| B26–B29        | `tests/cli/test_exec_help_exact`                                                                                                                                                                                                                                                         | `tests/parity/expected/help-exec.json`     |
+| B30            | `tests/cli/test_exec_undocumented_options`                                                                                                                                                                                                                                               | —                                          |
+| B31            | `tests/cli/test_exec_prompt_sources`                                                                                                                                                                                                                                                     | `fixtures/prompts`                         |
+| B32, B34       | `tests/cli/test_exec_streaming_modes`                                                                                                                                                                                                                                                    | `fixtures/stream-jsonrpc`                  |
+| B33            | `tests/cli/test_exec_flag_conflicts`                                                                                                                                                                                                                                                     | —                                          |
+| B35–B38        | `tests/cli/test_daemon_options`                                                                                                                                                                                                                                                          | `tests/parity/expected/help-daemon.json`   |
+| B39, B40       | `tests/cli/test_search_options`                                                                                                                                                                                                                                                          | `tests/parity/expected/help-search.json`   |
+| B41, B42, B75  | `tests/cli/test_update_options`                                                                                                                                                                                                                                                          | `tests/parity/expected/help-update.json`   |
+| B43–B45        | `tests/cli/test_mcp_tree`                                                                                                                                                                                                                                                                | `tests/parity/expected/help-mcp.json`      |
+| B46            | `tests/cli/test_plugin_tree`                                                                                                                                                                                                                                                             | `tests/parity/expected/help-plugin.json`   |
+| B47, B48       | `tests/cli/test_computer_tree`                                                                                                                                                                                                                                                           | `tests/parity/expected/help-computer.json` |
+| B49–B51, B74   | `tests/cli/test_doctor_options`                                                                                                                                                                                                                                                          | `tests/parity/expected/help-doctor.json`   |
+| B52–B62        | `tests/cli/test_hidden_commands_absent`                                                                                                                                                                                                                                                  | `fixtures/flags-on`                        |
+| B64            | `tests/cli/test_dispatch_token_provenance`                                                                                                                                                                                                                                               | —                                          |
+| B65–B68        | `tests/cli/test_launch_path_anchoring`                                                                                                                                                                                                                                                   | `fixtures/nested-dirs`                     |
+| B69–B73, B76   | `tests/cli/test_exit_codes`                                                                                                                                                                                                                                                              | —                                          |
+| B77–B81        | `tests/cli/test_precedence_chain`                                                                                                                                                                                                                                                        | `fixtures/settings-layers`                 |
 
 ### argv → parse-result table
 
