@@ -1470,3 +1470,40 @@ test("method surface: every request B61 names is served, not method-not-found", 
   }
   await harness.dispose();
 });
+
+test("exit status: the session's outcome decides it (B54, B55)", async () => {
+  const ok = await openSession({});
+  ok.harness.send({
+    jsonrpc: "2.0",
+    id: 93,
+    method: "session/prompt",
+    params: { sessionId: ok.sessionId, prompt: [{ type: "text", text: "go" }] },
+  });
+  assert.deepEqual(resultOf(await ok.harness.nextResponse(93)), {
+    stopReason: "end_turn",
+  });
+  assert.equal(ok.harness.server.exitCode, 0);
+  await ok.harness.dispose();
+
+  const failed = await openSession({
+    runner: scriptedRunner(async () => ({
+      kind: "failed",
+      message: "the provider exploded",
+    })),
+  });
+  failed.harness.send({
+    jsonrpc: "2.0",
+    id: 94,
+    method: "session/prompt",
+    params: {
+      sessionId: failed.sessionId,
+      prompt: [{ type: "text", text: "go" }],
+    },
+  });
+  assert.equal(
+    failureOf(await failed.harness.nextResponse(94)).error.code,
+    -32603,
+  );
+  assert.equal(failed.harness.server.exitCode, 1);
+  await failed.harness.dispose();
+});

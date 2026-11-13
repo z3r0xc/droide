@@ -33,6 +33,7 @@ import {
   type SessionStore,
   type SessionStoreOptions,
 } from "../session/store.ts";
+import { TranscriptUnavailableError } from "../session/errors.ts";
 import {
   isJsonObject,
   type JsonObject,
@@ -559,4 +560,41 @@ export function openExecSession(options: OpenExecSessionOptions): ExecSession {
       cause: error,
     });
   }
+}
+
+export interface AdoptExecSessionOptions {
+  /** The store that already holds this session's row. */
+  readonly store: SessionStore;
+  readonly sessionId: string;
+  readonly clock: () => number;
+}
+
+/**
+ * The transcript of a session whose row already exists — ACP's `session/new`
+ * registers it — so the turn path appends to that session instead of minting a
+ * second one. A row with no transcript file yet is an empty history.
+ *
+ * The caller owns the store: {@link ExecSession.close} is a no-op here, and one
+ * `store.close()` ends the whole run.
+ */
+export function adoptExecSession(
+  options: AdoptExecSessionOptions,
+): ExecSession {
+  let history: Message[] = [];
+  try {
+    history = messagesFromRecords(options.store.readSession(options.sessionId));
+  } catch (error) {
+    if (!(error instanceof TranscriptUnavailableError)) throw error;
+  }
+  return new AdoptedExecSession(
+    options.store,
+    options.sessionId,
+    options.clock,
+    history,
+  );
+}
+
+/** A stored session whose `close` leaves the shared store open. */
+class AdoptedExecSession extends StoredExecSession {
+  override close(): void {}
 }

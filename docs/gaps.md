@@ -5,13 +5,13 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **52** markers across **44** clauses.
+Total: **51** markers across **44** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
 | `src/acp/protocol.ts:1123` | `B68` | the union covers every update the clause names, but this slice produces only the two chunks, plan, tool_call, tool_call_update, current_mode_update and config_option_update; session_info_update, available_commands_update and usage_update have no producer yet. |
 | `src/acp/protocol.ts:32` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
-| `src/acp/server.ts:568` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
+| `src/acp/server.ts:582` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
 | `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
 | `src/app/interactive-turn.ts:558` | `95 B10` | steering and the queued-message list are not implemented, so a second submit is refused with a notice instead of being queued or delivered to the running turn. |
 | `src/cli/commands/resume.ts:67` | `10 B22` | the interactive shell cannot adopt a stored transcript yet, so the resumed session is named here but the shell still opens empty. |
@@ -25,7 +25,6 @@ Total: **52** markers across **44** clauses.
 | `src/daemon/web-socket.ts:574` | `B33` | the token-gated /port-proxy/<port> surface (query token, cookie exchange, traversal refusal) is not implemented, so those requests answer 404 instead of proxying or refusing with 401. |
 | `src/exec/acp-runner.ts:310` | `B66` | the shared TurnOutcome has no distinct permission-rejection reason, so a call the user denied reaches this point as failed and answers with an internal error instead of end_turn. |
 | `src/exec/acp-runner.ts:373` | `B69` | the exec tool runner's confirm seam receives no tool-use id, so the permission card names the tool rather than the call ACP wants it to refer to; carrying the id is a change to src/tools/permissions.ts, outside this slice. |
-| `src/exec/acp-runner.ts:476` | `B60` | src/exec/command.ts still refuses -o acp before this entry is reached; connecting it is a change to that file, outside this slice. The entry itself is complete here. |
 | `src/exec/acp-runner.ts:48` | `B65` | images are parsed, validated and carried here, but the shared TurnRequest has no image channel, so a plain exec runner drops them. Attaching them needs the agent loop's media port, which this slice does not own. |
 | `src/exec/list-tools.ts:16` | `B53` | the source of defaultAllowed is not pinned by the clause; this build derives it from catalogue membership at autonomy off. |
 | `src/extensions/mcp/client.ts:418` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |

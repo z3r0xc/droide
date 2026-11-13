@@ -145,6 +145,12 @@ export interface AcpServer {
   run(): Promise<void>;
   /** Stops early: aborts turns and answers pending permissions as cancelled. */
   close(): Promise<void>;
+  /**
+   * The process exit status this session earned (B54/B55): `0` when every
+   * prompt ended `end_turn` (or none ran), `1` when a prompt was refused,
+   * cancelled or failed.
+   */
+  readonly exitCode: number;
 }
 
 const DEFAULT_REASONING_EFFORT = "medium";
@@ -329,7 +335,12 @@ class AcpServerImpl implements AcpServer {
   #authenticated: boolean;
   #permissionRequestCounter = 0;
   #accepting = true;
+  #failed = false;
   #shutdown: Promise<void> | undefined;
+
+  get exitCode(): number {
+    return this.#failed ? 1 : 0;
+  }
 
   constructor(options: AcpServerOptions) {
     this.#options = options;
@@ -483,6 +494,7 @@ class AcpServerImpl implements AcpServer {
         }
         case ACP_METHODS.sessionPrompt: {
           const result = await this.#prompt(request.id, request.params);
+          if (result.stopReason !== "end_turn") this.#failed = true;
           await this.#writer.write(createAcpSuccess(request.id, result));
           return;
         }
@@ -517,6 +529,8 @@ class AcpServerImpl implements AcpServer {
           );
       }
     } catch (error) {
+      // B55: a prompt that could not be answered is a failed run.
+      if (request.method === ACP_METHODS.sessionPrompt) this.#failed = true;
       const protocol =
         error instanceof AcpProtocolError
           ? error

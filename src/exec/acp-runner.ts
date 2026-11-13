@@ -471,11 +471,9 @@ export interface RunAcpDaemonOptions extends Omit<
 
 /**
  * The `droide exec --output-format acp` handoff: console output moves to
- * stderr, the server owns stdout, and a signal closes it cleanly.
- *
- * TODO(spec B60): `src/exec/command.ts` still refuses `-o acp` before this
- * entry is reached; connecting it is a change to that file, outside this
- * slice. The entry itself is complete here.
+ * stderr, the server owns stdout, and a signal closes it cleanly. The returned
+ * status is the session's own — `0` when every prompt ended `end_turn`, `1`
+ * otherwise (B54/B55).
  */
 export async function runAcpDaemon(
   options: RunAcpDaemonOptions,
@@ -502,7 +500,7 @@ export async function runAcpDaemon(
   }
   try {
     await server.run();
-    return 0;
+    return server.exitCode;
   } catch {
     return 1;
   } finally {
