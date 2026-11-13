@@ -172,7 +172,7 @@ const ignore: KeyAction = { kind: "ignore" };
 /** Spec "Key bindings" table, in table order. */
 export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["enter"], action: { kind: "submit", queue: false } },
-  { keys: ["ctrl+enter"], action: { kind: "submit", queue: true } },
+  { keys: ["ctrl+enter", "alt+enter"], action: { kind: "submit", queue: true } },
   { keys: ["shift+enter"], action: { kind: "newline" } },
   { keys: ["newline"], action: { kind: "newline" } },
   {
@@ -392,9 +392,11 @@ function decodeToken(buffer: string): Decoded {
     const alt =
       next === "\u007f"
         ? "alt+backspace"
-        : upper
-          ? `alt+shift+${next.toLowerCase()}`
-          : `alt+${next}`;
+        : next === "\r"
+          ? "alt+enter"
+          : upper
+            ? `alt+shift+${next.toLowerCase()}`
+            : `alt+${next}`;
     return {
       status: "token",
       token: { type: "key", value: alt, length: 2 },
@@ -456,6 +458,19 @@ const CSI_KEYS: Readonly<Record<string, string>> = {
   F: "end",
 };
 
+/**
+ * Control keys a Kitty-protocol terminal reports as `CSI <code> ; <mods> u`.
+ * Only the keys the shell binds are named; every other code is decoded as the
+ * character it denotes, so an unlisted key is still typed rather than dropped.
+ */
+const CSI_U_KEYS: Readonly<Record<number, string>> = {
+  13: "enter",
+  9: "tab",
+  27: "escape",
+  32: "space",
+  127: "backspace",
+};
+
 const CSI_TILDE_KEYS: Readonly<Record<string, string>> = {
   "1": "home",
   "3": "delete",
@@ -469,6 +484,19 @@ function keyFromCsi(sequence: string, final: string): string {
   const params = sequence.startsWith("?") ? "" : sequence;
   if (final === "Z") return "shift+tab";
   const [base = "", modifierText] = params.split(";");
+  if (final === "u") {
+    // Kitty's CSI-u: a printable key or a control key with modifier bits.
+    const code = Number.parseInt(base, 10);
+    const named = CSI_U_KEYS[code];
+    const modifier =
+      modifierText === undefined ? 0 : Number.parseInt(modifierText, 10) - 1;
+    if (named !== undefined) return `${modifierPrefix(modifier)}${named}`;
+    if (Number.isFinite(code) && code >= 32 && code <= 0x10ffff) {
+      const text = String.fromCodePoint(code).toLowerCase();
+      return `${modifierPrefix(modifier)}${text}`;
+    }
+    return "";
+  }
   const modifier =
     modifierText === undefined ? 0 : Number.parseInt(modifierText, 10) - 1;
   const prefix = modifierPrefix(modifier);

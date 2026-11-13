@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **41** markers across **36** clauses.
+Total: **38** markers across **33** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -18,22 +18,19 @@ Total: **41** markers across **36** clauses.
 | `src/daemon/command.ts:170` | `B1` | --droide-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
 | `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
 | `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient DROIDE_API_KEY and reports a local identity. |
-| `src/daemon/server.ts:233` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
-| `src/daemon/web-socket.ts:580` | `B33` | the token-gated /port-proxy/<port> surface (query token, cookie exchange, traversal refusal) is not implemented, so those requests answer 404 instead of proxying or refusing with 401. |
+| `src/daemon/server.ts:251` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
 | `src/exec/acp-runner.ts:310` | `B66` | the shared TurnOutcome has no distinct permission-rejection reason, so a call the user denied reaches this point as failed and answers with an internal error instead of end_turn. |
 | `src/exec/acp-runner.ts:373` | `B69` | the exec tool runner's confirm seam receives no tool-use id, so the permission card names the tool rather than the call ACP wants it to refer to; carrying the id is a change to src/tools/permissions.ts, outside this slice. |
 | `src/exec/acp-runner.ts:48` | `B65` | images are parsed, validated and carried here, but the shared TurnRequest has no image channel, so a plain exec runner drops them. Attaching them needs the agent loop's media port, which this slice does not own. |
 | `src/exec/list-tools.ts:16` | `B53` | the source of defaultAllowed is not pinned by the clause; this build derives it from catalogue membership at autonomy off. |
-| `src/extensions/mcp/client.ts:418` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
-| `src/extensions/mcp/client.ts:429` | `B22` | image blocks are reported by type and size instead of being compressed, and an unsupported image MIME type keeps the same marker. |
-| `src/extensions/mcp/client.ts:48` | `B11` | era negotiation is not attempted — no server/discover probe, no 2026-07-28 rescue after a -32022 refusal, no legacy verdict cache; the server's chosen revision is accepted as returned. |
-| `src/extensions/mcp/client.ts:687` | `B13` | the spec does not pin cursor following, so the page ceiling and the repeated-cursor refusal are this build's bounds. |
+| `src/extensions/mcp/client.ts:420` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
+| `src/extensions/mcp/client.ts:431` | `B22` | image blocks are reported by type and size instead of being compressed, and an unsupported image MIME type keeps the same marker. |
+| `src/extensions/mcp/client.ts:50` | `B11` | era negotiation is not attempted — no server/discover probe, no 2026-07-28 rescue after a -32022 refusal, no legacy verdict cache; the server's chosen revision is accepted as returned. |
+| `src/extensions/mcp/client.ts:709` | `B13` | the spec does not pin cursor following, so the page ceiling and the repeated-cursor refusal are this build's bounds. |
 | `src/extensions/mcp/oauth/flow.ts:419` | `B26` | B26 says the issuer comes from authorizationServerIssuer "or the server URL's well-known document" but does not pin which document, nor what happens when the server publishes none. This build falls back to the resource origin. |
 | `src/extensions/mcp/oauth/flow.ts:458` | `B26` | B26 pins the published client metadata (B27) and the redirect coverage, but not the registration body's client_name, grant types or auth method for a dynamic client. This build registers a public client with the loopback redirect set. |
 | `src/extensions/mcp/oauth/flow.ts:618` | `B26` | B26 lists tokenEndpointAuthMethod without pinning the accepted values; only public auth and client_secret_basic are implemented (client_secret_post needs a form body this token client does not send). |
-| `src/extensions/mcp/transport.ts:871` | `B3` | an sse server's server-initiated event stream (a GET that stays open) is not opened, so it never delivers tools/list_changed; the POST response path is supported. |
 | `src/extensions/plugins/install.ts:342` | `B42` | the Claude Code layout translation (.claude-plugin to .droide-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
-| `src/extensions/plugins/installed.ts:240` | `B36` | strictEnabledPlugins is parsed but not enforced, so an entry below the policy level still resolves as enabled here. |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
 | `src/tools/fs/read.ts:266` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |

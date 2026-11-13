@@ -253,7 +253,9 @@ in dim grey, each occupying one row, and the window follows the cursor
 - `Enter` while a turn runs **steers**: the line joins the queue marked `steer`. A steering line
   starts no turn of its own — it belongs to the next turn that starts, and its text is appended to
   that turn's prompt after one blank line.
-- `Ctrl+Enter` queues a **turn**: the line is marked `queue` and, when the running turn ends for
+- `Ctrl+Enter` queues a **turn** (a terminal that cannot encode it sends `Alt+Enter`, which this
+  build binds to the same action; a Kitty-protocol terminal reports `Ctrl+Enter` as
+  `CSI 13;5 u`, which the decoder reads as `ctrl+enter`): the line is marked `queue` and, when the running turn ends for
   any reason other than cancellation, exactly one entry is drained and starts the next turn. That
   turn's prompt is the queued entry's own text first, then any `steer` lines that arrived before
   it, joined by one blank line (FIFO order is kept; a steering line never overtakes the queued
