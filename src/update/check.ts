@@ -106,6 +106,23 @@ export async function checkForUpdate(
           "no release feed visible to an anonymous client (no releases yet, or a private repository)",
       };
     }
+    if (response.status === 403 || response.status === 429) {
+      // An anonymous client is rate-limited per address; the same answer comes
+      // for a blocked network. Both are temporary, so name the cause and the
+      // wait rather than reporting a bare status.
+      const reset = response.headers.get("x-ratelimit-reset");
+      const wait =
+        reset === null
+          ? null
+          : Math.max(0, Number.parseInt(reset, 10) * 1000 - Date.now());
+      return {
+        kind: "unavailable",
+        reason:
+          wait === null || !Number.isFinite(wait)
+            ? `the release feed is rate-limited (HTTP ${response.status}); try again later`
+            : `the release feed is rate-limited (HTTP ${response.status}); try again in ${Math.max(1, Math.ceil(wait / 60_000))} minute(s)`,
+      };
+    }
     if (!response.ok) {
       return {
         kind: "unavailable",

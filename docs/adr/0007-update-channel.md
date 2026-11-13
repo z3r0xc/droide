@@ -32,7 +32,12 @@ endpoint is our choice to make.
    see it, so `--check` reports "no release feed visible to an anonymous client"
    rather than pretending the project has no releases. Authenticating would mean
    storing a token, which this command must not do.
-5. **Version comparison is semver-only.** A tag that is not `vX.Y.Z` is ignored
+5. **A rate limit is named as one.** An anonymous client is limited per
+   address, and the same `403` arrives from a blocked network. Both are
+   temporary, so the reason says "the release feed is rate-limited" and, when
+   `x-ratelimit-reset` is present, how many minutes to wait — a bare status
+   reads like a broken feed. The install path reports it the same way.
+6. **Version comparison is semver-only.** A tag that is not `vX.Y.Z` is ignored
    with a warning rather than "upgrading" on a lexicographic accident.
 
 ## Consequences
