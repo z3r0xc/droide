@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **46** markers across **40** clauses.
+Total: **44** markers across **38** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -13,7 +13,6 @@ Total: **46** markers across **40** clauses.
 | `src/acp/protocol.ts:32` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
 | `src/acp/server.ts:582` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
 | `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
-| `src/app/interactive-turn.ts:573` | `95 B10` | steering and the queued-message list are not implemented, so a second submit is refused with a notice instead of being queued or delivered to the running turn. |
 | `src/cli/commands/resume.ts:67` | `10 B22` | the interactive shell cannot adopt a stored transcript yet, so the resumed session is named here but the shell still opens empty. |
 | `src/cli/mcp-mutations.ts:321` | `B7` | org MCP policy is remote-only and this build does not resolve it into AppContext, so a server the policy would block is not refused here. |
 | `src/cli/resume-commands.ts:419` | `10 B22` | the interactive session picker is not implemented, so a terminal gets the same bounded list as a pipe instead of a choice; --last is the one way to select without a picker. |
@@ -34,7 +33,6 @@ Total: **46** markers across **40** clauses.
 | `src/extensions/mcp/oauth/flow.ts:419` | `B26` | B26 says the issuer comes from authorizationServerIssuer "or the server URL's well-known document" but does not pin which document, nor what happens when the server publishes none. This build falls back to the resource origin. |
 | `src/extensions/mcp/oauth/flow.ts:458` | `B26` | B26 pins the published client metadata (B27) and the redirect coverage, but not the registration body's client_name, grant types or auth method for a dynamic client. This build registers a public client with the loopback redirect set. |
 | `src/extensions/mcp/oauth/flow.ts:618` | `B26` | B26 lists tokenEndpointAuthMethod without pinning the accepted values; only public auth and client_secret_basic are implemented (client_secret_post needs a form body this token client does not send). |
-| `src/extensions/mcp/tools.ts:36` | `30 B7` | arguments are not validated against the server's JSON Schema before the call. |
 | `src/extensions/mcp/transport.ts:871` | `B3` | an sse server's server-initiated event stream (a GET that stays open) is not opened, so it never delivers tools/list_changed; the POST response path is supported. |
 | `src/extensions/plugins/install.ts:335` | `B42` | the Claude Code layout translation (.claude-plugin to .droide-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
 | `src/extensions/plugins/install.ts:647` | `B37` | the flow stops at the registry write. The clause also says the install writes the enablement map, but this build has no settings writer (src/config reads settings.json and never rewrites it), so general.enabledPlugins is left alone and the plugin resolves as enabled by absence. A settings-write surface has to exist before this can land. |
