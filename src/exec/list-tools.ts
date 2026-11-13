@@ -12,8 +12,6 @@
  * `defaultAllowed` is our derivation: membership of the catalogue at the
  * strictest autonomy (`off`). The field's presence and type are contractual,
  * which is what the clause pins.
- *
- * TODO(spec B53): the source of `defaultAllowed` is not pinned by the clause; this build derives it from catalogue membership at autonomy off.
  */
 import type { ToolDefinition } from "../tools/registry.ts";
 

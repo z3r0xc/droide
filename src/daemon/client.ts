@@ -62,9 +62,8 @@ export const WORKTREE_CLEANUP_TIMEOUT_MS = 900_000;
 /**
  * Timeouts that override the default for one method (B19).
  *
- * TODO(spec B19): the spec pins the four budgets but not the method names that
- * carry them; these `daemon.*` spellings are this build's map, and callers may
- * replace it through `methodTimeouts`.
+ * The four `daemon.*` spellings are quoted by spec 70 B19; callers may still
+ * replace the map through `methodTimeouts`.
  */
 export const METHOD_TIMEOUTS: Readonly<Record<string, number>> = {
   "daemon.init_session": SESSION_INIT_TIMEOUT_MS,

@@ -476,6 +476,10 @@ single-line JSON **array** whose entries are
 `{id, llmId, displayName, description, category, defaultAllowed,
 currentlyAllowed}` (`entrypoints/exec/handler.ts:458-461`,
 `utils/toolCatalog.ts:138-169`). With any other format it is a text listing:
+`defaultAllowed` is derived as membership of the selection at the strictest
+autonomy (`off`), so it answers "would this tool be offered with every guard on"
+rather than repeating the current state (`src/exec/list-tools.ts`; regression:
+`tests/integration/exec/list-tools.test.ts`). `[derived]`
 `Available tools for <model>`, `Autonomy: <autonomy>`, then category sections
 with `  • <llmId> (<displayName>) - status: allowed|blocked[ override]`.
 The categories this build declares are `Files` (`Read`, `Create`, `Edit`, `LS`),

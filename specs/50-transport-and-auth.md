@@ -128,6 +128,12 @@ cold (`orig/packages/runtime/auth/src/auth/common/cache.ts:617-620,691-703`).
 `MetaError` when the global API config is installed, before any request
 (`orig/packages/utils/src/api/config.ts:7-40`). `[observed]`
 
+A base URL is an origin plus a path prefix, so this build also refuses one that
+carries credentials, a query or a fragment: any of the three would either be
+sent on every request or make relative-path joining ambiguous
+(`src/transport/urls.ts`, `parseApiBaseUrl`; the refusals are tested in
+`tests/unit/transport/urls.test.ts`). `[observed]`
+
 **B8** Relative paths are joined to the base URL resolved for that request
 (`getBaseUrl`), not to a value captured at construction, so a region
 resolution or organization switch that lands between requests changes the
