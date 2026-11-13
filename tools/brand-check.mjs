@@ -17,7 +17,7 @@ process.stdout.on("error", (error) => {
 });
 
 const RULES = [
-  { name: "product name", re: /(?<![\w/.-])droid(?![\w-])/iu },
+  { name: "product name", re: /(?<![a-z])droid(?![a-z])/iu },
   { name: "release number", re: /(?<![\w.])1\.9\.0(?![\w.])/u },
   { name: "vendor", re: /\bFactory\b/u },
   { name: "vendor host", re: /\b(?:app|downloads)\.factory\.ai\b/iu },
@@ -26,7 +26,7 @@ const RULES = [
 
 // Historical prose that must be allowed to speak plainly about the previous
 // layout; the ADR exists to record it.
-const ALLOWED = [/^docs\/adr\/0011-/u];
+const ALLOWED = [/^docs\/adr\/0011-/u, /^tools\/brand-check\.mjs$/u];
 
 const TEXT =
   /\.(?:ts|tsx|js|mjs|cjs|json|md|yml|yaml|toml|rs|sql|sh|txt|svg|html)$/u;

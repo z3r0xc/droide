@@ -10,9 +10,10 @@
  *    `  • <llmId> (<displayName>) - status: allowed|blocked[ override]`.
  *
  * `defaultAllowed` is our derivation: membership of the catalogue at the
- * strictest autonomy (`off`). The field's presence and type are contractual;
- * its source is not pinned by the spec, which is recorded as a
- * `TODO(spec B53)`.
+ * strictest autonomy (`off`). The field's presence and type are contractual,
+ * which is what the clause pins.
+ *
+ * TODO(spec B53): the source of `defaultAllowed` is not pinned by the clause; this build derives it from catalogue membership at autonomy off.
  */
 import type { ToolDefinition } from "../tools/registry.ts";
 
@@ -44,8 +45,6 @@ export function buildToolListRows(
       displayName: definition.displayName,
       description: definition.description,
       category: definition.category ?? "Other",
-      // TODO(spec B53): the spec does not pin the source; this build uses
-      // catalogue membership at autonomy `off`.
       defaultAllowed: defaultAllowed.has(definition.llmId),
       currentlyAllowed: currentlyAllowed.has(definition.llmId),
     }))

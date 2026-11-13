@@ -537,8 +537,8 @@ export type LlmFailureReason =
  * User-facing copy per class. B102 pins one message per class but the spec file
  * quotes none of them, so these are factual descriptions, not recoveries.
  *
- * TODO(spec B102): replace with the exact fixed copy from
- * `orig/packages/droid-core/src/llms/errors/constants.ts:1-44`.
+ * TODO(spec B102): replace with the exact fixed copy recorded in the evidence
+ * report for provider errors (constants module, see `evidence/INVENTORY.md`).
  */
 export const LLM_FAILURE_MESSAGES: Readonly<Record<LlmFailureReason, string>> =
   {
