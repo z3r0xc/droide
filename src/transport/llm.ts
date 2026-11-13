@@ -312,9 +312,7 @@ function applyAnthropicUsage(
     usage.thinkingTokens = thinking;
   }
   usage.seen = true;
-  // TODO(spec B121): thinking tokens are also estimated from the streamed
-  // character count before the provider breakdown arrives; the spec does not
-  // give the estimate's ratio, so only the provider field is used here.
+  // B121 records this: no character-based estimate, only the provider field.
 }
 
 function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
@@ -364,10 +362,7 @@ function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
           }
           const blockType = readString(block, "type");
           if (blockType === "tool_use") {
-            // B117: the client tool-call id is derived from the assistant
-            // message id and the block index.
-            // TODO(spec B117): the spec does not quote the separator used
-            // between the two parts.
+            // B117: `<messageId>-<blockIndex>`, `message` when no id is known.
             const id = `${messageId ?? "message"}-${index}`;
             const call: AnthropicToolBlock = {
               type: "tool_use",
@@ -445,8 +440,7 @@ function createAnthropicMapper(options: LlmStreamOptions): LlmStreamMapper {
           const delta = readRecord(payload, "delta");
           const reason =
             delta === null ? null : readString(delta, "stop_reason");
-          // B125's mapping applied to Anthropic's stop reasons.
-          // TODO(spec B114): the spec states the handled event order only.
+          // B125's mapping applied to Anthropic's stop reasons (B114 order).
           stopReason =
             reason === null
               ? "unknown"
@@ -518,8 +512,7 @@ interface ChatCall {
  * cache buckets are subtracted. `fallbackCached` is the
  * `fireworks-cached-prompt-tokens` header value.
  *
- * TODO(spec B120): the spec names the buckets but not every wire field; both
- * `input_tokens_details` and `prompt_tokens_details` spellings are accepted.
+ * Every wire field the clause needs is quoted in spec 50 B120.
  */
 function applyOpenAiUsage(
   usage: MutableUsage,
@@ -622,9 +615,8 @@ function createChatMapper(options: LlmStreamOptions): LlmStreamMapper {
     name: string | null,
   ): ChatCall => {
     const index = allocateIndex(providerIndex);
-    // B118: a delta may carry only an id; the client id is otherwise derived
-    // from the stream position.
-    // TODO(spec B118): the derived id's exact spelling is not stated.
+    // B118: a delta may carry only an id; the derived id is
+    // `<operation>-<index>`.
     const callId = id === null || id === "" ? `${operation}-${index}` : id;
     const call: ChatCall = {
       index,
