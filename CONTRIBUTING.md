@@ -13,7 +13,7 @@ Every change must pass, in this order:
 npm run typecheck      # tsc --noEmit
 npm run format:check   # prettier over src/tests/json
 npm test               # unit + integration (node --test)
-npm run test:parity    # CLI snapshots recorded from this build (local only)
+npm run test:parity    # CLI snapshots recorded from this build (tracked)
 npm run gaps:check     # docs/gaps.md matches the TODO(spec …) markers in src/
 npm run brand:check    # no other product's name, release number or vendor host
 cargo fmt --all -- --check
@@ -21,9 +21,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI runs all of it except the parity suites that need recorded goldens (those are
-recorded locally and never committed — see
-`docs/adr/0010-own-brand-and-snapshot-harness.md`).
+CI runs all of it. The snapshots under `tests/parity/expected/` are tracked, so
+the parity job gates every change — see
+`docs/adr/0010-own-brand-and-snapshot-harness.md`.
 
 ## Spec first
 

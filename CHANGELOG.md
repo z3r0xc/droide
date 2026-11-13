@@ -4,6 +4,36 @@ The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, which a
 unit test keeps equal to the package version; a release bumps both. The recorded
 CLI cases check the version line by shape, not by number. See `docs/release.md`.
 
+## 0.5.0 — 2026-11-13
+
+### Added
+
+- **A brand guard** (`npm run brand:check`, `tools/brand-check.mjs`, wired into
+  CI): a tracked file may not name another product, its release number or its
+  vendor host. ADR 0011 is the one allowlisted file, because it has to explain
+  what the previous layout was called.
+- **Our own request headers** (`X-Droide-Org-Id`, `X-Droide-Client`,
+  `X-Droide-Sdk`, `X-Droide-Request-Surface`, `X-Droide-Exec-Output-Format`,
+  `X-Droide-Exec-Input-Format`, `X-Droide-Whoami-Extended`,
+  `X-Droide-Session-Attribution`) and the `managed` deployment discriminant.
+
+### Changed
+
+- **No invented endpoint.** The build bakes no API base URL, so
+  `DROIDE_API_BASE_URL` is the only source. With it unset, `doctor`'s
+  `connectivity` check reports `skip` (`no API endpoint configured`) instead of
+  resolving a host of ours, and `droide exec` exits 1 with
+  `no API endpoint configured: set DROIDE_API_BASE_URL (or choose a custom model
+  in settings)`.
+- `exec --list-tools` answers before a model target, session, socket or API key
+  is resolved, so it needs no credential.
+- The settings key for the agent model is `model`.
+- CLI snapshots are tracked under `tests/parity/expected/`, so the parity CI job
+  gates every change; `--record` stays a reviewed act.
+- Specs cite the reference corpus under neutral names (`protocol/agent/`,
+  `agent-registry.ts`, `packages/core/`) and every deployment sentence says
+  `managed`.
+
 ## 0.4.0 — 2026-11-13
 
 ### Added

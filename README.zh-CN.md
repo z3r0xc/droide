@@ -48,7 +48,7 @@
 | `daemon`                                                                                   | 本地可用——WebSocket 传输、JSON-RPC、鉴权闸门、单实例、有序关闭；Remote Control 与端口代理已声明，尚未构建                                                                         |
 | 无参数的 `droide`                                                                          | 在 TTY 对上启动交互式 shell；输入提示词会执行一个 agent 回合，带流式行、审批与 Esc 取消                                                                                           |
 | 原生 helper                                                                                | 15 个 JSON-line 方法（包括 PTY 会话），在 TypeScript 侧有类型并有校验，69 个 Rust 测试，另有契约测试会通过已编译二进制启动真实进程（`npm run test:native`）——**尚未接入工具执行** |
-| 测试套件                                                                                   | 128 个文件中的 1261 个测试：1254 通过，7 跳过，另有 69 个 Rust 测试                                                                                                               |
+| 测试套件                                                                                   | 129 个文件中的 1265 个测试：1258 通过，7 跳过，另有 69 个 Rust 测试                                                                                                               |
 
 `exec` 需要模型凭据。没有凭据时它会拒绝，而不是靠猜：
 
@@ -78,7 +78,7 @@ $ node bin/droide.mjs exec --mission "build it"
 
 当前代码树的形态：11 份编号规格文档——共享上下文加十份子系统规格，
 `specs/` 下共 9,414 行——`src/` 下 147 个 TypeScript 文件（52,048 行），
-`crates/droide-native/src/` 下 9 个 Rust 文件，9 份 ADR，1261 个 TypeScript
+`crates/droide-native/src/` 下 9 个 Rust 文件，9 份 ADR，1265 个 TypeScript
 测试与 69 个 Rust 测试。凡是实现窄于其所引用条款之处，代码中都标有
 `TODO(spec …)`，并计入 [`docs/gaps.md`](./docs/gaps.md)，该文件由
 `npm run gaps` 重新生成。
@@ -94,7 +94,7 @@ node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 默认 12 项具名检查（--checks all：16）
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 1261 tests
+npm test                        # 1266 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 69 tests
@@ -182,7 +182,7 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 1. `npm run typecheck`
 2. `npm run format:check`
 3. `npm test`
-4. `npm run test:parity`（需要 `.work/parity` 下的本地快照）
+4. `npm run test:parity`（与 `tests/parity/expected/` 比对）
 5. `cargo test --workspace`
 6. `npm run gaps:check`
 7. `npm run brand:check`
