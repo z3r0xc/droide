@@ -4,6 +4,50 @@ The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, which a
 unit test keeps equal to the package version; a release bumps both. The recorded
 CLI cases check the version line by shape, not by number. See `docs/release.md`.
 
+## 0.7.0 — 2026-11-13
+
+### Added
+
+- **`Read` spills what it cannot show.** An over-budget result is written to
+  `<stateDir>/tool-outputs/<sha256 prefix>.txt` (directory `0700`, file `0600`,
+  temp-then-rename, 32 MiB cap) and the cut notice names that path; an
+  unwritable directory falls back to the offset/limit notice. A second identical
+  read reuses the file. Spec 30 B12.
+- **`Edit` matches against a scrubbed view.** Private-key blocks, bearer
+  credentials, provider-shaped keys, JWTs, assigned secrets and the session's
+  own key are replaced by `[redacted]` for matching only, with original offsets
+  kept, so a credential can neither be matched nor echoed; the file on disk is
+  written from the original bytes. Spec 30 B22.
+- **Background commands are supervised.** The child leads its own process group
+  and one exit hook kills it when the CLI dies (unless
+  `DROIDE_PRESERVE_BACKGROUND_PROCESSES`), and on Windows the inner PID and
+  creation time are reported instead of the PowerShell wrapper's. Spec 30 B31.
+- **ACP turns carry images**, a denied permission is the documented `end_turn`
+  rather than an internal error, and the confirm seam receives the tool-use id.
+  Spec 60 B65/B66/B69.
+- **MCP era negotiation**: `server/discover`, a 2025 fallback on `-32022`/
+  `-32601`/HTTP 400–405, a 24-hour verdict cache, a bounded cursor chain and the
+  three structured-output markers rewritten to the remediation sentence. Spec 60
+  B11/B13/B23.
+- **Plugins in the other layout install cleanly**: `.claude-plugin` →
+  `.droide-plugin`, `agents/` → `droids/`, `.mcp.json` → `mcp.json` wrapped in
+  `{ "mcpServers": … }` byte-for-byte, refused if the wrapper would exceed the
+  source size. Spec 60 B42.
+- **Compaction keeps what it replaced**: the summary row names the files the
+  replaced messages touched (≤40) and the last todo list (≤20), plus a fixed
+  authorship note. Spec 20 B49.
+- **The Anthropic rate-limit pair is a delay source** when `retry-after` is
+  absent. Spec 50 B41.
+
+### Changed
+
+- Spec 50 quotes the stream id spellings, the exact usage fields, the handled
+  event order, the absent character-based thinking estimate and the base-URL
+  credential/query refusals. Spec 70 quotes the four `daemon.*` budget methods;
+  spec 80 the `defaultAllowed` derivation.
+
+Gap markers across the three waves: 54 → 18.
+
 ## 0.6.0 — 2026-11-13
 
 ### Added
