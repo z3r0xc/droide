@@ -7,7 +7,7 @@ the commands shown.
 ls specs/*.md | wc -l                    # specs
 find src -name '*.ts' | wc -l            # product layer size
 npm test                                 # test suite
-node tests/parity/run.mjs --check        # CLI parity (local goldens)
+node tests/parity/run.mjs --check        # CLI parity (tracked snapshots)
 cargo test --workspace                   # native layer (CI only here)
 ```
 
@@ -17,8 +17,8 @@ cargo test --workspace                   # native layer (CI only here)
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Specifications           | 11 numbered specs + shared context, 9,414 lines, every clause cited and mapped to tests                                                                              |
 | TypeScript product layer | 147 files, 52,048 lines: CLI, app, config, session, agent, transport, exec, extensions, tools, native client                                                          |
-| Tests                    | 1261 TypeScript tests in 128 files (1254 pass, 7 skipped) + 69 Rust tests                                                                                            |
-| CLI parity               | 20/20 recorded cases against the local goldens                                                                                                                       |
+| Tests                    | 1265 TypeScript tests in 129 files (1258 pass, 7 skipped) + 69 Rust tests                                                                                            |
+| CLI parity               | 20/20 recorded cases against the tracked snapshots                                                                                                                       |
 | Native (Rust)            | `crates/droide-native`: protocol (15 methods), safe paths, file search, sandbox profiles, PTY sessions, DPAPI secrets — 69 tests, clippy `-D warnings`, builds locally |
 
 ## Command surface
@@ -65,7 +65,7 @@ cargo test --workspace                   # native layer (CI only here)
 | `droide "prompt"` on a TTY                                | the shell opens without the prompt, so the launcher refuses rather than dropping the words                                                                                 | M11: dispatch                 |
 | macOS/Linux credential stores                             | only the Windows DPAPI sealer exists, so the store refuses instead of writing plaintext                                                                        | next increment of M10b        |
 
-| Narrower-than-spec behaviour: 52 markers across 44 clauses | each is marked `TODO(spec …)` in code | `docs/gaps.md` lists every one with its clause |
+| Narrower-than-spec behaviour: 51 markers across 44 clauses | each is marked `TODO(spec …)` in code | `docs/gaps.md` lists every one with its clause |
 
 ## Gates
 
@@ -74,7 +74,7 @@ A change is mergeable when all of these pass:
 1. `npm run typecheck`
 2. `npm run format:check`
 3. `npm test`
-4. `npm run test:parity` (local goldens present)
+4. `npm run test:parity` (tracked snapshots present)
 5. `npm run gaps:check`
 6. `npm run brand:check`
 7. `cargo test --workspace` (CI)

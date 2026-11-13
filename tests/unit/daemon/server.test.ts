@@ -236,7 +236,7 @@ test("start on port 0 advertises the bound port and announces readiness in order
 
     const ready = channel.sent.map((text) => JSON.parse(text) as unknown);
     assert.deepEqual(ready, [
-      { type: "factory.daemon.ready", pid: 4242, version: DAEMON_VERSION },
+      { type: "droide.daemon.ready", pid: 4242, version: DAEMON_VERSION },
     ]);
     await assert.rejects(server.start(), /already started/);
   } finally {
@@ -404,8 +404,8 @@ test("a version mismatch never blocks authenticate; it decorates a later failure
     assert.equal(failure.message, "Method not found: daemon.unknown");
     assert.deepEqual(failure.data, {
       protocolVersionMismatch: {
-        localFactoryProtocolVersion: DROIDE_PROTOCOL_VERSION,
-        peerFactoryProtocolVersion: "1.300.0",
+        localPeerProtocolVersion: DROIDE_PROTOCOL_VERSION,
+        remotePeerProtocolVersion: "1.300.0",
         messageType: "request",
         method: "daemon.unknown",
         requestId: SECOND_ID,
@@ -611,7 +611,7 @@ test("the parent IPC transport frames requests as JSON strings and announces rea
       channel.sent.map((text) => JSON.parse(text) as unknown),
       [
         {
-          type: "factory.daemon.ready",
+          type: "droide.daemon.ready",
           pid: process.pid,
           version: DAEMON_VERSION,
         },

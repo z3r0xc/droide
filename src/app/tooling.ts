@@ -48,10 +48,7 @@ export interface SessionTooling {
 export interface CreateToolingOptions {
   readonly context: AppContext;
   /** Injected in tests; defaults to a real client per server. */
-  readonly clientFactory?: (
-    server: string,
-    config: McpServerConfig,
-  ) => McpClient;
+  readonly clientFor?: (server: string, config: McpServerConfig) => McpClient;
   /** Skip connecting servers (doctor, list-only commands). */
   readonly connect?: boolean;
   /**
@@ -60,7 +57,7 @@ export interface CreateToolingOptions {
    * Defaults to `"helper"`: the app asks, the binary's presence decides.
    */
   readonly nativeBackend?: NativeBackendKind;
-  /** Absolute helper path; overrides `DROIDE_NATIVE_BIN` and the factory bin. */
+  /** Absolute helper path; overrides `DROIDE_NATIVE_BIN` and the helper on PATH. */
   readonly nativeBinaryPath?: string;
 }
 
@@ -102,7 +99,7 @@ export async function createSessionTooling(
   if (options.connect !== false) {
     for (const entry of enabledMcpServers(configuration)) {
       const client =
-        options.clientFactory?.(entry.name, entry.config) ??
+        options.clientFor?.(entry.name, entry.config) ??
         new McpClient({ server: entry.name, config: entry.config });
       try {
         await client.connect();

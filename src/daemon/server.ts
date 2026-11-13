@@ -964,7 +964,7 @@ export class DaemonServer {
     }
     this.parentChannel?.send(
       JSON.stringify({
-        type: "factory.daemon.ready",
+        type: "droide.daemon.ready",
         pid: this.pid,
         version: this.version,
       }),

@@ -115,8 +115,8 @@ export type DaemonEnvelope =
 
 /** Advisory comparison record attached to failures only (B14). */
 export interface ProtocolVersionMismatch {
-  readonly localFactoryProtocolVersion: string;
-  readonly peerFactoryProtocolVersion: string;
+  readonly localPeerProtocolVersion: string;
+  readonly remotePeerProtocolVersion: string;
   readonly messageType?: string;
   readonly method?: string;
   readonly requestId?: string;
@@ -477,22 +477,22 @@ function parseErrorObject(value: unknown): JsonRpcErrorObject {
  * empty field is not a mismatch, and equality is not one either.
  */
 export function protocolVersionMismatch(
-  localFactoryProtocolVersion: string,
-  peerFactoryProtocolVersion: string | undefined,
+  localPeerProtocolVersion: string,
+  remotePeerProtocolVersion: string | undefined,
   context: ProtocolVersionContext = {},
 ): ProtocolVersionMismatch | undefined {
   if (
-    peerFactoryProtocolVersion === undefined ||
-    peerFactoryProtocolVersion === ""
+    remotePeerProtocolVersion === undefined ||
+    remotePeerProtocolVersion === ""
   ) {
     return undefined;
   }
-  if (peerFactoryProtocolVersion === localFactoryProtocolVersion) {
+  if (remotePeerProtocolVersion === localPeerProtocolVersion) {
     return undefined;
   }
   return {
-    localFactoryProtocolVersion,
-    peerFactoryProtocolVersion,
+    localPeerProtocolVersion,
+    remotePeerProtocolVersion,
     ...(context.messageType === undefined
       ? {}
       : { messageType: context.messageType }),
@@ -506,10 +506,10 @@ export function protocolVersionMismatch(
 /** The mismatch record for one envelope, if it has one. */
 export function envelopeVersionMismatch(
   envelope: DaemonEnvelope,
-  localFactoryProtocolVersion: string,
+  localPeerProtocolVersion: string,
 ): ProtocolVersionMismatch | undefined {
   return protocolVersionMismatch(
-    localFactoryProtocolVersion,
+    localPeerProtocolVersion,
     envelope.droideProtocolVersion,
     {
       messageType: envelope.type,

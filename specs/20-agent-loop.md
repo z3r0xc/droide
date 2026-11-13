@@ -217,7 +217,7 @@ are appended after the cached history so a retry keeps the same prefix.
 `onThinkingDelta`, `onToolInputDelta`, `onContentBlockComplete`,
 `onToolUseDetected`, followed by `onMessageComplete` and
 `onStreamingComplete(result, wasAborted?)`; a provider failure calls
-`onStreamingError` and rejects. Each provider *attempt* is bracketed by
+`onStreamingError` and rejects. Each provider _attempt_ is bracketed by
 `beginProviderRequestAttempt` / `onProviderRequestAttemptComplete`.
 `evidence/original/windows-x64/src/agent/messaging.ts:264-300`, `evidence/original/windows-x64/src/agent/messaging.ts:385-560`.
 
@@ -587,19 +587,19 @@ shown instead, because it may be any body.
 
 ## Data & config
 
-| Item | Where | Type / domain | Default | Absent / malformed |
-|---|---|---|---|---|
-| `--append-system-prompt <text>` | CLI flag | string | none | missing value → `Missing value for --append-system-prompt <text>` |
-| `--append-system-prompt-file <path>` | CLI flag | path | none | unreadable → `MetaError: Failed to read --append-system-prompt-file:` + path |
-| `--auto <level>` | CLI flag | `low\|medium\|high` | unset (session setting) | any other value → stderr error, exit 1 |
-| `--use-spec` | CLI flag | boolean | false | — |
-| `--disable-builtin-skills` | CLI flag | boolean | false | — |
-| `general.llmRequestTimeout` | settings | integer ms | 600000 | absent → default |
-| `general.compactionTokenLimitPerModel` | settings | map model→tokens | none | unknown model → model default, capped at max input |
-| session model / spec model / reasoning effort | session settings | model id / effort | resolved default | router resolves to concrete, else default model |
-| message `visibility` | protocol | `both\|llm_only\|user_only` | absent = `both` | absent → visible to both |
-| tool-results model budget | protocol constant | bytes | 32768 (64 KiB tier) | absent tier → 32 KiB |
-| media caps | protocol constant | counts | 10 images / 5 PDFs | over cap → oldest evicted + placeholder |
+| Item                                          | Where             | Type / domain               | Default                 | Absent / malformed                                                           |
+| --------------------------------------------- | ----------------- | --------------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `--append-system-prompt <text>`               | CLI flag          | string                      | none                    | missing value → `Missing value for --append-system-prompt <text>`            |
+| `--append-system-prompt-file <path>`          | CLI flag          | path                        | none                    | unreadable → `MetaError: Failed to read --append-system-prompt-file:` + path |
+| `--auto <level>`                              | CLI flag          | `low\|medium\|high`         | unset (session setting) | any other value → stderr error, exit 1                                       |
+| `--use-spec`                                  | CLI flag          | boolean                     | false                   | —                                                                            |
+| `--disable-builtin-skills`                    | CLI flag          | boolean                     | false                   | —                                                                            |
+| `general.llmRequestTimeout`                   | settings          | integer ms                  | 600000                  | absent → default                                                             |
+| `general.compactionTokenLimitPerModel`        | settings          | map model→tokens            | none                    | unknown model → model default, capped at max input                           |
+| session model / spec model / reasoning effort | session settings  | model id / effort           | resolved default        | router resolves to concrete, else default model                              |
+| message `visibility`                          | protocol          | `both\|llm_only\|user_only` | absent = `both`         | absent → visible to both                                                     |
+| tool-results model budget                     | protocol constant | bytes                       | 32768 (64 KiB tier)     | absent tier → 32 KiB                                                         |
+| media caps                                    | protocol constant | counts                      | 10 images / 5 PDFs      | over cap → oldest evicted + placeholder                                      |
 
 Flags and settings sources: `evidence/original/windows-x64/src/entrypoints/tui/options.ts:9-52`,
 `evidence/original/windows-x64/src/utils/appendSystemPromptArgs.ts:12-55`,
@@ -656,71 +656,71 @@ Fixtures are synthesised JSON under `tests/fixtures/agent_loop/`: each
 `AgentMessage[]`; each `tool_*.json` is a batch plus tool registry stub
 outcomes. Time, ids and jitter are injected.
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1 | `tests/agent_loop/test_default_command_is_tui` | none |
-| B2 | `tests/agent_loop/test_auto_and_spec_flags_after_resume` | `flags_resume.json` |
-| B3 | `tests/agent_loop/test_concurrent_turn_refused` | `history_simple.json` |
-| B4 | `tests/agent_loop/test_turn_rows_in_view_order` | `history_simple.json` |
-| B5 | `tests/agent_loop/test_turn_completion_reason` | `stream_text.json` |
-| B6, B7 | `tests/agent_loop/test_message_block_schema` | `history_blocks.json` |
-| B8 | `tests/agent_loop/test_tool_result_content_domain` | `history_tool_result.json` |
-| B9 | `tests/agent_loop/test_tool_call_id_deterministic` | `stream_tool_use.json` |
-| B10 | `tests/agent_loop/test_user_only_excluded_from_request` | `history_visibility.json` |
-| B11 | `tests/agent_loop/test_media_caps_evict_oldest` | `history_media_overflow.json` |
-| B12 | `tests/agent_loop/test_user_content_assembly_order` | `attachments.json` |
-| B13 | `tests/agent_loop/test_assistant_attribution_persisted` | `stream_text.json` |
-| B14 | `tests/agent_loop/test_system_prefix_and_cache_breakpoint` | `tools_minimal.json` |
-| B15 | `tests/agent_loop/test_system_block_order` | `tools_full.json` |
-| B16 | `tests/agent_loop/test_history_preparation_drops_and_breakpoints` | `history_dirty.json` |
-| B17 | `tests/agent_loop/test_anthropic_payload_shape` | `history_tools.json` |
-| B17 | `tests/agent_loop/test_openai_tool_message_mapping` | `history_tools.json` |
-| B18 | `tests/agent_loop/test_tool_descriptor_names` | `tools_long_name.json` |
-| B19 | `tests/agent_loop/test_summary_is_request_only` | `history_summarized.json` |
-| B20 | `tests/agent_loop/test_stream_callback_sequence` | `stream_text.json` |
-| B21 | `tests/agent_loop/test_anthropic_chunk_mapping` | `stream_thinking_tool.json` |
-| B22 | `tests/agent_loop/test_partial_tool_input_throttled` | `stream_tool_use_slow.json` |
-| B23 | `tests/agent_loop/test_retry_retracts_partial_message` | `stream_fail_then_text.json` |
-| B24 | `tests/agent_loop/test_emitted_event_names` | `stream_text.json` |
-| B25 | `tests/agent_loop/test_empty_reply_is_error` | `stream_empty.json` |
-| B26 | `tests/agent_loop/test_usage_and_compaction_tokens` | `stream_usage.json` |
-| B27 | `tests/agent_loop/test_results_in_request_order` | `tool_batch_parallel.json` |
-| B28 | `tests/agent_loop/test_admission_refusal` | `tool_unknown.json` |
-| B29 | `tests/agent_loop/test_input_validation_denial` | `tool_invalid_input.json` |
-| B29 | `tests/agent_loop/test_execute_lenient_fields` | `tool_execute_lenient.json` |
-| B30 | `tests/agent_loop/test_preflight_hook_order` | `hooks_pre_tool_use.json` |
-| B31 | `tests/agent_loop/test_confirmation_matrix` | `tool_confirmation_matrix.json` |
-| B32 | `tests/agent_loop/test_permission_prompt_batching` | `tool_batch_two.json` |
-| B33 | `tests/agent_loop/test_permission_outcomes` | `permission_outcomes.json` |
-| B34 | `tests/agent_loop/test_segments_parallel_then_sequential` | `tool_batch_mixed.json` |
-| B35 | `tests/agent_loop/test_error_result_envelope` | `tool_failure.json` |
-| B36 | `tests/agent_loop/test_result_truncation_head_tail` | `tool_large_output.json` |
-| B36 | `tests/agent_loop/test_read_line_truncation_note` | `read_large_file.txt` |
-| B37 | `tests/agent_loop/test_denied_path_tool_call_feedback` | `tool_edit_denied.json` |
-| B37 | `tests/agent_loop/test_spec_mode_restricted_tool` | `tool_spec_mode.json` |
-| B38 | `tests/agent_loop/test_rejection_ends_subagent_turn` | `tool_denied_subagent.json` |
-| B39 | `tests/agent_loop/test_stop_cancels_batch` | `tool_batch_running.json` |
-| B40 | `tests/agent_loop/test_stop_after_tools` | `tool_exit_spec_mode.json` |
-| B41 | `tests/agent_loop/test_context_row_single_per_prompt` | `turn_context.json` |
-| B42 | `tests/agent_loop/test_environment_block_rendering` | `system_info.json` |
-| B43 | `tests/agent_loop/test_instruction_file_discovery_order` | `agents_md_tree/` |
-| B44 | `tests/agent_loop/test_skills_reminder_and_delta` | `skills_two_turns.json` |
-| B45 | `tests/agent_loop/test_append_system_prompt_precedence` | `append_prompt.txt` |
-| B46 | `tests/agent_loop/test_token_weighting_and_limit_cap` | `usage_cases.json` |
-| B47 | `tests/agent_loop/test_threshold_compaction_and_suppression` | `usage_over_threshold.json` |
-| B48 | `tests/agent_loop/test_context_limit_recovery_once` | `stream_context_limit.json` |
-| B49 | `tests/agent_loop/test_summary_message_shape` | `summary_meta.json` |
-| B50 | `tests/agent_loop/test_spec_mode_reminder_and_denial` | `turn_spec_mode.json` |
-| B51 | `tests/agent_loop/test_registry_entry_fields` | `model_registry_slice.json` |
-| B52 | `tests/agent_loop/test_default_model_candidate_order` | `availability_sets.json` |
-| B53 | `tests/agent_loop/test_spec_slot_and_model_switch_reminder` | `model_switch.json` |
-| B54 | `tests/agent_loop/test_reasoning_effort_clamp` | `effort_cases.json` |
-| B55 | `tests/agent_loop/test_retry_attempt_budgets` | `retry_errors.json` |
-| B56 | `tests/agent_loop/test_retry_delay_schedule` | `retry_headers.json` |
-| B57 | `tests/agent_loop/test_retry_event_emitted` | `retry_errors.json` |
-| B58 | `tests/agent_loop/test_request_timeout_default` | `settings_timeout.json` |
-| B59 | `tests/agent_loop/test_auth_failure_mid_turn` | `stream_401.json` |
-| B60 | `tests/agent_loop/test_abort_result_no_failure_metric` | `stream_aborted.json` |
+| Clause | Test id                                                           | Fixture                         |
+| ------ | ----------------------------------------------------------------- | ------------------------------- |
+| B1     | `tests/agent_loop/test_default_command_is_tui`                    | none                            |
+| B2     | `tests/agent_loop/test_auto_and_spec_flags_after_resume`          | `flags_resume.json`             |
+| B3     | `tests/agent_loop/test_concurrent_turn_refused`                   | `history_simple.json`           |
+| B4     | `tests/agent_loop/test_turn_rows_in_view_order`                   | `history_simple.json`           |
+| B5     | `tests/agent_loop/test_turn_completion_reason`                    | `stream_text.json`              |
+| B6, B7 | `tests/agent_loop/test_message_block_schema`                      | `history_blocks.json`           |
+| B8     | `tests/agent_loop/test_tool_result_content_domain`                | `history_tool_result.json`      |
+| B9     | `tests/agent_loop/test_tool_call_id_deterministic`                | `stream_tool_use.json`          |
+| B10    | `tests/agent_loop/test_user_only_excluded_from_request`           | `history_visibility.json`       |
+| B11    | `tests/agent_loop/test_media_caps_evict_oldest`                   | `history_media_overflow.json`   |
+| B12    | `tests/agent_loop/test_user_content_assembly_order`               | `attachments.json`              |
+| B13    | `tests/agent_loop/test_assistant_attribution_persisted`           | `stream_text.json`              |
+| B14    | `tests/agent_loop/test_system_prefix_and_cache_breakpoint`        | `tools_minimal.json`            |
+| B15    | `tests/agent_loop/test_system_block_order`                        | `tools_full.json`               |
+| B16    | `tests/agent_loop/test_history_preparation_drops_and_breakpoints` | `history_dirty.json`            |
+| B17    | `tests/agent_loop/test_anthropic_payload_shape`                   | `history_tools.json`            |
+| B17    | `tests/agent_loop/test_openai_tool_message_mapping`               | `history_tools.json`            |
+| B18    | `tests/agent_loop/test_tool_descriptor_names`                     | `tools_long_name.json`          |
+| B19    | `tests/agent_loop/test_summary_is_request_only`                   | `history_summarized.json`       |
+| B20    | `tests/agent_loop/test_stream_callback_sequence`                  | `stream_text.json`              |
+| B21    | `tests/agent_loop/test_anthropic_chunk_mapping`                   | `stream_thinking_tool.json`     |
+| B22    | `tests/agent_loop/test_partial_tool_input_throttled`              | `stream_tool_use_slow.json`     |
+| B23    | `tests/agent_loop/test_retry_retracts_partial_message`            | `stream_fail_then_text.json`    |
+| B24    | `tests/agent_loop/test_emitted_event_names`                       | `stream_text.json`              |
+| B25    | `tests/agent_loop/test_empty_reply_is_error`                      | `stream_empty.json`             |
+| B26    | `tests/agent_loop/test_usage_and_compaction_tokens`               | `stream_usage.json`             |
+| B27    | `tests/agent_loop/test_results_in_request_order`                  | `tool_batch_parallel.json`      |
+| B28    | `tests/agent_loop/test_admission_refusal`                         | `tool_unknown.json`             |
+| B29    | `tests/agent_loop/test_input_validation_denial`                   | `tool_invalid_input.json`       |
+| B29    | `tests/agent_loop/test_execute_lenient_fields`                    | `tool_execute_lenient.json`     |
+| B30    | `tests/agent_loop/test_preflight_hook_order`                      | `hooks_pre_tool_use.json`       |
+| B31    | `tests/agent_loop/test_confirmation_matrix`                       | `tool_confirmation_matrix.json` |
+| B32    | `tests/agent_loop/test_permission_prompt_batching`                | `tool_batch_two.json`           |
+| B33    | `tests/agent_loop/test_permission_outcomes`                       | `permission_outcomes.json`      |
+| B34    | `tests/agent_loop/test_segments_parallel_then_sequential`         | `tool_batch_mixed.json`         |
+| B35    | `tests/agent_loop/test_error_result_envelope`                     | `tool_failure.json`             |
+| B36    | `tests/agent_loop/test_result_truncation_head_tail`               | `tool_large_output.json`        |
+| B36    | `tests/agent_loop/test_read_line_truncation_note`                 | `read_large_file.txt`           |
+| B37    | `tests/agent_loop/test_denied_path_tool_call_feedback`            | `tool_edit_denied.json`         |
+| B37    | `tests/agent_loop/test_spec_mode_restricted_tool`                 | `tool_spec_mode.json`           |
+| B38    | `tests/agent_loop/test_rejection_ends_subagent_turn`              | `tool_denied_subagent.json`     |
+| B39    | `tests/agent_loop/test_stop_cancels_batch`                        | `tool_batch_running.json`       |
+| B40    | `tests/agent_loop/test_stop_after_tools`                          | `tool_exit_spec_mode.json`      |
+| B41    | `tests/agent_loop/test_context_row_single_per_prompt`             | `turn_context.json`             |
+| B42    | `tests/agent_loop/test_environment_block_rendering`               | `system_info.json`              |
+| B43    | `tests/agent_loop/test_instruction_file_discovery_order`          | `agents_md_tree/`               |
+| B44    | `tests/agent_loop/test_skills_reminder_and_delta`                 | `skills_two_turns.json`         |
+| B45    | `tests/agent_loop/test_append_system_prompt_precedence`           | `append_prompt.txt`             |
+| B46    | `tests/agent_loop/test_token_weighting_and_limit_cap`             | `usage_cases.json`              |
+| B47    | `tests/agent_loop/test_threshold_compaction_and_suppression`      | `usage_over_threshold.json`     |
+| B48    | `tests/agent_loop/test_context_limit_recovery_once`               | `stream_context_limit.json`     |
+| B49    | `tests/agent_loop/test_summary_message_shape`                     | `summary_meta.json`             |
+| B50    | `tests/agent_loop/test_spec_mode_reminder_and_denial`             | `turn_spec_mode.json`           |
+| B51    | `tests/agent_loop/test_registry_entry_fields`                     | `model_registry_slice.json`     |
+| B52    | `tests/agent_loop/test_default_model_candidate_order`             | `availability_sets.json`        |
+| B53    | `tests/agent_loop/test_spec_slot_and_model_switch_reminder`       | `model_switch.json`             |
+| B54    | `tests/agent_loop/test_reasoning_effort_clamp`                    | `effort_cases.json`             |
+| B55    | `tests/agent_loop/test_retry_attempt_budgets`                     | `retry_errors.json`             |
+| B56    | `tests/agent_loop/test_retry_delay_schedule`                      | `retry_headers.json`            |
+| B57    | `tests/agent_loop/test_retry_event_emitted`                       | `retry_errors.json`             |
+| B58    | `tests/agent_loop/test_request_timeout_default`                   | `settings_timeout.json`         |
+| B59    | `tests/agent_loop/test_auth_failure_mid_turn`                     | `stream_401.json`               |
+| B60    | `tests/agent_loop/test_abort_result_no_failure_metric`            | `stream_aborted.json`           |
 
 Two tests are load-bearing for this spec's acceptance.
 
@@ -762,26 +762,26 @@ Citations written `src/…` or `packages/…` are relative to
 `evidence/original/windows-x64/`; the table below abbreviates them for
 readability. All citations are `[observed]` unless noted.
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `ev_loop_entry` | B1 | read `evidence/original/windows-x64/src/index.ts:1-3,199-207`, `evidence/original/windows-x64/src/cli.ts:31-40,477` |
-| `ev_loop_flags` | B2, B45, B50 | read `evidence/original/windows-x64/src/entrypoints/tui/run.ts:549-556,772-789`, `options.ts:9-52`, `autonomyFlag.ts:5-19` |
-| `ev_loop_turn` | B3, B4, B5, B40 | read `evidence/original/windows-x64/src/core/AgentLoop.ts:3003-3013,3252-3348,5104-5130,5240-5282,7690-7730` |
-| `ev_loop_messages` | B6, B7, B8, B10 | read `sdk-core/.../sessionV2/messages/{enums,schemas}.ts`, `utils/src/messages/visibility.ts:234-249` |
-| `ev_loop_tool_ids` | B9 | read `sdk-core/.../messages/toolCalls.ts:73-76`, `chunk-processing.ts:790-800` |
-| `ev_loop_media` | B11, B12 | read `image-limits.ts:16-17,151`, `userMessageInjection.ts:120-169` |
-| `ev_loop_attribution` | B13, B26 | read `AgentLoop.ts:7377-7490`, `schemas.ts:300-380`, `contextUsage.ts:21-25` |
-| `ev_loop_system_prompt` | B14, B15, B45 | read `buildSystemMessageBlocks.ts:70-311`, `systemPrompt.ts:84-90`, `common/src/cli/constants.ts:1-2` |
-| `ev_loop_prep` | B16, B19 | read `message-preparation.ts:914-1080`, `requestAssembly.ts:362-380,581-627` |
-| `ev_loop_payload` | B17, B18 | read `sendMessage.ts:2673-2685,2804-2826`, `converters.ts:1393-1490`, `client/constants.ts:85` |
-| `ev_loop_stream` | B20, B21, B22, B23, B24, B25 | read `agent/messaging.ts:264-600`, `chunk-processing.ts:735-900,320-340`, `AgentEventBus.ts:33-100` |
-| `ev_loop_tools` | B27–B40 | read `ToolExecutor.ts:1336-1530,1600-1660,2352-2510,2840-2900`, `agent/tools.ts:1428-1830,1999-2035`, `autonomy.ts:49-190`, `shouldConfirmExecution.ts:820-950`, `tool-confirmation.ts:609-700`, `segmentToolUsesByConcurrency.ts:70-108` |
-| `ev_loop_truncation` | B36 | read `tools/utils/constants.ts:32-56`, `large-output.ts:505-560`, `utils/truncate.ts:19-64` |
-| `ev_loop_context` | B41–B44 | read `AgentLoop.ts:4790-4840,5104-5130`, `systemInfo.ts:938-1030,1031-1055`, `agentsMdGuidelines.ts:36-60`, `skills/*` |
-| `ev_loop_compaction` | B46–B49 | read `token-estimation.ts:5-33`, `SettingsService.ts:4838-4855`, `AgentLoop.ts:7743-7846,7151-7165`, `CompactionManager.ts:425-520,892-900` |
-| `ev_loop_models` | B51–B54 | read `model-registry.ts:561-700`, `llm/enums.ts:7-30,128-145`, `availability.ts:33-46`, `llm/index.ts:696-712`, `SessionService.ts:4717-4765`, `systemInfo.ts:1073-1112` |
-| `ev_loop_retry` | B55–B58, B60 | read `retryPolicy/index.ts:20-203`, `daemon-sdk/src/retry.ts:15-42`, `llmStreamingPlatform.ts:60-112`, `sendMessage.ts:1660-1672,2302-2328,6236-6252`, `AgentLoop.ts:1438-1443` |
-| `ev_loop_auth` | B59 | read `AgentLoop.ts:8331-8458`, `authHelpers.ts:52-68`, `authMessages.ts:20-45`, `agentTurnCompletion.ts:99-140` |
+| Evidence                | Supports                     | Method                                                                                                                                                                                                                                    |
+| ----------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ev_loop_entry`         | B1                           | read `evidence/original/windows-x64/src/index.ts:1-3,199-207`, `evidence/original/windows-x64/src/cli.ts:31-40,477`                                                                                                                       |
+| `ev_loop_flags`         | B2, B45, B50                 | read `evidence/original/windows-x64/src/entrypoints/tui/run.ts:549-556,772-789`, `options.ts:9-52`, `autonomyFlag.ts:5-19`                                                                                                                |
+| `ev_loop_turn`          | B3, B4, B5, B40              | read `evidence/original/windows-x64/src/core/AgentLoop.ts:3003-3013,3252-3348,5104-5130,5240-5282,7690-7730`                                                                                                                              |
+| `ev_loop_messages`      | B6, B7, B8, B10              | read `sdk-core/.../sessionV2/messages/{enums,schemas}.ts`, `utils/src/messages/visibility.ts:234-249`                                                                                                                                     |
+| `ev_loop_tool_ids`      | B9                           | read `sdk-core/.../messages/toolCalls.ts:73-76`, `chunk-processing.ts:790-800`                                                                                                                                                            |
+| `ev_loop_media`         | B11, B12                     | read `image-limits.ts:16-17,151`, `userMessageInjection.ts:120-169`                                                                                                                                                                       |
+| `ev_loop_attribution`   | B13, B26                     | read `AgentLoop.ts:7377-7490`, `schemas.ts:300-380`, `contextUsage.ts:21-25`                                                                                                                                                              |
+| `ev_loop_system_prompt` | B14, B15, B45                | read `buildSystemMessageBlocks.ts:70-311`, `systemPrompt.ts:84-90`, `common/src/cli/constants.ts:1-2`                                                                                                                                     |
+| `ev_loop_prep`          | B16, B19                     | read `message-preparation.ts:914-1080`, `requestAssembly.ts:362-380,581-627`                                                                                                                                                              |
+| `ev_loop_payload`       | B17, B18                     | read `sendMessage.ts:2673-2685,2804-2826`, `converters.ts:1393-1490`, `client/constants.ts:85`                                                                                                                                            |
+| `ev_loop_stream`        | B20, B21, B22, B23, B24, B25 | read `agent/messaging.ts:264-600`, `chunk-processing.ts:735-900,320-340`, `AgentEventBus.ts:33-100`                                                                                                                                       |
+| `ev_loop_tools`         | B27–B40                      | read `ToolExecutor.ts:1336-1530,1600-1660,2352-2510,2840-2900`, `agent/tools.ts:1428-1830,1999-2035`, `autonomy.ts:49-190`, `shouldConfirmExecution.ts:820-950`, `tool-confirmation.ts:609-700`, `segmentToolUsesByConcurrency.ts:70-108` |
+| `ev_loop_truncation`    | B36                          | read `tools/utils/constants.ts:32-56`, `large-output.ts:505-560`, `utils/truncate.ts:19-64`                                                                                                                                               |
+| `ev_loop_context`       | B41–B44                      | read `AgentLoop.ts:4790-4840,5104-5130`, `systemInfo.ts:938-1030,1031-1055`, `agentsMdGuidelines.ts:36-60`, `skills/*`                                                                                                                    |
+| `ev_loop_compaction`    | B46–B49                      | read `token-estimation.ts:5-33`, `SettingsService.ts:4838-4855`, `AgentLoop.ts:7743-7846,7151-7165`, `CompactionManager.ts:425-520,892-900`                                                                                               |
+| `ev_loop_models`        | B51–B54                      | read `model-registry.ts:561-700`, `llm/enums.ts:7-30,128-145`, `availability.ts:33-46`, `llm/index.ts:696-712`, `SessionService.ts:4717-4765`, `systemInfo.ts:1073-1112`                                                                  |
+| `ev_loop_retry`         | B55–B58, B60                 | read `retryPolicy/index.ts:20-203`, `daemon-sdk/src/retry.ts:15-42`, `llmStreamingPlatform.ts:60-112`, `sendMessage.ts:1660-1672,2302-2328,6236-6252`, `AgentLoop.ts:1438-1443`                                                           |
+| `ev_loop_auth`          | B59                          | read `AgentLoop.ts:8331-8458`, `authHelpers.ts:52-68`, `authMessages.ts:20-45`, `agentTurnCompletion.ts:99-140`                                                                                                                           |
 
 All citations are `[observed]` unless noted. `[derived]` claims: B15 block order
 (assembled from separate pushes in one function), B26 compaction figure
@@ -799,7 +799,7 @@ All citations are `[observed]` unless noted. `[derived]` claims: B15 block order
    exact test assertions on `StreamingResult` (which fields are always
    present).
 2. **Exact retry jitter distribution**: `sendMessage` passes `jitter: true`
-   *and* a custom `getDelay`; `daemon-sdk` applies jitter only when `getDelay`
+   _and_ a custom `getDelay`; `daemon-sdk` applies jitter only when `getDelay`
    is absent (`daemon-sdk/src/retry.ts:33-37`). The effective delay for
    default-class errors therefore depends on whether `jitter` is still applied
    by the caller. B56's default branch may be ±20 % off. Blocks a bit-exact
@@ -808,7 +808,7 @@ All citations are `[observed]` unless noted. `[derived]` claims: B15 block order
    the named 64 KiB text tier are visible; which tools declare the wider tier
    is read from comments and call sites. Blocks a per-tool budget assertion.
 4. **Compaction summary soft cap and reserve** (`SUMMARY_SOFT_CAP_DEFAULT =
-   4000`, `SUMMARY_RESERVE_DEFAULT = 16000`) are defined but their effect on
+4000`, `SUMMARY_RESERVE_DEFAULT = 16000`) are defined but their effect on
    the produced summary is not observable without the summarizer prompt.
    Blocks a deterministic summary-length test.
 5. **Model default candidate lists** (`_DEFAULT_MODEL_CANDIDATES`) are
@@ -868,6 +868,7 @@ layout and resume, and any telemetry naming. Streaming internal class and
 function names (`StreamingState`, `processAnthropicChunk`) are ours to choose;
 only the emitted events, the persisted records and the wire payload shape are
 contractual.
+
 ### Recorded divergence: the identity line
 
 The reference build's first system block says it was built by its vendor. That
@@ -879,7 +880,7 @@ You are Droide, an AI software engineering agent.
 ```
 
 (see `src/agent/context.ts`, `identityLine()`). Everything the clause pins about
-*position* and *ordering* — identity first, then environment, skills, project
+_position_ and _ordering_ — identity first, then environment, skills, project
 instructions, appended text — is reproduced exactly; only the vendor claim is
 dropped. Any parity test that compares system prompts must normalise this line
 rather than treat it as a drift.

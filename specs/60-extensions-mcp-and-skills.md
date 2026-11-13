@@ -223,7 +223,7 @@ org `maxAutonomyLevel` ceiling. The fingerprint covers only `type + command + ar
 **B25 — CLI surface.** `droide mcp` exposes `add`, `remove`, `list`, `auth`, and
 `permissions {list, revoke <server> [tool], clear --confirm}`; `remove` without a name offers the
 removable servers, and `clear` requires `--confirm`
-(`.work/parity/expected/help-mcp.json`,
+(`tests/parity/expected/help-mcp.json`,
 `evidence/original/windows-x64/src/entrypoints/mcp/command.ts:49-112`).
 
 ### MCP OAuth
@@ -290,8 +290,7 @@ maps, or a list of hook-file paths. A document declaring `$schema` starting with
 `url {url, ref?, sha?}`, `local {path}`, `git-subdir {url, path, ref?, sha?}`,
 `npm {package, version?, registry?, authTokenEnvVar?}`, `archive {url, sha256?, authTokenEnvVar?}`.
 `git-subdir` without `path` is rejected. `archive` limits match Claude Code's published limits
-(256 MiB download, 120 s, 5 redirects, 100 000 entries, 512 MiB per file, 1 GiB total, compression ratio
-50) (`evidence/original/windows-x64/packages/common/src/settings/schema.ts:243-311`,
+(256 MiB download, 120 s, 5 redirects, 100 000 entries, 512 MiB per file, 1 GiB total, compression ratio 50) (`evidence/original/windows-x64/packages/common/src/settings/schema.ts:243-311`,
 `evidence/original/windows-x64/packages/runtime/plugins/src/constants.ts:71-88`).
 
 **B35 — Verification.** An `archive` source whose `sha256` is set must match the downloaded bytes or the
@@ -485,46 +484,46 @@ Every bundled `SKILL*.md` asset in the extracted bundle, with the flags its fron
 (`NU` = `user-invocable: false`, `NM` = `disable-model-invocation: true`). Names and descriptions are as
 shipped; the table is the required inventory, not an exhaustive behaviour description.
 
-| # | name | flags | purpose (first line of `description`) | asset |
-|---|---|---|---|---|
-| 1 | `agent-browser` | — | Automates browsers and Electron desktop apps for testing, form filling, screenshots, data extraction | `SKILL-g9mxfkpy.md` |
-| 2 | `automation-memory` | — | Inspect/reset what an automation remembers between runs, and the skills it carries | `SKILL-ep3wc2nz.md` |
-| 3 | `browse-wiki` | NU | Search and read wiki documentation for a repository | `SKILL-gbdd199q.md` |
-| 4 | `build-ios-apps` | — | Build, run, test, debug iOS apps in the Simulator with the Droide desktop mirror | `SKILL-jhwpbkqk.md` |
-| 5 | `cve-remediation` | — | Continuous CVE remediation in a workstream | `SKILL-f0vnm661.md` |
-| 6 | `dataset-create` | — | Create and publish an evaluation dataset of Harbor tasks | `SKILL-dgqkwhk5.md` |
-| 7 | `dataset-maintenance` | — | Keep an evaluation dataset healthy (broken/flaky/too-easy tasks) | `SKILL-aza89ye8.md` |
-| 8 | `dataset-update` | — | Publish a new version of an existing evaluation dataset | `SKILL-y7k0jwxt.md` |
-| 9 | `deep-security-review` | NU | Correctness-first, depth-first security audit of one repository (`/security-review`) | `SKILL-zp7gc6js.md` |
-| 10 | `eval-hillclimb` | — | Improve a skill/prompt/setting via controlled eval experiments | `SKILL-8zwg7vja.md` |
-| 11 | `eval-runs` | — | Answer any question about an eval run (status, score, trials, transcript) | `SKILL-r5eawrmy.md` |
-| 12 | `excel` | — | Produce polished Excel spreadsheets as real `.xlsx` | `SKILL-1g9nn1va.md` |
-| 13 | `handoff-to-computer` | — | Hand this session's task to a remote computer | `SKILL-v8mzxg6g.md` |
-| 14 | `incident` | NU | RCA runbook for alerts | `SKILL-4fmdpwyt.md` |
-| 15 | `init` | NM | Generate `AGENTS.md` contributor guidelines for a repository | `SKILL-85xzpb50.md` |
-| 16 | `install-code-review` | — | Install Droide automated code review (GitHub/GitLab/Bitbucket/Azure DevOps) | `SKILL-8tzj0zgy.md` |
-| 17 | `install-qa` | — | Set up automated QA testing: questionnaire, modular QA skill, CI | `SKILL-2t6kq9c6.md` |
-| 18 | `install-triage` | — | Scaffold a scheduled Slack triage automation | `SKILL-4e67370f.md` |
-| 19 | `install-wiki` | — | Install a CI action that refreshes the repository wiki | `SKILL-6x222byp.md` |
-| 20 | `learn-review-guidelines` | — | Learn a repo's review guidelines from acted-on PR comments | `SKILL-vj71qseh.md` |
-| 21 | `listener` | — | Run as a workstream listener and poll data sources | `SKILL-6kc9wg57.md` |
-| 22 | `listeners` | — | Create listeners and dispatch the items they send | `SKILL-pccfjsdv.md` |
-| 23 | `migrate` | NM | Take substantial work from an agreed plan to a verified outcome | `SKILL-g1nnpaw2.md` |
-| 24 | `mission-ledger` | NU, NM | Workstreams Ledger instructions injected into the orchestrator prompt (not invocable) | `SKILL-03zbfpwe.md` |
-| 25 | `pdf-document` | — | Produce polished PDF documents | `SKILL-wpy2j0ry.md` |
-| 26 | `powerpoint` | — | Produce polished PowerPoint decks as real `.pptx` | `SKILL-9tkvdm7a.md` |
-| 27 | `pr-risk-assessment` | — | Assess the risk level of a PR | `SKILL-kf88p09z.md` |
-| 28 | `pull-request-layer-manifest` | NU | Create/update the narrated reviewer layer manifest | `SKILL-tp6akc98.md` |
-| 29 | `review` | — | Review code changes and identify high-confidence, actionable bugs | `SKILL-pvsxjwm1.md` |
-| 30 | `review` (recall variant) | — | Recall-oriented replacement when the `ReviewRecallSkill` flag is on | `SKILL.recall-7hc692m5.md` |
-| 31 | `security-review` | — | STRIDE / OWASP Top 10 / OWASP LLM Top 10 / supply-chain review | `SKILL-e24hmgjz.md` |
-| 32 | `session-navigation` | — | Navigate, search, and manage Droide sessions | `SKILL-09h1a4ja.md` |
-| 33 | `shared-context` | — | Read/publish shared documents via `droide space` | `SKILL-c3q5m9m8.md` |
-| 34 | `simplify` | — | Review the intended change for reuse, quality, compatibility, efficiency | `SKILL-q59hwpmh.md` |
-| 35 | `visualize` | — | Inline charts and diagrams in desktop/web chat | `SKILL-a2hq898w.md` |
-| 36 | `wiki` | — | Generate comprehensive codebase documentation for a repository | `SKILL-jptbza44.md` |
-| 37 | `wiki-video-gen` | — | Droide-branded HyperFrames video overviews for wikis | `SKILL-jxjgmy45.md` |
-| 38 | `word-document` | — | Produce polished Word documents | `SKILL-mpyk7mee.md` |
+| #   | name                          | flags  | purpose (first line of `description`)                                                                | asset                      |
+| --- | ----------------------------- | ------ | ---------------------------------------------------------------------------------------------------- | -------------------------- |
+| 1   | `agent-browser`               | —      | Automates browsers and Electron desktop apps for testing, form filling, screenshots, data extraction | `SKILL-g9mxfkpy.md`        |
+| 2   | `automation-memory`           | —      | Inspect/reset what an automation remembers between runs, and the skills it carries                   | `SKILL-ep3wc2nz.md`        |
+| 3   | `browse-wiki`                 | NU     | Search and read wiki documentation for a repository                                                  | `SKILL-gbdd199q.md`        |
+| 4   | `build-ios-apps`              | —      | Build, run, test, debug iOS apps in the Simulator with the Droide desktop mirror                     | `SKILL-jhwpbkqk.md`        |
+| 5   | `cve-remediation`             | —      | Continuous CVE remediation in a workstream                                                           | `SKILL-f0vnm661.md`        |
+| 6   | `dataset-create`              | —      | Create and publish an evaluation dataset of Harbor tasks                                             | `SKILL-dgqkwhk5.md`        |
+| 7   | `dataset-maintenance`         | —      | Keep an evaluation dataset healthy (broken/flaky/too-easy tasks)                                     | `SKILL-aza89ye8.md`        |
+| 8   | `dataset-update`              | —      | Publish a new version of an existing evaluation dataset                                              | `SKILL-y7k0jwxt.md`        |
+| 9   | `deep-security-review`        | NU     | Correctness-first, depth-first security audit of one repository (`/security-review`)                 | `SKILL-zp7gc6js.md`        |
+| 10  | `eval-hillclimb`              | —      | Improve a skill/prompt/setting via controlled eval experiments                                       | `SKILL-8zwg7vja.md`        |
+| 11  | `eval-runs`                   | —      | Answer any question about an eval run (status, score, trials, transcript)                            | `SKILL-r5eawrmy.md`        |
+| 12  | `excel`                       | —      | Produce polished Excel spreadsheets as real `.xlsx`                                                  | `SKILL-1g9nn1va.md`        |
+| 13  | `handoff-to-computer`         | —      | Hand this session's task to a remote computer                                                        | `SKILL-v8mzxg6g.md`        |
+| 14  | `incident`                    | NU     | RCA runbook for alerts                                                                               | `SKILL-4fmdpwyt.md`        |
+| 15  | `init`                        | NM     | Generate `AGENTS.md` contributor guidelines for a repository                                         | `SKILL-85xzpb50.md`        |
+| 16  | `install-code-review`         | —      | Install Droide automated code review (GitHub/GitLab/Bitbucket/Azure DevOps)                          | `SKILL-8tzj0zgy.md`        |
+| 17  | `install-qa`                  | —      | Set up automated QA testing: questionnaire, modular QA skill, CI                                     | `SKILL-2t6kq9c6.md`        |
+| 18  | `install-triage`              | —      | Scaffold a scheduled Slack triage automation                                                         | `SKILL-4e67370f.md`        |
+| 19  | `install-wiki`                | —      | Install a CI action that refreshes the repository wiki                                               | `SKILL-6x222byp.md`        |
+| 20  | `learn-review-guidelines`     | —      | Learn a repo's review guidelines from acted-on PR comments                                           | `SKILL-vj71qseh.md`        |
+| 21  | `listener`                    | —      | Run as a workstream listener and poll data sources                                                   | `SKILL-6kc9wg57.md`        |
+| 22  | `listeners`                   | —      | Create listeners and dispatch the items they send                                                    | `SKILL-pccfjsdv.md`        |
+| 23  | `migrate`                     | NM     | Take substantial work from an agreed plan to a verified outcome                                      | `SKILL-g1nnpaw2.md`        |
+| 24  | `mission-ledger`              | NU, NM | Workstreams Ledger instructions injected into the orchestrator prompt (not invocable)                | `SKILL-03zbfpwe.md`        |
+| 25  | `pdf-document`                | —      | Produce polished PDF documents                                                                       | `SKILL-wpy2j0ry.md`        |
+| 26  | `powerpoint`                  | —      | Produce polished PowerPoint decks as real `.pptx`                                                    | `SKILL-9tkvdm7a.md`        |
+| 27  | `pr-risk-assessment`          | —      | Assess the risk level of a PR                                                                        | `SKILL-kf88p09z.md`        |
+| 28  | `pull-request-layer-manifest` | NU     | Create/update the narrated reviewer layer manifest                                                   | `SKILL-tp6akc98.md`        |
+| 29  | `review`                      | —      | Review code changes and identify high-confidence, actionable bugs                                    | `SKILL-pvsxjwm1.md`        |
+| 30  | `review` (recall variant)     | —      | Recall-oriented replacement when the `ReviewRecallSkill` flag is on                                  | `SKILL.recall-7hc692m5.md` |
+| 31  | `security-review`             | —      | STRIDE / OWASP Top 10 / OWASP LLM Top 10 / supply-chain review                                       | `SKILL-e24hmgjz.md`        |
+| 32  | `session-navigation`          | —      | Navigate, search, and manage Droide sessions                                                         | `SKILL-09h1a4ja.md`        |
+| 33  | `shared-context`              | —      | Read/publish shared documents via `droide space`                                                     | `SKILL-c3q5m9m8.md`        |
+| 34  | `simplify`                    | —      | Review the intended change for reuse, quality, compatibility, efficiency                             | `SKILL-q59hwpmh.md`        |
+| 35  | `visualize`                   | —      | Inline charts and diagrams in desktop/web chat                                                       | `SKILL-a2hq898w.md`        |
+| 36  | `wiki`                        | —      | Generate comprehensive codebase documentation for a repository                                       | `SKILL-jptbza44.md`        |
+| 37  | `wiki-video-gen`              | —      | Droide-branded HyperFrames video overviews for wikis                                                 | `SKILL-jxjgmy45.md`        |
+| 38  | `word-document`               | —      | Produce polished Word documents                                                                      | `SKILL-mpyk7mee.md`        |
 
 Two assets carry the name `review`: the second replaces the first when the `ReviewRecallSkill` feature
 flag is on (`evidence/original/windows-x64/src/skills/builtin/builtinSkillDefinitions.ts:99-110`). Each
@@ -621,82 +620,82 @@ removes the session so later requests for that id fail rather than reviving it
 
 ### MCP
 
-| Item | Location / shape | Required | Default | Notes |
-|---|---|---|---|---|
-| User servers | `<stateDir>/mcp.json` → `mcpServers.<name>` | no | absent | key normalized before use (`evidence/original/windows-x64/src/services/mcp/mcpConfigPresence.ts:73-81`, `evidence/original/windows-x64/packages/runtime/settings/src/SettingsFolder.ts:1286-1310`) |
-| Project servers | `<projectRoot>/.droide/mcp.json` | no | absent | `projectRoot` = git root else cwd |
-| Transport | `type`: `stdio`\|`http`\|`sse` | no | `stdio` | discriminated union |
-| stdio | `command`, `args[]`, `env{}` | `command` | `args: []` | `env` is the credential channel |
-| remote | `url`, `headers{}`, `oauth` | `url` | — | `oauth: false` disables |
-| Per-server limits | `timeout`, `connectTimeout` (ms) | no | 180 000 / 10 000 (stdio 30 000) | positive int ≤ 2 147 483 647 |
-| Filters | `enabledTools[]`, `disabledTools[]` | no | — | denylist wins |
-| Permissions | `persistentPermissions.servers/tools` | no | — | nested shape; flat keys migrate |
-| Era cache | `cache/mcp/protocol-eras/v1/<sha256>.json` | no | — | `{version:1, checkedAt}`, ≤1 KiB |
-| Catalogs | `cache/mcp/catalogs/<server>.json` | no | — | `MCP_CATALOG_VERSION = 1`, ≤4 MiB |
-| Env overrides | `DROIDE_MCP_LIST_TOOLS_TIMEOUT_MS`, `DROIDE_MCP_BLOCKING_LOAD_TIMEOUT_MS` | no | 15 000 / 60 000 | per-fetch / per-session |
+| Item              | Location / shape                                                          | Required  | Default                         | Notes                                                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------- | --------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User servers      | `<stateDir>/mcp.json` → `mcpServers.<name>`                               | no        | absent                          | key normalized before use (`evidence/original/windows-x64/src/services/mcp/mcpConfigPresence.ts:73-81`, `evidence/original/windows-x64/packages/runtime/settings/src/SettingsFolder.ts:1286-1310`) |
+| Project servers   | `<projectRoot>/.droide/mcp.json`                                          | no        | absent                          | `projectRoot` = git root else cwd                                                                                                                                                                  |
+| Transport         | `type`: `stdio`\|`http`\|`sse`                                            | no        | `stdio`                         | discriminated union                                                                                                                                                                                |
+| stdio             | `command`, `args[]`, `env{}`                                              | `command` | `args: []`                      | `env` is the credential channel                                                                                                                                                                    |
+| remote            | `url`, `headers{}`, `oauth`                                               | `url`     | —                               | `oauth: false` disables                                                                                                                                                                            |
+| Per-server limits | `timeout`, `connectTimeout` (ms)                                          | no        | 180 000 / 10 000 (stdio 30 000) | positive int ≤ 2 147 483 647                                                                                                                                                                       |
+| Filters           | `enabledTools[]`, `disabledTools[]`                                       | no        | —                               | denylist wins                                                                                                                                                                                      |
+| Permissions       | `persistentPermissions.servers/tools`                                     | no        | —                               | nested shape; flat keys migrate                                                                                                                                                                    |
+| Era cache         | `cache/mcp/protocol-eras/v1/<sha256>.json`                                | no        | —                               | `{version:1, checkedAt}`, ≤1 KiB                                                                                                                                                                   |
+| Catalogs          | `cache/mcp/catalogs/<server>.json`                                        | no        | —                               | `MCP_CATALOG_VERSION = 1`, ≤4 MiB                                                                                                                                                                  |
+| Env overrides     | `DROIDE_MCP_LIST_TOOLS_TIMEOUT_MS`, `DROIDE_MCP_BLOCKING_LOAD_TIMEOUT_MS` | no        | 15 000 / 60 000                 | per-fetch / per-session                                                                                                                                                                            |
 
 ### Plugins
 
-| Item | Location / shape | Notes |
-|---|---|---|
-| Marketplace registry | `<scopeRoot>/plugins/known_marketplaces.json` (+ `known_marketplaces/`) | one entry per registered marketplace (`MarketplaceEntrySchema`: `source`, `installLocation`, `lastUpdated`, `autoUpdate` default `true`) |
-| Installed registry | `<scopeRoot>/plugins/installed_plugins.json` (+ `installed_plugins/`) | `{schemaVersion, plugins: {id: entry[]}}` |
-| Entry | `scope`, `installPath`, `version`, `installedAt`, `lastUpdated`, `source`, `marketplaceSourceHash?`, `externalSource?`, `externalCommit?`, `npm?`, `portableOnly?` | one array per plugin id |
-| Marketplace checkout | `<scopeRoot>/plugins/marketplaces/<name>/` | manifest at `.droide-plugin/marketplace.json` or `.claude-plugin/marketplace.json` |
-| Plugin copies | `<scopeRoot>/plugins/cache/<version>/` | staging prefix `.plugin-staging-` |
-| Plugin data | `<scopeRoot>/plugins/data/<slot>/` | referenced as `${*_PLUGIN_DATA}` |
-| Enablement | `general.enabledPlugins` in `settings.json` | plus `strictEnabledPlugins`, `extraKnownMarketplaces`, `strictKnownMarketplaces`, `pluginTokenHosts` |
+| Item                 | Location / shape                                                                                                                                                   | Notes                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Marketplace registry | `<scopeRoot>/plugins/known_marketplaces.json` (+ `known_marketplaces/`)                                                                                            | one entry per registered marketplace (`MarketplaceEntrySchema`: `source`, `installLocation`, `lastUpdated`, `autoUpdate` default `true`) |
+| Installed registry   | `<scopeRoot>/plugins/installed_plugins.json` (+ `installed_plugins/`)                                                                                              | `{schemaVersion, plugins: {id: entry[]}}`                                                                                                |
+| Entry                | `scope`, `installPath`, `version`, `installedAt`, `lastUpdated`, `source`, `marketplaceSourceHash?`, `externalSource?`, `externalCommit?`, `npm?`, `portableOnly?` | one array per plugin id                                                                                                                  |
+| Marketplace checkout | `<scopeRoot>/plugins/marketplaces/<name>/`                                                                                                                         | manifest at `.droide-plugin/marketplace.json` or `.claude-plugin/marketplace.json`                                                       |
+| Plugin copies        | `<scopeRoot>/plugins/cache/<version>/`                                                                                                                             | staging prefix `.plugin-staging-`                                                                                                        |
+| Plugin data          | `<scopeRoot>/plugins/data/<slot>/`                                                                                                                                 | referenced as `${*_PLUGIN_DATA}`                                                                                                         |
+| Enablement           | `general.enabledPlugins` in `settings.json`                                                                                                                        | plus `strictEnabledPlugins`, `extraKnownMarketplaces`, `strictKnownMarketplaces`, `pluginTokenHosts`                                     |
 
 ### Skills
 
-| Item | Shape | Notes |
-|---|---|---|
-| Skill file | `SKILL.md` with YAML frontmatter + markdown body | body becomes `systemPrompt` |
-| Frontmatter | `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`, `version`, `tools`, `enabled`, `user-invocable`, `disable-model-invocation` | see B48 |
-| Directories | `<settingsFolder>/skills/<name>/SKILL.md`, `.agent/skills`, `.agents/skills`, `<mission>/skills` | see B46/B47 |
-| Ledger | `general.disabledSkills: string[]` | union across levels, sanitized names |
-| Builtin ids | `filePath = "builtin:<name>"` | no file on disk unless the bundle is materialized |
+| Item        | Shape                                                                                                                                                       | Notes                                             |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Skill file  | `SKILL.md` with YAML frontmatter + markdown body                                                                                                            | body becomes `systemPrompt`                       |
+| Frontmatter | `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`, `version`, `tools`, `enabled`, `user-invocable`, `disable-model-invocation` | see B48                                           |
+| Directories | `<settingsFolder>/skills/<name>/SKILL.md`, `.agent/skills`, `.agents/skills`, `<mission>/skills`                                                            | see B46/B47                                       |
+| Ledger      | `general.disabledSkills: string[]`                                                                                                                          | union across levels, sanitized names              |
+| Builtin ids | `filePath = "builtin:<name>"`                                                                                                                               | no file on disk unless the bundle is materialized |
 
 ### ACP
 
-| Item | Value |
-|---|---|
-| Transport | NDJSON on stdin/stdout; console → stderr |
-| Methods | see B61 |
-| Mode ids | `normal`, `spec`, `auto-low`, `auto-medium`, `auto-high` |
-| Config option ids | `model`, `reasoning_effort`, `autonomy_level` |
-| Stop reasons | `end_turn`, `cancelled`, `refusal` (+ SDK-defined others unused here) |
-| Meta extension | `_meta.droide.source ∈ {mcp, connector}` |
+| Item              | Value                                                                 |
+| ----------------- | --------------------------------------------------------------------- |
+| Transport         | NDJSON on stdin/stdout; console → stderr                              |
+| Methods           | see B61                                                               |
+| Mode ids          | `normal`, `spec`, `auto-low`, `auto-medium`, `auto-high`              |
+| Config option ids | `model`, `reasoning_effort`, `autonomy_level`                         |
+| Stop reasons      | `end_turn`, `cancelled`, `refusal` (+ SDK-defined others unused here) |
+| Meta extension    | `_meta.droide.source ∈ {mcp, connector}`                              |
 
 ## Errors
 
-| Trigger | Identity (observed) | Effect |
-|---|---|---|
-| `mcp.json` JSONC parse error | file contributes nothing; `Failed to load mcp.json` logged | other files still load |
-| `mcp.json` schema violation (server entry) | presence probe reports `hasError`; server not started | no partial server |
-| Unset `${VAR}` in `env`/`headers` | `MCP server credential references an unset environment variable "<VAR>"` | that server's connect fails |
-| Server not in config at call time | `Server does not exist` with `{name}` | call fails, no retry |
-| Connect exceeds budget | `MCP server connection timed out after <n> seconds` (`McpServerConnectTimeoutError`) | server marked failed |
-| `tools/list` rejected result | `The MCP server returned an invalid tools/list result` (+ `reason`) — no cause is attached | listing fails; failure negative-cached 60 s |
-| stdio transport closed mid-call | `Stdio MCP server transport closed` with `stage: in_flight\|not_sent` | call fails; message tells whether the server may have acted |
-| Tool call exceeds `timeout` | SDK request timeout | call fails; turn continues |
-| MCP add: unknown `--type` | `commands:mcp.add.invalidServerType` message | nothing written |
-| MCP add: duplicate name | `commands:mcp.add.serverAlreadyExists` with the existing config detail | nothing written |
-| MCP add: URL without `--type` | `commands:mcp.add.looksLikeUrl` | nothing written |
-| MCP add: policy denial | `commands:mcp.add.blockedByPolicy` | nothing written |
-| Plugin id without `@` | `"<id>" isn't a valid plugin name. Use plugin-name@marketplace, for example review-tools@team-tools.` | nothing installed |
-| Marketplace unknown | `plugin-not-found` / `marketplace-not-found` reason; user-facing error text | nothing installed |
-| Marketplace source drift | `Marketplace "<name>" does not match its configured source` | install refused |
-| Org policy denies source | `Installing plugins from "<name>" is not allowed by organization policy` | install refused |
-| Archive checksum mismatch | `checksum-mismatch` | install refused, cache untouched |
-| Archive unsafe entry / limits | `unsafe-entry`, `extraction-limit`, `invalid-archive`, `too-large` | extraction aborted |
-| Plugin uninstall, not present | `commands:plugin.pluginNotInstalled` | no change |
-| Skill name invalid | validation errors: `Skill must have a name` / `Skill name must contain only lowercase letters, numbers, and hyphens` / `Skill name must contain at least one letter or number` / `Skill must have a system prompt` | skill listed as `invalid`, not activatable |
-| Skill tool: unknown name | `skillNotFound` message | tool result is an error, no activation |
-| Skill tool: disabled/invalid | `skillDisabled` / `skillInvalid` (invalid lists the validation errors) | no activation |
-| ACP prompt while busy | invalid request `A prompt is already running for this session` | no second turn starts |
-| ACP `type: 'acp'` MCP server | invalid params `MCP servers with the acp transport are not supported` | `session/new` fails |
-| ACP `--disable-builtin-skills` | `Invalid flags: --disable-builtin-skills is not supported in ACP modes.` | process exits non-zero before starting |
+| Trigger                                    | Identity (observed)                                                                                                                                                                                                | Effect                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `mcp.json` JSONC parse error               | file contributes nothing; `Failed to load mcp.json` logged                                                                                                                                                         | other files still load                                      |
+| `mcp.json` schema violation (server entry) | presence probe reports `hasError`; server not started                                                                                                                                                              | no partial server                                           |
+| Unset `${VAR}` in `env`/`headers`          | `MCP server credential references an unset environment variable "<VAR>"`                                                                                                                                           | that server's connect fails                                 |
+| Server not in config at call time          | `Server does not exist` with `{name}`                                                                                                                                                                              | call fails, no retry                                        |
+| Connect exceeds budget                     | `MCP server connection timed out after <n> seconds` (`McpServerConnectTimeoutError`)                                                                                                                               | server marked failed                                        |
+| `tools/list` rejected result               | `The MCP server returned an invalid tools/list result` (+ `reason`) — no cause is attached                                                                                                                         | listing fails; failure negative-cached 60 s                 |
+| stdio transport closed mid-call            | `Stdio MCP server transport closed` with `stage: in_flight\|not_sent`                                                                                                                                              | call fails; message tells whether the server may have acted |
+| Tool call exceeds `timeout`                | SDK request timeout                                                                                                                                                                                                | call fails; turn continues                                  |
+| MCP add: unknown `--type`                  | `commands:mcp.add.invalidServerType` message                                                                                                                                                                       | nothing written                                             |
+| MCP add: duplicate name                    | `commands:mcp.add.serverAlreadyExists` with the existing config detail                                                                                                                                             | nothing written                                             |
+| MCP add: URL without `--type`              | `commands:mcp.add.looksLikeUrl`                                                                                                                                                                                    | nothing written                                             |
+| MCP add: policy denial                     | `commands:mcp.add.blockedByPolicy`                                                                                                                                                                                 | nothing written                                             |
+| Plugin id without `@`                      | `"<id>" isn't a valid plugin name. Use plugin-name@marketplace, for example review-tools@team-tools.`                                                                                                              | nothing installed                                           |
+| Marketplace unknown                        | `plugin-not-found` / `marketplace-not-found` reason; user-facing error text                                                                                                                                        | nothing installed                                           |
+| Marketplace source drift                   | `Marketplace "<name>" does not match its configured source`                                                                                                                                                        | install refused                                             |
+| Org policy denies source                   | `Installing plugins from "<name>" is not allowed by organization policy`                                                                                                                                           | install refused                                             |
+| Archive checksum mismatch                  | `checksum-mismatch`                                                                                                                                                                                                | install refused, cache untouched                            |
+| Archive unsafe entry / limits              | `unsafe-entry`, `extraction-limit`, `invalid-archive`, `too-large`                                                                                                                                                 | extraction aborted                                          |
+| Plugin uninstall, not present              | `commands:plugin.pluginNotInstalled`                                                                                                                                                                               | no change                                                   |
+| Skill name invalid                         | validation errors: `Skill must have a name` / `Skill name must contain only lowercase letters, numbers, and hyphens` / `Skill name must contain at least one letter or number` / `Skill must have a system prompt` | skill listed as `invalid`, not activatable                  |
+| Skill tool: unknown name                   | `skillNotFound` message                                                                                                                                                                                            | tool result is an error, no activation                      |
+| Skill tool: disabled/invalid               | `skillDisabled` / `skillInvalid` (invalid lists the validation errors)                                                                                                                                             | no activation                                               |
+| ACP prompt while busy                      | invalid request `A prompt is already running for this session`                                                                                                                                                     | no second turn starts                                       |
+| ACP `type: 'acp'` MCP server               | invalid params `MCP servers with the acp transport are not supported`                                                                                                                                              | `session/new` fails                                         |
+| ACP `--disable-builtin-skills`             | `Invalid flags: --disable-builtin-skills is not supported in ACP modes.`                                                                                                                                           | process exits non-zero before starting                      |
 
 ## Acceptance tests
 
@@ -704,61 +703,61 @@ All fixtures are synthesised: temporary directories standing in for `~/.droide` 
 hand-written `SKILL.md`, `mcp.json`, `marketplace.json` and `plugin.json` files. No network, no
 credentials, no wall clock, no dependence on the reference build.
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1, B2 | `tests/extensions/test_mcp_config_discovery_and_tolerance` | `fixtures/mcp/two-files/`, `fixtures/mcp/broken-jsonc/` |
-| B3 | `tests/extensions/test_mcp_server_schema_by_transport` | `fixtures/mcp/transports/` |
-| B4 | `tests/extensions/test_mcp_config_merge_precedence` | `fixtures/mcp/merge-precedence/` |
-| B5 | `tests/extensions/test_mcp_name_canonicalization` | `fixtures/mcp/alias-keys/` |
-| B6 | `tests/extensions/test_mcp_add_writes_user_file` | `fixtures/mcp/empty-home/` |
-| B7 | `tests/extensions/test_mcp_policy_allowlist` | `fixtures/mcp/policy/` |
-| B8 | `tests/extensions/test_mcp_secret_reference_resolution` | `fixtures/mcp/secrets/` |
-| B9 | `tests/extensions/test_mcp_sandbox_env_allowlist` | `fixtures/mcp/sandbox-env/` |
-| B10, B11 | `tests/extensions/test_mcp_connect_budget_and_era_plan` | `fixtures/mcp/connect/` |
-| B12 | `tests/extensions/test_mcp_era_cache_ttl_and_ignored_files` | `fixtures/mcp/era-cache/` |
-| B13, B14 | `tests/extensions/test_mcp_tool_list_timeout_and_lenient_retry` | `fixtures/mcp/tool-list/` |
-| B15 | `tests/extensions/test_mcp_tool_filters` | `fixtures/mcp/tool-filters/` |
-| B16 | `tests/extensions/test_mcp_tool_registration_identity` | `fixtures/mcp/registration/` |
-| B17 | `tests/extensions/test_mcp_tool_name_collision` | `fixtures/mcp/name-collision/` |
-| B18, B19 | `tests/extensions/test_mcp_registration_lifecycle_and_seed` | `fixtures/mcp/seed-catalog/` |
-| B20, B21 | `tests/extensions/test_mcp_call_timeout_and_cancel` | `fixtures/mcp/call/` |
-| B22, B23 | `tests/extensions/test_mcp_result_marshalling` | `fixtures/mcp/results/` |
-| B24 | `tests/extensions/test_mcp_persistent_permission_gates` | `fixtures/mcp/permissions/` |
-| B25 | `tests/extensions/test_mcp_cli_help_matches_golden` | `tests/parity/cases/help-mcp.json` |
-| B26 | `tests/extensions/test_mcp_oauth_config_constraints` | `fixtures/mcp/oauth-config/` |
-| B27, B28 | `tests/extensions/test_mcp_oauth_callback_ports` | `fixtures/mcp/oauth-ports/` |
-| B29, B30 | `tests/extensions/test_mcp_oauth_credential_tombstones` | `fixtures/mcp/oauth-store/` |
-| B31 | `tests/extensions/test_plugin_registry_layout` | `fixtures/plugins/registry/` |
-| B32 | `tests/extensions/test_plugin_marketplace_manifest_validation` | `fixtures/plugins/marketplace-manifest/` |
-| B33 | `tests/extensions/test_plugin_manifest_validation` | `fixtures/plugins/plugin-manifest/` |
-| B34, B35 | `tests/extensions/test_plugin_source_kinds_and_verification` | `fixtures/plugins/sources/` |
-| B36 | `tests/extensions/test_plugin_enablement_settings_precedence` | `fixtures/plugins/enablement/` |
-| B37 | `tests/extensions/test_plugin_install_flow` | `fixtures/plugins/install/` |
-| B38, B39 | `tests/extensions/test_plugin_uninstall_and_update_flows` | `fixtures/plugins/installed/` |
-| B40 | `tests/extensions/test_plugin_marketplace_cli` | `fixtures/plugins/marketplace-cli/` |
-| B41, B44 | `tests/extensions/test_plugin_component_merge` | `fixtures/plugins/components/` |
-| B42, B43 | `tests/extensions/test_plugin_claude_layout_translation` | `fixtures/plugins/claude-layout/` |
-| B45 | `tests/extensions/test_plugin_component_markers` | `fixtures/plugins/markers/` |
-| B46, B47 | `tests/extensions/test_skill_discovery_with_overlapping_names` | `fixtures/skills/overlap/` |
-| B48, B49 | `tests/extensions/test_skill_frontmatter_keys_and_validation` | `fixtures/skills/frontmatter/` |
-| B50 | `tests/extensions/test_skill_collision_priority_and_shadowing` | `fixtures/skills/collide/` |
-| B51 | `tests/extensions/test_skill_disabled_ledger_union` | `fixtures/skills/ledger/` |
-| B52 | `tests/extensions/test_builtin_skill_materialization` | `fixtures/skills/builtin/` |
-| B53, B54 | `tests/extensions/test_skill_listing_budget_and_rendering` | `fixtures/skills/listing/` |
-| B55 | `tests/extensions/test_skill_delta_reminder` | `fixtures/skills/delta/` |
-| B56 | `tests/extensions/test_skill_tool_activation_payload` | `fixtures/skills/activate/` |
-| B57 | `tests/extensions/test_skill_slash_command_registration` | `fixtures/skills/slash/` |
-| B58 | `tests/extensions/test_disable_builtin_skills_effect` | `fixtures/skills/disable-builtin/` |
-| B59 | `tests/extensions/test_spec_mode_skill_write_boundary` | `fixtures/spec-mode/` |
-| B60, B61 | `tests/extensions/test_acp_method_surface` | `fixtures/acp/ndjson/` |
-| B62 | `tests/extensions/test_acp_initialize_response` | `fixtures/acp/initialize/` |
-| B63, B64 | `tests/extensions/test_acp_mcp_server_conversion` | `fixtures/acp/mcp-servers/` |
-| B65, B66 | `tests/extensions/test_acp_prompt_and_stop_reasons` | `fixtures/acp/turns/` |
-| B67 | `tests/extensions/test_acp_cancel_semantics` | `fixtures/acp/cancel/` |
-| B68 | `tests/extensions/test_acp_session_update_shapes` | `fixtures/acp/updates/` |
-| B69 | `tests/extensions/test_acp_permission_option_mapping` | `fixtures/acp/permissions/` |
-| B70 | `tests/extensions/test_acp_modes_and_config_options` | `fixtures/acp/config/` |
-| B71 | `tests/extensions/test_acp_session_lifecycle` | `fixtures/acp/lifecycle/` |
+| Clause   | Test id                                                         | Fixture                                                 |
+| -------- | --------------------------------------------------------------- | ------------------------------------------------------- |
+| B1, B2   | `tests/extensions/test_mcp_config_discovery_and_tolerance`      | `fixtures/mcp/two-files/`, `fixtures/mcp/broken-jsonc/` |
+| B3       | `tests/extensions/test_mcp_server_schema_by_transport`          | `fixtures/mcp/transports/`                              |
+| B4       | `tests/extensions/test_mcp_config_merge_precedence`             | `fixtures/mcp/merge-precedence/`                        |
+| B5       | `tests/extensions/test_mcp_name_canonicalization`               | `fixtures/mcp/alias-keys/`                              |
+| B6       | `tests/extensions/test_mcp_add_writes_user_file`                | `fixtures/mcp/empty-home/`                              |
+| B7       | `tests/extensions/test_mcp_policy_allowlist`                    | `fixtures/mcp/policy/`                                  |
+| B8       | `tests/extensions/test_mcp_secret_reference_resolution`         | `fixtures/mcp/secrets/`                                 |
+| B9       | `tests/extensions/test_mcp_sandbox_env_allowlist`               | `fixtures/mcp/sandbox-env/`                             |
+| B10, B11 | `tests/extensions/test_mcp_connect_budget_and_era_plan`         | `fixtures/mcp/connect/`                                 |
+| B12      | `tests/extensions/test_mcp_era_cache_ttl_and_ignored_files`     | `fixtures/mcp/era-cache/`                               |
+| B13, B14 | `tests/extensions/test_mcp_tool_list_timeout_and_lenient_retry` | `fixtures/mcp/tool-list/`                               |
+| B15      | `tests/extensions/test_mcp_tool_filters`                        | `fixtures/mcp/tool-filters/`                            |
+| B16      | `tests/extensions/test_mcp_tool_registration_identity`          | `fixtures/mcp/registration/`                            |
+| B17      | `tests/extensions/test_mcp_tool_name_collision`                 | `fixtures/mcp/name-collision/`                          |
+| B18, B19 | `tests/extensions/test_mcp_registration_lifecycle_and_seed`     | `fixtures/mcp/seed-catalog/`                            |
+| B20, B21 | `tests/extensions/test_mcp_call_timeout_and_cancel`             | `fixtures/mcp/call/`                                    |
+| B22, B23 | `tests/extensions/test_mcp_result_marshalling`                  | `fixtures/mcp/results/`                                 |
+| B24      | `tests/extensions/test_mcp_persistent_permission_gates`         | `fixtures/mcp/permissions/`                             |
+| B25      | `tests/extensions/test_mcp_cli_help_matches_golden`             | `tests/parity/cases/help-mcp.json`                      |
+| B26      | `tests/extensions/test_mcp_oauth_config_constraints`            | `fixtures/mcp/oauth-config/`                            |
+| B27, B28 | `tests/extensions/test_mcp_oauth_callback_ports`                | `fixtures/mcp/oauth-ports/`                             |
+| B29, B30 | `tests/extensions/test_mcp_oauth_credential_tombstones`         | `fixtures/mcp/oauth-store/`                             |
+| B31      | `tests/extensions/test_plugin_registry_layout`                  | `fixtures/plugins/registry/`                            |
+| B32      | `tests/extensions/test_plugin_marketplace_manifest_validation`  | `fixtures/plugins/marketplace-manifest/`                |
+| B33      | `tests/extensions/test_plugin_manifest_validation`              | `fixtures/plugins/plugin-manifest/`                     |
+| B34, B35 | `tests/extensions/test_plugin_source_kinds_and_verification`    | `fixtures/plugins/sources/`                             |
+| B36      | `tests/extensions/test_plugin_enablement_settings_precedence`   | `fixtures/plugins/enablement/`                          |
+| B37      | `tests/extensions/test_plugin_install_flow`                     | `fixtures/plugins/install/`                             |
+| B38, B39 | `tests/extensions/test_plugin_uninstall_and_update_flows`       | `fixtures/plugins/installed/`                           |
+| B40      | `tests/extensions/test_plugin_marketplace_cli`                  | `fixtures/plugins/marketplace-cli/`                     |
+| B41, B44 | `tests/extensions/test_plugin_component_merge`                  | `fixtures/plugins/components/`                          |
+| B42, B43 | `tests/extensions/test_plugin_claude_layout_translation`        | `fixtures/plugins/claude-layout/`                       |
+| B45      | `tests/extensions/test_plugin_component_markers`                | `fixtures/plugins/markers/`                             |
+| B46, B47 | `tests/extensions/test_skill_discovery_with_overlapping_names`  | `fixtures/skills/overlap/`                              |
+| B48, B49 | `tests/extensions/test_skill_frontmatter_keys_and_validation`   | `fixtures/skills/frontmatter/`                          |
+| B50      | `tests/extensions/test_skill_collision_priority_and_shadowing`  | `fixtures/skills/collide/`                              |
+| B51      | `tests/extensions/test_skill_disabled_ledger_union`             | `fixtures/skills/ledger/`                               |
+| B52      | `tests/extensions/test_builtin_skill_materialization`           | `fixtures/skills/builtin/`                              |
+| B53, B54 | `tests/extensions/test_skill_listing_budget_and_rendering`      | `fixtures/skills/listing/`                              |
+| B55      | `tests/extensions/test_skill_delta_reminder`                    | `fixtures/skills/delta/`                                |
+| B56      | `tests/extensions/test_skill_tool_activation_payload`           | `fixtures/skills/activate/`                             |
+| B57      | `tests/extensions/test_skill_slash_command_registration`        | `fixtures/skills/slash/`                                |
+| B58      | `tests/extensions/test_disable_builtin_skills_effect`           | `fixtures/skills/disable-builtin/`                      |
+| B59      | `tests/extensions/test_spec_mode_skill_write_boundary`          | `fixtures/spec-mode/`                                   |
+| B60, B61 | `tests/extensions/test_acp_method_surface`                      | `fixtures/acp/ndjson/`                                  |
+| B62      | `tests/extensions/test_acp_initialize_response`                 | `fixtures/acp/initialize/`                              |
+| B63, B64 | `tests/extensions/test_acp_mcp_server_conversion`               | `fixtures/acp/mcp-servers/`                             |
+| B65, B66 | `tests/extensions/test_acp_prompt_and_stop_reasons`             | `fixtures/acp/turns/`                                   |
+| B67      | `tests/extensions/test_acp_cancel_semantics`                    | `fixtures/acp/cancel/`                                  |
+| B68      | `tests/extensions/test_acp_session_update_shapes`               | `fixtures/acp/updates/`                                 |
+| B69      | `tests/extensions/test_acp_permission_option_mapping`           | `fixtures/acp/permissions/`                             |
+| B70      | `tests/extensions/test_acp_modes_and_config_options`            | `fixtures/acp/config/`                                  |
+| B71      | `tests/extensions/test_acp_session_lifecycle`                   | `fixtures/acp/lifecycle/`                               |
 
 The inventory table is pinned by `tests/extensions/test_bundled_skill_inventory` against
 `fixtures/skills/inventory/`: it asserts the exact set of bundled names, each name's `user-invocable` /
@@ -771,70 +770,70 @@ Every `path:line` below is relative to `evidence/original/windows-x64/`, e.g.
 `evidence/original/windows-x64/src/mcp/constants.ts:6`; rows that name a repo-relative path
 (`tests/parity/…`) or a path under `evidence/extracted/windows-x64/` say so explicitly.
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `ev_mcp_constants_1` (`src/mcp/constants.ts:6-102`) | B10, B13, B19, B20, B28 | reading |
-| `ev_mcp_schema_1` (`packages/common/src/settings/schema.ts:2254-2362`) | B3, B4, B24 | reading |
-| `ev_mcp_schema_2` (`packages/sdk-core/src/protocol/settings/schema.ts:96-160`) | B26 | reading |
-| `ev_mcp_merge_1` (`packages/runtime/settings/src/mergeMcp.ts:1-28`) | B4 | reading |
-| `ev_mcp_hierarchy_1` (`packages/runtime/settings/src/SettingsManager.ts:3923-4053`) | B4 | reading |
-| `ev_mcp_hierarchy_2` (`packages/runtime/settings/src/SettingsResolver.ts:286-305`) | B4 | reading |
-| `ev_mcp_paths_1` (`src/services/mcp/mcpConfigPresence.ts:73-81`, `:236-266`) | B1, B4 | reading |
-| `ev_mcp_load_1` (`packages/runtime/settings/src/SettingsFolder.ts:1286-1315`) | B2 | reading |
-| `ev_mcp_names_1` (`packages/utils/src/mcp/normalizeServerName/index.ts:15-82`) | B5 | reading |
-| `ev_mcp_names_2` (`src/mcp/utils.ts:115-117`, `:255-305`) | B17 | reading |
-| `ev_mcp_names_3` (`packages/core/src/llms/client/tool-call-ids.ts:13-70`) | B17 | reading |
-| `ev_mcp_service_1` (`src/services/mcp/McpService.ts:4198-4310`, `:4429-4480`) | B16, B18 | reading |
-| `ev_mcp_hub_1` (`src/mcp/McpHub.ts:1762-1800`, `:2221-2330`) | B15, B20, B21, B30 | reading |
-| `ev_mcp_exec_1` (`src/tools/executors/client/mcp/formatMcpResult.ts:12-125`) | B22, B23 | reading |
-| `ev_mcp_oauth_1` (`packages/common/src/mcp-oauth/constants.ts:3-74`) | B27 | reading |
-| `ev_mcp_oauth_2` (`packages/runtime/auth/src/mcp-oauth/schema.ts:111-174`) | B29 | reading |
-| `ev_mcp_oauth_3` (`src/services/mcp/oauth/core/driver.ts:1-70`) | B28, B29 [inferred step order] | reading |
-| `ev_mcp_policy_1` (`packages/runtime/settings/src/McpSettingsManager.ts:119-135`, `:193-270`) | B7 | reading |
-| `ev_mcp_perm_1` (`src/services/mcp/McpPermissionService.ts:1-35`, `:196-260`) | B24 | reading |
-| `ev_mcp_cli_1` (`src/entrypoints/mcp/command.ts:17-112`) | B6, B25 | reading |
-| `ev_mcp_add_1` (`src/commands/mcp/add.ts:25-252`) | B5, B6 | reading |
-| `ev_mcp_secrets_1` (`src/mcp/resolveMcpSecretReferences.ts:8-80`) | B8 | reading |
-| `ev_mcp_sandbox_1` (`src/mcp/sandbox.ts:77-150`) | B9 | reading |
-| `ev_mcp_era_1` (`src/mcp/protocolEra.ts:1-84`) | B12 | reading |
-| `ev_plugin_layout_1` (`packages/runtime/plugins/src/constants.ts:5-39`, `:71-88`) | B31, B34 | reading |
-| `ev_plugin_registry_1` (`packages/runtime/plugins/src/PluginRegistry.ts:283-300`, `:791-815`) | B31 | reading |
-| `ev_plugin_manifest_1` (`packages/common/src/settings/schema.ts:306-350`, `:490-527`) | B32, B35, B36 | reading |
-| `ev_plugin_manifest_2` (`packages/runtime/plugins/src/pluginHooks.ts:37-45`, `:192-240`) | B33, B44 | reading |
-| `ev_plugin_archive_1` (`packages/runtime/plugins/src/archivePluginInstaller.internals.ts:438-486`) | B33, B45 | reading |
-| `ev_plugin_archive_2` (`packages/runtime/plugins/src/archivePluginInstaller.ts:82`, `:160-175`) | B35 | reading |
-| `ev_plugin_cli_1` (`src/entrypoints/plugin/command.ts:24-118`, `src/entrypoints/plugin/install.ts:11-49`) | B37, B40 | reading |
-| `ev_plugin_cli_2` (`src/entrypoints/plugin/uninstall.ts:16-45`, `src/entrypoints/plugin/update.ts:11-66`) | B38, B39 | reading |
-| `ev_plugin_manager_1` (`packages/runtime/settings/src/PluginMarketplaceManager.ts:1707-1795`, `:2172-2200`) | B37, B38 | reading |
-| `ev_plugin_loader_1` (`packages/runtime/plugins/src/PluginLoader.ts:283-296`, `:355-380`, `:515-560`, `packages/runtime/settings/src/mergeDroids.ts:10-37`, `packages/runtime/settings/src/mergeMcp.ts:15-27`) | B41 | reading |
-| `ev_plugin_loader_2` (`packages/runtime/plugins/src/PluginLoader.ts:238-282`) | B41 | reading |
-| `ev_plugin_copy_1` (`packages/runtime/plugins/src/pluginCopy.ts:196-250`) | B42 | reading |
-| `ev_plugin_env_1` (`packages/utils/src/settings/pluginEnvVars.ts:1-60`) | B43 | reading |
-| `ev_plugin_id_1` (`packages/runtime/plugins/src/pluginId.ts:1-37`) | B37 | reading |
-| `ev_skill_priority_1` (`src/skills/constants.ts:3-44`) | B46, B53, B54, B55 | reading |
-| `ev_skill_resolve_1` (`src/skills/resolveEffectiveSkills.ts:71-240`) | B50, B51 | reading |
-| `ev_skill_index_1` (`src/skills/builtin/index.ts:204-215`, `:467-633`) | B46, B51, B58 | reading |
-| `ev_skill_dirs_1` (`packages/runtime/settings/src/SettingsFolder.ts:1455-1487`, `packages/runtime/settings/src/AgentSettingsFolder.ts:33-140`) | B47 | reading |
-| `ev_skill_fm_1` (`packages/common/src/settings/schema.ts:2396-2420`) | B48 | reading |
-| `ev_skill_fm_2` (`packages/utils/src/frontmatter/parseSkillFrontmatter.ts:73-118`) | B49 | reading |
-| `ev_skill_builtin_1` (`src/skills/builtin/loadBuiltinSkill.ts:89-110`, `src/skills/builtin/builtinSkillDefinitions.ts:186-247`, `src/skills/builtin/agent-browser/prompt.ts:1-4`) | B52 | reading |
-| `ev_skill_render_1` (`src/skills/availableSkillsReminder.ts:27-140`) | B53, B55 | reading |
-| `ev_skill_render_2` (`src/skills/skillListingRenderer.ts:9-169`) | B54 | reading |
-| `ev_skill_exec_1` (`src/tools/executors/SkillExecutor.ts:66-175`) | B56 | reading |
-| `ev_skill_slash_1` (`src/commands/skills/SkillCommandsLoader.ts:20-60`, `src/commands/skills/BuildSlashCommandsForSkills.ts:274-296`) | B57, B58 | reading |
-| `ev_skill_spec_1` (`src/agent/tools.ts:1979-2036`) | B59 | reading |
-| `ev_skill_disable_1` (`src/services/SessionService.ts:10884-10902`, `src/entrypoints/exec/assertValidOptions.ts:166-175`) | B58 | reading |
-| `ev_skill_inventory_1` (38 `SKILL*.md` assets in `evidence/extracted/windows-x64/`) | inventory table | decoded via `iconv` (UTF-16LE) / text grep |
-| `ev_acp_wire_1` (`src/exec/acpDaemonRunner.ts:14-92`) | B60, B61 | reading |
-| `ev_acp_agent_1` (`src/acp/AcpAgent.ts:1450-1560`) | B62, B63 | reading |
-| `ev_acp_agent_2` (`src/acp/AcpAgent.ts:2130-2250`) | B65, B66, B67 | reading |
-| `ev_acp_agent_3` (`src/acp/AcpAgent.ts:1290-1335`, `:2033-2044`) | B68, B70 | reading |
-| `ev_acp_convert_1` (`src/acp/session/convertAcpMcpServer.ts:13-39`) | B64 | reading |
-| `ev_acp_updates_1` (`src/acp/protocol/sessionUpdates.ts:266-705`, `src/acp/protocol/schemas.ts:1-40`) | B68 | reading |
-| `ev_acp_perm_1` (`src/acp/tools/mapOutcomeToKind.ts:8-33`, `src/acp/tools/permissionMappers.ts:1-60`) | B69 | reading |
-| `ev_acp_modes_1` (`src/acp/session/constants.ts:4-6`, `src/acp/session/modes.ts:14-38`) | B70 | reading |
-| `ev_acp_lifecycle_1` (`src/acp/AcpAgent.ts:1554-1780`, `:2097-2130`) | B71 | reading |
-| `ev_cli_goldens_1` (repo-relative `.work/parity/expected/help-mcp.json`, `help-plugin.json`, `help-exec.json`) | B25, B40, B58 | recorded goldens |
+| Evidence                                                                                                                                                                                                       | Supports                       | Method                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------ |
+| `ev_mcp_constants_1` (`src/mcp/constants.ts:6-102`)                                                                                                                                                            | B10, B13, B19, B20, B28        | reading                                    |
+| `ev_mcp_schema_1` (`packages/common/src/settings/schema.ts:2254-2362`)                                                                                                                                         | B3, B4, B24                    | reading                                    |
+| `ev_mcp_schema_2` (`packages/sdk-core/src/protocol/settings/schema.ts:96-160`)                                                                                                                                 | B26                            | reading                                    |
+| `ev_mcp_merge_1` (`packages/runtime/settings/src/mergeMcp.ts:1-28`)                                                                                                                                            | B4                             | reading                                    |
+| `ev_mcp_hierarchy_1` (`packages/runtime/settings/src/SettingsManager.ts:3923-4053`)                                                                                                                            | B4                             | reading                                    |
+| `ev_mcp_hierarchy_2` (`packages/runtime/settings/src/SettingsResolver.ts:286-305`)                                                                                                                             | B4                             | reading                                    |
+| `ev_mcp_paths_1` (`src/services/mcp/mcpConfigPresence.ts:73-81`, `:236-266`)                                                                                                                                   | B1, B4                         | reading                                    |
+| `ev_mcp_load_1` (`packages/runtime/settings/src/SettingsFolder.ts:1286-1315`)                                                                                                                                  | B2                             | reading                                    |
+| `ev_mcp_names_1` (`packages/utils/src/mcp/normalizeServerName/index.ts:15-82`)                                                                                                                                 | B5                             | reading                                    |
+| `ev_mcp_names_2` (`src/mcp/utils.ts:115-117`, `:255-305`)                                                                                                                                                      | B17                            | reading                                    |
+| `ev_mcp_names_3` (`packages/core/src/llms/client/tool-call-ids.ts:13-70`)                                                                                                                                      | B17                            | reading                                    |
+| `ev_mcp_service_1` (`src/services/mcp/McpService.ts:4198-4310`, `:4429-4480`)                                                                                                                                  | B16, B18                       | reading                                    |
+| `ev_mcp_hub_1` (`src/mcp/McpHub.ts:1762-1800`, `:2221-2330`)                                                                                                                                                   | B15, B20, B21, B30             | reading                                    |
+| `ev_mcp_exec_1` (`src/tools/executors/client/mcp/formatMcpResult.ts:12-125`)                                                                                                                                   | B22, B23                       | reading                                    |
+| `ev_mcp_oauth_1` (`packages/common/src/mcp-oauth/constants.ts:3-74`)                                                                                                                                           | B27                            | reading                                    |
+| `ev_mcp_oauth_2` (`packages/runtime/auth/src/mcp-oauth/schema.ts:111-174`)                                                                                                                                     | B29                            | reading                                    |
+| `ev_mcp_oauth_3` (`src/services/mcp/oauth/core/driver.ts:1-70`)                                                                                                                                                | B28, B29 [inferred step order] | reading                                    |
+| `ev_mcp_policy_1` (`packages/runtime/settings/src/McpSettingsManager.ts:119-135`, `:193-270`)                                                                                                                  | B7                             | reading                                    |
+| `ev_mcp_perm_1` (`src/services/mcp/McpPermissionService.ts:1-35`, `:196-260`)                                                                                                                                  | B24                            | reading                                    |
+| `ev_mcp_cli_1` (`src/entrypoints/mcp/command.ts:17-112`)                                                                                                                                                       | B6, B25                        | reading                                    |
+| `ev_mcp_add_1` (`src/commands/mcp/add.ts:25-252`)                                                                                                                                                              | B5, B6                         | reading                                    |
+| `ev_mcp_secrets_1` (`src/mcp/resolveMcpSecretReferences.ts:8-80`)                                                                                                                                              | B8                             | reading                                    |
+| `ev_mcp_sandbox_1` (`src/mcp/sandbox.ts:77-150`)                                                                                                                                                               | B9                             | reading                                    |
+| `ev_mcp_era_1` (`src/mcp/protocolEra.ts:1-84`)                                                                                                                                                                 | B12                            | reading                                    |
+| `ev_plugin_layout_1` (`packages/runtime/plugins/src/constants.ts:5-39`, `:71-88`)                                                                                                                              | B31, B34                       | reading                                    |
+| `ev_plugin_registry_1` (`packages/runtime/plugins/src/PluginRegistry.ts:283-300`, `:791-815`)                                                                                                                  | B31                            | reading                                    |
+| `ev_plugin_manifest_1` (`packages/common/src/settings/schema.ts:306-350`, `:490-527`)                                                                                                                          | B32, B35, B36                  | reading                                    |
+| `ev_plugin_manifest_2` (`packages/runtime/plugins/src/pluginHooks.ts:37-45`, `:192-240`)                                                                                                                       | B33, B44                       | reading                                    |
+| `ev_plugin_archive_1` (`packages/runtime/plugins/src/archivePluginInstaller.internals.ts:438-486`)                                                                                                             | B33, B45                       | reading                                    |
+| `ev_plugin_archive_2` (`packages/runtime/plugins/src/archivePluginInstaller.ts:82`, `:160-175`)                                                                                                                | B35                            | reading                                    |
+| `ev_plugin_cli_1` (`src/entrypoints/plugin/command.ts:24-118`, `src/entrypoints/plugin/install.ts:11-49`)                                                                                                      | B37, B40                       | reading                                    |
+| `ev_plugin_cli_2` (`src/entrypoints/plugin/uninstall.ts:16-45`, `src/entrypoints/plugin/update.ts:11-66`)                                                                                                      | B38, B39                       | reading                                    |
+| `ev_plugin_manager_1` (`packages/runtime/settings/src/PluginMarketplaceManager.ts:1707-1795`, `:2172-2200`)                                                                                                    | B37, B38                       | reading                                    |
+| `ev_plugin_loader_1` (`packages/runtime/plugins/src/PluginLoader.ts:283-296`, `:355-380`, `:515-560`, `packages/runtime/settings/src/mergeDroids.ts:10-37`, `packages/runtime/settings/src/mergeMcp.ts:15-27`) | B41                            | reading                                    |
+| `ev_plugin_loader_2` (`packages/runtime/plugins/src/PluginLoader.ts:238-282`)                                                                                                                                  | B41                            | reading                                    |
+| `ev_plugin_copy_1` (`packages/runtime/plugins/src/pluginCopy.ts:196-250`)                                                                                                                                      | B42                            | reading                                    |
+| `ev_plugin_env_1` (`packages/utils/src/settings/pluginEnvVars.ts:1-60`)                                                                                                                                        | B43                            | reading                                    |
+| `ev_plugin_id_1` (`packages/runtime/plugins/src/pluginId.ts:1-37`)                                                                                                                                             | B37                            | reading                                    |
+| `ev_skill_priority_1` (`src/skills/constants.ts:3-44`)                                                                                                                                                         | B46, B53, B54, B55             | reading                                    |
+| `ev_skill_resolve_1` (`src/skills/resolveEffectiveSkills.ts:71-240`)                                                                                                                                           | B50, B51                       | reading                                    |
+| `ev_skill_index_1` (`src/skills/builtin/index.ts:204-215`, `:467-633`)                                                                                                                                         | B46, B51, B58                  | reading                                    |
+| `ev_skill_dirs_1` (`packages/runtime/settings/src/SettingsFolder.ts:1455-1487`, `packages/runtime/settings/src/AgentSettingsFolder.ts:33-140`)                                                                 | B47                            | reading                                    |
+| `ev_skill_fm_1` (`packages/common/src/settings/schema.ts:2396-2420`)                                                                                                                                           | B48                            | reading                                    |
+| `ev_skill_fm_2` (`packages/utils/src/frontmatter/parseSkillFrontmatter.ts:73-118`)                                                                                                                             | B49                            | reading                                    |
+| `ev_skill_builtin_1` (`src/skills/builtin/loadBuiltinSkill.ts:89-110`, `src/skills/builtin/builtinSkillDefinitions.ts:186-247`, `src/skills/builtin/agent-browser/prompt.ts:1-4`)                              | B52                            | reading                                    |
+| `ev_skill_render_1` (`src/skills/availableSkillsReminder.ts:27-140`)                                                                                                                                           | B53, B55                       | reading                                    |
+| `ev_skill_render_2` (`src/skills/skillListingRenderer.ts:9-169`)                                                                                                                                               | B54                            | reading                                    |
+| `ev_skill_exec_1` (`src/tools/executors/SkillExecutor.ts:66-175`)                                                                                                                                              | B56                            | reading                                    |
+| `ev_skill_slash_1` (`src/commands/skills/SkillCommandsLoader.ts:20-60`, `src/commands/skills/BuildSlashCommandsForSkills.ts:274-296`)                                                                          | B57, B58                       | reading                                    |
+| `ev_skill_spec_1` (`src/agent/tools.ts:1979-2036`)                                                                                                                                                             | B59                            | reading                                    |
+| `ev_skill_disable_1` (`src/services/SessionService.ts:10884-10902`, `src/entrypoints/exec/assertValidOptions.ts:166-175`)                                                                                      | B58                            | reading                                    |
+| `ev_skill_inventory_1` (38 `SKILL*.md` assets in `evidence/extracted/windows-x64/`)                                                                                                                            | inventory table                | decoded via `iconv` (UTF-16LE) / text grep |
+| `ev_acp_wire_1` (`src/exec/acpDaemonRunner.ts:14-92`)                                                                                                                                                          | B60, B61                       | reading                                    |
+| `ev_acp_agent_1` (`src/acp/AcpAgent.ts:1450-1560`)                                                                                                                                                             | B62, B63                       | reading                                    |
+| `ev_acp_agent_2` (`src/acp/AcpAgent.ts:2130-2250`)                                                                                                                                                             | B65, B66, B67                  | reading                                    |
+| `ev_acp_agent_3` (`src/acp/AcpAgent.ts:1290-1335`, `:2033-2044`)                                                                                                                                               | B68, B70                       | reading                                    |
+| `ev_acp_convert_1` (`src/acp/session/convertAcpMcpServer.ts:13-39`)                                                                                                                                            | B64                            | reading                                    |
+| `ev_acp_updates_1` (`src/acp/protocol/sessionUpdates.ts:266-705`, `src/acp/protocol/schemas.ts:1-40`)                                                                                                          | B68                            | reading                                    |
+| `ev_acp_perm_1` (`src/acp/tools/mapOutcomeToKind.ts:8-33`, `src/acp/tools/permissionMappers.ts:1-60`)                                                                                                          | B69                            | reading                                    |
+| `ev_acp_modes_1` (`src/acp/session/constants.ts:4-6`, `src/acp/session/modes.ts:14-38`)                                                                                                                        | B70                            | reading                                    |
+| `ev_acp_lifecycle_1` (`src/acp/AcpAgent.ts:1554-1780`, `:2097-2130`)                                                                                                                                           | B71                            | reading                                    |
+| `ev_cli_goldens_1` (repo-relative `tests/parity/expected/help-mcp.json`, `help-plugin.json`, `help-exec.json`)                                                                                                 | B25, B40, B58                  | recorded goldens                           |
 
 Labelling. Two claims are `[derived]` rather than read directly: B17's collision-stability guarantee
 (the code comments assert it and the hashing is of the raw name, but no executed collision case was
@@ -918,11 +917,11 @@ markers and the settings schema). B67's stale-request rule is `[observed]` in co
 **Explicitly not part of the contract**
 
 - Exact wording of progress/spinner text, table formatting, and log lines.
-- The set of bundled skills is a *release* property: a conforming build must keep the mechanism and the
+- The set of bundled skills is a _release_ property: a conforming build must keep the mechanism and the
   inventory of the release it targets, but adding or removing a skill is not a behaviour change of this
   subsystem.
 - Internal implementation choices: the stdio process-family/job-object machinery, catalog prewarming,
   metrics names, and the exact hashing of internal cache filenames beyond the directory layout stated
   above.
 - Feature-flag gating of individual builtins and plugins (which of them a given org sees) is a policy
-  concern owned elsewhere; this spec pins that gating *exists* and where it is applied.
+  concern owned elsewhere; this spec pins that gating _exists_ and where it is applied.

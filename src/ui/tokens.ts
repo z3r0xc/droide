@@ -13,7 +13,7 @@
  */
 
 /** The two shipped themes (B17). `auto` resolution is a later slice. */
-export type ThemeName = "factory-dark" | "factory-light";
+export type ThemeName = "droide-dark" | "droide-light";
 
 /** Colour depth the terminal can render, after B18 degradation. */
 export type ColorDepth = "truecolor" | "256" | "16" | "none";
@@ -244,7 +244,7 @@ export type PaletteSlot =
 
 /** The flat, theme-resolved palette every renderer reads (B17). */
 function themePalette(theme: ThemeName): Readonly<Record<PaletteSlot, string>> {
-  const side = theme === "factory-dark" ? "dark" : "light";
+  const side = theme === "droide-dark" ? "dark" : "light";
   return {
     ...CORE_PALETTE[side],
     ...TEXT_PALETTE[side],
@@ -260,25 +260,25 @@ function themePalette(theme: ThemeName): Readonly<Record<PaletteSlot, string>> {
   };
 }
 
-/** factory-dark resolved to one flat slot map. */
+/** droide-dark resolved to one flat slot map. */
 export const PALETTE_DARK: Readonly<Record<PaletteSlot, string>> =
-  themePalette("factory-dark");
+  themePalette("droide-dark");
 
-/** factory-light resolved to one flat slot map (unpublished slots inherit dark). */
+/** droide-light resolved to one flat slot map (unpublished slots inherit dark). */
 export const PALETTE_LIGHT: Readonly<Record<PaletteSlot, string>> =
-  themePalette("factory-light");
+  themePalette("droide-light");
 
 /** Resolve a theme name to its flat palette. */
 export function paletteFor(
   theme: ThemeName,
 ): Readonly<Record<PaletteSlot, string>> {
-  return theme === "factory-light" ? PALETTE_LIGHT : PALETTE_DARK;
+  return theme === "droide-light" ? PALETTE_LIGHT : PALETTE_DARK;
 }
 
 /** Read a slot's literal hex for a theme, before capability degradation. */
 export function themeColor(
   slot: PaletteSlot,
-  theme: ThemeName = "factory-dark",
+  theme: ThemeName = "droide-dark",
 ): string {
   return paletteFor(theme)[slot];
 }

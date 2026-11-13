@@ -281,7 +281,7 @@ test("a second daemon on the same address exits 1 and the first keeps answering 
 
     assert.deepEqual(await httpGet(first.endpoint.port, "/health"), {
       status: 200,
-      body: "factory-daemon ok",
+      body: "droide-daemon ok",
     });
   } finally {
     await first.close();

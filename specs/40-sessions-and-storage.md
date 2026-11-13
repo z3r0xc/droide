@@ -3,13 +3,13 @@
 - **Target:** the `droide` CLI shipped from this repository
 - **Status:** review
 - **Owner:** storage / session index
-- **Related:** `specs/00-context.md`, `specs/template.md`; session transcript *writer* and `/btw` forks are the CLI session lifecycle; daemon RPC surface (`SEARCH_SESSIONS`) is the daemon spec; embeddings/semantic recall are their own slice. Tool ids: none.
+- **Related:** `specs/00-context.md`, `specs/template.md`; session transcript _writer_ and `/btw` forks are the CLI session lifecycle; daemon RPC surface (`SEARCH_SESSIONS`) is the daemon spec; embeddings/semantic recall are their own slice. Tool ids: none.
 
 ## Purpose
 
 `droide` keeps one durable artefact per session — a JSONL transcript plus an
 optional settings file under `<home>/<dir>/sessions/` — and projects it into a
-local SQLite *session index* that answers "list my sessions" and "search my
+local SQLite _session index_ that answers "list my sessions" and "search my
 sessions" without reading every file. This spec pins that projection: the
 database's shape and versioning, the rules that decide when a row is rewritten
 or restarted, the on-disk layout (including the WAL and lock behaviour the CLI
@@ -54,7 +54,7 @@ not in the recovered source; see Open question 1).
 - **Sessions dir** — `<base>/sessions` (`packages/runtime/session-index/src/access.ts:85-87`).
 - **Transcript** — `<sessions dir>/<project dir>/<session id>.jsonl`; the
   **settings file** is the sibling `<session id>.settings.json` and is optional.
-- **project_key** — the transcript's directory *relative to the sessions dir*:
+- **project_key** — the transcript's directory _relative to the sessions dir_:
   `''` (global root), `'btw'`, or a sanitized project directory that always
   begins with `-` (`packages/runtime/session-paths/src/index.ts:102-124`).
 - **Cache database** — `<base>/cache/session-index/index.db`
@@ -320,7 +320,7 @@ cascade the same way (`0006_spans_and_search*.sql:8-10`, `81-82`, `130-132`). `[
 
 **B32.** Each row carries `session_ingest.schema_version`, stamped on every
 refresh write with `max(latest cache migration, 7)`; a mutation write that finds
-a *higher* stamp lowers it to this build's version and lowers
+a _higher_ stamp lowers it to this build's version and lowers
 `meta.last_full_refresh_schema_version` with it, so a newer build backfills what
 this write may have rewritten (`ingest.ts:212-216`, `303-325`). `[observed]`
 
@@ -475,25 +475,25 @@ prints the search-failed message and sets 1 (`run.ts:160-173`). `[observed]`
 ### Our head: version 10 (a local design, labelled)
 
 The reference build's cache head is version 9. This build adds one migration of its own,
-`0010_transcript_index`, because the retrieval shape we need is a *literal
-transcript index* rather than the reference build's `session_term_filters` planner.
+`0010_transcript_index`, because the retrieval shape we need is a _literal
+transcript index_ rather than the reference build's `session_term_filters` planner.
 The difference is deliberate and recorded here, not hidden:
 
-| object | purpose |
-|---|---|
-| `transcript_index` | one row per transcript path: session, project key, mtime+size fingerprint, `indexed_at`, and six settings-derived columns (`mission`, `tags`, `archived_at`, `worktree`, `artifacts`, `settings_write_seq`) |
-| `transcript_index_value` | one row per indexed line (`path`, `line`, `ordinal` PK): `kind`, `tool`, `role`, `summary`, lowercased `value`, FK-cascaded from `transcript_index` |
-| 3 indexes | by session, by project key, and by lowercased value for the prefilter |
-| 3 triggers | a changed fingerprint clears cached values; an insert seeds the settings copy; a `sessions` update keeps it synced |
+| object                   | purpose                                                                                                                                                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transcript_index`       | one row per transcript path: session, project key, mtime+size fingerprint, `indexed_at`, and six settings-derived columns (`mission`, `tags`, `archived_at`, `worktree`, `artifacts`, `settings_write_seq`) |
+| `transcript_index_value` | one row per indexed line (`path`, `line`, `ordinal` PK): `kind`, `tool`, `role`, `summary`, lowercased `value`, FK-cascaded from `transcript_index`                                                         |
+| 3 indexes                | by session, by project key, and by lowercased value for the prefilter                                                                                                                                       |
+| 3 triggers               | a changed fingerprint clears cached values; an insert seeds the settings copy; a `sessions` update keeps it synced                                                                                          |
 
-**Invariant that keeps this honest.** The index only *prefilters*: a session is
+**Invariant that keeps this honest.** The index only _prefilters_: a session is
 skipped only when its fingerprint still matches its file **and** no cached value
 matches the query. Everything else is scanned exactly as before, so the results
 of `search()` are identical with the index on or off — proven by
 `tests/integration/session/index.test.ts` (indexed vs literal parity over 15
 query/option cases, plus a prefilter-trust case).
 
-A binary database written by the reference build is therefore *not* readable by this
+A binary database written by the reference build is therefore _not_ readable by this
 build (different table names), and this build's database is not readable by the
 reference build. That is the cost of a clean-room index; it is stated here instead of
 being discovered by a user.
@@ -505,21 +505,21 @@ being discovered by a user.
 (`constants.ts:9-22`); created with `IF NOT EXISTS` on every open, unlike
 migration SQL, which never uses `IF NOT EXISTS` (`0001_baseline*.sql:19-21`).
 
-The nine migrations, and what each is *for* (a conforming build must produce the
+The nine migrations, and what each is _for_ (a conforming build must produce the
 same head shape; only a migration's identity and effect are contract, not its
 wording):
 
-| v | ledger name | intent |
-|---|---|---|
-| 1 | `baseline` | The whole initial cache: `meta`, `sessions` (with `org_id`, `owner`, `parent`, `calling_session_id`, `calling_tool_use_id`, `mission`, `tags`, tri-state `has_user_visible_messages`), its five indexes, and `session_ingest` kept in its own table because its write class differs. **Frozen**: every later change is an appended migration, and a change that alters what a row *means* invalidates the bookkeeping so the refresh rewrites the rows (`0001_baseline*.sql:1-21`) |
-| 2 | `transcript-summary-fingerprint` | Detect first-line rewrites whose writers preserve mtime (`0002_transcript_summary_fingerprint*.sql:1-4`) |
-| 3 | `tags_role_key` | `tags` now carries a derived `mission-session:role` key; mark every row's settings unread with `-1` (not `0`, which is a real "no settings file"), drop `last_full_refresh_at` so readers fall back until a covering refresh, and add `sessions_settings_rewritten` for older builds' writes (`0003_tags_role_key*.sql:1-38`) |
-| 4 | `daemon-session-fields` | Let the daemon list from the index alone: `host_id`, `worktree`, `artifacts`, and `settings_write_seq` (NULL = needs re-reading) with the `sessions_daemon_fields_stale` trigger (`0004_daemon_session_fields*.sql:1-33`) |
-| 5 | `schema-version` | Per-row `schema_version`, so a backfill is named by a migration instead of a cleared marker; every row is NULL here, so the next refresh reads every summary line once (`0005_schema_version*.sql:1-20`) |
-| 6 | `spans-and-search` | Everything retrieval stores: span-tail columns, `session_spans`, `session_term_filters`; additive, no backfill (`0006_spans_and_search*.sql:1-28`) |
-| 7 | `term-prefixes` | Record the word-prefix rule for term filters. It shipped as `TERM_FILTER_SCHEMA_VERSION = 7` with no file, so the ledger takes the entry; the SQL is a no-op because a migration must contain a statement (`0007_term_prefixes*.sql:1-15`) |
-| 8 | `whole-transcript-records` | Stop dropping over-long transcript records: rows stamped 7 that skipped nothing move to 8, rows that skipped a record are re-read from their start by the next refresh (`0008_whole_transcript_records*.sql:1-21`) |
-| 9 | `vector-bookkeeping` | `meta.vector_epoch` plus the three `session_spans` triggers and the unembedded-span index, so semantic search can reuse its matrix (`0009_vector_bookkeeping*.sql:1-54`) |
+| v   | ledger name                      | intent                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `baseline`                       | The whole initial cache: `meta`, `sessions` (with `org_id`, `owner`, `parent`, `calling_session_id`, `calling_tool_use_id`, `mission`, `tags`, tri-state `has_user_visible_messages`), its five indexes, and `session_ingest` kept in its own table because its write class differs. **Frozen**: every later change is an appended migration, and a change that alters what a row _means_ invalidates the bookkeeping so the refresh rewrites the rows (`0001_baseline*.sql:1-21`) |
+| 2   | `transcript-summary-fingerprint` | Detect first-line rewrites whose writers preserve mtime (`0002_transcript_summary_fingerprint*.sql:1-4`)                                                                                                                                                                                                                                                                                                                                                                           |
+| 3   | `tags_role_key`                  | `tags` now carries a derived `mission-session:role` key; mark every row's settings unread with `-1` (not `0`, which is a real "no settings file"), drop `last_full_refresh_at` so readers fall back until a covering refresh, and add `sessions_settings_rewritten` for older builds' writes (`0003_tags_role_key*.sql:1-38`)                                                                                                                                                      |
+| 4   | `daemon-session-fields`          | Let the daemon list from the index alone: `host_id`, `worktree`, `artifacts`, and `settings_write_seq` (NULL = needs re-reading) with the `sessions_daemon_fields_stale` trigger (`0004_daemon_session_fields*.sql:1-33`)                                                                                                                                                                                                                                                          |
+| 5   | `schema-version`                 | Per-row `schema_version`, so a backfill is named by a migration instead of a cleared marker; every row is NULL here, so the next refresh reads every summary line once (`0005_schema_version*.sql:1-20`)                                                                                                                                                                                                                                                                           |
+| 6   | `spans-and-search`               | Everything retrieval stores: span-tail columns, `session_spans`, `session_term_filters`; additive, no backfill (`0006_spans_and_search*.sql:1-28`)                                                                                                                                                                                                                                                                                                                                 |
+| 7   | `term-prefixes`                  | Record the word-prefix rule for term filters. It shipped as `TERM_FILTER_SCHEMA_VERSION = 7` with no file, so the ledger takes the entry; the SQL is a no-op because a migration must contain a statement (`0007_term_prefixes*.sql:1-15`)                                                                                                                                                                                                                                         |
+| 8   | `whole-transcript-records`       | Stop dropping over-long transcript records: rows stamped 7 that skipped nothing move to 8, rows that skipped a record are re-read from their start by the next refresh (`0008_whole_transcript_records*.sql:1-21`)                                                                                                                                                                                                                                                                 |
+| 9   | `vector-bookkeeping`             | `meta.vector_epoch` plus the three `session_spans` triggers and the unembedded-span index, so semantic search can reuse its matrix (`0009_vector_bookkeeping*.sql:1-54`)                                                                                                                                                                                                                                                                                                           |
 
 Backfills are declared in code, not SQL: version 5 names the summary-line source
 and version 8 the transcript source (`src/migrations.ts:28-38`).
@@ -532,28 +532,28 @@ by `0009_vector_bookkeeping*.sql:22`).
 
 `sessions` (`0001_baseline*.sql:28-123` plus `0004_daemon_session_fields*.sql:22-25`):
 
-| column | type | nullability / default | meaning |
-|---|---|---|---|
-| `session_id` | TEXT | PK | UUIDv4, transcript file stem |
-| `project_key` | TEXT | NOT NULL | transcript dir relative to sessions dir; `''` is a real value |
-| `cwd` | TEXT | | working directory from the summary |
-| `title` | TEXT | | session title |
-| `org_id` | TEXT | | tenancy; NULL means "not permitted to assume" |
-| `owner` | TEXT | | tenancy |
-| `parent` | TEXT | | `SessionData.parent` (vendor prefix elided) |
-| `calling_session_id` | TEXT | | parent session for subagents |
-| `calling_tool_use_id` | TEXT | | tool call that spawned it |
-| `mission` | TEXT | | mission id |
-| `tags` | BLOB | NOT NULL DEFAULT `jsonb('{}')` | JSON object keyed by tag name |
-| `has_user_visible_messages` | INTEGER | | tri-state: NULL undetermined, 0 hides |
-| `archived_at` | TEXT | | archive marker |
-| `first_event_at` | INTEGER | | epoch ms, first event (else file birth time) |
-| `last_event_at` | INTEGER | | epoch ms, newest message |
-| `messages_count` | INTEGER | NOT NULL DEFAULT 0 | every message in the transcript |
-| `host_id` | TEXT | | host that ran it |
-| `worktree` | TEXT | | JSON from the settings file |
-| `artifacts` | TEXT | | JSON from the settings file |
-| `settings_write_seq` | INTEGER | | NULL means the settings-derived columns need re-reading |
+| column                      | type    | nullability / default          | meaning                                                       |
+| --------------------------- | ------- | ------------------------------ | ------------------------------------------------------------- |
+| `session_id`                | TEXT    | PK                             | UUIDv4, transcript file stem                                  |
+| `project_key`               | TEXT    | NOT NULL                       | transcript dir relative to sessions dir; `''` is a real value |
+| `cwd`                       | TEXT    |                                | working directory from the summary                            |
+| `title`                     | TEXT    |                                | session title                                                 |
+| `org_id`                    | TEXT    |                                | tenancy; NULL means "not permitted to assume"                 |
+| `owner`                     | TEXT    |                                | tenancy                                                       |
+| `parent`                    | TEXT    |                                | `SessionData.parent` (vendor prefix elided)                   |
+| `calling_session_id`        | TEXT    |                                | parent session for subagents                                  |
+| `calling_tool_use_id`       | TEXT    |                                | tool call that spawned it                                     |
+| `mission`                   | TEXT    |                                | mission id                                                    |
+| `tags`                      | BLOB    | NOT NULL DEFAULT `jsonb('{}')` | JSON object keyed by tag name                                 |
+| `has_user_visible_messages` | INTEGER |                                | tri-state: NULL undetermined, 0 hides                         |
+| `archived_at`               | TEXT    |                                | archive marker                                                |
+| `first_event_at`            | INTEGER |                                | epoch ms, first event (else file birth time)                  |
+| `last_event_at`             | INTEGER |                                | epoch ms, newest message                                      |
+| `messages_count`            | INTEGER | NOT NULL DEFAULT 0             | every message in the transcript                               |
+| `host_id`                   | TEXT    |                                | host that ran it                                              |
+| `worktree`                  | TEXT    |                                | JSON from the settings file                                   |
+| `artifacts`                 | TEXT    |                                | JSON from the settings file                                   |
+| `settings_write_seq`        | INTEGER |                                | NULL means the settings-derived columns need re-reading       |
 
 Indexes: `sessions_parent`, `sessions_caller`, `sessions_mission`
 (`0001_baseline*.sql:124-126`), expression index
@@ -564,20 +564,20 @@ Indexes: `sessions_parent`, `sessions_caller`, `sessions_mission`
 
 `session_ingest` (`0001_baseline*.sql:178-194`, then `0002`, `0005`, `0006`):
 
-| column | type | nullability / default |
-|---|---|---|
-| `session_id` | TEXT | PK, `REFERENCES sessions(session_id) ON DELETE CASCADE` |
-| `transcript_mtime_ms` | INTEGER | NOT NULL DEFAULT 0 |
-| `transcript_size` | INTEGER | NOT NULL DEFAULT 0 |
-| `transcript_offset` | INTEGER | NOT NULL DEFAULT 0 (bytes read) |
-| `transcript_skipped_lines` | INTEGER | NOT NULL DEFAULT 0 |
-| `transcript_messages_count` | INTEGER | NOT NULL DEFAULT 0 |
-| `settings_mtime_ms` | INTEGER | NOT NULL DEFAULT 0; `-1` = unread |
-| `transcript_summary_fingerprint` | TEXT | nullable (added v2) |
-| `schema_version` | INTEGER | nullable (added v5) |
-| `span_tail_offset` | INTEGER | NOT NULL DEFAULT 0 (added v6) |
-| `span_tail_line` | INTEGER | NOT NULL DEFAULT 0 |
-| `span_tail_index` | INTEGER | NOT NULL DEFAULT 0 |
+| column                           | type    | nullability / default                                   |
+| -------------------------------- | ------- | ------------------------------------------------------- |
+| `session_id`                     | TEXT    | PK, `REFERENCES sessions(session_id) ON DELETE CASCADE` |
+| `transcript_mtime_ms`            | INTEGER | NOT NULL DEFAULT 0                                      |
+| `transcript_size`                | INTEGER | NOT NULL DEFAULT 0                                      |
+| `transcript_offset`              | INTEGER | NOT NULL DEFAULT 0 (bytes read)                         |
+| `transcript_skipped_lines`       | INTEGER | NOT NULL DEFAULT 0                                      |
+| `transcript_messages_count`      | INTEGER | NOT NULL DEFAULT 0                                      |
+| `settings_mtime_ms`              | INTEGER | NOT NULL DEFAULT 0; `-1` = unread                       |
+| `transcript_summary_fingerprint` | TEXT    | nullable (added v2)                                     |
+| `schema_version`                 | INTEGER | nullable (added v5)                                     |
+| `span_tail_offset`               | INTEGER | NOT NULL DEFAULT 0 (added v6)                           |
+| `span_tail_line`                 | INTEGER | NOT NULL DEFAULT 0                                      |
+| `span_tail_index`                | INTEGER | NOT NULL DEFAULT 0                                      |
 
 `session_spans` (`0006_spans_and_search*.sql:81-112`): `session_id TEXT NOT NULL
 REFERENCES sessions(session_id) ON DELETE CASCADE`, `span_index INTEGER NOT NULL`,
@@ -651,24 +651,24 @@ reports `sqlite_version()` and which library supplied it.
 
 ## Errors
 
-| Condition | Identity | Effect |
-|---|---|---|
-| Duplicate or non-positive migration version | `Duplicate session index migration version` / `Session index migration version must be positive` | import-time throw; nothing opened |
-| Known-version checksum differs | `Session index migration checksum mismatch` (log `source: session-index`, `key: <version>:<name>`) | open fails, file untouched |
-| Ledger complete but a table/column/index missing | `Session index database is not shaped like this build` with `state` = fault id, `key` = `table[.column]` or index name | open fails, file untouched |
-| A table cannot be described | `Session index table could not be inspected` (`key: <table>`) | open fails |
-| SQLite reports corruption / not-a-database | `SQLITE_CORRUPT*` / `SQLITE_NOTADB`; log `database quarantined` with `operation` = open/migrate/check/recover and `state` = moved/absent/replaced/failed | file moved to quarantine, fresh file retried once |
-| Quarantine rename refused | log `database quarantine failed` with errno | original error propagates, file left in place |
-| Nested store transaction | `Nested session-index transaction` | throw; the outer transaction is unaffected |
-| Row's key resolves outside the sessions dir | `Indexed session resolves outside the sessions dir` (`state: outside-sessions-dir`) | listing fails for that row; no path leaks into the log |
-| Peer holds the writer slot | SQLite busy/locked; log `Deferred a session index write a peer held the lock for` | write returns "refused"; caller retries after yielding; no data lost |
-| WAL at its write cap | log `Declined a session index write because the write-ahead log is at its cap` | write refused, retried later |
-| Refresh lease held | none (silent) | second pass returns without reading |
-| `--kind` outside the enum | `Invalid --kind value` (a `MetaError`, so the generic search-failure line is printed) | exit 1 |
-| Query outside the supported regex subset | `Search query rejected`; stderr `common:sessionSearch.queryRejected`, exit 1 | nothing scanned |
-| Index-requiring flag with the feature off | `--include-archived, --exclude-children and --include-hidden need the session index, which is off` | exit 1 |
-| `ripgrep` missing or unusable | log `Session search matcher is unavailable` (`state: matcher-unavailable`) | empty result with `complete: false`; no transcript scan |
-| Search aborted (Ctrl-C) | exit 130 | no output written |
+| Condition                                        | Identity                                                                                                                                                 | Effect                                                               |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Duplicate or non-positive migration version      | `Duplicate session index migration version` / `Session index migration version must be positive`                                                         | import-time throw; nothing opened                                    |
+| Known-version checksum differs                   | `Session index migration checksum mismatch` (log `source: session-index`, `key: <version>:<name>`)                                                       | open fails, file untouched                                           |
+| Ledger complete but a table/column/index missing | `Session index database is not shaped like this build` with `state` = fault id, `key` = `table[.column]` or index name                                   | open fails, file untouched                                           |
+| A table cannot be described                      | `Session index table could not be inspected` (`key: <table>`)                                                                                            | open fails                                                           |
+| SQLite reports corruption / not-a-database       | `SQLITE_CORRUPT*` / `SQLITE_NOTADB`; log `database quarantined` with `operation` = open/migrate/check/recover and `state` = moved/absent/replaced/failed | file moved to quarantine, fresh file retried once                    |
+| Quarantine rename refused                        | log `database quarantine failed` with errno                                                                                                              | original error propagates, file left in place                        |
+| Nested store transaction                         | `Nested session-index transaction`                                                                                                                       | throw; the outer transaction is unaffected                           |
+| Row's key resolves outside the sessions dir      | `Indexed session resolves outside the sessions dir` (`state: outside-sessions-dir`)                                                                      | listing fails for that row; no path leaks into the log               |
+| Peer holds the writer slot                       | SQLite busy/locked; log `Deferred a session index write a peer held the lock for`                                                                        | write returns "refused"; caller retries after yielding; no data lost |
+| WAL at its write cap                             | log `Declined a session index write because the write-ahead log is at its cap`                                                                           | write refused, retried later                                         |
+| Refresh lease held                               | none (silent)                                                                                                                                            | second pass returns without reading                                  |
+| `--kind` outside the enum                        | `Invalid --kind value` (a `MetaError`, so the generic search-failure line is printed)                                                                    | exit 1                                                               |
+| Query outside the supported regex subset         | `Search query rejected`; stderr `common:sessionSearch.queryRejected`, exit 1                                                                             | nothing scanned                                                      |
+| Index-requiring flag with the feature off        | `--include-archived, --exclude-children and --include-hidden need the session index, which is off`                                                       | exit 1                                                               |
+| `ripgrep` missing or unusable                    | log `Session search matcher is unavailable` (`state: matcher-unavailable`)                                                                               | empty result with `complete: false`; no transcript scan              |
+| Search aborted (Ctrl-C)                          | exit 130                                                                                                                                                 | no output written                                                    |
 
 ## Acceptance tests
 
@@ -679,25 +679,25 @@ cache SQL assets (their contents are the contract), plus
 `thinking` block, a `tool_use` with `input`, the matching `tool_result`, a text
 `document` block, and a `session_start` with title/cwd).
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B6, B9, B10, B11 | `tests/session_index/test_migration_ledger` | `fixtures/migrations/` |
-| B7, B8 | `tests/session_index/test_migration_identity_normalization` | `fixtures/migrations/` |
-| B12, B13 | `tests/session_index/test_open_rejects_wrong_shape` | `fixtures/migrations/`, a DB altered by `ALTER TABLE sessions DROP COLUMN host_id` |
-| B14, B15, B16 | `tests/session_index/test_quarantine_and_recovery` | a 4 KB file of random bytes at `index.db`; a `-wal` beside it |
-| B1, B2, B3, B4, B5 | `tests/session_index/test_open_pragmas_and_layout` | empty dir |
-| B17, B18, B19, B20, B21 | `tests/session_index/test_row_write_semantics` | `fixtures/sessions/` |
-| B22 | `tests/session_index/test_settings_triggers` | one row written by `UPDATE sessions SET mission = 'm'` |
-| B23, B24, B25, B26, B27, B28, B29 | `tests/session_index/test_refresh_plan` | `fixtures/sessions/` incl. a retitled transcript with restored mtime |
-| B30, B31 | `tests/session_index/test_cleanup_cascade` | `fixtures/sessions/` with one transcript deleted between passes |
-| B32, B33, B34 | `tests/session_index/test_schema_version_backfill` | DB at head, row stamped 7 |
-| B35, B36 | `tests/session_index/test_spans_and_vector_epoch` | spans inserted, re-upserted with changed text |
-| B37 | `tests/session_index/test_annotations_schema` | `fixtures/migrations/annotations/` |
-| B38, B39, B40, B41 | `tests/session_index/test_listing_order_and_scope` | `fixtures/sessions/` with two orgs, an archived row, a BTW fork |
-| B42 | `tests/session_index/test_listing_coverage_wait` | `fixtures/sessions/` with `meta` cleared of `last_full_refresh_at` |
-| B43, B44, B45, B56 | `tests/cli/test_search_option_contract` | `fixtures/search/` (help text + argument parsing harness) |
-| B46, B47, B48, B49, B50, B51, B52 | `tests/cli/test_search_results` | `fixtures/search/` |
-| B53, B54, B55 | `tests/cli/test_search_output_format` | `fixtures/search/` + a `--json` golden |
+| Clause                            | Test id                                                     | Fixture                                                                            |
+| --------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| B6, B9, B10, B11                  | `tests/session_index/test_migration_ledger`                 | `fixtures/migrations/`                                                             |
+| B7, B8                            | `tests/session_index/test_migration_identity_normalization` | `fixtures/migrations/`                                                             |
+| B12, B13                          | `tests/session_index/test_open_rejects_wrong_shape`         | `fixtures/migrations/`, a DB altered by `ALTER TABLE sessions DROP COLUMN host_id` |
+| B14, B15, B16                     | `tests/session_index/test_quarantine_and_recovery`          | a 4 KB file of random bytes at `index.db`; a `-wal` beside it                      |
+| B1, B2, B3, B4, B5                | `tests/session_index/test_open_pragmas_and_layout`          | empty dir                                                                          |
+| B17, B18, B19, B20, B21           | `tests/session_index/test_row_write_semantics`              | `fixtures/sessions/`                                                               |
+| B22                               | `tests/session_index/test_settings_triggers`                | one row written by `UPDATE sessions SET mission = 'm'`                             |
+| B23, B24, B25, B26, B27, B28, B29 | `tests/session_index/test_refresh_plan`                     | `fixtures/sessions/` incl. a retitled transcript with restored mtime               |
+| B30, B31                          | `tests/session_index/test_cleanup_cascade`                  | `fixtures/sessions/` with one transcript deleted between passes                    |
+| B32, B33, B34                     | `tests/session_index/test_schema_version_backfill`          | DB at head, row stamped 7                                                          |
+| B35, B36                          | `tests/session_index/test_spans_and_vector_epoch`           | spans inserted, re-upserted with changed text                                      |
+| B37                               | `tests/session_index/test_annotations_schema`               | `fixtures/migrations/annotations/`                                                 |
+| B38, B39, B40, B41                | `tests/session_index/test_listing_order_and_scope`          | `fixtures/sessions/` with two orgs, an archived row, a BTW fork                    |
+| B42                               | `tests/session_index/test_listing_coverage_wait`            | `fixtures/sessions/` with `meta` cleared of `last_full_refresh_at`                 |
+| B43, B44, B45, B56                | `tests/cli/test_search_option_contract`                     | `fixtures/search/` (help text + argument parsing harness)                          |
+| B46, B47, B48, B49, B50, B51, B52 | `tests/cli/test_search_results`                             | `fixtures/search/`                                                                 |
+| B53, B54, B55                     | `tests/cli/test_search_output_format`                       | `fixtures/search/` + a `--json` golden                                             |
 
 Three tests carry the load and must be exact:
 
@@ -738,24 +738,24 @@ Three tests carry the load and must be exact:
 
 ## Evidence
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `ev_schema_cache_head` | B6–B13, Data & config | Decoded assets 1–9 (UTF-16LE for 0001/0003) and applied them with `sqlite3` 3.50.6 to an empty file; inventoried `sqlite_master` and `pragma_table_info` |
-| `ev_schema_annotations` | B37 | Decoded and applied `0001_session_annotations`; inventoried the two tables and four indexes |
-| `ev_migrate_runner` | B6–B16 | Reading `migrate.ts:40-470` [observed] |
-| `ev_driver_pragmas` | B1–B3, B14–B16 | Reading `constants.ts:237-341`, `driver.ts:830-1031` [observed] |
-| `ev_cache_open` | B12, B14, B15 | Reading `cache.ts:37-172`, `schema.ts:26-238` [observed] |
-| `ev_record_writes` | B17–B22 | Reading `record.ts:92-741`, `ingest.ts:1181-1235` [observed] |
-| `ev_refresh_plan` | B23–B31, B34 | Reading `discovery.ts:43-300`, `ingest.ts:212-330`, `567-632`, `1310-1360`, `2147-2230` [observed] |
-| `ev_lease` | B4 | Reading `lease.ts:1-120` [observed] |
-| `ev_listing` | B38–B42 | Reading `record.ts:239-400`, `925-968`, `listing.ts:71-145`, `216-270`, `driver.ts:1024-1031` [observed] |
-| `ev_search_cli` | B43–B46, B53–B56 | Reading `src/entrypoints/search/command.ts:8-66`, `run.ts:36-173`, `src/search/sessionSearch.ts:1-341` [observed] |
-| `ev_search_engine` | B47–B52 | Reading `search.ts:289-400`, `640-900`, `1400-1700`, `2116-2196`, `2333-3064`; `utils/src/session-search/extract.ts:257-340`, `rank.ts:13-67` [observed] |
-| `ev_search_bounds` | B44, B51 | Reading `utils/src/session-search/query.ts:44-73`, `packages/common/src/session/constants.ts:77-86` [observed] |
-| `ev_session_paths` | B17, Data & config | Reading `session-paths/src/index.ts:36-160`, `280-381` [observed] |
-| `ev_state_home` | Terms, layout | Reading `cli/src/home/index.ts:13-29`, `environment/src/constants/index.ts:6-9` [derived: `getDirName` is an accessor over `getBaseEnv()`] |
-| `ev_schema_version` | B32–B33 | Reading `ingest.ts:212-325`, `record.ts:833-868` [observed] |
-| `ev_daemon_search` | B49, B54 | Reading `daemon-search.ts:30-130`, `283-400`; protocol schema `sdk-core/.../agent.ts:893-963` [observed] |
+| Evidence                | Supports              | Method                                                                                                                                                   |
+| ----------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ev_schema_cache_head`  | B6–B13, Data & config | Decoded assets 1–9 (UTF-16LE for 0001/0003) and applied them with `sqlite3` 3.50.6 to an empty file; inventoried `sqlite_master` and `pragma_table_info` |
+| `ev_schema_annotations` | B37                   | Decoded and applied `0001_session_annotations`; inventoried the two tables and four indexes                                                              |
+| `ev_migrate_runner`     | B6–B16                | Reading `migrate.ts:40-470` [observed]                                                                                                                   |
+| `ev_driver_pragmas`     | B1–B3, B14–B16        | Reading `constants.ts:237-341`, `driver.ts:830-1031` [observed]                                                                                          |
+| `ev_cache_open`         | B12, B14, B15         | Reading `cache.ts:37-172`, `schema.ts:26-238` [observed]                                                                                                 |
+| `ev_record_writes`      | B17–B22               | Reading `record.ts:92-741`, `ingest.ts:1181-1235` [observed]                                                                                             |
+| `ev_refresh_plan`       | B23–B31, B34          | Reading `discovery.ts:43-300`, `ingest.ts:212-330`, `567-632`, `1310-1360`, `2147-2230` [observed]                                                       |
+| `ev_lease`              | B4                    | Reading `lease.ts:1-120` [observed]                                                                                                                      |
+| `ev_listing`            | B38–B42               | Reading `record.ts:239-400`, `925-968`, `listing.ts:71-145`, `216-270`, `driver.ts:1024-1031` [observed]                                                 |
+| `ev_search_cli`         | B43–B46, B53–B56      | Reading `src/entrypoints/search/command.ts:8-66`, `run.ts:36-173`, `src/search/sessionSearch.ts:1-341` [observed]                                        |
+| `ev_search_engine`      | B47–B52               | Reading `search.ts:289-400`, `640-900`, `1400-1700`, `2116-2196`, `2333-3064`; `utils/src/session-search/extract.ts:257-340`, `rank.ts:13-67` [observed] |
+| `ev_search_bounds`      | B44, B51              | Reading `utils/src/session-search/query.ts:44-73`, `packages/common/src/session/constants.ts:77-86` [observed]                                           |
+| `ev_session_paths`      | B17, Data & config    | Reading `session-paths/src/index.ts:36-160`, `280-381` [observed]                                                                                        |
+| `ev_state_home`         | Terms, layout         | Reading `cli/src/home/index.ts:13-29`, `environment/src/constants/index.ts:6-9` [derived: `getDirName` is an accessor over `getBaseEnv()`]               |
+| `ev_schema_version`     | B32–B33               | Reading `ingest.ts:212-325`, `record.ts:833-868` [observed]                                                                                              |
+| `ev_daemon_search`      | B49, B54              | Reading `daemon-search.ts:30-130`, `283-400`; protocol schema `sdk-core/.../agent.ts:893-963` [observed]                                                 |
 
 Inferred only: the human strings behind the i18n keys (message catalogs are
 absent from the recovered tree), and the annotations database path.
@@ -764,7 +764,7 @@ absent from the recovered tree), and the annotations database path.
 
 1. **Human-facing wording.** `common:sessionSearch.*` message texts are not in
    the recovered source (only `t('common:sessionSearch.…')` calls). The
-   *structure* of B53 is observed; the literal words are not. Settle by running
+   _structure_ of B53 is observed; the literal words are not. Settle by running
    `droide search x --help`/a search against a seeded home capture. Blocks the
    exact-text half of B53/B56.
 2. **Annotations database path and writer.** Only its DDL, its generated
@@ -773,7 +773,7 @@ absent from the recovered tree), and the annotations database path.
    the annotations file. Settle from a captured home directory (`find` under
    `<base>` for `*.db` after an annotating run) or from the packaging manifest.
 3. **`CacheOpenOutcome` / `SchemaFault` / `SessionIndexStatus` literal values.**
-   The enums module is a type-only barrel and absent. Their *behaviour* is
+   The enums module is a type-only barrel and absent. Their _behaviour_ is
    established (created / migrated / current; missing-table, missing-column,
    column-changed, missing-index, foreign-object; ready / busy / failed), their
    serialised strings are not. Affects log assertions only.
@@ -804,7 +804,7 @@ A conforming build must reproduce:
   nullability, defaults, the three `session_spans` `CHECK`s and both partial
   indexes — because the open path validates the catalog against the migrations
   and because a future migration is addressed by version number.
-- The `schema_migrations` ledger with a content checksum over *normalised* SQL,
+- The `schema_migrations` ledger with a content checksum over _normalised_ SQL,
   one `BEGIN IMMEDIATE` transaction per migration, "skip if a peer applied it",
   and tolerance of an ahead ledger with no tolerance for a missing object.
 - The write-ahead-log policy: WAL, no auto-checkpoint, bounded journal,

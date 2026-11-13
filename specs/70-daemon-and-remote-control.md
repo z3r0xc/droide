@@ -128,7 +128,7 @@ absence across `src/entrypoints/daemon/**` and
 **B5 — Readiness is announced, in this order.** After `DaemonServer.start()`
 resolves, the daemon (a) emits `sd_notify` `READY=1` when `NOTIFY_SOCKET` is
 set, and (b) if a parent IPC channel is connected, sends the message
-`{ type: "factory.daemon.ready", pid, version }`. It then prints a fixed
+`{ type: "droide.daemon.ready", pid, version }`. It then prints a fixed
 banner to stdout: `commands:daemon.running`, `commands:daemon.version`,
 `commands:daemon.pid`, `commands:daemon.logs`, then the endpoint line
 (`commands:daemon.unixSocket` with the path, `commands:daemon.wsEndpoint`
@@ -477,7 +477,7 @@ a missing host binding says "Reprovision it.".
 `src/entrypoints/daemon/remoteAccess.ts:150-240`.)
 
 **B33 — Port proxy.** The WebSocket server answers `GET /health` with
-`200/factory-daemon ok` (unauthenticated, used by the desktop's pre-kill
+`200/droide-daemon ok` (unauthenticated, used by the desktop's pre-kill
 probe) and proxies `/port-proxy/<port><path>` to `localhost:<port>` on the
 daemon machine for ports 1024-65535. A proxy request needs the per-process
 32-byte base64url token (`daemon.get_proxy_token`), supplied as the
@@ -512,31 +512,31 @@ runs.
 
 ### CLI flags (B1)
 
-| Flag | Type / domain | Default | Effect |
-|---|---|---|---|
-| `-p, --port <number>` | integer | none | TCP port; `0` = OS-assigned. Ignored when `--unix` is set. |
-| `--host <address>` | string | `127.0.0.1` | Bind address. |
-| `--unix <path>` | path | none | Unix socket; wins over `--port`. |
-| `-d, --debug` | boolean | `false` | Verbose daemon debug log. |
-| `--listen <transport>` | `websocket` \| `ipc` | `websocket` | `ipc` = IPC-only, no socket. |
-| `--droide-path <path>` | path | none | Droide executable for spawned sessions; resolved from PATH otherwise. |
-| `--liveness-fd <fd>` | integer | none | Inherited pipe; parent-death shutdown. |
-| `--parent-pid <pid>` | integer | none | Polled parent; parent-death shutdown. |
-| `--remote-control` | boolean | `false` | Enables Remote Control (implies `remoteAccess`). |
-| `--remote-access` | boolean | `false` | Alias for `--remote-control`. |
-| `--settings <path>` | path | root `--settings` | Exported as `DROIDE_RUNTIME_SETTINGS_PATH`. |
-| `--enable-child-ipc` | (hidden) | — | No-op; child IPC is always on. |
+| Flag                   | Type / domain        | Default           | Effect                                                                |
+| ---------------------- | -------------------- | ----------------- | --------------------------------------------------------------------- |
+| `-p, --port <number>`  | integer              | none              | TCP port; `0` = OS-assigned. Ignored when `--unix` is set.            |
+| `--host <address>`     | string               | `127.0.0.1`       | Bind address.                                                         |
+| `--unix <path>`        | path                 | none              | Unix socket; wins over `--port`.                                      |
+| `-d, --debug`          | boolean              | `false`           | Verbose daemon debug log.                                             |
+| `--listen <transport>` | `websocket` \| `ipc` | `websocket`       | `ipc` = IPC-only, no socket.                                          |
+| `--droide-path <path>` | path                 | none              | Droide executable for spawned sessions; resolved from PATH otherwise. |
+| `--liveness-fd <fd>`   | integer              | none              | Inherited pipe; parent-death shutdown.                                |
+| `--parent-pid <pid>`   | integer              | none              | Polled parent; parent-death shutdown.                                 |
+| `--remote-control`     | boolean              | `false`           | Enables Remote Control (implies `remoteAccess`).                      |
+| `--remote-access`      | boolean              | `false`           | Alias for `--remote-control`.                                         |
+| `--settings <path>`    | path                 | root `--settings` | Exported as `DROIDE_RUNTIME_SETTINGS_PATH`.                           |
+| `--enable-child-ipc`   | (hidden)             | —                 | No-op; child IPC is always on.                                        |
 
 ### Environment
 
-| Variable | Where | Meaning |
-|---|---|---|
-| `DROIDE_RUNTIME_SETTINGS_PATH` | set by `--settings` | Runtime settings overlay for the daemon process only. |
-| `NOTIFY_SOCKET`, `WATCHDOG_*`, `LISTEN_*`, `INVOCATION_ID` | read at boot, then stripped from `process.env` | systemd notification; stripped so children cannot signal systemd. |
-| `DROIDE_SESSION_TIMEOUT_MS` | daemon config | Positive integer; replaces the 30-minute inactivity timeout. |
-| `DROIDE_DAEMON_HEARTBEAT_INTERVAL_MS` | daemon config | Positive integer; heartbeat interval override. |
-| `DROIDE_DAEMON_CGROUP_ISOLATION`, `DROIDE_DAEMON_CGROUP_RESERVE_BYTES`, `DROIDE_DAEMON_CGROUP_STATUS`, `DROIDE_DAEMON_CGROUP_REASON` | Computer only | Managed cgroup admission and report. |
-| `SHELL_ENV_FROM_PARENT_ENV_VAR` marker | daemon | `1` means the parent already loaded the login shell environment. |
+| Variable                                                                                                                             | Where                                          | Meaning                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | ----------------------------------------------------------------- |
+| `DROIDE_RUNTIME_SETTINGS_PATH`                                                                                                       | set by `--settings`                            | Runtime settings overlay for the daemon process only.             |
+| `NOTIFY_SOCKET`, `WATCHDOG_*`, `LISTEN_*`, `INVOCATION_ID`                                                                           | read at boot, then stripped from `process.env` | systemd notification; stripped so children cannot signal systemd. |
+| `DROIDE_SESSION_TIMEOUT_MS`                                                                                                          | daemon config                                  | Positive integer; replaces the 30-minute inactivity timeout.      |
+| `DROIDE_DAEMON_HEARTBEAT_INTERVAL_MS`                                                                                                | daemon config                                  | Positive integer; heartbeat interval override.                    |
+| `DROIDE_DAEMON_CGROUP_ISOLATION`, `DROIDE_DAEMON_CGROUP_RESERVE_BYTES`, `DROIDE_DAEMON_CGROUP_STATUS`, `DROIDE_DAEMON_CGROUP_REASON` | Computer only                                  | Managed cgroup admission and report.                              |
+| `SHELL_ENV_FROM_PARENT_ENV_VAR` marker                                                                                               | daemon                                         | `1` means the parent already loaded the login shell environment.  |
 
 (`src/entrypoints/daemon/run.ts:30-42`;
 `src/entrypoints/daemon/handler.ts:239-280,620-640`;
@@ -544,24 +544,24 @@ runs.
 
 ### Wire constants
 
-| Constant | Value | Source |
-|---|---|---|
-| `JSONRPC_VERSION` | `2.0` | `protocol/shared/constants.ts:7` |
-| `LEGACY_DROIDE_API_VERSION` | `1.0.0` (frozen) | `protocol/shared/constants.ts:5` |
-| `DROIDE_PROTOCOL_VERSION` | `1.321.0` | `protocol/agent/schemas/constants.ts:6` |
-| `COMPRESSED_PAYLOAD_TAG` | `0x01` | `protocol/daemon/constants.ts:95` |
-| `DEFLATE_RAW_ENCODING` | `deflate-raw` | `protocol/daemon/constants.ts:88` |
-| `CLIENT_FRAME_TARGET_BYTES` | 8 MiB | `daemon-core/.../constants/constants.ts:13` |
-| `DAEMON_SERVE_BIND_MAX_RETRIES` | 5 | `protocol/daemon/constants.ts:113` |
-| `DAEMON_SERVE_BIND_INITIAL_DELAY_MS` | 500 | `protocol/daemon/constants.ts:114` |
-| WebSocket idle timeout | 300 s | `web-socket-server.ts:54` (`DEFAULT_E2B_KILL_TIMEOUT_MS` 300000/1000) |
-| WebSocket ping interval | 30 s | `web-socket-server.ts:81` |
-| Pending daemon request TTL | 300 s | `server/constants/constants.ts:3` |
-| Pending resend attempts | 5 | `server/constants/constants.ts:5` |
-| Session inactivity (Local/Computer) | 1 800 000 ms | `agent-registry.ts:116` |
-| Relay ping interval / pong timeout | 1000 / 5000 ms | `common/relay/constants.ts:100-118` |
-| Relay reconnect grace | 15 000 ms | `common/relay/constants.ts:25` |
-| Secure channel | v2, `Noise_NK_25519_ChaChaPoly_SHA256` | `crypto/secure-channel/constants.ts:1-5` |
+| Constant                             | Value                                  | Source                                                                |
+| ------------------------------------ | -------------------------------------- | --------------------------------------------------------------------- |
+| `JSONRPC_VERSION`                    | `2.0`                                  | `protocol/shared/constants.ts:7`                                      |
+| `LEGACY_DROIDE_API_VERSION`          | `1.0.0` (frozen)                       | `protocol/shared/constants.ts:5`                                      |
+| `DROIDE_PROTOCOL_VERSION`            | `1.321.0`                              | `protocol/agent/schemas/constants.ts:6`                               |
+| `COMPRESSED_PAYLOAD_TAG`             | `0x01`                                 | `protocol/daemon/constants.ts:95`                                     |
+| `DEFLATE_RAW_ENCODING`               | `deflate-raw`                          | `protocol/daemon/constants.ts:88`                                     |
+| `CLIENT_FRAME_TARGET_BYTES`          | 8 MiB                                  | `daemon-core/.../constants/constants.ts:13`                           |
+| `DAEMON_SERVE_BIND_MAX_RETRIES`      | 5                                      | `protocol/daemon/constants.ts:113`                                    |
+| `DAEMON_SERVE_BIND_INITIAL_DELAY_MS` | 500                                    | `protocol/daemon/constants.ts:114`                                    |
+| WebSocket idle timeout               | 300 s                                  | `web-socket-server.ts:54` (`DEFAULT_E2B_KILL_TIMEOUT_MS` 300000/1000) |
+| WebSocket ping interval              | 30 s                                   | `web-socket-server.ts:81`                                             |
+| Pending daemon request TTL           | 300 s                                  | `server/constants/constants.ts:3`                                     |
+| Pending resend attempts              | 5                                      | `server/constants/constants.ts:5`                                     |
+| Session inactivity (Local/Computer)  | 1 800 000 ms                           | `agent-registry.ts:116`                                               |
+| Relay ping interval / pong timeout   | 1000 / 5000 ms                         | `common/relay/constants.ts:100-118`                                   |
+| Relay reconnect grace                | 15 000 ms                              | `common/relay/constants.ts:25`                                        |
+| Secure channel                       | v2, `Noise_NK_25519_ChaChaPoly_SHA256` | `crypto/secure-channel/constants.ts:1-5`                              |
 
 ### JSON-RPC error codes
 
@@ -573,97 +573,97 @@ SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
 
 ### Persisted files
 
-| Path | Shape | Written by |
-|---|---|---|
-| `<home>/<stateDir>/host.json` | `HostConfig` (`schemaVersion:1`, `hostId`, `createdAt`, optional `provisioningId`, optional `computerRegistration`) | host identity service |
-| `<...>/computer.json` | `LegacyComputerConfig` (`computerId`, optional `hostId`/`provisioningId`, `registeredAt`) | host identity service |
-| `<...>/computer-identity/identity.json` | `PersistedComputerIdentity` | host identity service |
-| `<...>/pending-askuser-requests.json` | `{version:1, requests:[...]}` | daemon shutdown / failed start |
-| `<...>/logs/daemon.log` | daemon log | logging |
+| Path                                    | Shape                                                                                                               | Written by                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `<home>/<stateDir>/host.json`           | `HostConfig` (`schemaVersion:1`, `hostId`, `createdAt`, optional `provisioningId`, optional `computerRegistration`) | host identity service          |
+| `<...>/computer.json`                   | `LegacyComputerConfig` (`computerId`, optional `hostId`/`provisioningId`, `registeredAt`)                           | host identity service          |
+| `<...>/computer-identity/identity.json` | `PersistedComputerIdentity`                                                                                         | host identity service          |
+| `<...>/pending-askuser-requests.json`   | `{version:1, requests:[...]}`                                                                                       | daemon shutdown / failed start |
+| `<...>/logs/daemon.log`                 | daemon log                                                                                                          | logging                        |
 
 ## Errors
 
 ### Startup
 
-| Condition | Observable | State |
-|---|---|---|
-| Port in use, retries exhausted | `Startup failed: <bind message>` on stderr; exit 1; log `CLI daemon startup failed` | Nothing left listening; rollback closed IPC/relay/services. Retry after the other daemon stops is safe. |
-| `--unix` path exists and cannot be bound | Same as above with the bind message | Socket file left as found. Recovery is removing the file (Open question 3). |
-| `--listen ipc` without an inherited channel | `Startup failed: --listen ipc requires the daemon to be spawned with an inherited IPC channel`; exit 1 | No transport opened. |
-| `--listen ipc` + `--remote-control` | `Startup failed: --listen ipc cannot be combined with --remote-control`; exit 1 | Nothing opened. |
-| Parent channel already gone (`ipc`) | code `droide.daemon.ipc-disconnected`; exit 1 | Nothing opened. |
-| Customer-prem + relay/air-gap/non-local | `MetaError` message (B32); exit 1 | Nothing opened. |
-| Remote control without registration, non-TTY | `commands:daemon.remoteAccessRegistrationRequired`; exit 1 | No registration written. |
-| Relay URL missing | `commands:daemon.remoteAccessRelayUrlRequired`; exit 1 | Registration already saved (B28). |
-| Relay publish/handshake failure | startup fails after retries; exit 1 | Existing relay connection (if any) left intact / closed cleanly. |
-| Any other bootstrap failure | `Startup failed: <message>`; exit 1 | Rollback. |
+| Condition                                    | Observable                                                                                             | State                                                                                                   |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Port in use, retries exhausted               | `Startup failed: <bind message>` on stderr; exit 1; log `CLI daemon startup failed`                    | Nothing left listening; rollback closed IPC/relay/services. Retry after the other daemon stops is safe. |
+| `--unix` path exists and cannot be bound     | Same as above with the bind message                                                                    | Socket file left as found. Recovery is removing the file (Open question 3).                             |
+| `--listen ipc` without an inherited channel  | `Startup failed: --listen ipc requires the daemon to be spawned with an inherited IPC channel`; exit 1 | No transport opened.                                                                                    |
+| `--listen ipc` + `--remote-control`          | `Startup failed: --listen ipc cannot be combined with --remote-control`; exit 1                        | Nothing opened.                                                                                         |
+| Parent channel already gone (`ipc`)          | code `droide.daemon.ipc-disconnected`; exit 1                                                          | Nothing opened.                                                                                         |
+| Customer-prem + relay/air-gap/non-local      | `MetaError` message (B32); exit 1                                                                      | Nothing opened.                                                                                         |
+| Remote control without registration, non-TTY | `commands:daemon.remoteAccessRegistrationRequired`; exit 1                                             | No registration written.                                                                                |
+| Relay URL missing                            | `commands:daemon.remoteAccessRelayUrlRequired`; exit 1                                                 | Registration already saved (B28).                                                                       |
+| Relay publish/handshake failure              | startup fails after retries; exit 1                                                                    | Existing relay connection (if any) left intact / closed cleanly.                                        |
+| Any other bootstrap failure                  | `Startup failed: <message>`; exit 1                                                                    | Rollback.                                                                                               |
 
 ### Connection and request
 
-| Condition | Observable | Notes |
-|---|---|---|
-| Non-auth first request | `AUTHENTICATION_ERROR` "Connection not authenticated. Must call daemon.authenticate first." | Connection stays open. |
-| Malformed frame pre-auth | `PARSE_ERROR`, `id:null` | Connection stays open. |
-| Bad/missing credential | `AUTHENTICATION_ERROR`; `reason` only when the daemon can classify it | Client maps to `AuthRejected` / `IdentityMismatch` / `RelayGatewayError`. |
-| Version mismatch | Only on failures, as `data.protocolVersionMismatch` | Never blocks a successful authenticate. |
-| Unknown method | `METHOD_NOT_FOUND` `Method not found: <m>` | Carries the mismatch data when present. |
-| Relay method without capability | `INVALID_REQUEST`, fixed relay message | Older SDKs match this text as a liveness sentinel. |
-| Duplicate pending server→client id | `CONFLICT` thrown to the producer | The existing request keeps its slot. |
-| Pending server→client request expiry | Produced request rejects `Pending daemon request timed out` | Except `ask_user`/`pick_options`/`request_permission`. |
-| Client request timeout | `RequestTimeoutError(method, id, timeoutMs)` | Request already sent; daemon may still complete it. |
-| Transport close | Every pending request rejects `ConnectionClosedError(code, reason)` | Reconnect rejects with code 1000 / `Connection reopened`. |
-| Kill unknown background process | `{killed:false}` | No error, no session created. |
-| Idle session expiry | `session_inactivity` notification, then teardown | Draft deletion only when empty. |
+| Condition                            | Observable                                                                                  | Notes                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Non-auth first request               | `AUTHENTICATION_ERROR` "Connection not authenticated. Must call daemon.authenticate first." | Connection stays open.                                                    |
+| Malformed frame pre-auth             | `PARSE_ERROR`, `id:null`                                                                    | Connection stays open.                                                    |
+| Bad/missing credential               | `AUTHENTICATION_ERROR`; `reason` only when the daemon can classify it                       | Client maps to `AuthRejected` / `IdentityMismatch` / `RelayGatewayError`. |
+| Version mismatch                     | Only on failures, as `data.protocolVersionMismatch`                                         | Never blocks a successful authenticate.                                   |
+| Unknown method                       | `METHOD_NOT_FOUND` `Method not found: <m>`                                                  | Carries the mismatch data when present.                                   |
+| Relay method without capability      | `INVALID_REQUEST`, fixed relay message                                                      | Older SDKs match this text as a liveness sentinel.                        |
+| Duplicate pending server→client id   | `CONFLICT` thrown to the producer                                                           | The existing request keeps its slot.                                      |
+| Pending server→client request expiry | Produced request rejects `Pending daemon request timed out`                                 | Except `ask_user`/`pick_options`/`request_permission`.                    |
+| Client request timeout               | `RequestTimeoutError(method, id, timeoutMs)`                                                | Request already sent; daemon may still complete it.                       |
+| Transport close                      | Every pending request rejects `ConnectionClosedError(code, reason)`                         | Reconnect rejects with code 1000 / `Connection reopened`.                 |
+| Kill unknown background process      | `{killed:false}`                                                                            | No error, no session created.                                             |
+| Idle session expiry                  | `session_inactivity` notification, then teardown                                            | Draft deletion only when empty.                                           |
 
 ### Remote / relay
 
-| Condition | Observable |
-|---|---|
-| Relay rejects credential `unauthorized` | `auth_error`, terminal; client `RelayUnauthorized` |
-| `computer_already_connected` | `auth_error`; bounded retry; client `DaemonConflict` |
-| `wrong_region` | terminal; client `RelayWrongRegion` |
-| `service_unavailable` / `rate_limited` | retryable; client `RelayGatewayError` / `RelayRateLimited` |
-| Secure handshake rejected (pin mismatch) | `SecureIdentityRejected`; transport refreshes the pin once, then fails |
-| Tampered secure record | close 4017 locally / `Unauthorized` to older relays; `SecureProtocolViolation` |
+| Condition                                | Observable                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------ |
+| Relay rejects credential `unauthorized`  | `auth_error`, terminal; client `RelayUnauthorized`                             |
+| `computer_already_connected`             | `auth_error`; bounded retry; client `DaemonConflict`                           |
+| `wrong_region`                           | terminal; client `RelayWrongRegion`                                            |
+| `service_unavailable` / `rate_limited`   | retryable; client `RelayGatewayError` / `RelayRateLimited`                     |
+| Secure handshake rejected (pin mismatch) | `SecureIdentityRejected`; transport refreshes the pin once, then fails         |
+| Tampered secure record                   | close 4017 locally / `Unauthorized` to older relays; `SecureProtocolViolation` |
 
 (`packages/sdk-core/src/protocol/daemon/schemas/relay-auth.ts:29-80`;
 `packages/daemon-sdk/src/session/connection-failure.ts:330-380`.)
 
 ## Acceptance tests
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1, B11 (surface) | `tests/daemon/test_help_daemon` | recorded stdout golden; `$COLUMNS` fixed at 80 |
-| B2 | `tests/daemon/test_settings_flag_forwarding` | temp `HOME`; root `--settings <tmp>`; assert `DROIDE_RUNTIME_SETTINGS_PATH` in the child env |
-| B3 | `tests/daemon/test_transport_selection` | config table: `{listen,unix,port}` → expected constructor config (ipc-only / unix / tcp / none) |
-| B4 | `tests/daemon/test_no_discovery_file` | temp `HOME`; start daemon with `--port 0`; assert the state dir gains no port/pid file |
-| B5 | `tests/daemon/test_readiness_signals` | fake parent IPC sink + `NOTIFY_SOCKET` temp socket; assert ready message keys and `READY=1` before the banner |
-| B6, B7 | `tests/daemon/test_single_instance_two_starts` | two daemons, same fixed loopback port, in-process harness; second exits 1 with `Startup failed:`; first still answers `/health` |
-| B7 | `tests/daemon/test_stale_port_retry` | injected `serve` that throws `EADDRINUSE` 5× then succeeds with fake timers; assert delays `[500,1000,2000,4000,8000]`, success logged on attempt 5; 6 failures rethrow |
-| B7 (unix) | `tests/daemon/test_stale_unix_socket_cleanup` | (a) socket file with no listener → bind succeeds; (b) socket held by a live listener → exit 1 with bind message. Marked inferred until Open question 3 settles |
-| B8 | `tests/daemon/test_graceful_shutdown_order` | fake services recording stop calls + `SIGTERM`; assert order and exit 0 |
-| B9 | `tests/daemon/test_crash_policy` | injected uncaught errors: agent error → daemon alive; `ENOSPC` → alive; other → `Critical error:` then exit 1 |
-| B10 | `tests/daemon/test_parent_death_monitors` | liveness pipe closed / `--parent-pid` of an exited process → shutdown invoked; interval asserted at 2000 ms with fake timers |
-| B12 | `tests/protocol/test_frame_codec` | text frame, binary `0x01`+deflate frame, IPC string frame, relay `client_frame` envelope; byte-for-byte expected |
-| B13 | `tests/protocol/test_request_response_fixture` | `fixtures/protocol/authenticate.request.json`, `authenticate.response.json`, `error.method_not_found.json`; parse → normalise → compare |
-| B14 | `tests/protocol/test_handshake_version_negotiation` | 4 envelopes: equal, older, newer, absent version; expected `protocolVersionMismatch` presence and contents |
-| B15 | `tests/protocol/test_auth_gate` | unauthenticated `list_opened_sessions` and malformed frame; expected exact error envelopes |
-| B16, B17 | `tests/protocol/test_authenticate_pipeline` | authenticate with 2 pipelined reads + 1 disallowed method; expected status notification, two results, one `INVALID_REQUEST`, then a second authenticate returns identity, logout closes |
-| B18 | `tests/protocol/test_dispatch_errors` | unknown method, relay method without capability, handler throw, bad params |
-| B19 | `tests/protocol/test_request_lifecycle` | fake transport; close during pending → `ConnectionClosedError`; abort before/after send |
-| B20 | `tests/protocol/test_pending_server_requests` | duplicate id → `CONFLICT`; non-elicitation TTL expiry with fake timers |
-| B21 | `tests/protocol/test_cancel_methods` | interrupt response with `drainedRequestIds` at protocol 1.292.0 |
-| B22 | `tests/protocol/test_background_processes` | two-process snapshot notification + `kill_background_process` `{killed:true}`/`{killed:false}` |
-| B23 | `tests/daemon/test_session_inactivity` | fake timers at 30 min; assert `session_inactivity` payload fields, then teardown; retention callback re-arms |
-| B24 | `tests/daemon/test_pending_prompt_restore` | snapshot file with one fresh and one 25 h old request; restore keeps only the fresh one, before transport start |
-| B25, B26 | `tests/computer/test_register_list_remove` | fake backend; temp `HOME`; assert `host.json`/`computer.json` contents and exit codes |
-| B27 | `tests/computer/test_reconcile_registration` | table: missing / hostId absent / hostId conflict / backend error → status and local state |
-| B28, B32 | `tests/daemon/test_remote_control_gating` | non-TTY without registration → exact message; BYOM disabled → refusal; customer-prem cases → refusals |
-| B29 | `tests/relay/test_relay_auth_frames` | recorded `relay.authenticate` frame and `auth_ok`/`auth_error` fixtures; disposition table per code |
-| B30 | `tests/computer/test_computer_identity_file` | generated identity parses; base64 canonical; `keyId` 32 hex; private key absent from logs |
-| B31 | `tests/protocol/test_identity_mismatch` | credential of another user/org → `AUTHENTICATION_ERROR` with each `reason` |
-| B33 | `tests/daemon/test_port_proxy_auth` | no token → 401; query token → 302 + cookie; bad port → 400; traversal path → 400; unknown path → 404 |
-| B34 | `tests/cli/test_daemon_unavailable_messages` | classified errors → exact fallback strings |
+| Clause            | Test id                                             | Fixture                                                                                                                                                                                 |
+| ----------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1, B11 (surface) | `tests/daemon/test_help_daemon`                     | recorded stdout golden; `$COLUMNS` fixed at 80                                                                                                                                          |
+| B2                | `tests/daemon/test_settings_flag_forwarding`        | temp `HOME`; root `--settings <tmp>`; assert `DROIDE_RUNTIME_SETTINGS_PATH` in the child env                                                                                            |
+| B3                | `tests/daemon/test_transport_selection`             | config table: `{listen,unix,port}` → expected constructor config (ipc-only / unix / tcp / none)                                                                                         |
+| B4                | `tests/daemon/test_no_discovery_file`               | temp `HOME`; start daemon with `--port 0`; assert the state dir gains no port/pid file                                                                                                  |
+| B5                | `tests/daemon/test_readiness_signals`               | fake parent IPC sink + `NOTIFY_SOCKET` temp socket; assert ready message keys and `READY=1` before the banner                                                                           |
+| B6, B7            | `tests/daemon/test_single_instance_two_starts`      | two daemons, same fixed loopback port, in-process harness; second exits 1 with `Startup failed:`; first still answers `/health`                                                         |
+| B7                | `tests/daemon/test_stale_port_retry`                | injected `serve` that throws `EADDRINUSE` 5× then succeeds with fake timers; assert delays `[500,1000,2000,4000,8000]`, success logged on attempt 5; 6 failures rethrow                 |
+| B7 (unix)         | `tests/daemon/test_stale_unix_socket_cleanup`       | (a) socket file with no listener → bind succeeds; (b) socket held by a live listener → exit 1 with bind message. Marked inferred until Open question 3 settles                          |
+| B8                | `tests/daemon/test_graceful_shutdown_order`         | fake services recording stop calls + `SIGTERM`; assert order and exit 0                                                                                                                 |
+| B9                | `tests/daemon/test_crash_policy`                    | injected uncaught errors: agent error → daemon alive; `ENOSPC` → alive; other → `Critical error:` then exit 1                                                                           |
+| B10               | `tests/daemon/test_parent_death_monitors`           | liveness pipe closed / `--parent-pid` of an exited process → shutdown invoked; interval asserted at 2000 ms with fake timers                                                            |
+| B12               | `tests/protocol/test_frame_codec`                   | text frame, binary `0x01`+deflate frame, IPC string frame, relay `client_frame` envelope; byte-for-byte expected                                                                        |
+| B13               | `tests/protocol/test_request_response_fixture`      | `fixtures/protocol/authenticate.request.json`, `authenticate.response.json`, `error.method_not_found.json`; parse → normalise → compare                                                 |
+| B14               | `tests/protocol/test_handshake_version_negotiation` | 4 envelopes: equal, older, newer, absent version; expected `protocolVersionMismatch` presence and contents                                                                              |
+| B15               | `tests/protocol/test_auth_gate`                     | unauthenticated `list_opened_sessions` and malformed frame; expected exact error envelopes                                                                                              |
+| B16, B17          | `tests/protocol/test_authenticate_pipeline`         | authenticate with 2 pipelined reads + 1 disallowed method; expected status notification, two results, one `INVALID_REQUEST`, then a second authenticate returns identity, logout closes |
+| B18               | `tests/protocol/test_dispatch_errors`               | unknown method, relay method without capability, handler throw, bad params                                                                                                              |
+| B19               | `tests/protocol/test_request_lifecycle`             | fake transport; close during pending → `ConnectionClosedError`; abort before/after send                                                                                                 |
+| B20               | `tests/protocol/test_pending_server_requests`       | duplicate id → `CONFLICT`; non-elicitation TTL expiry with fake timers                                                                                                                  |
+| B21               | `tests/protocol/test_cancel_methods`                | interrupt response with `drainedRequestIds` at protocol 1.292.0                                                                                                                         |
+| B22               | `tests/protocol/test_background_processes`          | two-process snapshot notification + `kill_background_process` `{killed:true}`/`{killed:false}`                                                                                          |
+| B23               | `tests/daemon/test_session_inactivity`              | fake timers at 30 min; assert `session_inactivity` payload fields, then teardown; retention callback re-arms                                                                            |
+| B24               | `tests/daemon/test_pending_prompt_restore`          | snapshot file with one fresh and one 25 h old request; restore keeps only the fresh one, before transport start                                                                         |
+| B25, B26          | `tests/computer/test_register_list_remove`          | fake backend; temp `HOME`; assert `host.json`/`computer.json` contents and exit codes                                                                                                   |
+| B27               | `tests/computer/test_reconcile_registration`        | table: missing / hostId absent / hostId conflict / backend error → status and local state                                                                                               |
+| B28, B32          | `tests/daemon/test_remote_control_gating`           | non-TTY without registration → exact message; BYOM disabled → refusal; customer-prem cases → refusals                                                                                   |
+| B29               | `tests/relay/test_relay_auth_frames`                | recorded `relay.authenticate` frame and `auth_ok`/`auth_error` fixtures; disposition table per code                                                                                     |
+| B30               | `tests/computer/test_computer_identity_file`        | generated identity parses; base64 canonical; `keyId` 32 hex; private key absent from logs                                                                                               |
+| B31               | `tests/protocol/test_identity_mismatch`             | credential of another user/org → `AUTHENTICATION_ERROR` with each `reason`                                                                                                              |
+| B33               | `tests/daemon/test_port_proxy_auth`                 | no token → 401; query token → 302 + cookie; bad port → 400; traversal path → 400; unknown path → 404                                                                                    |
+| B34               | `tests/cli/test_daemon_unavailable_messages`        | classified errors → exact fallback strings                                                                                                                                              |
 
 Fixtures are synthesised JSON envelopes and in-memory fakes; no fixture is
 copied from the reference build. Tests that bind use loopback only and a
@@ -671,25 +671,25 @@ fixed free port; timer tests use fake timers.
 
 ## Evidence
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `ev_daemon_cli_1` | B1 | read of `src/entrypoints/daemon/command.ts:20-83`; captured golden `.work/parity/expected/help-daemon.json` (now absent from the tree) |
-| `ev_daemon_cli_2` | B2, B3 | `command.ts:85-104`; `handler.ts:533-535,925`; `daemon-server.ts:312-315` |
-| `ev_daemon_lifecycle_1` | B5, B6, B8, B9, B10 | `handler.ts:700-960`; `daemon-server.ts:256-660`; `run.ts:196-253`; `DaemonCore.ts:326-420` |
-| `ev_daemon_discovery_1` | B4 | negative search across `src/entrypoints/daemon/**`, `packages/daemon-core/src/server/**` for port/pid/state files; only `/health` exists |
-| `ev_daemon_bind_1` | B7 | `web-socket-server.ts:501-556`; `protocol/daemon/constants.ts:104-115` |
-| `ev_protocol_framing_1` | B12 | `payload-codec.ts:11-30`; `ipc-server-transport.ts:16-38`; `common/relay/schemas.ts:50-59` |
-| `ev_protocol_envelope_1` | B13, B14 | `protocol/shared/schemas.ts:290-410`; `default-helpers.ts:413-434`; `envelope-helpers.ts:160-245` |
-| `ev_protocol_auth_1` | B15, B16, B17, B18 | `daemon-connection-handler.ts:522-1040,1208-1265`; `request-dispatcher.ts:140-395` |
-| `ev_protocol_client_1` | B19, B20, B21 | `RequestEngine.ts:182-215,466-560,863-980`; `DaemonClient.ts:365-395,543-612`; `pending-daemon-request-store.ts:263-330` |
-| `ev_protocol_background_1` | B22 | `protocol/agent/schemas/cli.ts:536-566`; `schemas/client.ts:688-692,1354-1360`; `request-handler.ts:18688-18704` |
-| `ev_daemon_retention_1` | B23, B24 | `agent-registry.ts:116,252-267,1975-2100`; `pendingElicitationPersistence.ts:22-40` |
-| `ev_remote_cli_1` | B25, B26, B27 | `computer/command.ts:12-105`; `computer/run.ts:145-300`; `registration.ts:27-125`; `HostConfigStore.ts:13-95` |
-| `ev_remote_daemon_1` | B28, B29 | `remoteAccess.ts:78-371`; `daemon-server.ts:662-780`; `WebSocketRelayTransport.ts:300-400` |
-| `ev_remote_identity_1` | B30, B31 | `runtime/host/src/constants/index.ts:1-8`; `runtime/host/src/schemas.ts:11-30`; `auth/utils.ts:390-480`; `crypto/secure-channel/constants.ts:1-5` |
-| `ev_remote_prem_1` | B32 | `DaemonCore.ts:127-160`; `handler.ts:355-372,424-438` |
-| `ev_daemon_portproxy_1` | B33 | `web-socket-server.ts:327-437`; `auth/proxy-token.ts:1-24` |
-| `ev_cli_unavailable_1` | B34 | `daemonErrorMessages.ts:62-75`; `connection-failure.ts:42-200`; `doctor/checks/daemon.ts:18-50`; `createSameProcessDaemonClient.ts:1-20` |
+| Evidence                   | Supports            | Method                                                                                                                                            |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ev_daemon_cli_1`          | B1                  | read of `src/entrypoints/daemon/command.ts:20-83`; captured golden `tests/parity/expected/help-daemon.json` (now absent from the tree)            |
+| `ev_daemon_cli_2`          | B2, B3              | `command.ts:85-104`; `handler.ts:533-535,925`; `daemon-server.ts:312-315`                                                                         |
+| `ev_daemon_lifecycle_1`    | B5, B6, B8, B9, B10 | `handler.ts:700-960`; `daemon-server.ts:256-660`; `run.ts:196-253`; `DaemonCore.ts:326-420`                                                       |
+| `ev_daemon_discovery_1`    | B4                  | negative search across `src/entrypoints/daemon/**`, `packages/daemon-core/src/server/**` for port/pid/state files; only `/health` exists          |
+| `ev_daemon_bind_1`         | B7                  | `web-socket-server.ts:501-556`; `protocol/daemon/constants.ts:104-115`                                                                            |
+| `ev_protocol_framing_1`    | B12                 | `payload-codec.ts:11-30`; `ipc-server-transport.ts:16-38`; `common/relay/schemas.ts:50-59`                                                        |
+| `ev_protocol_envelope_1`   | B13, B14            | `protocol/shared/schemas.ts:290-410`; `default-helpers.ts:413-434`; `envelope-helpers.ts:160-245`                                                 |
+| `ev_protocol_auth_1`       | B15, B16, B17, B18  | `daemon-connection-handler.ts:522-1040,1208-1265`; `request-dispatcher.ts:140-395`                                                                |
+| `ev_protocol_client_1`     | B19, B20, B21       | `RequestEngine.ts:182-215,466-560,863-980`; `DaemonClient.ts:365-395,543-612`; `pending-daemon-request-store.ts:263-330`                          |
+| `ev_protocol_background_1` | B22                 | `protocol/agent/schemas/cli.ts:536-566`; `schemas/client.ts:688-692,1354-1360`; `request-handler.ts:18688-18704`                                  |
+| `ev_daemon_retention_1`    | B23, B24            | `agent-registry.ts:116,252-267,1975-2100`; `pendingElicitationPersistence.ts:22-40`                                                               |
+| `ev_remote_cli_1`          | B25, B26, B27       | `computer/command.ts:12-105`; `computer/run.ts:145-300`; `registration.ts:27-125`; `HostConfigStore.ts:13-95`                                     |
+| `ev_remote_daemon_1`       | B28, B29            | `remoteAccess.ts:78-371`; `daemon-server.ts:662-780`; `WebSocketRelayTransport.ts:300-400`                                                        |
+| `ev_remote_identity_1`     | B30, B31            | `runtime/host/src/constants/index.ts:1-8`; `runtime/host/src/schemas.ts:11-30`; `auth/utils.ts:390-480`; `crypto/secure-channel/constants.ts:1-5` |
+| `ev_remote_prem_1`         | B32                 | `DaemonCore.ts:127-160`; `handler.ts:355-372,424-438`                                                                                             |
+| `ev_daemon_portproxy_1`    | B33                 | `web-socket-server.ts:327-437`; `auth/proxy-token.ts:1-24`                                                                                        |
+| `ev_cli_unavailable_1`     | B34                 | `daemonErrorMessages.ts:62-75`; `connection-failure.ts:42-200`; `doctor/checks/daemon.ts:18-50`; `createSameProcessDaemonClient.ts:1-20`          |
 
 ## Open questions
 
@@ -738,7 +738,7 @@ A conforming build must reproduce:
   the hidden `--enable-child-ipc` no-op and the `--remote-access` alias.
 - Transport precedence and the absence of a discovery file: endpoint comes
   from the supervisor; readiness is stdout + optional `sd_notify` + optional
-  parent IPC `factory.daemon.ready`.
+  parent IPC `droide.daemon.ready`.
 - The bind-as-mutex model with the 500 ms doubling retry (5 retries) and the
   `Startup failed: …`/exit-1 outcome; a graceful, ordered, 10 s-bounded
   shutdown that exits 0.

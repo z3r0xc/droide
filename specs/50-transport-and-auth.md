@@ -39,7 +39,7 @@ per-provider adapters).
 
 - Command parsing, help text, and the fact that `deployment` is intercepted
   before commander dispatch — `10-cli-surface.md`.
-- The agent loop's decision to retry a *turn* (model fallback, provider
+- The agent loop's decision to retry a _turn_ (model fallback, provider
   rotation, resumption), as opposed to the transport's per-attempt policy —
   agent-loop spec.
 - Session transcript persistence and cloud-sync batching semantics —
@@ -58,20 +58,20 @@ the `openai`-platform header values, which come from the model catalogue spec.
 
 Citations are abbreviated: `orig/…` = `evidence/original/windows-x64/…`.
 
-| Term | Meaning |
-|---|---|
-| **backend** | The hosted control plane reached at `apiBaseUrl`/`apiBaseUrlEu`, or at a customer Prem origin. |
-| **hosted route** | A route served by the hosted control plane, e.g. `/api/sessions/v2`. |
-| **managed Prem** | A hosted Prem placement advertised per organization as `premBaseHostV2`; it is *not* an authentication authority (`orig/packages/common/src/api/backend/schemas.ts:45-47`). |
-| **customer Prem** | A self-hosted deployment selected by `auth-deployment.json`; it *is* the authentication authority (`orig/packages/runtime/auth/src/auth/prem/config.ts:101-107`). |
-| **deployment selection** | The persisted choice `managed` or `customer-prem`+origin. Independent of whether credentials are saved. |
-| **credential source** | One of `workos` (stored WorkOS session or brokered provider), `api-key` (`DROIDE_API_KEY`), `prem` (customer credential record). Spelled `TokenSourceType` in code. |
-| **credential snapshot** | One consistent read of token + active organization (+ Prem identity) plus the user it names. |
-| **base URL** | The origin (and any path prefix) a relative backend path is appended to. |
-| **managed LLM route** | One of the `/api/llm/…` proxy paths; `headerPurpose: 'usage'`. |
-| **turn attempt** | One HTTP/WebSocket request to a model provider under the retry policy; a *turn* may contain several attempts. |
-| **stream event** | One decoded JSON payload from an SSE `data:` field or one Responses WebSocket frame. |
-| **airgap** | `DROIDE_AIRGAP_ENABLED` (or the baked define) is true: no backend-bound request may leave the process. |
+| Term                     | Meaning                                                                                                                                                                     |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **backend**              | The hosted control plane reached at `apiBaseUrl`/`apiBaseUrlEu`, or at a customer Prem origin.                                                                              |
+| **hosted route**         | A route served by the hosted control plane, e.g. `/api/sessions/v2`.                                                                                                        |
+| **managed Prem**         | A hosted Prem placement advertised per organization as `premBaseHostV2`; it is _not_ an authentication authority (`orig/packages/common/src/api/backend/schemas.ts:45-47`). |
+| **customer Prem**        | A self-hosted deployment selected by `auth-deployment.json`; it _is_ the authentication authority (`orig/packages/runtime/auth/src/auth/prem/config.ts:101-107`).           |
+| **deployment selection** | The persisted choice `managed` or `customer-prem`+origin. Independent of whether credentials are saved.                                                                     |
+| **credential source**    | One of `workos` (stored WorkOS session or brokered provider), `api-key` (`DROIDE_API_KEY`), `prem` (customer credential record). Spelled `TokenSourceType` in code.         |
+| **credential snapshot**  | One consistent read of token + active organization (+ Prem identity) plus the user it names.                                                                                |
+| **base URL**             | The origin (and any path prefix) a relative backend path is appended to.                                                                                                    |
+| **managed LLM route**    | One of the `/api/llm/…` proxy paths; `headerPurpose: 'usage'`.                                                                                                              |
+| **turn attempt**         | One HTTP/WebSocket request to a model provider under the retry policy; a _turn_ may contain several attempts.                                                               |
+| **stream event**         | One decoded JSON payload from an SSE `data:` field or one Responses WebSocket frame.                                                                                        |
+| **airgap**               | `DROIDE_AIRGAP_ENABLED` (or the baked define) is true: no backend-bound request may leave the process.                                                                      |
 
 ## Observable behaviour
 
@@ -106,7 +106,7 @@ otherwise it is the region the identity reports (`Region.global|eu`; vendor
 prefix elided) (`orig/packages/runtime/auth/src/auth/common/cache.ts:665-676`;
 `orig/packages/common/src/shared/enums.ts:129-132`). `[observed]`
 
-**B5** The Prem host used for a *managed* Prem organization is
+**B5** The Prem host used for a _managed_ Prem organization is
 `premBaseHostV2` from the identity answer, read synchronously from cache for
 callers that cannot await; the blocking read pops the identity cache when it is
 cold (`orig/packages/runtime/auth/src/auth/common/cache.ts:617-620,691-703`).
@@ -132,6 +132,7 @@ path: the request policy, when present, refuses a different origin, any
 userinfo, a fragment, or a path the policy does not allow, before credentials
 are resolved or bytes are sent (`orig/packages/utils/src/api/fetch.ts:11-29`;
 `orig/src/api/config.ts:326-334`). `[observed]`
+
 ### B. Request construction and headers
 
 **B10** Headers built from a credential are, in order: `Authorization: Bearer
@@ -149,7 +150,7 @@ to `cli`), `X-Droide-Sdk` (SDK callers only), `X-Droide-Request-Surface`,
 `[observed]`
 
 **B12** `headerPurpose: 'usage'` omits the operational `X-Droide-Client`
-default and sends only a *known* caller's attribution. On a usage route the
+default and sends only a _known_ caller's attribution. On a usage route the
 final transport strips attribution headers supplied by the caller, so a retained
 SDK tuple cannot be relabelled onto proxy traffic
 (`orig/src/api/config.ts:191-228`;
@@ -224,27 +225,27 @@ managed transport (`http`/`websocket`), an optional header purpose, and one of
 
 **B24** The session and message routes are:
 
-| Route id | Method | Hosted path | Prem path |
-|---|---|---|---|
-| `create-session` | POST | `/api/sessions/create` | `/api/apps/cloud-sync/sessions` |
-| `list-sessions` | GET | `/api/sessions/v2` | `/api/apps/cloud-sync/sessions` |
-| `list-archived-sessions` | GET | `/api/sessions/archived` | `/api/apps/cloud-sync/sessions/archived` |
-| `get-session` | GET | `/api/sessions/{id}` | `/api/apps/cloud-sync/sessions/{id}` |
-| `archive-session` | POST | `/api/sessions/{id}/archive` | same path under Prem prefix |
-| `unarchive-session` | POST | `/api/sessions/{id}/unarchive` | same path under Prem prefix |
-| `list-session-messages` | GET | `/api/v0/sessions/{id}/messages` | none |
-| `update-agent-status` | POST | `/api/sessions/{id}/agent-status` | Prem prefix |
-| `update-title` | POST | `/api/sessions/{id}/update-title` | Prem prefix |
-| `update-settings` | POST | `/api/sessions/{id}/update-settings` | Prem prefix |
-| `update-mission-metadata` | POST | `/api/sessions/{id}/mission/metadata` | Prem prefix |
-| `update-artifacts` | POST | `/api/sessions/{id}/artifacts` | Prem prefix |
-| `update-pull-request-links` | POST | `/api/sessions/{id}/pull-request-links` | Prem prefix |
-| `update-privacy` | POST | `/api/sessions/{id}/privacy` | none (hosted until Prem supports sharing) |
-| `create-message` | POST | `/api/sessions/{id}/message/create` | `/api/apps/cloud-sync/sessions/{id}/messages` |
-| `search-sessions` | GET (hosted) / POST (Prem) | `/api/sessions/search` | `/api/apps/cloud-sync/sessions/search` |
-| `cloud-sync-batch` | POST | the `SESSION_BATCH_PATH` constant (value absent from the recovered tree; see Open question 1) | `/api/apps/cloud-sync/sessions/batch` |
-| `get-pinned-sessions` | GET | `/api/sessions/pinned` | Prem prefix `/pinned` |
-| `pin-session` / `unpin-session` | POST / DELETE | `/api/sessions/{id}/pin` | Prem prefix `/pin` |
+| Route id                        | Method                     | Hosted path                                                                                   | Prem path                                     |
+| ------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `create-session`                | POST                       | `/api/sessions/create`                                                                        | `/api/apps/cloud-sync/sessions`               |
+| `list-sessions`                 | GET                        | `/api/sessions/v2`                                                                            | `/api/apps/cloud-sync/sessions`               |
+| `list-archived-sessions`        | GET                        | `/api/sessions/archived`                                                                      | `/api/apps/cloud-sync/sessions/archived`      |
+| `get-session`                   | GET                        | `/api/sessions/{id}`                                                                          | `/api/apps/cloud-sync/sessions/{id}`          |
+| `archive-session`               | POST                       | `/api/sessions/{id}/archive`                                                                  | same path under Prem prefix                   |
+| `unarchive-session`             | POST                       | `/api/sessions/{id}/unarchive`                                                                | same path under Prem prefix                   |
+| `list-session-messages`         | GET                        | `/api/v0/sessions/{id}/messages`                                                              | none                                          |
+| `update-agent-status`           | POST                       | `/api/sessions/{id}/agent-status`                                                             | Prem prefix                                   |
+| `update-title`                  | POST                       | `/api/sessions/{id}/update-title`                                                             | Prem prefix                                   |
+| `update-settings`               | POST                       | `/api/sessions/{id}/update-settings`                                                          | Prem prefix                                   |
+| `update-mission-metadata`       | POST                       | `/api/sessions/{id}/mission/metadata`                                                         | Prem prefix                                   |
+| `update-artifacts`              | POST                       | `/api/sessions/{id}/artifacts`                                                                | Prem prefix                                   |
+| `update-pull-request-links`     | POST                       | `/api/sessions/{id}/pull-request-links`                                                       | Prem prefix                                   |
+| `update-privacy`                | POST                       | `/api/sessions/{id}/privacy`                                                                  | none (hosted until Prem supports sharing)     |
+| `create-message`                | POST                       | `/api/sessions/{id}/message/create`                                                           | `/api/apps/cloud-sync/sessions/{id}/messages` |
+| `search-sessions`               | GET (hosted) / POST (Prem) | `/api/sessions/search`                                                                        | `/api/apps/cloud-sync/sessions/search`        |
+| `cloud-sync-batch`              | POST                       | the `SESSION_BATCH_PATH` constant (value absent from the recovered tree; see Open question 1) | `/api/apps/cloud-sync/sessions/batch`         |
+| `get-pinned-sessions`           | GET                        | `/api/sessions/pinned`                                                                        | Prem prefix `/pinned`                         |
+| `pin-session` / `unpin-session` | POST / DELETE              | `/api/sessions/{id}/pin`                                                                      | Prem prefix `/pin`                            |
 
 (`orig/src/api/BackendClient.ts:274-394`;
 `orig/packages/common/src/api/prem/constants/index.ts:34-38`; the batch constant
@@ -334,8 +335,8 @@ response body (`orig/packages/runtime/auth/src/auth/common/constants.ts:31-35`;
 refuses redirects (`orig/packages/runtime/auth/src/auth/prem/constants.ts:1-2`;
 `orig/packages/runtime/auth/src/auth/prem/client.ts:45-62`). `[observed]`
 
-**B37** A failed WorkOS refresh is *permanent* for a 4xx status other than 429,
-and *transient* for 5xx, transport failure, the deadline, or a 2xx whose body
+**B37** A failed WorkOS refresh is _permanent_ for a 4xx status other than 429,
+and _transient_ for 5xx, transport failure, the deadline, or a 2xx whose body
 does not carry tokens (`orig/packages/runtime/auth/src/auth/workos/refresh.ts:18-36,64-89`;
 `orig/packages/utils/src/api/httpStatus.ts:10-12`). `[observed]`
 
@@ -938,34 +939,34 @@ and exits non-zero when any selected check fails
 
 ### Environment variables
 
-| Name | Type / domain | Default | Absent / malformed | Clause |
-|---|---|---|---|---|
-| `DROIDE_API_BASE_URL` | absolute http(s) URL, no trailing `/` | none — the baked define is empty | `exec` exits 1 with `no API endpoint configured`; `doctor` `connectivity` reports `skip` | B3, B7 |
-| `DROIDE_API_BASE_URL_EU` | absolute http(s) URL, no trailing `/` | none | EU region falls back to `DROIDE_API_BASE_URL` | B1, B3 |
-| `DROIDE_API_KEY` | opaque key, prefix `fk-` | none | falls through to WorkOS/Prem | B52, B53 |
-| `DROIDE_WORKOS_BASE_URL` | URL | `https://api.workos.com/user_management` | default used | B59 |
-| `DROIDE_ENV` | `development` \| `production` | `development` | invalid value throws | B60 |
-| `DROIDE_DISABLE_KEYRING` | `true` \| `1` | false | any other value is false | B47 |
-| `DROIDE_AIRGAP_ENABLED` | `true` \| `1`; baked define wins | false | any other value is false | B89, B58 |
-| `DROIDE_HOME_OVERRIDE` | absolute path | OS home | ignored when empty | B45 |
-| `DROIDE_EXTRA_CA_CERTS`, `NODE_EXTRA_CA_CERTS` | inline PEM, or `path.delimiter` file list | none | unreadable entries contribute nothing | B85 |
-| `NODE_TLS_REJECT_UNAUTHORIZED` | `0` disables verification | verification on | doctor warns | B87 |
-| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (either case) | proxy URLs / host list | none | direct connection | B84 |
-| `CLI_VERSION` | version string | unset | `X-Client-Version` is not sent | B11 |
+| Name                                                  | Type / domain                             | Default                                  | Absent / malformed                                                                       | Clause   |
+| ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------- | -------- |
+| `DROIDE_API_BASE_URL`                                 | absolute http(s) URL, no trailing `/`     | none — the baked define is empty         | `exec` exits 1 with `no API endpoint configured`; `doctor` `connectivity` reports `skip` | B3, B7   |
+| `DROIDE_API_BASE_URL_EU`                              | absolute http(s) URL, no trailing `/`     | none                                     | EU region falls back to `DROIDE_API_BASE_URL`                                            | B1, B3   |
+| `DROIDE_API_KEY`                                      | opaque key, prefix `fk-`                  | none                                     | falls through to WorkOS/Prem                                                             | B52, B53 |
+| `DROIDE_WORKOS_BASE_URL`                              | URL                                       | `https://api.workos.com/user_management` | default used                                                                             | B59      |
+| `DROIDE_ENV`                                          | `development` \| `production`             | `development`                            | invalid value throws                                                                     | B60      |
+| `DROIDE_DISABLE_KEYRING`                              | `true` \| `1`                             | false                                    | any other value is false                                                                 | B47      |
+| `DROIDE_AIRGAP_ENABLED`                               | `true` \| `1`; baked define wins          | false                                    | any other value is false                                                                 | B89, B58 |
+| `DROIDE_HOME_OVERRIDE`                                | absolute path                             | OS home                                  | ignored when empty                                                                       | B45      |
+| `DROIDE_EXTRA_CA_CERTS`, `NODE_EXTRA_CA_CERTS`        | inline PEM, or `path.delimiter` file list | none                                     | unreadable entries contribute nothing                                                    | B85      |
+| `NODE_TLS_REJECT_UNAUTHORIZED`                        | `0` disables verification                 | verification on                          | doctor warns                                                                             | B87      |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (either case) | proxy URLs / host list                    | none                                     | direct connection                                                                        | B84      |
+| `CLI_VERSION`                                         | version string                            | unset                                    | `X-Client-Version` is not sent                                                           | B11      |
 
 ### Files
 
-| Path (relative to the credential base directory) | Format | Owner | Clause |
-|---|---|---|---|
-| `auth-deployment.json` | JSON `{version:1, revision:uuid, deployment}` | deployment selection | B70 |
-| `auth.v2.keyring` | encrypted credentials JSON | WorkOS v2 (keyring) | B46 |
-| `auth.v2.loginkeychain` | encrypted credentials JSON | WorkOS v2 (macOS security CLI) | B46 |
-| `auth.v2.file` | encrypted credentials JSON | WorkOS v2 (keyfile) | B46 |
-| `auth.v2.key` | 32-byte key | keyfile backend | B46 |
-| `auth.v2.write.lock` | lock file | all writers | B46 |
-| `prem-auth/<sha256(origin)>/credentials.json` | encrypted `{version, backend, ciphertext}` | Prem | B77 |
-| `prem-auth/<sha256(origin)>/credentials.key` | key | Prem keyfile backend | B77 |
-| `certs/…` | system-root cache | certificate loader | B86 |
+| Path (relative to the credential base directory) | Format                                        | Owner                          | Clause |
+| ------------------------------------------------ | --------------------------------------------- | ------------------------------ | ------ |
+| `auth-deployment.json`                           | JSON `{version:1, revision:uuid, deployment}` | deployment selection           | B70    |
+| `auth.v2.keyring`                                | encrypted credentials JSON                    | WorkOS v2 (keyring)            | B46    |
+| `auth.v2.loginkeychain`                          | encrypted credentials JSON                    | WorkOS v2 (macOS security CLI) | B46    |
+| `auth.v2.file`                                   | encrypted credentials JSON                    | WorkOS v2 (keyfile)            | B46    |
+| `auth.v2.key`                                    | 32-byte key                                   | keyfile backend                | B46    |
+| `auth.v2.write.lock`                             | lock file                                     | all writers                    | B46    |
+| `prem-auth/<sha256(origin)>/credentials.json`    | encrypted `{version, backend, ciphertext}`    | Prem                           | B77    |
+| `prem-auth/<sha256(origin)>/credentials.key`     | key                                           | Prem keyfile backend           | B77    |
+| `certs/…`                                        | system-root cache                             | certificate loader             | B86    |
 
 ### Header names (literal)
 
@@ -984,56 +985,56 @@ and exits non-zero when any selected check fails
 Grouped by trigger. Exit codes are process-level; library errors carry no exit
 status of their own.
 
-| Trigger | Identity | User-visible effect | Retry-safe |
-|---|---|---|---|
-| No credential at all | `AuthenticationError` / `notAuthenticatedMessage` | "Not authenticated…" | no (needs `/login` or key) |
-| Configured key rejected (400/401/403) | `ResponseError400/401/403`, reason `apiKeyRejected` | invalid-key copy | no |
-| Key validation could not run (≥500 / network) | reason `ApiUnavailable` | "API is not accessible…" | yes, later |
-| Key validation malformed 2xx | `ResponseError` (502) | validation-failed copy | no |
-| Expired session, refresh unreachable | transient `TokenRefreshError`, null token for nullable readers | expired/again-later copy | yes |
-| Refresh rejected (4xx ≠ 429) | permanent `TokenRefreshError` | expired-login copy | no; session ends |
-| Customer deployment signed out | `AuthenticationError('Sign in to this customer deployment.')` | customer-login copy | after sign-in |
-| Customer deployment awaiting org | `AuthenticationError('Choose an organization…')` | same | after choice |
-| Selection file malformed/unreadable | `AuthDeploymentSelectionError` | message + exit 1 at startup | no (repair file) |
-| Expected Prem pin mismatch | `ExpectedPremDeploymentError` | `droide deployment set --private-origin` | no |
-| Prem auth in airgap | `ResponseError403Forbidden` | "Prem authentication is unavailable…" | no |
-| Prem network/TLS failure | `ResponseError` (status preserved) | generic Prem auth failure | yes |
-| Backend call in airgap | `AirgapBlockedError` | "Outbound request blocked…" | no |
-| Hosted path on customer deployment | `MetaError` | "This hosted operation is unavailable…" / "This operation is unavailable…" | no |
-| Backend non-2xx | `FetchError` `${status} ${body}` | status + server text (hosted) | 5xx/429 only if caller retries |
-| Customer backend non-2xx | `FetchError('Customer request failed')` | status only | as above |
-| Daemon missing credentials | `MetaError` type `Precondition` | "Daemon not authenticated" | no, until configured |
-| HTTP 401 from WorkOS refresh | permanent `TokenRefreshError` | re-login | no |
-| HTTP 429 at a model provider | `LLMThrottlingError` / throttling reason | "high demand…" | yes, with server delay honoured |
-| HTTP 5xx/529 at a model provider | `LLMOverloadedError` / internal error | "provider is currently overloaded…" | yes (capacity policy) |
-| Network/TLS failure to a model provider | `LLMNetworkError` | "network issues…" | yes |
-| Proxy content gate 403 | code `content_policy_rejected` | policy-blocked copy | no |
-| No active plan 402 | code `no_active_subscription` | "No active subscription found." | no |
-| Request body too large 413 | `LLMRequestTooLargeError` | shrink attachments copy | no |
-| Context window exceeded | context-limit reason | "Context limit exceeded…" | no (compaction may follow) |
+| Trigger                                       | Identity                                                       | User-visible effect                                                        | Retry-safe                      |
+| --------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------- |
+| No credential at all                          | `AuthenticationError` / `notAuthenticatedMessage`              | "Not authenticated…"                                                       | no (needs `/login` or key)      |
+| Configured key rejected (400/401/403)         | `ResponseError400/401/403`, reason `apiKeyRejected`            | invalid-key copy                                                           | no                              |
+| Key validation could not run (≥500 / network) | reason `ApiUnavailable`                                        | "API is not accessible…"                                                   | yes, later                      |
+| Key validation malformed 2xx                  | `ResponseError` (502)                                          | validation-failed copy                                                     | no                              |
+| Expired session, refresh unreachable          | transient `TokenRefreshError`, null token for nullable readers | expired/again-later copy                                                   | yes                             |
+| Refresh rejected (4xx ≠ 429)                  | permanent `TokenRefreshError`                                  | expired-login copy                                                         | no; session ends                |
+| Customer deployment signed out                | `AuthenticationError('Sign in to this customer deployment.')`  | customer-login copy                                                        | after sign-in                   |
+| Customer deployment awaiting org              | `AuthenticationError('Choose an organization…')`               | same                                                                       | after choice                    |
+| Selection file malformed/unreadable           | `AuthDeploymentSelectionError`                                 | message + exit 1 at startup                                                | no (repair file)                |
+| Expected Prem pin mismatch                    | `ExpectedPremDeploymentError`                                  | `droide deployment set --private-origin`                                   | no                              |
+| Prem auth in airgap                           | `ResponseError403Forbidden`                                    | "Prem authentication is unavailable…"                                      | no                              |
+| Prem network/TLS failure                      | `ResponseError` (status preserved)                             | generic Prem auth failure                                                  | yes                             |
+| Backend call in airgap                        | `AirgapBlockedError`                                           | "Outbound request blocked…"                                                | no                              |
+| Hosted path on customer deployment            | `MetaError`                                                    | "This hosted operation is unavailable…" / "This operation is unavailable…" | no                              |
+| Backend non-2xx                               | `FetchError` `${status} ${body}`                               | status + server text (hosted)                                              | 5xx/429 only if caller retries  |
+| Customer backend non-2xx                      | `FetchError('Customer request failed')`                        | status only                                                                | as above                        |
+| Daemon missing credentials                    | `MetaError` type `Precondition`                                | "Daemon not authenticated"                                                 | no, until configured            |
+| HTTP 401 from WorkOS refresh                  | permanent `TokenRefreshError`                                  | re-login                                                                   | no                              |
+| HTTP 429 at a model provider                  | `LLMThrottlingError` / throttling reason                       | "high demand…"                                                             | yes, with server delay honoured |
+| HTTP 5xx/529 at a model provider              | `LLMOverloadedError` / internal error                          | "provider is currently overloaded…"                                        | yes (capacity policy)           |
+| Network/TLS failure to a model provider       | `LLMNetworkError`                                              | "network issues…"                                                          | yes                             |
+| Proxy content gate 403                        | code `content_policy_rejected`                                 | policy-blocked copy                                                        | no                              |
+| No active plan 402                            | code `no_active_subscription`                                  | "No active subscription found."                                            | no                              |
+| Request body too large 413                    | `LLMRequestTooLargeError`                                      | shrink attachments copy                                                    | no                              |
+| Context window exceeded                       | context-limit reason                                           | "Context limit exceeded…"                                                  | no (compaction may follow)      |
 
 ## Acceptance tests
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1–B9 | `tests/transport/test_base_url_matrix` | `fixtures/transport/base_url_matrix.json` |
-| B10–B20, B22 | `tests/transport/test_header_construction` | `fixtures/transport/credential_snapshot.json` |
-| B8, B9, B21, B91 | `tests/transport/test_request_policy` | `fixtures/transport/policy_cases.json` |
-| B23–B32 | `tests/transport/test_route_table` | `fixtures/transport/routes.json` |
-| B33–B39 | `tests/transport/test_deadlines` | `fixtures/transport/deadlines.json` |
-| B40–B44 | `tests/transport/test_llm_retry` | `fixtures/transport/retry_cases.json` |
-| B45–B58 | `tests/transport/test_credential_store` | `fixtures/transport/credential_store/` |
-| B59–B69 | `tests/transport/test_workos` | `fixtures/transport/workos_cases.json` |
-| B70–B74 | `tests/transport/test_deployment_selection` | `fixtures/transport/deployments.json` |
-| B75–B83 | `tests/transport/test_prem_auth` | `fixtures/transport/prem_cases.json` |
-| B84–B91 | `tests/transport/test_ca_and_airgap` | `fixtures/transport/ca_airgap.json` |
-| B92–B104 | `tests/transport/test_http_error_messages` | `fixtures/transport/http_errors.json` |
-| B105–B109 | `tests/transport/test_llm_transport_routing` | `fixtures/transport/routing.json` |
-| B110–B113 | `tests/transport/test_sse_reader` | `fixtures/transport/sse/*.txt` |
-| B114–B119 | `tests/transport/test_stream_events` | `fixtures/transport/streams/*.jsonl` |
-| B120–B123 | `tests/transport/test_usage_accounting` | `fixtures/transport/usage_streams.jsonl` |
-| B124–B126 | `tests/transport/test_converse_and_ws` | `fixtures/transport/converse_ws.json` |
-| B127–B130 | `tests/transport/test_cli_auth_surface` | `fixtures/transport/doctor_auth.json` |
+| Clause           | Test id                                      | Fixture                                       |
+| ---------------- | -------------------------------------------- | --------------------------------------------- |
+| B1–B9            | `tests/transport/test_base_url_matrix`       | `fixtures/transport/base_url_matrix.json`     |
+| B10–B20, B22     | `tests/transport/test_header_construction`   | `fixtures/transport/credential_snapshot.json` |
+| B8, B9, B21, B91 | `tests/transport/test_request_policy`        | `fixtures/transport/policy_cases.json`        |
+| B23–B32          | `tests/transport/test_route_table`           | `fixtures/transport/routes.json`              |
+| B33–B39          | `tests/transport/test_deadlines`             | `fixtures/transport/deadlines.json`           |
+| B40–B44          | `tests/transport/test_llm_retry`             | `fixtures/transport/retry_cases.json`         |
+| B45–B58          | `tests/transport/test_credential_store`      | `fixtures/transport/credential_store/`        |
+| B59–B69          | `tests/transport/test_workos`                | `fixtures/transport/workos_cases.json`        |
+| B70–B74          | `tests/transport/test_deployment_selection`  | `fixtures/transport/deployments.json`         |
+| B75–B83          | `tests/transport/test_prem_auth`             | `fixtures/transport/prem_cases.json`          |
+| B84–B91          | `tests/transport/test_ca_and_airgap`         | `fixtures/transport/ca_airgap.json`           |
+| B92–B104         | `tests/transport/test_http_error_messages`   | `fixtures/transport/http_errors.json`         |
+| B105–B109        | `tests/transport/test_llm_transport_routing` | `fixtures/transport/routing.json`             |
+| B110–B113        | `tests/transport/test_sse_reader`            | `fixtures/transport/sse/*.txt`                |
+| B114–B119        | `tests/transport/test_stream_events`         | `fixtures/transport/streams/*.jsonl`          |
+| B120–B123        | `tests/transport/test_usage_accounting`      | `fixtures/transport/usage_streams.jsonl`      |
+| B124–B126        | `tests/transport/test_converse_and_ws`       | `fixtures/transport/converse_ws.json`         |
+| B127–B130        | `tests/transport/test_cli_auth_surface`      | `fixtures/transport/doctor_auth.json`         |
 
 ### Test specifications
 
@@ -1179,20 +1180,20 @@ check ids and exits non-zero when one is forced to `fail`.
 
 ## Evidence
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `ev_transport_1` | B1–B9 | `orig/packages/runtime/auth/src/auth/common/resolveCliApiBaseUrl.ts:13-21`, `orig/src/environment.ts:285-317`, `orig/src/environmentResolution.ts:90-127,189-197`, `orig/packages/runtime/auth/src/auth/common/cache.ts:617-620,665-703`, `orig/packages/utils/src/api/config.ts:7-40`, `orig/packages/utils/src/api/fetch.ts:11-29,200-218`, `orig/src/api/config.ts:302-334`; direct reading |
-| `ev_transport_2` | B10–B22 | `orig/src/api/config.ts:149-242,302-334`, `orig/packages/runtime/auth/src/auth/common/whoami.ts:19-56`, `orig/packages/sdk-core/src/protocol/schemas/constants.ts:7-36`, `orig/src/api/BackendClient.ts:60-99,807-886`, `orig/src/llm-proxy/utils.ts:235-296`, `orig/packages/utils/src/api/fetch.ts:32-96,255-296`, `orig/packages/daemon-core/src/services/ApiClient.ts:129-260,430-480`, `orig/packages/utils/src/api/constants.ts:6-9`, `orig/packages/runtime/auth/src/auth/prem/client.ts:107-140`; direct reading |
-| `ev_transport_3` | B23–B32 | `orig/src/api/BackendClient.ts:191-593,610-660,724-806,888-916`, `orig/packages/common/src/api/backend/enums.ts:9-83`, `orig/packages/common/src/api/llm-proxy/enums.ts:10-44`, `orig/packages/common/src/api/prem/constants/index.ts:34-38`, `orig/packages/common/src/api/cli/schemas.ts:34-100`; route table read exhaustively |
-| `ev_transport_4` | B33–B44 | `orig/packages/utils/src/api/fetch.ts:298-320`, `orig/packages/runtime/auth/src/auth/common/constants.ts:24-35`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:18-89`, `orig/packages/runtime/auth/src/auth/prem/client.ts:45-62`, `orig/packages/core/src/llms/client/retryPolicy/index.ts:14-203`, `orig/packages/core/src/llms/client/sendMessage.ts:484-491,3076-3081`, `orig/packages/common/src/api/llm-proxy/constants.ts:59-70`, `orig/packages/utils/src/api/httpStatus.ts:10-12`; constants and branches read |
-| `ev_transport_5` | B45–B58 | `orig/packages/runtime/auth/src/credentials/presence.ts:16-19`, `orig/packages/runtime/auth/src/credentials/constants.ts:1-3`, `orig/packages/runtime/auth/src/credentials/CredentialsStorage.ts:50-74,150-186,320-322,512-541,653-704,717-838`, `orig/packages/runtime/auth/src/auth/source.ts:83-160,234-320,579-663`, `orig/packages/runtime/auth/src/credentials/schemas.ts:10-42`, `orig/packages/runtime/auth/src/auth/common/cache.ts:50-95,506-593`, `orig/packages/runtime/auth/src/auth/common/constants.ts:8-24`; storage code read |
-| `ev_transport_6` | B59–B69 | `orig/packages/runtime/auth/src/auth/workos/base-url.ts:3-9`, `orig/packages/runtime/auth/src/auth/workos/config/index.ts:11-40`, `orig/packages/runtime/auth/src/auth/workos/login/device-code.ts:34-246`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:39-62`, `orig/packages/runtime/auth/src/auth/source.ts:531-605`, `orig/packages/runtime/auth/src/auth/active-organization.ts:88-126,180-234`, `orig/packages/runtime/auth/src/auth/resolve-org.ts:15-61`; flow code read |
-| `ev_transport_7` | B70–B74 | `orig/packages/runtime/auth/src/deployment/index.ts:25-95`, `schemas.ts:4-25`, `constants.ts:1`, `errors.ts:6-36`, `orig/packages/runtime/auth/src/auth/prem/config.ts:11-77,101-116`, `orig/src/entrypoints/deployment/command.ts:30-112`, `orig/src/environment.ts:285-317`, `orig/src/index.ts:186-196`; files and command read |
-| `ev_transport_8` | B75–B83 | `orig/packages/runtime/auth/src/auth/prem/client.ts:107-360,460-483`, `login.ts:47-171`, `storage.ts:80-104,224-300`, `schemas.ts`, `constants.ts:1-2`, `orig/packages/runtime/auth/src/auth/get.ts:36-91,165-190`, `orig/packages/runtime/auth/src/auth/active-organization.ts:50-70`; flow code read |
-| `ev_transport_9` | B84–B91 | `orig/src/constants/constants.ts:87-94`, `orig/src/utils/certificates/parseCertificates.ts:8-20`, `orig/src/utils/systemCertificates.ts:46,640-700`, `orig/src/entrypoints/doctor/checks/proxy.ts:17-20`, `certificates.ts:21-47,120-130`, `connectivity.ts:170-182`, `orig/packages/utils/src/api/fetch.ts:54,250,308-315`, `orig/packages/utils/src/api/errors.ts:40-56`, `orig/src/api/fetchBackend.ts:14-30`, `orig/packages/utils/src/api/constants.ts:1-9`; source read |
-| `ev_transport_10` | B92–B104 | `orig/packages/logging/src/errors/errors.ts:13-46`, `orig/packages/logging/src/errors/responses/errors.ts:7-68`, `orig/packages/runtime/auth/src/auth/api-key/verify.ts:47-127`, `orig/src/commands/authHelpers.ts:41-148`, `orig/src/i18n/authMessages.ts:11-63`, `orig/src/entrypoints/exec/run.ts:585-590,660-680`, `orig/src/entrypoints/wiki-search/run.ts:85-92`, `orig/packages/core/src/llms/errors/utils.ts:1034-1213`, `errors/constants.ts:1-44`, `errors/errors.ts:125-545`, `orig/packages/common/src/api/llm-proxy/constants.ts:24-58`; classification and copy read |
-| `ev_transport_11` | B105–B126 | `orig/packages/core/src/llms/client/converters.ts:102,1393,2080`, `sendMessage.ts:484-491,1330-1332,2676-2704,3076-3081,5040-5135`, `providerRouting.ts:60-102,320-352`, `chunk-processing.ts:699-1050,1144-1175,1177-1740,2117-2150,2151-2160,2238-2310,2410-2416`, `bedrock/converse.ts:266-287,333-420`, `orig/packages/common/src/api/llm-proxy/enums.ts:47-88`, `orig/packages/utils/src/api/response.ts:139-280`, `orig/src/api/BackendClient.ts:212-220`, `orig/src/services/SessionService.ts:8430-8497`; stream processors and adapters read |
-| `ev_transport_12` | B127–B130 | `evidence/cli/help.txt`, `orig/src/commands/loginCommand.ts:11-31`, `orig/src/commands/logoutCommand.ts:39-138`, `orig/src/entrypoints/doctor/checks/auth.ts:147,234,260,403-427`, `orig/src/entrypoints/doctor/run.ts:406-421`; help capture and command code read |
+| Evidence          | Supports  | Method                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ev_transport_1`  | B1–B9     | `orig/packages/runtime/auth/src/auth/common/resolveCliApiBaseUrl.ts:13-21`, `orig/src/environment.ts:285-317`, `orig/src/environmentResolution.ts:90-127,189-197`, `orig/packages/runtime/auth/src/auth/common/cache.ts:617-620,665-703`, `orig/packages/utils/src/api/config.ts:7-40`, `orig/packages/utils/src/api/fetch.ts:11-29,200-218`, `orig/src/api/config.ts:302-334`; direct reading                                                                                                                                                                                     |
+| `ev_transport_2`  | B10–B22   | `orig/src/api/config.ts:149-242,302-334`, `orig/packages/runtime/auth/src/auth/common/whoami.ts:19-56`, `orig/packages/sdk-core/src/protocol/schemas/constants.ts:7-36`, `orig/src/api/BackendClient.ts:60-99,807-886`, `orig/src/llm-proxy/utils.ts:235-296`, `orig/packages/utils/src/api/fetch.ts:32-96,255-296`, `orig/packages/daemon-core/src/services/ApiClient.ts:129-260,430-480`, `orig/packages/utils/src/api/constants.ts:6-9`, `orig/packages/runtime/auth/src/auth/prem/client.ts:107-140`; direct reading                                                           |
+| `ev_transport_3`  | B23–B32   | `orig/src/api/BackendClient.ts:191-593,610-660,724-806,888-916`, `orig/packages/common/src/api/backend/enums.ts:9-83`, `orig/packages/common/src/api/llm-proxy/enums.ts:10-44`, `orig/packages/common/src/api/prem/constants/index.ts:34-38`, `orig/packages/common/src/api/cli/schemas.ts:34-100`; route table read exhaustively                                                                                                                                                                                                                                                  |
+| `ev_transport_4`  | B33–B44   | `orig/packages/utils/src/api/fetch.ts:298-320`, `orig/packages/runtime/auth/src/auth/common/constants.ts:24-35`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:18-89`, `orig/packages/runtime/auth/src/auth/prem/client.ts:45-62`, `orig/packages/core/src/llms/client/retryPolicy/index.ts:14-203`, `orig/packages/core/src/llms/client/sendMessage.ts:484-491,3076-3081`, `orig/packages/common/src/api/llm-proxy/constants.ts:59-70`, `orig/packages/utils/src/api/httpStatus.ts:10-12`; constants and branches read                                                   |
+| `ev_transport_5`  | B45–B58   | `orig/packages/runtime/auth/src/credentials/presence.ts:16-19`, `orig/packages/runtime/auth/src/credentials/constants.ts:1-3`, `orig/packages/runtime/auth/src/credentials/CredentialsStorage.ts:50-74,150-186,320-322,512-541,653-704,717-838`, `orig/packages/runtime/auth/src/auth/source.ts:83-160,234-320,579-663`, `orig/packages/runtime/auth/src/credentials/schemas.ts:10-42`, `orig/packages/runtime/auth/src/auth/common/cache.ts:50-95,506-593`, `orig/packages/runtime/auth/src/auth/common/constants.ts:8-24`; storage code read                                     |
+| `ev_transport_6`  | B59–B69   | `orig/packages/runtime/auth/src/auth/workos/base-url.ts:3-9`, `orig/packages/runtime/auth/src/auth/workos/config/index.ts:11-40`, `orig/packages/runtime/auth/src/auth/workos/login/device-code.ts:34-246`, `orig/packages/runtime/auth/src/auth/workos/refresh.ts:39-62`, `orig/packages/runtime/auth/src/auth/source.ts:531-605`, `orig/packages/runtime/auth/src/auth/active-organization.ts:88-126,180-234`, `orig/packages/runtime/auth/src/auth/resolve-org.ts:15-61`; flow code read                                                                                        |
+| `ev_transport_7`  | B70–B74   | `orig/packages/runtime/auth/src/deployment/index.ts:25-95`, `schemas.ts:4-25`, `constants.ts:1`, `errors.ts:6-36`, `orig/packages/runtime/auth/src/auth/prem/config.ts:11-77,101-116`, `orig/src/entrypoints/deployment/command.ts:30-112`, `orig/src/environment.ts:285-317`, `orig/src/index.ts:186-196`; files and command read                                                                                                                                                                                                                                                 |
+| `ev_transport_8`  | B75–B83   | `orig/packages/runtime/auth/src/auth/prem/client.ts:107-360,460-483`, `login.ts:47-171`, `storage.ts:80-104,224-300`, `schemas.ts`, `constants.ts:1-2`, `orig/packages/runtime/auth/src/auth/get.ts:36-91,165-190`, `orig/packages/runtime/auth/src/auth/active-organization.ts:50-70`; flow code read                                                                                                                                                                                                                                                                             |
+| `ev_transport_9`  | B84–B91   | `orig/src/constants/constants.ts:87-94`, `orig/src/utils/certificates/parseCertificates.ts:8-20`, `orig/src/utils/systemCertificates.ts:46,640-700`, `orig/src/entrypoints/doctor/checks/proxy.ts:17-20`, `certificates.ts:21-47,120-130`, `connectivity.ts:170-182`, `orig/packages/utils/src/api/fetch.ts:54,250,308-315`, `orig/packages/utils/src/api/errors.ts:40-56`, `orig/src/api/fetchBackend.ts:14-30`, `orig/packages/utils/src/api/constants.ts:1-9`; source read                                                                                                      |
+| `ev_transport_10` | B92–B104  | `orig/packages/logging/src/errors/errors.ts:13-46`, `orig/packages/logging/src/errors/responses/errors.ts:7-68`, `orig/packages/runtime/auth/src/auth/api-key/verify.ts:47-127`, `orig/src/commands/authHelpers.ts:41-148`, `orig/src/i18n/authMessages.ts:11-63`, `orig/src/entrypoints/exec/run.ts:585-590,660-680`, `orig/src/entrypoints/wiki-search/run.ts:85-92`, `orig/packages/core/src/llms/errors/utils.ts:1034-1213`, `errors/constants.ts:1-44`, `errors/errors.ts:125-545`, `orig/packages/common/src/api/llm-proxy/constants.ts:24-58`; classification and copy read |
+| `ev_transport_11` | B105–B126 | `orig/packages/core/src/llms/client/converters.ts:102,1393,2080`, `sendMessage.ts:484-491,1330-1332,2676-2704,3076-3081,5040-5135`, `providerRouting.ts:60-102,320-352`, `chunk-processing.ts:699-1050,1144-1175,1177-1740,2117-2150,2151-2160,2238-2310,2410-2416`, `bedrock/converse.ts:266-287,333-420`, `orig/packages/common/src/api/llm-proxy/enums.ts:47-88`, `orig/packages/utils/src/api/response.ts:139-280`, `orig/src/api/BackendClient.ts:212-220`, `orig/src/services/SessionService.ts:8430-8497`; stream processors and adapters read                              |
+| `ev_transport_12` | B127–B130 | `evidence/cli/help.txt`, `orig/src/commands/loginCommand.ts:11-31`, `orig/src/commands/logoutCommand.ts:39-138`, `orig/src/entrypoints/doctor/checks/auth.ts:147,234,260,403-427`, `orig/src/entrypoints/doctor/run.ts:406-421`; help capture and command code read                                                                                                                                                                                                                                                                                                                |
 
 ## Open questions
 

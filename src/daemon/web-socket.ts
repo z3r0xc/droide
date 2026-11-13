@@ -565,7 +565,7 @@ function handshakeAccepted(head: string, expected: string): boolean {
 }
 
 /** The body the desktop's pre-kill probe reads (B33). */
-export const HEALTH_BODY = "factory-daemon ok";
+export const HEALTH_BODY = "droide-daemon ok";
 
 /**
  * Create the HTTP server a daemon binds. `GET /health` answers `200` with

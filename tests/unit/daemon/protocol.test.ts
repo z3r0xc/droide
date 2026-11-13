@@ -292,8 +292,8 @@ test("a missing protocol version is not a mismatch; a different one is", () => {
   assert.equal(protocolVersionMismatch("1.321.0", ""), undefined);
   assert.equal(protocolVersionMismatch("1.321.0", "1.321.0"), undefined);
   assert.deepEqual(protocolVersionMismatch("1.321.0", "1.300.0"), {
-    localFactoryProtocolVersion: "1.321.0",
-    peerFactoryProtocolVersion: "1.300.0",
+    localPeerProtocolVersion: "1.321.0",
+    remotePeerProtocolVersion: "1.300.0",
   });
 });
 
@@ -306,8 +306,8 @@ test("envelopeVersionMismatch names the message type, method and request id", ()
     "1.321.0",
   );
   assert.deepEqual(mismatch, {
-    localFactoryProtocolVersion: "1.321.0",
-    peerFactoryProtocolVersion: "1.300.0",
+    localPeerProtocolVersion: "1.321.0",
+    remotePeerProtocolVersion: "1.300.0",
     messageType: "request",
     method: "list_sessions",
     requestId: ID,
@@ -326,25 +326,25 @@ test("attachVersionMismatch keeps existing data and adds the record", () => {
   const decorated = attachVersionMismatch(
     createErrorObject(-32601, "Method not found: x", { reason: "unknown" }),
     {
-      localFactoryProtocolVersion: "1.321.0",
-      peerFactoryProtocolVersion: "1.300.0",
+      localPeerProtocolVersion: "1.321.0",
+      remotePeerProtocolVersion: "1.300.0",
     },
   );
   assert.deepEqual(decorated.data, {
     reason: "unknown",
     protocolVersionMismatch: {
-      localFactoryProtocolVersion: "1.321.0",
-      peerFactoryProtocolVersion: "1.300.0",
+      localPeerProtocolVersion: "1.321.0",
+      remotePeerProtocolVersion: "1.300.0",
     },
   });
   const noData = attachVersionMismatch(createErrorObject(-32601, "x"), {
-    localFactoryProtocolVersion: "1.321.0",
-    peerFactoryProtocolVersion: "1.300.0",
+    localPeerProtocolVersion: "1.321.0",
+    remotePeerProtocolVersion: "1.300.0",
   });
   assert.deepEqual(noData.data, {
     protocolVersionMismatch: {
-      localFactoryProtocolVersion: "1.321.0",
-      peerFactoryProtocolVersion: "1.300.0",
+      localPeerProtocolVersion: "1.321.0",
+      remotePeerProtocolVersion: "1.300.0",
     },
   });
 });

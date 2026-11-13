@@ -13,7 +13,7 @@ The checkout this tree was read in (GitHub `z3r0xc/droide`), on branch
 
 The behaviour these specs pin was first written down from **one reference
 build**: a terminal coding agent shipped as a single-file Bun executable. Below,
-*the reference build* means that artefact and *the CLI* means the program it
+_the reference build_ means that artefact and _the CLI_ means the program it
 ships, whichever platform slice a clause was observed on.
 
 Its original TypeScript was recovered from source maps embedded in the binary and
@@ -29,12 +29,12 @@ Re-export barrels and type-only modules were elided by the bundler and are
 Citations keep the evidence tree's own layout and line ranges. Two elisions are
 applied so a spec never prints a vendor or product name:
 
-| In the evidence tree | In a spec |
-|---|---|
-| `packages/<vendor>-core/…` | `packages/core/…` |
+| In the evidence tree                                          | In a spec                                   |
+| ------------------------------------------------------------- | ------------------------------------------- |
+| `packages/<vendor>-core/…`                                    | `packages/core/…`                           |
 | `packages/<vendor>-sdk-core/…`, `packages/<vendor>-sdk-ext/…` | `packages/sdk-core/…`, `packages/sdk-ext/…` |
-| `@<vendor>/<pkg>` package scope | the bare package name |
-| a file or symbol whose name begins with the vendor's | the same name with that prefix elided |
+| `@<vendor>/<pkg>` package scope                               | the bare package name                       |
+| a file or symbol whose name begins with the vendor's          | the same name with that prefix elided       |
 
 Everything else — directory shape, file name, `:line` or `:line-range` — is
 reproduced verbatim, so a claim can still be walked back to the byte range it
@@ -42,14 +42,14 @@ rests on.
 
 ## Ready-made artefacts
 
-| artefact | what it gives |
-|---|---|
-| `docs/architecture/README.md` | layer map, package roles, hubs, entry points |
-| `evidence/arch/graph.json` | per-file internal imports, external deps, package edges |
-| `evidence/cli/help.txt` | captured `--help` |
-| `tests/parity/cases/`, `.work/parity/expected/` | recorded CLI cases (help texts, exit codes, error strings) |
-| `evidence/extracted/windows-x64/` | the raw bundle: 783 JS chunks plus assets (`SKILL*.md`, `*.sql` migrations, native blobs) |
-| `specs/template.md`, `specs/README.md` | the required spec structure |
+| artefact                                        | what it gives                                                                             |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `docs/architecture/README.md`                   | layer map, package roles, hubs, entry points                                              |
+| `evidence/arch/graph.json`                      | per-file internal imports, external deps, package edges                                   |
+| `evidence/cli/help.txt`                         | captured `--help`                                                                         |
+| `tests/parity/cases/`, `tests/parity/expected/` | recorded CLI cases (help texts, exit codes, error strings)                                |
+| `evidence/extracted/windows-x64/`               | the raw bundle: 783 JS chunks plus assets (`SKILL*.md`, `*.sql` migrations, native blobs) |
+| `specs/template.md`, `specs/README.md`          | the required spec structure                                                               |
 
 ## Rules (strict)
 

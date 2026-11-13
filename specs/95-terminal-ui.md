@@ -9,6 +9,9 @@
   `docs/adr/0010-own-brand-and-snapshot-harness.md` (program name is the only
   permitted difference; everything else here is parity-normalised)
 
+Citations in this file of the form `[src/…]` or `[packages/…]` are paths inside
+`evidence/original/windows-x64/`; line ranges are unchanged.
+
 ## Purpose
 
 The interactive terminal UI is the full-screen, alternate terminal surface a user reaches by
@@ -41,21 +44,21 @@ spec pins only the primitive (`MenuContainer`, `SelectableList`).
 
 ## Terms
 
-| Term | Meaning |
-|---|---|
-| **frame** | The ordered list of rendered lines (rows) produced by one Ink render pass, without trailing space padding. Golden tests compare frames. |
-| **row / column** | One terminal cell row / one terminal cell column. All widths are display columns (East-Asian wide = 2), never UTF-16 units. |
-| **transcript** | The scrolling history region above the composer. |
-| **composer** | The message input region: prompt, wrapped draft lines, hint row. |
-| **item** | One renderable unit of the transcript (a user message, an assistant text block, a tool call, …). |
-| **tool row** | The multi-line block a single tool invocation renders to. |
-| **static region** | Items already committed to terminal scrollback via Ink's `<Static>`; they never repaint. |
-| **dynamic region** | Items still live (streaming, or awaiting a decision); they repaint every frame. |
-| **COLORS** | The process-wide active palette object, a proxy over the resolved theme `[src/components/chat/themedColors.ts:1-12]`. |
-| **OSC palette override** | Writing `ESC ] 4;n;#rrggbb BEL` etc. so the terminal's own ANSI 0–15 slots take the theme's colours `[src/theme/ThemeEngine.ts:403-441]`. |
-| **marker** | The one-column bold glyph that starts a transcript row (`⛬`, `>`, `●`). |
-| **clamp** | Truncation at a display-width boundary, by grapheme cluster, never mid-cluster. |
-| **`${PROGRAM}`** | The program-name token, from `src/cli/brand.ts`. Strings are quoted exactly as the program prints them; wherever the program names itself the token is written `${PROGRAM}`, per `docs/adr/0010-own-brand-and-snapshot-harness.md` point 1. |
+| Term                     | Meaning                                                                                                                                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **frame**                | The ordered list of rendered lines (rows) produced by one Ink render pass, without trailing space padding. Golden tests compare frames.                                                                                                     |
+| **row / column**         | One terminal cell row / one terminal cell column. All widths are display columns (East-Asian wide = 2), never UTF-16 units.                                                                                                                 |
+| **transcript**           | The scrolling history region above the composer.                                                                                                                                                                                            |
+| **composer**             | The message input region: prompt, wrapped draft lines, hint row.                                                                                                                                                                            |
+| **item**                 | One renderable unit of the transcript (a user message, an assistant text block, a tool call, …).                                                                                                                                            |
+| **tool row**             | The multi-line block a single tool invocation renders to.                                                                                                                                                                                   |
+| **static region**        | Items already committed to terminal scrollback via Ink's `<Static>`; they never repaint.                                                                                                                                                    |
+| **dynamic region**       | Items still live (streaming, or awaiting a decision); they repaint every frame.                                                                                                                                                             |
+| **COLORS**               | The process-wide active palette object, a proxy over the resolved theme `[src/components/chat/themedColors.ts:1-12]`.                                                                                                                       |
+| **OSC palette override** | Writing `ESC ] 4;n;#rrggbb BEL` etc. so the terminal's own ANSI 0–15 slots take the theme's colours `[src/theme/ThemeEngine.ts:403-441]`.                                                                                                   |
+| **marker**               | The one-column bold glyph that starts a transcript row (`⛬`, `>`, `●`).                                                                                                                                                                     |
+| **clamp**                | Truncation at a display-width boundary, by grapheme cluster, never mid-cluster.                                                                                                                                                             |
+| **`${PROGRAM}`**         | The program-name token, from `src/cli/brand.ts`. Strings are quoted exactly as the program prints them; wherever the program names itself the token is written `${PROGRAM}`, per `docs/adr/0010-own-brand-and-snapshot-harness.md` point 1. |
 
 ## Observable behaviour
 
@@ -123,14 +126,14 @@ Row budget: `logoLines + 2 + (dev?1:0) + (version?2:0) + 5`
 
 Exact short-form row strings for the English build:
 
-| Row | Text (literal) | Source |
-|---|---|---|
-| dev | `[DEV]` | `[src/components/HeaderFrame.ts:423]` |
-| version | `v0.4.0` | `[src/components/HeaderFrame.ts:429]` |
-| tip prefix | `TIP: ` | `en:header.tip` |
-| shortcuts 1 | `shift+tab to cycle modes · ctrl+N to cycle models` | `en:header.shortcutsLine1` |
-| shortcuts 2 | `ctrl+L for autonomy · tab for reasoning` | `en:header.shortcutsLine2` |
-| status labels | `Skills`, `MCPs`, `Connectors`, `AGENTS.md` | `en:header.*Label` |
+| Row           | Text (literal)                                      | Source                                |
+| ------------- | --------------------------------------------------- | ------------------------------------- |
+| dev           | `[DEV]`                                             | `[src/components/HeaderFrame.ts:423]` |
+| version       | `v0.4.0`                                            | `[src/components/HeaderFrame.ts:429]` |
+| tip prefix    | `TIP: `                                             | `en:header.tip`                       |
+| shortcuts 1   | `shift+tab to cycle modes · ctrl+N to cycle models` | `en:header.shortcutsLine1`            |
+| shortcuts 2   | `ctrl+L for autonomy · tab for reasoning`           | `en:header.shortcutsLine2`            |
+| status labels | `Skills`, `MCPs`, `Connectors`, `AGENTS.md`         | `en:header.*Label`                    |
 
 ### B4 — Transcript commit model
 
@@ -220,7 +223,7 @@ The frame is mode-dependent:
 - **Windows + named mode**: the mode label is printed on the first padding row as
   `<label> · <title>` `[src/components/chat/ChatInput.tsx:1420-1428]`.
 
-Prompt symbols: first row `> ` (`primary`), bash mode ` ! ` (`success`), bash executing ` ⏳ `,
+Prompt symbols: first row `> ` (`primary`), bash mode `!` (`success`), bash executing `⏳`,
 continuation rows two spaces, spec mode `> ` `[src/components/chat/ChatInput.tsx:110-116]`,
 `[src/components/chat/ChatInput.tsx:405-425]`.
 
@@ -233,7 +236,7 @@ placeholder `Try "…"` chosen uniformly from 13 prompts
 Placeholder and unfocused text render dimmed `[src/components/chat/ChatInput.tsx:395-410]`.
 
 The hint row (exactly one row) is chosen in descending priority: editor guidance → steer hint →
-editor overflow hint `Ctrl+P to open in editor`, joined by ` · ` only while it fits
+editor overflow hint `Ctrl+P to open in editor`, joined by `·` only while it fits
 `[src/components/chat/ChatInput.tsx:176-238]`. It is indented 2 columns and truncated at the end
 `[src/components/chat/ChatInput.tsx:1510-1516]`.
 
@@ -281,10 +284,10 @@ preset is `DotsClockwise`, except where a status pins its own preset
 The footer is one row: left block then right block, separated by at least one space
 `[src/components/FooterStatusRow.tsx:846-876]`. Left block = timer `[⏱ <duration>, context: N%]`
 (when enabled) → pending-question count `N question set pending · /answer` → primary label →
-side-chat tag → custom-agents hint → next-loop summary, joined by ` | `; the first hint is separated by a
+side-chat tag → custom-agents hint → next-loop summary, joined by `|`; the first hint is separated by a
 single space when there is no pending-question segment. Right block = archived indicator → pull
 request / branch → `SANDBOX` → MCP → IDE. On Windows-like terminals the "right" block is appended
-to the left block instead, separated by ` | ` `[src/components/FooterStatusRow.tsx:740-790]`,
+to the left block instead, separated by `|` `[src/components/FooterStatusRow.tsx:740-790]`,
 `[src/components/FooterStatusRow.tsx:820-846]`. Hints shed their longest form first, then
 themselves, until the row fits beside the statuses; statuses then truncate `[src/components/FooterStatusRow.tsx:712-740]`.
 
@@ -330,7 +333,7 @@ the cursor `[src/hooks/useChatKeyboardInput.ts:240-250]`.
 
 If the paste is longer than **400 characters** or has more than **8 lines**, it is replaced by a
 placeholder `[<first 50 chars, newlines/tabs → space, trimmed>... <N> lines]`, where `N` is the
-number of *visual* rows at the composer width (raw line count when width is unknown); a second
+number of _visual_ rows at the composer width (raw line count when width is unknown); a second
 identical paste gets `, paste <k>` appended; the full original text is kept for submission
 `[src/hooks/useChatKeyboardInput.ts:1000-1045]`, `[src/hooks/useChatKeyboardInput.ts:520-540]`.
 `Alt+Shift+V` expands placeholders back to their text in the draft
@@ -352,7 +355,7 @@ Every themed component reads `COLORS.<slot>` at render time (never a module-leve
 theme switch repaints the whole surface `[src/components/chat/themedColors.ts:1-12]`,
 `[src/theme/themeColorState.ts:1-30]`.
 
-The active theme is `factory-dark` or `factory-light`, or `auto` resolved from the detected terminal
+The active theme is `droide-dark` or `droide-light`, or `auto` resolved from the detected terminal
 appearance (light background → light theme), or a user theme from `~/.droide/themes/*.json`
 validated by a Zod schema (`name`, `appearance`, `colors` required)
 `[src/theme/ThemeEngine.ts:265-300]`, `[src/theme/themeLoader.ts:1-40]`.
@@ -364,17 +367,17 @@ fixed order black, red, green, yellow, blue, magenta, cyan, white, brightBlack �
 
 ### B18 — Terminal capability degradation
 
-| Condition | Effect |
-|---|---|
-| `NO_COLOR` set | colour-probing is skipped (no truecolour probe, no OSC 11 appearance probe); theme falls back to `COLORFGBG`, else dark `[src/utils/trueColorDetector/index.ts:78-86]`, `[src/utils/terminalAppearanceDetector/index.ts:56-66]` |
-| `FORCE_COLOR` set to any value | truecolour probe skipped — the user's own choice wins `[src/utils/trueColorDetector/index.ts:78-86]` |
-| `FORCE_COLOR=0` | OSC 11 appearance probe skipped `[src/utils/terminalAppearanceDetector/index.ts:56-66]` |
-| `CI` set and not `false` | both probes skipped `[src/utils/trueColorDetector/index.ts:78-86]`, `[src/utils/terminalAppearanceDetector/index.ts:56-66]` |
-| not a TTY (stdin or stdout) | truecolour probe returns false; appearance falls back to `COLORFGBG`; the raw early-input shell is not started `[src/utils/trueColorDetector/index.ts:170-186]`, `[src/utils/terminalAppearanceDetector/index.ts:196-215]`, `[src/entrypoints/tui/bootstrap.ts:312-320]` |
-| `process.platform === 'win32'` | truecolour probe short-circuits to false and appearance uses `COLORFGBG` only — legacy ConHost and most remote channels drop DCS/OSC replies `[src/utils/trueColorDetector/index.ts:175-181]`, `[src/utils/terminalAppearanceDetector/index.ts:188-196]` |
-| chalk level ≥ 2 | no probe and no forcing (256-colour approximations are accepted as visually fine) `[src/utils/trueColorDetector/index.ts:196-206]` |
-| 16-colour terminal | palette is emitted as hex; chalk down-converts to the nearest ANSI-16 slot. The exact slot per token is chalk's conversion, not ours → Open question 3 `[src/theme/themes/factory-dark.ts:6-12]` |
-| `TERM=dumb` | OSC 8 hyperlinks are not written `[src/utils/hyperlinks.ts:100-112]` |
+| Condition                      | Effect                                                                                                                                                                                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NO_COLOR` set                 | colour-probing is skipped (no truecolour probe, no OSC 11 appearance probe); theme falls back to `COLORFGBG`, else dark `[src/utils/trueColorDetector/index.ts:78-86]`, `[src/utils/terminalAppearanceDetector/index.ts:56-66]`                                          |
+| `FORCE_COLOR` set to any value | truecolour probe skipped — the user's own choice wins `[src/utils/trueColorDetector/index.ts:78-86]`                                                                                                                                                                     |
+| `FORCE_COLOR=0`                | OSC 11 appearance probe skipped `[src/utils/terminalAppearanceDetector/index.ts:56-66]`                                                                                                                                                                                  |
+| `CI` set and not `false`       | both probes skipped `[src/utils/trueColorDetector/index.ts:78-86]`, `[src/utils/terminalAppearanceDetector/index.ts:56-66]`                                                                                                                                              |
+| not a TTY (stdin or stdout)    | truecolour probe returns false; appearance falls back to `COLORFGBG`; the raw early-input shell is not started `[src/utils/trueColorDetector/index.ts:170-186]`, `[src/utils/terminalAppearanceDetector/index.ts:196-215]`, `[src/entrypoints/tui/bootstrap.ts:312-320]` |
+| `process.platform === 'win32'` | truecolour probe short-circuits to false and appearance uses `COLORFGBG` only — legacy ConHost and most remote channels drop DCS/OSC replies `[src/utils/trueColorDetector/index.ts:175-181]`, `[src/utils/terminalAppearanceDetector/index.ts:188-196]`                 |
+| chalk level ≥ 2                | no probe and no forcing (256-colour approximations are accepted as visually fine) `[src/utils/trueColorDetector/index.ts:196-206]`                                                                                                                                       |
+| 16-colour terminal             | palette is emitted as hex; chalk down-converts to the nearest ANSI-16 slot. The exact slot per token is chalk's conversion, not ours → Open question 3 `[src/theme/themes/droide-dark.ts:6-12]`                                                                          |
+| `TERM=dumb`                    | OSC 8 hyperlinks are not written `[src/utils/hyperlinks.ts:100-112]`                                                                                                                                                                                                     |
 
 `COLORFGBG` parsing: last field `default` → light; `7`/`15` → light; `0`/`8` → dark; anything else →
 unknown → dark `[src/utils/terminalAppearanceDetector/index.ts:40-58]`. The truecolour probe writes
@@ -422,29 +425,29 @@ interval `[src/components/Spinner.tsx:22-30]`.
 
 ### Settings that change the surface
 
-| Setting | Key | Effect | Source |
-|---|---|---|---|
-| theme | `general.theme` | `factory-dark` (default), `factory-light`, `auto`, or a user theme name | `[src/theme/applyThemeChange.ts:1-20]`, `[src/theme/ThemeEngine.ts:265-300]` |
-| terminal override | `overrideTerminalColors` (bool) | enables OSC 4/10/11/12 palette writes | `[src/theme/applyThemeChange.ts:5-14]` |
-| thinking in main view | `getShowThinkingInMainView()` | shows reasoning blocks in the transcript | `[src/app.tsx:10185]` |
-| todo display mode | `getTodoDisplayMode()` | `Pinned` renders the panel above the composer | `[src/app.tsx:10648-10652]` |
-| token usage indicator | `getShowTokenUsageIndicator()` | adds `context: N%` to the footer timer | `[src/components/FooterStatusRow.tsx:388-392]` |
-| nerd font | `getNerdFont()` | prefixes the branch label with `` | `[src/components/FooterStatusRow.tsx:505-515]` |
-| vim mode | `getVimMode()` | enables NORMAL/INSERT and the vim row | `[src/hooks/useChatKeyboardInput.ts:1990-2000]` |
-| status line | `getStatusLine()` → `{command, padding, maxRows}` | renders the status-line region | `[src/components/StatusLine.tsx:130-160]` |
-| fast mode | `useIsFastMode()` | halves spinner and shimmer periods | `[src/components/Spinner.tsx:22-30]` |
+| Setting               | Key                                               | Effect                                                                | Source                                                                       |
+| --------------------- | ------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| theme                 | `general.theme`                                   | `droide-dark` (default), `droide-light`, `auto`, or a user theme name | `[src/theme/applyThemeChange.ts:1-20]`, `[src/theme/ThemeEngine.ts:265-300]` |
+| terminal override     | `overrideTerminalColors` (bool)                   | enables OSC 4/10/11/12 palette writes                                 | `[src/theme/applyThemeChange.ts:5-14]`                                       |
+| thinking in main view | `getShowThinkingInMainView()`                     | shows reasoning blocks in the transcript                              | `[src/app.tsx:10185]`                                                        |
+| todo display mode     | `getTodoDisplayMode()`                            | `Pinned` renders the panel above the composer                         | `[src/app.tsx:10648-10652]`                                                  |
+| token usage indicator | `getShowTokenUsageIndicator()`                    | adds `context: N%` to the footer timer                                | `[src/components/FooterStatusRow.tsx:388-392]`                               |
+| nerd font             | `getNerdFont()`                                   | prefixes the branch label with ``                                     | `[src/components/FooterStatusRow.tsx:505-515]`                               |
+| vim mode              | `getVimMode()`                                    | enables NORMAL/INSERT and the vim row                                 | `[src/hooks/useChatKeyboardInput.ts:1990-2000]`                              |
+| status line           | `getStatusLine()` → `{command, padding, maxRows}` | renders the status-line region                                        | `[src/components/StatusLine.tsx:130-160]`                                    |
+| fast mode             | `useIsFastMode()`                                 | halves spinner and shimmer periods                                    | `[src/components/Spinner.tsx:22-30]`                                         |
 
 ### Environment variables read by the surface
 
-| Variable | Meaning | Source |
-|---|---|---|
-| `NO_COLOR`, `FORCE_COLOR`, `CI` | colour probing policy (B18) | `[src/utils/trueColorDetector/index.ts:78-86]` |
-| `DISABLE_TRUECOLOR_PROBE` | force-off truecolour probing | `[src/utils/trueColorDetector/index.ts:78-86]` |
-| `COLORFGBG` | appearance fallback | `[src/utils/terminalAppearanceDetector/index.ts:40-58]` |
-| `TMUX` / `STY` | multiplexer; extended keys, 700 ms escape resolution, `TERM`-independent paste framing | `[src/utils/interactiveTerminalState.ts:26-34]`, `[src/hooks/repeatedKeySequence.ts:8-14]` |
-| `TERM` | `dumb` disables hyperlinks | `[src/utils/hyperlinks.ts:100-112]` |
-| `DROIDE_E2E_CLOCK_FILE` | pins the clock for deterministic timer/footer output | `[src/utils/e2eClock.ts:1-40]` |
-| `DROIDE_DISABLE_EARLY_INPUT_SHELL`, `FORCE_BLOCKING_UPDATE` | opt out of the raw early-input shell | `[src/entrypoints/tui/bootstrap.ts:312-320]` |
+| Variable                                                    | Meaning                                                                                | Source                                                                                     |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `NO_COLOR`, `FORCE_COLOR`, `CI`                             | colour probing policy (B18)                                                            | `[src/utils/trueColorDetector/index.ts:78-86]`                                             |
+| `DISABLE_TRUECOLOR_PROBE`                                   | force-off truecolour probing                                                           | `[src/utils/trueColorDetector/index.ts:78-86]`                                             |
+| `COLORFGBG`                                                 | appearance fallback                                                                    | `[src/utils/terminalAppearanceDetector/index.ts:40-58]`                                    |
+| `TMUX` / `STY`                                              | multiplexer; extended keys, 700 ms escape resolution, `TERM`-independent paste framing | `[src/utils/interactiveTerminalState.ts:26-34]`, `[src/hooks/repeatedKeySequence.ts:8-14]` |
+| `TERM`                                                      | `dumb` disables hyperlinks                                                             | `[src/utils/hyperlinks.ts:100-112]`                                                        |
+| `DROIDE_E2E_CLOCK_FILE`                                     | pins the clock for deterministic timer/footer output                                   | `[src/utils/e2eClock.ts:1-40]`                                                             |
+| `DROIDE_DISABLE_EARLY_INPUT_SHELL`, `FORCE_BLOCKING_UPDATE` | opt out of the raw early-input shell                                                   | `[src/entrypoints/tui/bootstrap.ts:312-320]`                                               |
 
 ### User theme file
 
@@ -459,31 +462,31 @@ carries an ANSI-256 index comment, it is reproduced; the light theme does not us
 
 ### D1 — Core palette
 
-| Slot | Dark | Light | Role |
-|---|---|---|---|
-| `primary` | `#d75f00` (166) | `#d75f00` | brand orange: prompt, assistant marker, spinner, "question set pending" |
-| `border` | `#878787` (102) | `#b0b0b0` | composer/menu borders |
-| `success` | `#afaf5f` (41) | `#2e7d32` | bash prompt, menu selection |
-| `error` | `#d75f5f` (167) | `#c62828` | failed tool text, `✗` status, remove buttons |
-| `warning` | `#ffaf00` (214) | `#e65100` | warnings, `SANDBOX`, risk badges |
-| `spec` | `#afafff` (147) | `#0057a8` | spec-mode accents |
-| `agi` | `#afaf5f` | `#2e7d32` | mission-mode accents |
-| `missionV2` | `terminal.ansi.blue` → `#5fafd7` | `#0057a8` | workstream accents (fallback when unset) |
-| `btw` | `#8fb9c9` | `#3d7a92` | `/btw` side-chat tag |
-| `asciiArt` | `#d75f00` | `#d75f00` | `[DEV]` tag, changelog divider |
-| `headerLogo` | `#eeeeee` (255) | `#000000` | header logo |
-| `toolName` | `#d7875f` (173) | `#b35900` | tool header name |
-| `toolParam` | `#b2b2b2` (249) | `#5a5a5a` | tool header params, counts |
-| `hookBadgeBg` / `hookBadgeFg` | `#af87ff` / `#000000` | `#7b1fa2` / `#ffffff` | hook badge |
-| `toolBadgeBg` / `toolBadgeFg` | `#FEB17F` / `#000000` | `#ff9800` / `#000000` | subagent badge slot 0 |
-| `statusActive` | `#00ff00` | `#00c853` | header `✓` |
-| `highlight` | `#d78700` (172) | `#e65100` | menu option selection |
-| `highlightDanger` | `#d75f5f` (167) | `#c62828` | destructive option, sandbox label |
-| `disconnected` | `#ff8787` (210) | `#ef5350` | disconnected state |
-| `gitAdditions` | `#7db87a` | `#659e62` | `+N` counts |
-| `gitDeletions` | `#b87a7a` | `#9e6262` | `-N` counts |
+| Slot                          | Dark                             | Light                 | Role                                                                    |
+| ----------------------------- | -------------------------------- | --------------------- | ----------------------------------------------------------------------- |
+| `primary`                     | `#d75f00` (166)                  | `#d75f00`             | brand orange: prompt, assistant marker, spinner, "question set pending" |
+| `border`                      | `#878787` (102)                  | `#b0b0b0`             | composer/menu borders                                                   |
+| `success`                     | `#afaf5f` (41)                   | `#2e7d32`             | bash prompt, menu selection                                             |
+| `error`                       | `#d75f5f` (167)                  | `#c62828`             | failed tool text, `✗` status, remove buttons                            |
+| `warning`                     | `#ffaf00` (214)                  | `#e65100`             | warnings, `SANDBOX`, risk badges                                        |
+| `spec`                        | `#afafff` (147)                  | `#0057a8`             | spec-mode accents                                                       |
+| `agi`                         | `#afaf5f`                        | `#2e7d32`             | mission-mode accents                                                    |
+| `missionV2`                   | `terminal.ansi.blue` → `#5fafd7` | `#0057a8`             | workstream accents (fallback when unset)                                |
+| `btw`                         | `#8fb9c9`                        | `#3d7a92`             | `/btw` side-chat tag                                                    |
+| `asciiArt`                    | `#d75f00`                        | `#d75f00`             | `[DEV]` tag, changelog divider                                          |
+| `headerLogo`                  | `#eeeeee` (255)                  | `#000000`             | header logo                                                             |
+| `toolName`                    | `#d7875f` (173)                  | `#b35900`             | tool header name                                                        |
+| `toolParam`                   | `#b2b2b2` (249)                  | `#5a5a5a`             | tool header params, counts                                              |
+| `hookBadgeBg` / `hookBadgeFg` | `#af87ff` / `#000000`            | `#7b1fa2` / `#ffffff` | hook badge                                                              |
+| `toolBadgeBg` / `toolBadgeFg` | `#FEB17F` / `#000000`            | `#ff9800` / `#000000` | subagent badge slot 0                                                   |
+| `statusActive`                | `#00ff00`                        | `#00c853`             | header `✓`                                                              |
+| `highlight`                   | `#d78700` (172)                  | `#e65100`             | menu option selection                                                   |
+| `highlightDanger`             | `#d75f5f` (167)                  | `#c62828`             | destructive option, sandbox label                                       |
+| `disconnected`                | `#ff8787` (210)                  | `#ef5350`             | disconnected state                                                      |
+| `gitAdditions`                | `#7db87a`                        | `#659e62`             | `+N` counts                                                             |
+| `gitDeletions`                | `#b87a7a`                        | `#9e6262`             | `-N` counts                                                             |
 
-Sources: `[src/theme/themes/factory-dark.ts:16-62]`, `[src/theme/themes/factory-light.ts:16-62]`.
+Sources: `[src/theme/themes/droide-dark.ts:16-62]`, `[src/theme/themes/droide-light.ts:16-62]`.
 
 Mode-row strings (exact): `Auto (Low) · edits and read-only commands`,
 `Auto (Med) · allow reversible commands`, `Auto (High) · allow all commands`,
@@ -493,56 +496,56 @@ Mode-row strings (exact): `Auto (Low) · edits and read-only commands`,
 
 ### D2 — Text palette
 
-| Slot | Dark | Light | Role |
-|---|---|---|---|
-| `text.primary` | `#eeeeee` (255) | `#1a1a1a` | default body text, model label |
-| `text.secondary` | `#a8a8a8` (248) | `#4a4a4a` | header dim text, secondary status |
-| `text.muted` | `#767676` (243) | `#6b6b6b` | hints, placeholders, result text, `↳` |
-| `text.userText` | `#D8D4D2` | `#000000` | user message text |
-| `text.userBg` | `#262626` (235) | `#e8e8e8` | user message background |
-| `text.selectionBg` | `#303030` (236) | falls back to `userBg` | selected list row |
-| `text.userSymbol` | `#d75f00` (166) | `#d75f00` | user message left bar |
-| `text.helpKey` | `#908a86` | `#000000` | help-bar keys (bold) |
-| `text.helpLabel` | `#645e5a` | `#8a8a8a` | help-bar labels |
-| `text.menuTitle` / `menuSectionHeader` | `#eeeeee` | `#000000` | menu titles, section headers |
-| `text.modelMultiplier` | `#5f8787` | `#8a8a8a` | `(1.5x)` multiplier |
-| `text.queuedSymbol` / `queuedText` | `#a04800` / `#8a8a8a` | `#c47a30` / `#6b6b6b` | queued message bar/text |
-| `text.info` | `#afafff` (from `spec`) | `#0057a8` | markdown table header; image chip border |
+| Slot                                   | Dark                    | Light                  | Role                                     |
+| -------------------------------------- | ----------------------- | ---------------------- | ---------------------------------------- |
+| `text.primary`                         | `#eeeeee` (255)         | `#1a1a1a`              | default body text, model label           |
+| `text.secondary`                       | `#a8a8a8` (248)         | `#4a4a4a`              | header dim text, secondary status        |
+| `text.muted`                           | `#767676` (243)         | `#6b6b6b`              | hints, placeholders, result text, `↳`    |
+| `text.userText`                        | `#D8D4D2`               | `#000000`              | user message text                        |
+| `text.userBg`                          | `#262626` (235)         | `#e8e8e8`              | user message background                  |
+| `text.selectionBg`                     | `#303030` (236)         | falls back to `userBg` | selected list row                        |
+| `text.userSymbol`                      | `#d75f00` (166)         | `#d75f00`              | user message left bar                    |
+| `text.helpKey`                         | `#908a86`               | `#000000`              | help-bar keys (bold)                     |
+| `text.helpLabel`                       | `#645e5a`               | `#8a8a8a`              | help-bar labels                          |
+| `text.menuTitle` / `menuSectionHeader` | `#eeeeee`               | `#000000`              | menu titles, section headers             |
+| `text.modelMultiplier`                 | `#5f8787`               | `#8a8a8a`              | `(1.5x)` multiplier                      |
+| `text.queuedSymbol` / `queuedText`     | `#a04800` / `#8a8a8a`   | `#c47a30` / `#6b6b6b`  | queued message bar/text                  |
+| `text.info`                            | `#afafff` (from `spec`) | `#0057a8`              | markdown table header; image chip border |
 
-Sources: `[src/theme/themes/factory-dark.ts:63-92]`, `[src/theme/themes/factory-light.ts:62-88]`,
+Sources: `[src/theme/themes/droide-dark.ts:63-92]`, `[src/theme/themes/droide-light.ts:62-88]`,
 fallback chain `[src/theme/themeColorState.ts:32-48]`.
 
 ### D3 — Diff palette
 
-| Slot | Dark | Light |
-|---|---|---|
-| `diff.added` | `#5fff5f` (83) | `#2e7d32` |
-| `diff.addedBg` | `#0a2e10` | `#90c898` |
-| `diff.addedWordBg` | `#1a5a22` | `#60a868` |
-| `diff.removed` | `#ff5f5f` (203) | `#c62828` |
-| `diff.removedBg` | `#2e0a0a` | `#e8b0b4` |
-| `diff.removedWordBg` | `#5a1a1a` | `#c87878` |
-| `diff.border` | `#585858` (240) | `#b0b0b0` |
-| `diff.lineNumber` | `#767676` (243) | `#8a8a8a` |
-| `diff.header` | `#5fafd7` (74) | `#0057a8` |
-| `diff.unchanged` | `#767676` (243) | `#8a8a8a` |
-| `diff.dimUnchanged` | `#5f5f5f` (59) | `#b0b0b0` |
+| Slot                 | Dark            | Light     |
+| -------------------- | --------------- | --------- |
+| `diff.added`         | `#5fff5f` (83)  | `#2e7d32` |
+| `diff.addedBg`       | `#0a2e10`       | `#90c898` |
+| `diff.addedWordBg`   | `#1a5a22`       | `#60a868` |
+| `diff.removed`       | `#ff5f5f` (203) | `#c62828` |
+| `diff.removedBg`     | `#2e0a0a`       | `#e8b0b4` |
+| `diff.removedWordBg` | `#5a1a1a`       | `#c87878` |
+| `diff.border`        | `#585858` (240) | `#b0b0b0` |
+| `diff.lineNumber`    | `#767676` (243) | `#8a8a8a` |
+| `diff.header`        | `#5fafd7` (74)  | `#0057a8` |
+| `diff.unchanged`     | `#767676` (243) | `#8a8a8a` |
+| `diff.dimUnchanged`  | `#5f5f5f` (59)  | `#b0b0b0` |
 
-Sources: `[src/theme/themes/factory-dark.ts:93-116]`, `[src/theme/themes/factory-light.ts:90-113]`.
+Sources: `[src/theme/themes/droide-dark.ts:93-116]`, `[src/theme/themes/droide-light.ts:90-113]`.
 
 ### D4 — Markdown palette
 
-| Slot | Dark | Light |
-|---|---|---|
-| `markdown.bold` | `#bcbcbc` (250) | `#1a1a1a` |
-| `markdown.italic` | `#bcbcbc` (250) | `#4a4a4a` |
-| `markdown.code` | `#8a8a8a` (245) | `#5a5a5a` |
-| `markdown.link` | `#af87af` (139) | `#0057a8` |
-| `markdown.heading` | `#dadada` (253) | `#1a1a1a` |
-| `markdown.blockquote` | `#8a8a8a` (245) | `#6b6b6b` |
+| Slot                     | Dark            | Light     |
+| ------------------------ | --------------- | --------- |
+| `markdown.bold`          | `#bcbcbc` (250) | `#1a1a1a` |
+| `markdown.italic`        | `#bcbcbc` (250) | `#4a4a4a` |
+| `markdown.code`          | `#8a8a8a` (245) | `#5a5a5a` |
+| `markdown.link`          | `#af87af` (139) | `#0057a8` |
+| `markdown.heading`       | `#dadada` (253) | `#1a1a1a` |
+| `markdown.blockquote`    | `#8a8a8a` (245) | `#6b6b6b` |
 | `markdown.strikethrough` | `#8a8a8a` (245) | `#8a8a8a` |
 
-Sources: `[src/theme/themes/factory-dark.ts:118-131]`, `[src/theme/themes/factory-light.ts:116-131]`.
+Sources: `[src/theme/themes/droide-dark.ts:118-131]`, `[src/theme/themes/droide-light.ts:116-131]`.
 
 ### D5 — Mission Control palette (used by todo icons and panels)
 
@@ -551,8 +554,8 @@ Sources: `[src/theme/themes/factory-dark.ts:118-131]`, `[src/theme/themes/factor
 `fail #af5f5f`, `info #626262`, `ref #5f8787`, `worker #878787`, `progress #00d75f`,
 `barFillFrom #ff5f00`, `barFillTo #ff5f00`, `barEmpty #585858`, `hlBg #bcbcbc`, `hlFg #080808`,
 `t2 #e4e4e4`, `t4 #bcbcbc`, `t6 #b2b2b2`, `t9 #808080`, `t12 #626262`, `ts #626262`, `qb #585858`
-(dark; light equivalents at `[src/theme/themes/factory-light.ts:146-201]`)
-`[src/theme/themes/factory-dark.ts:134-200]`.
+(dark; light equivalents at `[src/theme/themes/droide-light.ts:146-201]`)
+`[src/theme/themes/droide-dark.ts:134-200]`.
 
 ### D6 — Subagent badge palette
 
@@ -573,32 +576,32 @@ Placeholder (input still streaming) badge is `···` on `diff.border` with `tex
 #eeeeee`, `meta #767676`, `regexp #d75f5f`, `operator/punctuation #eeeeee`, `symbol/bullet #5f8787`,
 `link #5fafd7`, `emphasis/strong #eeeeee`, `section #5fafd7`, `addition #00d75f`, `deletion #d75f5f`,
 `subst #eeeeee`, `template-tag #afafff`, `template-variable #d75f5f`
-`[src/theme/themes/factory-dark.ts:203-278]`; light equivalents
-`[src/theme/themes/factory-light.ts:204-280]`.
+`[src/theme/themes/droide-dark.ts:203-278]`; light equivalents
+`[src/theme/themes/droide-light.ts:204-280]`.
 
 ### D8 — Terminal ANSI palette (OSC 4 slots)
 
-| Index | Name | Dark | Light |
-|---|---|---|---|
-| 0 | black | `#1c1c1c` | `#1a1a1a` |
-| 1 | red | `#d75f5f` | `#c62828` |
-| 2 | green | `#00d75f` | `#2e7d32` |
-| 3 | yellow | `#ffaf00` | `#e65100` |
-| 4 | blue | `#5fafd7` | `#0057a8` |
-| 5 | magenta | `#afafff` | `#7b1fa2` |
-| 6 | cyan | `#5f8787` | `#00695c` |
-| 7 | white | `#dadada` | `#f5f5f5` |
-| 8 | brightBlack | `#767676` | `#8a8a8a` |
-| 9 | brightRed | `#ff5f5f` | `#ef5350` |
-| 10 | brightGreen | `#5fff5f` | `#43a047` |
-| 11 | brightYellow | `#ffd75f` | `#ff9800` |
-| 12 | brightBlue | `#87afd7` | `#1e88e5` |
-| 13 | brightMagenta | `#d7afff` | `#ab47bc` |
-| 14 | brightCyan | `#87d7d7` | `#00897b` |
-| 15 | brightWhite | `#eeeeee` | `#ffffff` |
+| Index | Name          | Dark      | Light     |
+| ----- | ------------- | --------- | --------- |
+| 0     | black         | `#1c1c1c` | `#1a1a1a` |
+| 1     | red           | `#d75f5f` | `#c62828` |
+| 2     | green         | `#00d75f` | `#2e7d32` |
+| 3     | yellow        | `#ffaf00` | `#e65100` |
+| 4     | blue          | `#5fafd7` | `#0057a8` |
+| 5     | magenta       | `#afafff` | `#7b1fa2` |
+| 6     | cyan          | `#5f8787` | `#00695c` |
+| 7     | white         | `#dadada` | `#f5f5f5` |
+| 8     | brightBlack   | `#767676` | `#8a8a8a` |
+| 9     | brightRed     | `#ff5f5f` | `#ef5350` |
+| 10    | brightGreen   | `#5fff5f` | `#43a047` |
+| 11    | brightYellow  | `#ffd75f` | `#ff9800` |
+| 12    | brightBlue    | `#87afd7` | `#1e88e5` |
+| 13    | brightMagenta | `#d7afff` | `#ab47bc` |
+| 14    | brightCyan    | `#87d7d7` | `#00897b` |
+| 15    | brightWhite   | `#eeeeee` | `#ffffff` |
 
 Also `background #1c1c1c` / `#f5f5f5`, `foreground #eeeeee` / `#1a1a1a`, `cursor #d75f00` both
-`[src/theme/themes/factory-dark.ts:281-328]`, `[src/theme/themes/factory-light.ts:283-323]`.
+`[src/theme/themes/droide-dark.ts:281-328]`, `[src/theme/themes/droide-light.ts:283-323]`.
 
 ### D9 — Typography
 
@@ -606,11 +609,11 @@ The terminal surface is cell-based: the only typeface is the user's monospace fo
 is expressed in columns and rows. No webfont is loaded into the terminal. Two fonts ship **only**
 for rasterising SVG (Mermaid diagrams) to PNG:
 
-| Asset | Value |
-|---|---|
-| font files | `src/fonts/Arimo-Regular.ttf`, `src/fonts/Arimo-Bold.ttf` (bundled as assets) `[src/utils/images/svg.ts:7-8]` |
-| bold cut coverage | the bold cut covers exactly the regular cut's code points; a glyph missing from regular forces the text path `[src/utils/images/svg.ts:10-24]` |
-| SVG sizing | absolute CSS units converted to px: `in 96`, `cm 96/2.54`, `mm 96/25.4`, `pt 96/72`, `pc 16`; text keeps its intrinsic `font-size` unless the markup has none `[src/utils/images/svg.ts:33-45]` |
+| Asset             | Value                                                                                                                                                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| font files        | `src/fonts/Arimo-Regular.ttf`, `src/fonts/Arimo-Bold.ttf` (bundled as assets) `[src/utils/images/svg.ts:7-8]`                                                                                   |
+| bold cut coverage | the bold cut covers exactly the regular cut's code points; a glyph missing from regular forces the text path `[src/utils/images/svg.ts:10-24]`                                                  |
+| SVG sizing        | absolute CSS units converted to px: `in 96`, `cm 96/2.54`, `mm 96/25.4`, `pt 96/72`, `pc 16`; text keeps its intrinsic `font-size` unless the markup has none `[src/utils/images/svg.ts:33-45]` |
 
 Emphasis in the terminal: `bold` for markers, tool names, menu options and headers; `italic` for the
 thinking label and code-fence language; `dimColor` for hints, placeholders, truncation notices,
@@ -618,72 +621,72 @@ status-line output and the unfocused composer frame.
 
 ### D10 — Spacing scale
 
-| Token | Cells | Used by |
-|---|---|---|
-| transcript content inset | 6 (`terminalWidth - contentWidth`) | all message/tool content |
-| assistant marker inset | 3 (`ASSISTANT_MESSAGE_INSET`) | compact/workstream views `[src/components/chat/constants.ts:33-37]` |
-| user bubble inset | 3 (`USER_BUBBLE_INSET`) — bar 1 + padding 2 | user messages `[src/components/chat/constants.ts:39-42]` |
-| tool row margin | 3 + inner 1 | tool rows `[src/components/tools/ToolDisplayShell.tsx:99-150]` |
-| tool result indent | 4 (`TOOL_RESULT_INDENT`) | tool result text and images `[src/utils/constants.ts:344]` |
-| thinking indent | 3 (`THINKING_INSET`) | reasoning block `[src/components/ThinkingDisplay.tsx:9-12]` |
-| composer padding | x 1, y 1 (Windows) / x 1, y 0 (others) | frame `[src/components/chat/viewportBudget.ts:113-133]` |
-| composer inner text width | `max(width - 10, 1)` | wrapping `[src/components/chat/viewportBudget.ts:136-140]` |
-| menu padding | border 1 + x 1 | menus `[src/components/common/MenuContainer.tsx:44-55]` |
-| menu min width | 78 | `MenuContainer` default `[src/components/common/MenuContainer.tsx:60-64]` |
-| header left margin | 2 (`LEFT_MARGIN`) | header grid `[src/components/HeaderFrame.ts:53]` |
-| status item gap | 2 | header status row `[src/components/HeaderFrame.ts:67]` |
-| footer status separator | `" | "` (3) | footer `[src/components/FooterStatusRow.tsx:87-88]` |
-| footer row gap | 1 | footer `[src/components/FooterStatusRow.tsx:88]` |
-| help segment separator | 3 spaces | footer/help bars `[src/components/common/StyledHelpText.tsx:11-13]` |
-| markdown list marker | 3 (`LIST_MARKER_WIDTH`), tail indent 2 | markdown `[src/components/renderMarkdown.tsx:64-65]` |
-| markdown code inset | 2 (`CODE_TEXT_INSET`) | fenced code `[src/components/renderMarkdown.tsx:71]` |
-| diff gutter | 10-column box (4+1+4+1 pad) + 1 margin | diffs `[src/components/DiffRenderer.tsx:195-220]` |
-| approval prompt indent | 2 (options), 2 (sections) | `[src/components/BatchToolConfirmationMessage.tsx:1225-1240]` |
+| Token                     | Cells                                       | Used by                                                                   |
+| ------------------------- | ------------------------------------------- | ------------------------------------------------------------------------- |
+| transcript content inset  | 6 (`terminalWidth - contentWidth`)          | all message/tool content                                                  |
+| assistant marker inset    | 3 (`ASSISTANT_MESSAGE_INSET`)               | compact/workstream views `[src/components/chat/constants.ts:33-37]`       |
+| user bubble inset         | 3 (`USER_BUBBLE_INSET`) — bar 1 + padding 2 | user messages `[src/components/chat/constants.ts:39-42]`                  |
+| tool row margin           | 3 + inner 1                                 | tool rows `[src/components/tools/ToolDisplayShell.tsx:99-150]`            |
+| tool result indent        | 4 (`TOOL_RESULT_INDENT`)                    | tool result text and images `[src/utils/constants.ts:344]`                |
+| thinking indent           | 3 (`THINKING_INSET`)                        | reasoning block `[src/components/ThinkingDisplay.tsx:9-12]`               |
+| composer padding          | x 1, y 1 (Windows) / x 1, y 0 (others)      | frame `[src/components/chat/viewportBudget.ts:113-133]`                   |
+| composer inner text width | `max(width - 10, 1)`                        | wrapping `[src/components/chat/viewportBudget.ts:136-140]`                |
+| menu padding              | border 1 + x 1                              | menus `[src/components/common/MenuContainer.tsx:44-55]`                   |
+| menu min width            | 78                                          | `MenuContainer` default `[src/components/common/MenuContainer.tsx:60-64]` |
+| header left margin        | 2 (`LEFT_MARGIN`)                           | header grid `[src/components/HeaderFrame.ts:53]`                          |
+| status item gap           | 2                                           | header status row `[src/components/HeaderFrame.ts:67]`                    |
+| footer status separator   | `"                                          | "` (3)                                                                    | footer `[src/components/FooterStatusRow.tsx:87-88]` |
+| footer row gap            | 1                                           | footer `[src/components/FooterStatusRow.tsx:88]`                          |
+| help segment separator    | 3 spaces                                    | footer/help bars `[src/components/common/StyledHelpText.tsx:11-13]`       |
+| markdown list marker      | 3 (`LIST_MARKER_WIDTH`), tail indent 2      | markdown `[src/components/renderMarkdown.tsx:64-65]`                      |
+| markdown code inset       | 2 (`CODE_TEXT_INSET`)                       | fenced code `[src/components/renderMarkdown.tsx:71]`                      |
+| diff gutter               | 10-column box (4+1+4+1 pad) + 1 margin      | diffs `[src/components/DiffRenderer.tsx:195-220]`                         |
+| approval prompt indent    | 2 (options), 2 (sections)                   | `[src/components/BatchToolConfirmationMessage.tsx:1225-1240]`             |
 
 ### D11 — Borders and box characters
 
-| Use | Characters | Source |
-|---|---|---|
-| Composer frame (non-Windows) | `round`: `╭ ╮ ╰ ╯ ─ │` | `[src/components/chat/ChatInput.tsx:1510-1520]` |
-| Spec/mission composer top border | `╭── <label> · <title> ───╮`, degenerate `╭╮`, `╭` | `[src/components/chat/ChatInput.tsx:156-177]` |
-| Menus / help sections / suggestions box | `round` border in `border` | `[src/components/common/MenuContainer.tsx:96-104]` |
-| Pinned todo panel | left-only `bold` border column in `text.muted` | `[src/components/PinnedTodoDisplay.tsx:88-96]` |
-| Markdown blockquote | left `single` border in `markdown.blockquote` | `[src/components/renderMarkdown.tsx:998-1015]` |
-| Markdown code fence | left border in `text.muted` | `[src/components/renderMarkdown.tsx:405-424]` |
-| Markdown thematic break | `─` repeated to content width | `[src/components/renderMarkdown.tsx:1027-1035]` |
-| Markdown table column separator | `" │ "` | `[src/components/renderMarkdown.tsx:734]` |
-| Diff line-number divider | `│` (documented position) | `[src/components/DiffRenderer.tsx:195-205]` |
-| Header changelog divider | `│` in `asciiArt` | `[src/components/HeaderFrame.ts:578-581]` |
-| Mini logo | `╔═══╗ / ║ D R O I D ║ / ╚═══╝` (21 columns) | `[src/components/chat/constants.ts:159-164]` |
-| Full logo | 6-row block-letter word (spells `${PROGRAM}`) in `█`, 59 columns wide, exact shape at `ASCII` | `[src/components/chat/constants.ts:133-153]` |
+| Use                                     | Characters                                                                                    | Source                                             |
+| --------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Composer frame (non-Windows)            | `round`: `╭ ╮ ╰ ╯ ─ │`                                                                        | `[src/components/chat/ChatInput.tsx:1510-1520]`    |
+| Spec/mission composer top border        | `╭── <label> · <title> ───╮`, degenerate `╭╮`, `╭`                                            | `[src/components/chat/ChatInput.tsx:156-177]`      |
+| Menus / help sections / suggestions box | `round` border in `border`                                                                    | `[src/components/common/MenuContainer.tsx:96-104]` |
+| Pinned todo panel                       | left-only `bold` border column in `text.muted`                                                | `[src/components/PinnedTodoDisplay.tsx:88-96]`     |
+| Markdown blockquote                     | left `single` border in `markdown.blockquote`                                                 | `[src/components/renderMarkdown.tsx:998-1015]`     |
+| Markdown code fence                     | left border in `text.muted`                                                                   | `[src/components/renderMarkdown.tsx:405-424]`      |
+| Markdown thematic break                 | `─` repeated to content width                                                                 | `[src/components/renderMarkdown.tsx:1027-1035]`    |
+| Markdown table column separator         | `" │ "`                                                                                       | `[src/components/renderMarkdown.tsx:734]`          |
+| Diff line-number divider                | `│` (documented position)                                                                     | `[src/components/DiffRenderer.tsx:195-205]`        |
+| Header changelog divider                | `│` in `asciiArt`                                                                             | `[src/components/HeaderFrame.ts:578-581]`          |
+| Mini logo                               | `╔═══╗ / ║ D R O I D ║ / ╚═══╝` (21 columns)                                                  | `[src/components/chat/constants.ts:159-164]`       |
+| Full logo                               | 6-row block-letter word (spells `${PROGRAM}`) in `█`, 59 columns wide, exact shape at `ASCII` | `[src/components/chat/constants.ts:133-153]`       |
 
 ### D12 — Glyph and icon set
 
-| Glyph | Meaning | Slot | Source |
-|---|---|---|---|
-| `⛬` | assistant message marker | `primary` | `[src/components/chat/constants.ts:31]` |
-| `>` | user message marker (in `MessageItem`) | `text.userText` | `[src/components/MessageItem.tsx:540-555]` |
-| `●` | tool/system message marker; todo in-progress | role colour / `text.primary` | `[src/components/MessageItem.tsx:540-555]`, `[src/components/TodoItem.tsx:20-24]` |
-| `○` | todo pending | `text.muted` | `[src/components/TodoItem.tsx:20-24]` |
-| `✓` | todo completed; header status ok | `mc.done` / `statusActive` | `[src/components/TodoItem.tsx:18-24]`, `[src/components/HeaderFrame.ts:466-467]` |
-| `✗` | header status missing | `error` | `[src/components/HeaderFrame.ts:467-468]` |
-| `⏳` | bash command executing prompt | `success` | `[src/components/chat/ChatInput.tsx:113]` |
-| `!` (prompt ` ! `) | bash mode | `success` | `[src/components/chat/ChatInput.tsx:112]` |
-| `↳` | result / child line: tool result, task progress, subagent rows, truncation notices | `text.muted` | `[src/components/tools/implementations/DefaultTool.tsx:155-165]` |
-| `⎿` | interrupted notice prefix | `text.muted` | `[src/components/chat/constants.ts:44]` |
-| `>` (selected) | selected list/menu row | `primary` / `success` | `[src/components/SelectableList.tsx:88-95]`, `[src/components/common/MenuOptionRow.tsx:15-22]` |
-| `✕` | cancel option selected prefix | `highlightDanger` | `[src/agent/tool-confirmation.ts:150-153]` |
-| `···` | placeholder subagent badge | `diff.border` bg | `[src/components/tools/implementations/subagentBadge.ts:38-44]` |
-| `?` | help (shown in footer/`? for help`) | — | `en:footer.showHelp` |
-| `↑ ↓ ← →` | help rows, navigation hints | — | `[src/components/help] en:keybindings.historyNavigation` |
-| `↑ N more` / `↓ N more` | composer viewport indicators | `text.muted` | `[src/components/chat/ChatInput.tsx:1482-1499]` |
-| `---- N more lines hidden ----` | clipped live-tail header | `text.muted` | `en:streamingTail.hiddenLines` |
-| `⏱` | footer timer | `text.muted` | `[src/components/FooterStatusRow.tsx:395-406]` |
-| `·` | inline separator in hints, mode borders, brief rows | `text.muted` | `[src/components/chat/ChatInput.tsx:118]` |
-| `…` / `...` | truncation. `…` in header tip clamp; `...` in tool/paste notices | — | `[src/components/HeaderFrame.ts:458-462]`, `[src/components/tools/implementations/DefaultTool.tsx:22-28]` |
-| `[Image N]`, `[x]` | image attachment chip, remove button | `text.info`, `error` | `en:imageAttachment.*` |
-| `[DEV]` | non-production tag | `asciiArt` | `[src/components/HeaderFrame.ts:423]` |
-| `` `|` `` | branch icon when nerd font is on | `toolName` bold | `[src/components/FooterStatusRow.tsx:82]` |
+| Glyph                           | Meaning                                                                            | Slot                             | Source                                                                                                    |
+| ------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `⛬`                             | assistant message marker                                                           | `primary`                        | `[src/components/chat/constants.ts:31]`                                                                   |
+| `>`                             | user message marker (in `MessageItem`)                                             | `text.userText`                  | `[src/components/MessageItem.tsx:540-555]`                                                                |
+| `●`                             | tool/system message marker; todo in-progress                                       | role colour / `text.primary`     | `[src/components/MessageItem.tsx:540-555]`, `[src/components/TodoItem.tsx:20-24]`                         |
+| `○`                             | todo pending                                                                       | `text.muted`                     | `[src/components/TodoItem.tsx:20-24]`                                                                     |
+| `✓`                             | todo completed; header status ok                                                   | `mc.done` / `statusActive`       | `[src/components/TodoItem.tsx:18-24]`, `[src/components/HeaderFrame.ts:466-467]`                          |
+| `✗`                             | header status missing                                                              | `error`                          | `[src/components/HeaderFrame.ts:467-468]`                                                                 |
+| `⏳`                            | bash command executing prompt                                                      | `success`                        | `[src/components/chat/ChatInput.tsx:113]`                                                                 |
+| `!` (prompt `!`)                | bash mode                                                                          | `success`                        | `[src/components/chat/ChatInput.tsx:112]`                                                                 |
+| `↳`                             | result / child line: tool result, task progress, subagent rows, truncation notices | `text.muted`                     | `[src/components/tools/implementations/DefaultTool.tsx:155-165]`                                          |
+| `⎿`                             | interrupted notice prefix                                                          | `text.muted`                     | `[src/components/chat/constants.ts:44]`                                                                   |
+| `>` (selected)                  | selected list/menu row                                                             | `primary` / `success`            | `[src/components/SelectableList.tsx:88-95]`, `[src/components/common/MenuOptionRow.tsx:15-22]`            |
+| `✕`                             | cancel option selected prefix                                                      | `highlightDanger`                | `[src/agent/tool-confirmation.ts:150-153]`                                                                |
+| `···`                           | placeholder subagent badge                                                         | `diff.border` bg                 | `[src/components/tools/implementations/subagentBadge.ts:38-44]`                                           |
+| `?`                             | help (shown in footer/`? for help`)                                                | —                                | `en:footer.showHelp`                                                                                      |
+| `↑ ↓ ← →`                       | help rows, navigation hints                                                        | —                                | `[src/components/help] en:keybindings.historyNavigation`                                                  |
+| `↑ N more` / `↓ N more`         | composer viewport indicators                                                       | `text.muted`                     | `[src/components/chat/ChatInput.tsx:1482-1499]`                                                           |
+| `---- N more lines hidden ----` | clipped live-tail header                                                           | `text.muted`                     | `en:streamingTail.hiddenLines`                                                                            |
+| `⏱`                             | footer timer                                                                       | `text.muted`                     | `[src/components/FooterStatusRow.tsx:395-406]`                                                            |
+| `·`                             | inline separator in hints, mode borders, brief rows                                | `text.muted`                     | `[src/components/chat/ChatInput.tsx:118]`                                                                 |
+| `…` / `...`                     | truncation. `…` in header tip clamp; `...` in tool/paste notices                   | —                                | `[src/components/HeaderFrame.ts:458-462]`, `[src/components/tools/implementations/DefaultTool.tsx:22-28]` |
+| `[Image N]`, `[x]`              | image attachment chip, remove button                                               | `text.info`, `error`             | `en:imageAttachment.*`                                                                                    |
+| `[DEV]`                         | non-production tag                                                                 | `asciiArt`                       | `[src/components/HeaderFrame.ts:423]`                                                                     |
+| `` `                            | ` ``                                                                               | branch icon when nerd font is on | `toolName` bold                                                                                           | `[src/components/FooterStatusRow.tsx:82]` |
 
 Spinner presets (all shipped, selectable): `Arrow ←↖↑↗→↘↓↙` (100 ms), `Arc ◜◠◝◞◡◟` (100),
 `Balloon .oOo.` (120), `Bounce ⠁⠂⠄⡀⠄⠂` (120), `Breathe` (17 frames, 100), `CircleHalves ◐◓◑◒` (50),
@@ -695,26 +698,26 @@ Spinner presets (all shipped, selectable): `Arrow ←↖↑↗→↘↓↙` (100
 
 ### D13 — Animation timings
 
-| Motion | Timing | Source |
-|---|---|---|
-| shared animation tick | 125 ms | `[src/utils/constants.ts:207]` |
-| status banner spinner | 60 ms per frame, all states | `[src/utils/tuiSpinner/status.ts:10-13]` |
-| default spinner | 80 ms | `[src/utils/tuiSpinner/constants.ts:70-73]` |
-| fast mode | every spinner/shimmer interval halved | `[src/components/Spinner.tsx:22-30]` |
-| tool-name shimmer sweep | 1000 ms cycle, 500 ms in fast mode, highlight `#e6e6e6`, width `max(3, floor(len*0.6))` | `[src/components/tools/ToolHeader.tsx:34-90]` |
-| lone-ESC resolution | 400 ms | `[src/keyboard/constants.ts:9]` |
-| ESC-run flush | 150 ms after first ESC; 650 ms tmux grace; 20 ms grace flush | `[src/keyboard/constants.ts:10-14]` |
-| incomplete CSI close | 250 ms | `[src/keyboard/constants.ts:15]` |
-| repeated-key reset | 200 ms (no tmux) / 700 ms (tmux) | `[src/hooks/repeatedKeySequence.ts:3-14]` |
-| paste key guard | 100 ms | `[src/components/chat/constants.ts:55]` |
-| double Ctrl+C exit window | 2000 ms | `[src/app.tsx:2544]` |
-| file-suggestion debounce / loading delay | 100 ms / 200 ms | `[src/components/chat/constants.ts:104-110]` |
-| truecolour probe / appearance probe | 500 ms each | `[src/utils/trueColorDetector/index.ts:22]`, `[src/utils/terminalAppearanceDetector/index.ts:21]` |
-| status-line config poll | 1000 ms | `[src/components/StatusLine.tsx:120-127]` |
+| Motion                                   | Timing                                                                                  | Source                                                                                            |
+| ---------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| shared animation tick                    | 125 ms                                                                                  | `[src/utils/constants.ts:207]`                                                                    |
+| status banner spinner                    | 60 ms per frame, all states                                                             | `[src/utils/tuiSpinner/status.ts:10-13]`                                                          |
+| default spinner                          | 80 ms                                                                                   | `[src/utils/tuiSpinner/constants.ts:70-73]`                                                       |
+| fast mode                                | every spinner/shimmer interval halved                                                   | `[src/components/Spinner.tsx:22-30]`                                                              |
+| tool-name shimmer sweep                  | 1000 ms cycle, 500 ms in fast mode, highlight `#e6e6e6`, width `max(3, floor(len*0.6))` | `[src/components/tools/ToolHeader.tsx:34-90]`                                                     |
+| lone-ESC resolution                      | 400 ms                                                                                  | `[src/keyboard/constants.ts:9]`                                                                   |
+| ESC-run flush                            | 150 ms after first ESC; 650 ms tmux grace; 20 ms grace flush                            | `[src/keyboard/constants.ts:10-14]`                                                               |
+| incomplete CSI close                     | 250 ms                                                                                  | `[src/keyboard/constants.ts:15]`                                                                  |
+| repeated-key reset                       | 200 ms (no tmux) / 700 ms (tmux)                                                        | `[src/hooks/repeatedKeySequence.ts:3-14]`                                                         |
+| paste key guard                          | 100 ms                                                                                  | `[src/components/chat/constants.ts:55]`                                                           |
+| double Ctrl+C exit window                | 2000 ms                                                                                 | `[src/app.tsx:2544]`                                                                              |
+| file-suggestion debounce / loading delay | 100 ms / 200 ms                                                                         | `[src/components/chat/constants.ts:104-110]`                                                      |
+| truecolour probe / appearance probe      | 500 ms each                                                                             | `[src/utils/trueColorDetector/index.ts:22]`, `[src/utils/terminalAppearanceDetector/index.ts:21]` |
+| status-line config poll                  | 1000 ms                                                                                 | `[src/components/StatusLine.tsx:120-127]`                                                         |
 
 ## Screen layout
 
-### Frame at 80×24, new session, English, `factory-dark`, production build
+### Frame at 80×24, new session, English, `droide-dark`, production build
 
 `height = 24 ≤ 24` → compact header (no vertical margins), mini logo, 12 header rows. Transcript is
 empty. Then the input-area stack: one reserved blank row, the mode/model row, the composer (3 rows:
@@ -776,21 +779,21 @@ row 18-   transcript items (see renderers)
 Common facts: content width `contentWidth`; marker column 1 cell + 1.5-cell gap; bodies wrap (never
 horizontally clip); every renderer sanitises its text (B20).
 
-| # | Item | Rendered as | Collapsed by default | Max lines |
-|---|---|---|---|---|
-| R1 | **User message** | one `backgroundColor = text.userBg` column as the accent bar (colour `text.userSymbol`, or `spec` when the message was sent in spec mode), then 2 columns of padding, then the text in `text.userText` (wrapping) with a trailing space; image attachments follow inside the same background at `contentWidth - 3` `[src/components/MessageItem.tsx:443-490]` | never | unbounded |
-| R2 | **Assistant text** | marker `⛬` in `primary` bold, gap, then markdown rendered at `contentWidth` with heading colour `markdown.heading` `[src/components/MessageItem.tsx:520-560]`, `[src/components/MessageItem.tsx:560-600]` | never | unbounded |
-| R3 | **Thinking block** | indent 3 columns, width `contentWidth - 3`; label `Thinking:` (or `Thinking (i/n):`, `Reasoning Summary:` / `Reasoning Summary (i/n):`) in `text.muted` italic, then the reasoning text as *italic* markdown in `text.muted` `[src/components/ThinkingDisplay.tsx:100-150]`, `en:thinking.*` | hidden unless `showThinking` is on; when hidden the block occupies no rows | unbounded |
-| R4 | **Tool call** | 3-column margin; header = bold tool display name in `toolName` + `, `-joined params in `toolParam` (margin-left 1) + optional right-aligned suffix in `text.muted`; params are `key: "value"` with values truncated at 50 chars to `…`; pending names shimmer `[src/components/tools/ToolHeader.tsx:120-250]`, `[src/components/tools/implementations/DefaultTool.tsx:170-215]` | result body collapsed to the preview caps (B7) | header 1 row (+1 per wrapped param set); preview 4 rows |
-| R5 | **Tool result** | inner margin 1 under the header: `↳ ` + text (`text.muted`), or markdown when it fits, or `error` text on failure `[src/components/tools/implementations/DefaultTool.tsx:141-165]` | yes — 4 lines / 1024 chars in the normal view | 200 lines / 16 KiB in Ctrl+O view |
-| R6 | **Diff** | 11-column gutter (10-column box: `old` 4 + space + `new` 4; + 1 margin) then a space then the line, backgrounds per D3; hunk context separators as their own dimmed row with one blank row above and below `[src/components/DiffRenderer.tsx:195-220]`, `[src/components/DiffRenderer.tsx:436-475]` | yes — 20 lines inline (`MAX_DIFF_LINES`), 500 rows detailed (`DETAILED_MAX_DIFF_ROWS`) | 20 / 500 |
-| R7 | **Error** | ordinary message row: marker `●` in `error`, body in `error`; tool errors render `↳ <text>` in `error` with the `(error)` suffix in collapsed groups `[src/components/MessageItem.tsx:520-560]`, `en:toolDisplay.errorSuffix` | never | unbounded |
-| R8 | **Todo list** | pinned panel (B9): `Plan · C/T` then border column then `✓/●/○ <content>` rows | yes — window anchored on the last completed item, overflow `... N more, Alt/Option+P to view all` | `maxVisibleRows` |
-| R9 | **Subagent / task row** | header = badge (`Worker`, `Explorer`, `···` placeholder; `Resume <badge>` for resumes) + bold description in quotes `"<description>"` with ` - <complexity>` appended when present; then exactly 2 lines tall (header + status) to prevent jitter; status line `↳ Done (N tool uses · 1.2s)` or `↳ <progress label ≤80 chars>` or `⚠ Task failed` in `error` `[src/components/ToolExecutionItem.tsx:96-104]`, `[src/components/tools/implementations/TaskTool.tsx:229-400]`, `en:toolDisplay.task.*` | result body hidden; only the 2 header/status rows | 2 |
-| R10 | **Plan / spec card** | header row only in the live region; the proposal body (plan or mission proposal) renders once in the static region via `ProposalDisplay`; approval/plan screens (`PlanDetailsScreen`, `ApprovalDetailsScreen`) replace the whole surface `[src/components/UnifiedToolDisplay.tsx:455-470]`, `[src/app.tsx:10880-10895]` | body outside the dynamic region | body unbounded in the full-screen view |
-| R11 | **Approval prompt** | rounded `border` box, min width 78, 1 column padding: queue position `Approval N of M` (muted), section headers (`Commands (N): <risk>`, `File Edits (N):`, `File Creations (N):`, `Patches (N):`, `MCP tool to approve · <impact>`), bodies indented 2, then the options list (2-space indent, selected bold in `text.primary`, unselected `text.muted`) and a one-row help line `↑↓ navigate · Enter select · Esc cancel` (plus ` · Ctrl+O expand diff` or ` · Ctrl+O collapse`, then ` · Alt/Option+E to inspect approval details`) `[src/components/BatchToolConfirmationMessage.tsx:820-870]`, `[src/components/BatchToolConfirmationMessage.tsx:1220-1240]`, `en:batchConfirmation.*` | diff detail collapsed | help line 1 row, variants as above |
-| R12 | **System notice** | marker `●` in `text.muted`, body in `text.muted`; warnings prefix in `warning`; abort notice `⎿ Interrupted` `[src/components/MessageItem.tsx:520-560]`, `[src/components/chat/constants.ts:44]` | never | unbounded |
-| R13 | **Collapsed tool group** | header `<Tool name> <N> <noun>` (noun: file/search/pattern/directory/URL/agent/item; plural per rules) + ` (<K> failed)` in `error`, then `↳ <subtitle>` for the first and two spaces for the rest, sliding window of the last 8 entries, overflow `Ctrl+O to view all` `[src/components/CollapsedToolGroup.tsx:470-640]`, `en:toolDisplay.countFailed`, `en:toolDisplay.ctrlOToViewAll` | compact mode collapses to header + one active subtitle | 1 + 8 |
+| #   | Item                     | Rendered as                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Collapsed by default                                                                              | Max lines                                               |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| R1  | **User message**         | one `backgroundColor = text.userBg` column as the accent bar (colour `text.userSymbol`, or `spec` when the message was sent in spec mode), then 2 columns of padding, then the text in `text.userText` (wrapping) with a trailing space; image attachments follow inside the same background at `contentWidth - 3` `[src/components/MessageItem.tsx:443-490]`                                                                                                                                                                                                                                                                                                                               | never                                                                                             | unbounded                                               |
+| R2  | **Assistant text**       | marker `⛬` in `primary` bold, gap, then markdown rendered at `contentWidth` with heading colour `markdown.heading` `[src/components/MessageItem.tsx:520-560]`, `[src/components/MessageItem.tsx:560-600]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | never                                                                                             | unbounded                                               |
+| R3  | **Thinking block**       | indent 3 columns, width `contentWidth - 3`; label `Thinking:` (or `Thinking (i/n):`, `Reasoning Summary:` / `Reasoning Summary (i/n):`) in `text.muted` italic, then the reasoning text as _italic_ markdown in `text.muted` `[src/components/ThinkingDisplay.tsx:100-150]`, `en:thinking.*`                                                                                                                                                                                                                                                                                                                                                                                                | hidden unless `showThinking` is on; when hidden the block occupies no rows                        | unbounded                                               |
+| R4  | **Tool call**            | 3-column margin; header = bold tool display name in `toolName` + `, `-joined params in `toolParam` (margin-left 1) + optional right-aligned suffix in `text.muted`; params are `key: "value"` with values truncated at 50 chars to `…`; pending names shimmer `[src/components/tools/ToolHeader.tsx:120-250]`, `[src/components/tools/implementations/DefaultTool.tsx:170-215]`                                                                                                                                                                                                                                                                                                             | result body collapsed to the preview caps (B7)                                                    | header 1 row (+1 per wrapped param set); preview 4 rows |
+| R5  | **Tool result**          | inner margin 1 under the header: `↳ ` + text (`text.muted`), or markdown when it fits, or `error` text on failure `[src/components/tools/implementations/DefaultTool.tsx:141-165]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | yes — 4 lines / 1024 chars in the normal view                                                     | 200 lines / 16 KiB in Ctrl+O view                       |
+| R6  | **Diff**                 | 11-column gutter (10-column box: `old` 4 + space + `new` 4; + 1 margin) then a space then the line, backgrounds per D3; hunk context separators as their own dimmed row with one blank row above and below `[src/components/DiffRenderer.tsx:195-220]`, `[src/components/DiffRenderer.tsx:436-475]`                                                                                                                                                                                                                                                                                                                                                                                         | yes — 20 lines inline (`MAX_DIFF_LINES`), 500 rows detailed (`DETAILED_MAX_DIFF_ROWS`)            | 20 / 500                                                |
+| R7  | **Error**                | ordinary message row: marker `●` in `error`, body in `error`; tool errors render `↳ <text>` in `error` with the `(error)` suffix in collapsed groups `[src/components/MessageItem.tsx:520-560]`, `en:toolDisplay.errorSuffix`                                                                                                                                                                                                                                                                                                                                                                                                                                                               | never                                                                                             | unbounded                                               |
+| R8  | **Todo list**            | pinned panel (B9): `Plan · C/T` then border column then `✓/●/○ <content>` rows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | yes — window anchored on the last completed item, overflow `... N more, Alt/Option+P to view all` | `maxVisibleRows`                                        |
+| R9  | **Subagent / task row**  | header = badge (`Worker`, `Explorer`, `···` placeholder; `Resume <badge>` for resumes) + bold description in quotes `"<description>"` with ` - <complexity>` appended when present; then exactly 2 lines tall (header + status) to prevent jitter; status line `↳ Done (N tool uses · 1.2s)` or `↳ <progress label ≤80 chars>` or `⚠ Task failed` in `error` `[src/components/ToolExecutionItem.tsx:96-104]`, `[src/components/tools/implementations/TaskTool.tsx:229-400]`, `en:toolDisplay.task.*`                                                                                                                                                                                        | result body hidden; only the 2 header/status rows                                                 | 2                                                       |
+| R10 | **Plan / spec card**     | header row only in the live region; the proposal body (plan or mission proposal) renders once in the static region via `ProposalDisplay`; approval/plan screens (`PlanDetailsScreen`, `ApprovalDetailsScreen`) replace the whole surface `[src/components/UnifiedToolDisplay.tsx:455-470]`, `[src/app.tsx:10880-10895]`                                                                                                                                                                                                                                                                                                                                                                     | body outside the dynamic region                                                                   | body unbounded in the full-screen view                  |
+| R11 | **Approval prompt**      | rounded `border` box, min width 78, 1 column padding: queue position `Approval N of M` (muted), section headers (`Commands (N): <risk>`, `File Edits (N):`, `File Creations (N):`, `Patches (N):`, `MCP tool to approve · <impact>`), bodies indented 2, then the options list (2-space indent, selected bold in `text.primary`, unselected `text.muted`) and a one-row help line `↑↓ navigate · Enter select · Esc cancel` (plus ` · Ctrl+O expand diff` or ` · Ctrl+O collapse`, then ` · Alt/Option+E to inspect approval details`) `[src/components/BatchToolConfirmationMessage.tsx:820-870]`, `[src/components/BatchToolConfirmationMessage.tsx:1220-1240]`, `en:batchConfirmation.*` | diff detail collapsed                                                                             | help line 1 row, variants as above                      |
+| R12 | **System notice**        | marker `●` in `text.muted`, body in `text.muted`; warnings prefix in `warning`; abort notice `⎿ Interrupted` `[src/components/MessageItem.tsx:520-560]`, `[src/components/chat/constants.ts:44]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | never                                                                                             | unbounded                                               |
+| R13 | **Collapsed tool group** | header `<Tool name> <N> <noun>` (noun: file/search/pattern/directory/URL/agent/item; plural per rules) + ` (<K> failed)` in `error`, then `↳ <subtitle>` for the first and two spaces for the rest, sliding window of the last 8 entries, overflow `Ctrl+O to view all` `[src/components/CollapsedToolGroup.tsx:470-640]`, `en:toolDisplay.countFailed`, `en:toolDisplay.ctrlOToViewAll`                                                                                                                                                                                                                                                                                                    | compact mode collapses to header + one active subtitle                                            | 1 + 8                                                   |
 
 ## Key bindings
 
@@ -799,48 +802,48 @@ Two spelling systems exist and both are contractual: the **footer/help** spellin
 **key-hint** spelling (`formatChordLabelForKeyHint`: macOS modifier glyphs `⌃ ⌥ ⇧`, otherwise plain
 `+`-joined) `[src/keyboard/keyboardChords.ts:600-660]`.
 
-| Action | Keys | Precondition | Source |
-|---|---|---|---|
-| submit message | `Enter` | suggestions closed | `[src/hooks/useChatKeyboardInput.ts:1921-2010]` |
-| queue message at end of loop | `Ctrl+Enter` | — | `[src/hooks/useChatKeyboardInput.ts:1950-2010]` |
-| insert newline | `Shift+Enter`, `Ctrl+Enter` (as documented), `\` then `Enter`, raw LF | — | `[src/keyboard/keyboardChords.ts:470-480]`, `[src/hooks/useChatKeyboardInput.ts:2438-2448]` |
-| newline / next row in suggestions | `↑` `↓` / `Tab` (menu open) | menu open | `[src/components/SelectableList.tsx:1-50]` |
-| accept highlighted suggestion | `Tab` / `Enter` | menu open | `[src/components/chat/CommandSuggestions.tsx:1-40]`, `en:chatInput.navigationHint` |
-| close menus | `Esc` | menu open | `[src/hooks/useChatKeyboardInput.ts:2066-2085]` |
-| cancel / exit bash mode | `Esc` | — | `[src/hooks/useChatKeyboardInput.ts:2066-2085]` |
-| clear draft → restore → rewind | `Esc` ×1 / ×2 / ×3 | ×2 needs a non-empty draft | `[src/hooks/useChatKeyboardInput.ts:1138-1180]` |
-| cycle interaction mode | `Shift+Tab` (Windows help pane prints `Ctrl + T` — inconsistent with the binding; see Open question 8) | menus closed | `[src/hooks/useChatKeyboardInput.ts:2103-2125]`, `[src/components/HelpPopup.tsx:390-400]` |
-| cycle reasoning effort | `Tab` | menus closed | `[src/hooks/useChatKeyboardInput.ts:2127-2145]` |
-| cycle model | `Ctrl+N` | menus closed | `[src/hooks/useChatKeyboardInput.ts:2196-2206]` |
-| cycle autonomy level | `Ctrl+L` | — | `[src/keyboard/keyboardChords.ts:390-395]` |
-| toggle detailed transcript | `Ctrl+O` | not in a blocking overlay | `[src/app.tsx:6097-6110]` |
-| toggle plan screen | `Alt/Option+P` | — | `[src/keyboard/keyboardChords.ts:470-476]` |
-| open help | `?` on empty input, `Ctrl+/` | — | `[src/hooks/useChatKeyboardInput.ts:2362-2366]`, `[src/hooks/useChatKeyboardInput.ts:2184-2188]` |
-| toggle bash mode | `!` on empty input | — | `[src/hooks/useChatKeyboardInput.ts:2362-2370]`, `en:chatInput.bash*` |
-| open editor with draft | `Ctrl+P` | — | `[src/hooks/useChatKeyboardInput.ts:2170-2176]`, `en:chatInput.editorOverflowHint` |
-| copy input | `Ctrl+Shift+C` | — | `[src/keyboard/keyboardChords.ts:430-440]` |
-| paste text or image | `Ctrl+V` / `Cmd+V` | — | `[src/hooks/useChatKeyboardInput.ts:2190-2194]` |
-| expand pasted block | `Alt+Shift+V` | placeholder present | `[src/keyboard/keyboardChords.ts:445-450]` |
-| delete draft attachments (fallback: forward delete) | `Ctrl+D` | attachments present | `[src/hooks/useChatKeyboardInput.ts:2506-2520]` |
-| review queued messages | `Ctrl+R` | queued messages exist | `[src/hooks/useChatKeyboardInput.ts:2150-2160]` |
-| pull top queued message into input | `Ctrl+G` | queued messages exist | `[src/hooks/useChatKeyboardInput.ts:2160-2170]` |
-| queued-review: close / delete / send now | `Ctrl+R` or `Esc` / `Ctrl+D` / `Enter` | review mode | `[src/app.tsx:4100-4135]` |
-| open mission control | `Ctrl+T` | — | `[src/app.tsx:6340-6352]` |
-| open side chat | `Ctrl+Y` | no blocking overlay | `[src/app.tsx:6467-6490]` |
-| dismiss / restore changelog | `Ctrl+J` | changelog present | `[src/app.tsx:6520-6540]` |
-| open custom-agents view | `Alt/Option+S`, or `←` from an empty composer | — | `[src/keyboard/keyboardChords.ts:455-462]`, `[src/components/FooterStatusRow.tsx:90-93]` |
-| toggle auto-compaction | `Alt+X` | — | `[src/keyboard/keyboardChords.ts:465-470]` |
-| inspect approval details | `Alt/Option+E` | approval open | `[src/keyboard/keyboardChords.ts:470-480]` |
-| transcript scroll (one row / one turn / page) | `Alt+↑/↓`, `Alt+PageUp/PageDown`, `Alt/Option+Shift+↑/↓` jump oldest/newest | — | `[src/keyboard/keyboardChords.ts:400-440]` |
-| history navigation | `↑` / `↓` | suggestions closed | `[src/hooks/useChatKeyboardInput.ts:2250-2300]` |
-| cursor word moves | `Option+B` / `Option+F`, `Ctrl+←` / `Ctrl+→` | — | `[src/keyboard/keyboardChords.ts:520-540]` |
-| line start / end | `Ctrl+A` / `Ctrl+E`, `Home` / `End` | — | `[src/keyboard/keyboardChords.ts:540-560]` |
-| delete previous char | `Backspace`, `Ctrl+H` | — | `[src/keyboard/keyboardChords.ts:560-580]` |
-| delete next char | `Delete`, `Ctrl+D` | no attachments | `[src/keyboard/keyboardChords.ts:575-590]` |
-| delete previous / next word | `Ctrl+W` / `Option+Backspace`; `Option+D` / `Ctrl+Delete` | — | `[src/keyboard/keyboardChords.ts:585-610]` |
-| delete to line start / end | `Ctrl+U` / `Ctrl+K` | — | `[src/keyboard/keyboardChords.ts:605-625]` |
-| exit | `Ctrl+C` twice within 2000 ms, or `/quit` | — | `[src/app.tsx:2463-2546]` |
-| confirm open exit prompt | `Ctrl+C` | exit-confirm pane open | `[src/app.tsx:2475-2482]` |
+| Action                                              | Keys                                                                                                   | Precondition               | Source                                                                                           |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------ |
+| submit message                                      | `Enter`                                                                                                | suggestions closed         | `[src/hooks/useChatKeyboardInput.ts:1921-2010]`                                                  |
+| queue message at end of loop                        | `Ctrl+Enter`                                                                                           | —                          | `[src/hooks/useChatKeyboardInput.ts:1950-2010]`                                                  |
+| insert newline                                      | `Shift+Enter`, `Ctrl+Enter` (as documented), `\` then `Enter`, raw LF                                  | —                          | `[src/keyboard/keyboardChords.ts:470-480]`, `[src/hooks/useChatKeyboardInput.ts:2438-2448]`      |
+| newline / next row in suggestions                   | `↑` `↓` / `Tab` (menu open)                                                                            | menu open                  | `[src/components/SelectableList.tsx:1-50]`                                                       |
+| accept highlighted suggestion                       | `Tab` / `Enter`                                                                                        | menu open                  | `[src/components/chat/CommandSuggestions.tsx:1-40]`, `en:chatInput.navigationHint`               |
+| close menus                                         | `Esc`                                                                                                  | menu open                  | `[src/hooks/useChatKeyboardInput.ts:2066-2085]`                                                  |
+| cancel / exit bash mode                             | `Esc`                                                                                                  | —                          | `[src/hooks/useChatKeyboardInput.ts:2066-2085]`                                                  |
+| clear draft → restore → rewind                      | `Esc` ×1 / ×2 / ×3                                                                                     | ×2 needs a non-empty draft | `[src/hooks/useChatKeyboardInput.ts:1138-1180]`                                                  |
+| cycle interaction mode                              | `Shift+Tab` (Windows help pane prints `Ctrl + T` — inconsistent with the binding; see Open question 8) | menus closed               | `[src/hooks/useChatKeyboardInput.ts:2103-2125]`, `[src/components/HelpPopup.tsx:390-400]`        |
+| cycle reasoning effort                              | `Tab`                                                                                                  | menus closed               | `[src/hooks/useChatKeyboardInput.ts:2127-2145]`                                                  |
+| cycle model                                         | `Ctrl+N`                                                                                               | menus closed               | `[src/hooks/useChatKeyboardInput.ts:2196-2206]`                                                  |
+| cycle autonomy level                                | `Ctrl+L`                                                                                               | —                          | `[src/keyboard/keyboardChords.ts:390-395]`                                                       |
+| toggle detailed transcript                          | `Ctrl+O`                                                                                               | not in a blocking overlay  | `[src/app.tsx:6097-6110]`                                                                        |
+| toggle plan screen                                  | `Alt/Option+P`                                                                                         | —                          | `[src/keyboard/keyboardChords.ts:470-476]`                                                       |
+| open help                                           | `?` on empty input, `Ctrl+/`                                                                           | —                          | `[src/hooks/useChatKeyboardInput.ts:2362-2366]`, `[src/hooks/useChatKeyboardInput.ts:2184-2188]` |
+| toggle bash mode                                    | `!` on empty input                                                                                     | —                          | `[src/hooks/useChatKeyboardInput.ts:2362-2370]`, `en:chatInput.bash*`                            |
+| open editor with draft                              | `Ctrl+P`                                                                                               | —                          | `[src/hooks/useChatKeyboardInput.ts:2170-2176]`, `en:chatInput.editorOverflowHint`               |
+| copy input                                          | `Ctrl+Shift+C`                                                                                         | —                          | `[src/keyboard/keyboardChords.ts:430-440]`                                                       |
+| paste text or image                                 | `Ctrl+V` / `Cmd+V`                                                                                     | —                          | `[src/hooks/useChatKeyboardInput.ts:2190-2194]`                                                  |
+| expand pasted block                                 | `Alt+Shift+V`                                                                                          | placeholder present        | `[src/keyboard/keyboardChords.ts:445-450]`                                                       |
+| delete draft attachments (fallback: forward delete) | `Ctrl+D`                                                                                               | attachments present        | `[src/hooks/useChatKeyboardInput.ts:2506-2520]`                                                  |
+| review queued messages                              | `Ctrl+R`                                                                                               | queued messages exist      | `[src/hooks/useChatKeyboardInput.ts:2150-2160]`                                                  |
+| pull top queued message into input                  | `Ctrl+G`                                                                                               | queued messages exist      | `[src/hooks/useChatKeyboardInput.ts:2160-2170]`                                                  |
+| queued-review: close / delete / send now            | `Ctrl+R` or `Esc` / `Ctrl+D` / `Enter`                                                                 | review mode                | `[src/app.tsx:4100-4135]`                                                                        |
+| open mission control                                | `Ctrl+T`                                                                                               | —                          | `[src/app.tsx:6340-6352]`                                                                        |
+| open side chat                                      | `Ctrl+Y`                                                                                               | no blocking overlay        | `[src/app.tsx:6467-6490]`                                                                        |
+| dismiss / restore changelog                         | `Ctrl+J`                                                                                               | changelog present          | `[src/app.tsx:6520-6540]`                                                                        |
+| open custom-agents view                             | `Alt/Option+S`, or `←` from an empty composer                                                          | —                          | `[src/keyboard/keyboardChords.ts:455-462]`, `[src/components/FooterStatusRow.tsx:90-93]`         |
+| toggle auto-compaction                              | `Alt+X`                                                                                                | —                          | `[src/keyboard/keyboardChords.ts:465-470]`                                                       |
+| inspect approval details                            | `Alt/Option+E`                                                                                         | approval open              | `[src/keyboard/keyboardChords.ts:470-480]`                                                       |
+| transcript scroll (one row / one turn / page)       | `Alt+↑/↓`, `Alt+PageUp/PageDown`, `Alt/Option+Shift+↑/↓` jump oldest/newest                            | —                          | `[src/keyboard/keyboardChords.ts:400-440]`                                                       |
+| history navigation                                  | `↑` / `↓`                                                                                              | suggestions closed         | `[src/hooks/useChatKeyboardInput.ts:2250-2300]`                                                  |
+| cursor word moves                                   | `Option+B` / `Option+F`, `Ctrl+←` / `Ctrl+→`                                                           | —                          | `[src/keyboard/keyboardChords.ts:520-540]`                                                       |
+| line start / end                                    | `Ctrl+A` / `Ctrl+E`, `Home` / `End`                                                                    | —                          | `[src/keyboard/keyboardChords.ts:540-560]`                                                       |
+| delete previous char                                | `Backspace`, `Ctrl+H`                                                                                  | —                          | `[src/keyboard/keyboardChords.ts:560-580]`                                                       |
+| delete next char                                    | `Delete`, `Ctrl+D`                                                                                     | no attachments             | `[src/keyboard/keyboardChords.ts:575-590]`                                                       |
+| delete previous / next word                         | `Ctrl+W` / `Option+Backspace`; `Option+D` / `Ctrl+Delete`                                              | —                          | `[src/keyboard/keyboardChords.ts:585-610]`                                                       |
+| delete to line start / end                          | `Ctrl+U` / `Ctrl+K`                                                                                    | —                          | `[src/keyboard/keyboardChords.ts:605-625]`                                                       |
+| exit                                                | `Ctrl+C` twice within 2000 ms, or `/quit`                                                              | —                          | `[src/app.tsx:2463-2546]`                                                                        |
+| confirm open exit prompt                            | `Ctrl+C`                                                                                               | exit-confirm pane open     | `[src/app.tsx:2475-2482]`                                                                        |
 
 Slash-command completion rules: a `/` at the start of the draft opens the command menu, seeded from
 the command catalog with hidden commands filtered and the deployment/airgap filter applied; typing
@@ -854,45 +857,45 @@ File completion: `@` opens a debounced (100 ms) search; results list up to 6 row
 
 ## Errors
 
-| Trigger | Observable effect |
-|---|---|
-| Theme file invalid / unreadable | file skipped, previous theme stays active, deferred startup warning (no user-facing row) `[src/theme/themeLoader.ts:30-45]` |
-| Truecolour probe write fails | warning logged, colour handling unchanged, probe result false `[src/utils/trueColorDetector/index.ts:120-140]` |
-| OSC 11 probe fails/times out | falls back to `COLORFGBG`, else dark; one warning `[src/utils/terminalAppearanceDetector/index.ts:95-130]` |
-| Status-line command fails | the status row shows the failure text naming the failure and the way out instead of an empty row `[src/components/StatusLine.tsx:28-40]` |
-| Copy input fails | ephemeral system message `Failed to copy input to clipboard.` `en:chatInput.copyError` |
-| Clipboard image paste fails | `Failed to attach clipboard image: <error>` (warning row) `en:imageAttachment.failedClipboard` |
-| Image pasted while the model cannot take images | `⚠ <model> doesn't support images. Please switch models to attach images.` `en:imageAttachment.modelNoImageSupport` |
-| Tool cancelled by user | `⎿ Interrupted` (tool rows) / `Cancelled by user` `en:toolDisplay.cancelledByUser` |
-| All models blocked | error row under the mode/model row: `All models are blocked based on your settings. …` `en:appMessages.allModelsBlocked` |
-| Daemon startup failed (empty session) | header banner `⚠ Daemon startup failed` + body naming `~/.droide/logs/daemon-stderr.log` `[src/app.tsx:10177-10186]` |
+| Trigger                                         | Observable effect                                                                                                                        |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Theme file invalid / unreadable                 | file skipped, previous theme stays active, deferred startup warning (no user-facing row) `[src/theme/themeLoader.ts:30-45]`              |
+| Truecolour probe write fails                    | warning logged, colour handling unchanged, probe result false `[src/utils/trueColorDetector/index.ts:120-140]`                           |
+| OSC 11 probe fails/times out                    | falls back to `COLORFGBG`, else dark; one warning `[src/utils/terminalAppearanceDetector/index.ts:95-130]`                               |
+| Status-line command fails                       | the status row shows the failure text naming the failure and the way out instead of an empty row `[src/components/StatusLine.tsx:28-40]` |
+| Copy input fails                                | ephemeral system message `Failed to copy input to clipboard.` `en:chatInput.copyError`                                                   |
+| Clipboard image paste fails                     | `Failed to attach clipboard image: <error>` (warning row) `en:imageAttachment.failedClipboard`                                           |
+| Image pasted while the model cannot take images | `⚠ <model> doesn't support images. Please switch models to attach images.` `en:imageAttachment.modelNoImageSupport`                      |
+| Tool cancelled by user                          | `⎿ Interrupted` (tool rows) / `Cancelled by user` `en:toolDisplay.cancelledByUser`                                                       |
+| All models blocked                              | error row under the mode/model row: `All models are blocked based on your settings. …` `en:appMessages.allModelsBlocked`                 |
+| Daemon startup failed (empty session)           | header banner `⚠ Daemon startup failed` + body naming `~/.droide/logs/daemon-stderr.log` `[src/app.tsx:10177-10186]`                     |
 
 ## Acceptance tests
 
 Frames are compared as ordered lines with no trailing-space padding. Fixtures are synthetic.
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1 | `tests/ui/test_screen_sequences` | `fixtures/ui/screen-sequences.txt` — asserts the exact byte order of enter/leave sequences |
-| B2, B3 | `tests/ui/test_header_80x24`, `test_header_120x40` | `fixtures/ui/header-compact.txt`, `fixtures/ui/header-wide.txt` |
-| B4 | `tests/ui/test_static_dynamic_split` | `fixtures/ui/stream.jsonl` |
-| B5, R1–R13 | `tests/ui/test_golden_frame_80x24`, `test_golden_frame_120x40` | `fixtures/ui/transcript.jsonl` |
-| B6, B7, R4, R5 | `tests/ui/test_tool_row` | `fixtures/ui/tool-read.json` |
-| B8, R6 | `tests/ui/test_diff_row` | `fixtures/ui/diff-simple.patch` |
-| B9, R8 | `tests/ui/test_pinned_todo` | `fixtures/ui/todos.json` |
-| B10 | `tests/ui/test_composer_layout` | `fixtures/ui/composer-cases.json` |
-| B11 | `tests/ui/test_suggestions` | `fixtures/ui/commands.json`, `fixtures/ui/files.json` |
-| B12 | `tests/ui/test_status_banner` | `fixtures/ui/states.json` |
-| B13, B14 | `tests/ui/test_footer_fit`, `test_status_line` | `fixtures/ui/footer-widths.json`, `fixtures/ui/statusline.json` |
-| B15 | `tests/ui/test_key_sequences` | `fixtures/ui/keys.jsonl` |
-| B16 | `tests/ui/test_paste_thresholds` | `fixtures/ui/pastes.json` |
-| B17 | `tests/ui/test_palette_tokens` | `fixtures/ui/palette.json` |
-| B18 | `tests/ui/test_capability_matrix` | `fixtures/ui/env-matrix.json` |
-| B19 | `tests/ui/test_resize_reflow` | `fixtures/ui/resize.jsonl` |
-| B20 | `tests/ui/test_sanitization_widths` | `fixtures/ui/hostile-text.json` |
-| B21 | `tests/ui/test_animation_timings`, `test_palette_tokens` | `fixtures/ui/ticks.json` |
+| Clause         | Test id                                                        | Fixture                                                                                    |
+| -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| B1             | `tests/ui/test_screen_sequences`                               | `fixtures/ui/screen-sequences.txt` — asserts the exact byte order of enter/leave sequences |
+| B2, B3         | `tests/ui/test_header_80x24`, `test_header_120x40`             | `fixtures/ui/header-compact.txt`, `fixtures/ui/header-wide.txt`                            |
+| B4             | `tests/ui/test_static_dynamic_split`                           | `fixtures/ui/stream.jsonl`                                                                 |
+| B5, R1–R13     | `tests/ui/test_golden_frame_80x24`, `test_golden_frame_120x40` | `fixtures/ui/transcript.jsonl`                                                             |
+| B6, B7, R4, R5 | `tests/ui/test_tool_row`                                       | `fixtures/ui/tool-read.json`                                                               |
+| B8, R6         | `tests/ui/test_diff_row`                                       | `fixtures/ui/diff-simple.patch`                                                            |
+| B9, R8         | `tests/ui/test_pinned_todo`                                    | `fixtures/ui/todos.json`                                                                   |
+| B10            | `tests/ui/test_composer_layout`                                | `fixtures/ui/composer-cases.json`                                                          |
+| B11            | `tests/ui/test_suggestions`                                    | `fixtures/ui/commands.json`, `fixtures/ui/files.json`                                      |
+| B12            | `tests/ui/test_status_banner`                                  | `fixtures/ui/states.json`                                                                  |
+| B13, B14       | `tests/ui/test_footer_fit`, `test_status_line`                 | `fixtures/ui/footer-widths.json`, `fixtures/ui/statusline.json`                            |
+| B15            | `tests/ui/test_key_sequences`                                  | `fixtures/ui/keys.jsonl`                                                                   |
+| B16            | `tests/ui/test_paste_thresholds`                               | `fixtures/ui/pastes.json`                                                                  |
+| B17            | `tests/ui/test_palette_tokens`                                 | `fixtures/ui/palette.json`                                                                 |
+| B18            | `tests/ui/test_capability_matrix`                              | `fixtures/ui/env-matrix.json`                                                              |
+| B19            | `tests/ui/test_resize_reflow`                                  | `fixtures/ui/resize.jsonl`                                                                 |
+| B20            | `tests/ui/test_sanitization_widths`                            | `fixtures/ui/hostile-text.json`                                                            |
+| B21            | `tests/ui/test_animation_timings`, `test_palette_tokens`       | `fixtures/ui/ticks.json`                                                                   |
 
-**T1 — `test_palette_tokens`.** Input: the resolved `factory-dark` theme. Expected: for each row of
+**T1 — `test_palette_tokens`.** Input: the resolved `droide-dark` theme. Expected: for each row of
 D1–D8, `COLORS.<slot>` equals the literal hex in this spec; the OSC sequence builder emits
 `ESC]10;#eeeeee BEL ESC]11;#1c1c1c BEL ESC]12;#d75f00 BEL` then `ESC]4;0;#1c1c1c BEL` … `ESC]4;15;#eeeeee BEL`
 in index order. Failure message names the slot and both values.
@@ -900,7 +903,7 @@ in index order. Failure message names the slot and both values.
 **T2 — `test_golden_frame_80x24`.** Input: the scripted transcript in
 `fixtures/ui/transcript.jsonl` (one user message `hello`, one assistant text block `Hi there.`, one
 `Read` tool call on `src/a.ts` with a 2-line result, one completed `TodoWrite` with two todos
-`wire the reader` (completed) and `write the test` (in progress)), 80×24, `factory-dark`, English,
+`wire the reader` (completed) and `write the test` (in progress)), 80×24, `droide-dark`, English,
 `placeholders.prompt0` pinned, clock pinned by `DROIDE_E2E_CLOCK_FILE`. Expected: the exact frame
 `fixtures/ui/golden-80x24.txt`. Structural assertions that must also hold: every row ≤ 80 columns;
 header rows identical to the row list in "Screen layout"; the user row starts with one
@@ -917,28 +920,28 @@ footer renders left hints and right statuses separated by ≥ 1 space and the ro
 **T4 — `test_key_sequences`.** Each case is `(initial buffer, cursor, keys, expected buffer, expected
 cursor, expected side effect)`. Mandatory cases:
 
-| Case | Input | Expected |
-|---|---|---|
-| K1 | empty, `Enter` | no submit (empty draft) |
-| K2 | `hi`, `Enter` | submit `hi`, buffer ``, cursor 0 |
-| K3 | `hi`, `Shift+Enter` | buffer `hi\n`, cursor 3 |
-| K4 | `hi`, `Ctrl+Enter` | submit with `queuePlacement: EndOfLoop`, buffer `` |
-| K5 | `abc`, `Esc` | onEscape invoked, buffer unchanged |
-| K6 | `abc`, `Esc Esc` | buffer ``, cursor 0 |
-| K7 | `abc`, `Esc Esc Esc` | buffer `abc` restored and rewind menu opened |
-| K8 | `abc def`, `Ctrl+W` | buffer `abc `, cursor 4 |
-| K9 | `abc` with cursor 1, `Ctrl+K` | buffer `a`, cursor 1 |
-| K10 | `abc`, `Ctrl+A` then `Ctrl+E` | cursor 0 then 3 |
-| K11 | `abc`, `Ctrl+C` | buffer ``, cursor 0, ephemeral message `Press Ctrl+C again to exit.` |
-| K12 | `abc`, `Ctrl+C` twice inside 2000 ms | process exits, trigger `CtrlC` |
-| K13 | any, `Ctrl+V` | paste path invoked once (text or image) |
-| K14 | 500-char single-line paste, width 80 | buffer holds `[<first 50 chars>... <N> lines]` where `N` = visual rows at `width - 10` columns; the stored original is the unsanitised text |
-| K15 | 9-line paste | placeholder created (line count > 8) |
-| K16 | 400-char paste | not wrapped (threshold is strictly greater) |
-| K17 | paste then `Enter` within 100 ms, unframed | Enter dropped, no submit |
-| K18 | `@src` | file suggestions open, ≤ 6 rows |
-| K19 | `/he` | command suggestions open, filtered rows include `/help` |
-| K20 | `?` on empty buffer | help opened, buffer stays empty |
+| Case | Input                                      | Expected                                                                                                                                    |
+| ---- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| K1   | empty, `Enter`                             | no submit (empty draft)                                                                                                                     |
+| K2   | `hi`, `Enter`                              | submit `hi`, buffer ``, cursor 0                                                                                                            |
+| K3   | `hi`, `Shift+Enter`                        | buffer `hi\n`, cursor 3                                                                                                                     |
+| K4   | `hi`, `Ctrl+Enter`                         | submit with `queuePlacement: EndOfLoop`, buffer ``                                                                                          |
+| K5   | `abc`, `Esc`                               | onEscape invoked, buffer unchanged                                                                                                          |
+| K6   | `abc`, `Esc Esc`                           | buffer ``, cursor 0                                                                                                                         |
+| K7   | `abc`, `Esc Esc Esc`                       | buffer `abc` restored and rewind menu opened                                                                                                |
+| K8   | `abc def`, `Ctrl+W`                        | buffer `abc `, cursor 4                                                                                                                     |
+| K9   | `abc` with cursor 1, `Ctrl+K`              | buffer `a`, cursor 1                                                                                                                        |
+| K10  | `abc`, `Ctrl+A` then `Ctrl+E`              | cursor 0 then 3                                                                                                                             |
+| K11  | `abc`, `Ctrl+C`                            | buffer ``, cursor 0, ephemeral message `Press Ctrl+C again to exit.`                                                                        |
+| K12  | `abc`, `Ctrl+C` twice inside 2000 ms       | process exits, trigger `CtrlC`                                                                                                              |
+| K13  | any, `Ctrl+V`                              | paste path invoked once (text or image)                                                                                                     |
+| K14  | 500-char single-line paste, width 80       | buffer holds `[<first 50 chars>... <N> lines]` where `N` = visual rows at `width - 10` columns; the stored original is the unsanitised text |
+| K15  | 9-line paste                               | placeholder created (line count > 8)                                                                                                        |
+| K16  | 400-char paste                             | not wrapped (threshold is strictly greater)                                                                                                 |
+| K17  | paste then `Enter` within 100 ms, unframed | Enter dropped, no submit                                                                                                                    |
+| K18  | `@src`                                     | file suggestions open, ≤ 6 rows                                                                                                             |
+| K19  | `/he`                                      | command suggestions open, filtered rows include `/help`                                                                                     |
+| K20  | `?` on empty buffer                        | help opened, buffer stays empty                                                                                                             |
 
 **T5 — `test_resize_reflow`.** Render the T3 fixture at 120 wide, then at 80: expect the transcript
 rows to re-wrap at 74 columns, the header rows to stay byte-identical (static), the composer to
@@ -956,62 +959,62 @@ All `src/…` and `packages/…` paths below resolve under `evidence/original/wi
 `en:…` references are the English locale bundle in the chunk
 `evidence/extracted/windows-x64/chunk-j2hk0tf4.js` (the `common` namespace).
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `src/theme/themes/factory-dark.ts:16-328` | D1–D8, B17 | reading |
-| `src/theme/themes/factory-light.ts:16-323` | D1–D8, B17 | reading |
-| `src/theme/themeColorState.ts:28-115` | D6, B17 | reading |
-| `src/theme/ThemeEngine.ts:33-50,403-470` | B1, B17, D8 | reading |
-| `src/theme/themeLoader.ts:1-45` | B17, Data & config | reading |
-| `src/theme/applyThemeChange.ts:1-29` | B17 | reading |
-| `src/utils/terminalTheme/index.ts:1-11` | B17 | reading |
-| `src/components/chat/themedColors.ts:1-12` | B17 | reading |
-| `src/components/chat/constants.ts:15-215` | B9, B10, B11, D11, D12 | reading |
-| `src/components/chat/ChatInput.tsx:110-260,360-500,1350-1624` | B10, B11, D12 | reading |
-| `src/components/chat/viewportBudget.ts:1-260` | B10, B19, D10 | reading |
-| `src/components/chat/wrapText.ts:1-120` | B19 | reading |
-| `src/components/chat/CommandSuggestions.tsx:200-318` | B11 | reading |
-| `src/components/HeaderFrame.ts:53-588` | B3, D11 | reading |
-| `src/components/Header.tsx:1-35` | B3, B19 | reading |
-| `src/components/MessageItem.tsx:400-609` | R1, R2, R7, R12 | reading |
-| `src/components/ThinkingDisplay.tsx:1-152` | R3 | reading |
-| `src/components/TodoItem.tsx:1-48`, `src/components/PinnedTodoDisplay.tsx:1-108` | B9, R8 | reading |
-| `src/components/UnifiedToolDisplay.tsx:1-553` | B6, B7, R4, R5, R10 | reading |
-| `src/components/ToolExecutionItem.tsx:1-106` | R9 | reading |
-| `src/components/tools/ToolDisplayShell.tsx:45-180` | B6, D10 | reading |
-| `src/components/tools/ToolHeader.tsx:34-250` | R4, D13 | reading |
-| `src/components/tools/implementations/DefaultTool.tsx:1-215` | B7, R4, R5 | reading |
-| `src/components/tools/implementations/TaskTool.tsx:229-470` | R9 | reading |
-| `src/components/tools/implementations/subagentBadge.ts:1-50` | D6, R9 | reading |
-| `src/components/tools/implementations/TodoWrite.tsx:1-60` | R8 | reading |
-| `src/components/CollapsedToolGroup.tsx:300-640` | R13 | reading |
-| `src/components/DiffRenderer.tsx:190-680` | B8, R6, D10 | reading |
-| `src/components/BatchToolConfirmationMessage.tsx:330-420,820-1240` | R11 | reading |
-| `src/agent/tool-confirmation.ts:80-190` | R11 (option labels, `✕`) | reading |
-| `src/components/common/MenuContainer.tsx:1-140`, `MenuOptionRow.tsx:1-45` | R11, D10, D11 | reading |
-| `src/components/SelectableList.tsx:55-148` | B11, D12 | reading |
-| `src/components/common/StyledHelpText.tsx:1-61` | B13, D10 | reading |
-| `src/components/FooterStatusRow.tsx:80-876` | B13, D10, D12 | reading |
-| `src/components/StatusLine.tsx:28-201` | B14 | reading |
-| `src/components/Spinner.tsx:1-38`, `src/utils/tuiSpinner/*` | B21, D12, D13 | reading |
-| `src/utils/constants.ts:207,344` | D13, D10 | reading |
-| `src/utils/terminalSegments.ts:30-120,579-670` | B13, B20, D10 | reading |
-| `src/keyboard/constants.ts:1-22`, `src/keyboard/keyboardChords.ts:1-660` | B15, D13, Key bindings | reading |
-| `src/hooks/useChatKeyboardInput.ts:240-250,520-540,1000-1045,1138-1180,1921-2200,2380-2600` | B15, B16, Key bindings | reading |
-| `src/hooks/repeatedKeySequence.ts:1-20`, `src/hooks/constants.ts:155` | B15, D13 | reading |
-| `src/app.tsx:2216-2219,2463-2546,4100-4160,6097-6110,6335-6360,6467-6540,9990-10120,10170-10290,10620-10660,10825-11120` | B2, B12, B13, B15, B19 | reading |
-| `src/utils/interactiveTerminalState.ts:26-170` | B1 | reading |
-| `src/utils/trueColorDetector/index.ts:15-236` | B18 | reading |
-| `src/utils/terminalAppearanceDetector/index.ts:16-238` | B17, B18 | reading |
-| `src/utils/terminalCapabilities.ts:1-162` | B18 | reading |
-| `src/utils/hyperlinks.ts:100-112` | B18 (`TERM=dumb`) | reading |
-| `src/utils/isWsl.ts:1-60` | B10 (platform layout) | reading |
-| `src/entrypoints/tui/bootstrap.ts:300-340` | B18 (non-TTY) | reading |
-| `src/utils/e2eClock.ts:1-40` | Test determinism | reading |
-| `src/utils/images/svg.ts:1-60` | D9 | reading |
-| `src/components/renderMarkdown.tsx:64-71,382-425,560-640,940-1035` | R2, D10, D11, D12 | reading |
-| `src/components/chat/ImageAttachment.tsx:1-130` | B16 | reading |
-| `en:chatInput.*`, `en:statusBar.*`, `en:pinnedTodo.*`, `en:toolDisplay.*`, `en:batchConfirmation.*`, `en:confirmation.*`, `en:imageAttachment.*`, `en:streamingTail.*`, `en:assistantTimer.*`, `en:footer.*`, `en:process.ctrlCToExit`, `en:header.*`, `en:keybindings.*`, `en:helpSections.*`, `en:placeholders.*`, `en:thinking.*` | all literal strings | extraction from the English locale chunk |
+| Evidence                                                                                                                                                                                                                                                                                                                             | Supports                 | Method                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | ---------------------------------------- |
+| `src/theme/themes/droide-dark.ts:16-328`                                                                                                                                                                                                                                                                                             | D1–D8, B17               | reading                                  |
+| `src/theme/themes/droide-light.ts:16-323`                                                                                                                                                                                                                                                                                            | D1–D8, B17               | reading                                  |
+| `src/theme/themeColorState.ts:28-115`                                                                                                                                                                                                                                                                                                | D6, B17                  | reading                                  |
+| `src/theme/ThemeEngine.ts:33-50,403-470`                                                                                                                                                                                                                                                                                             | B1, B17, D8              | reading                                  |
+| `src/theme/themeLoader.ts:1-45`                                                                                                                                                                                                                                                                                                      | B17, Data & config       | reading                                  |
+| `src/theme/applyThemeChange.ts:1-29`                                                                                                                                                                                                                                                                                                 | B17                      | reading                                  |
+| `src/utils/terminalTheme/index.ts:1-11`                                                                                                                                                                                                                                                                                              | B17                      | reading                                  |
+| `src/components/chat/themedColors.ts:1-12`                                                                                                                                                                                                                                                                                           | B17                      | reading                                  |
+| `src/components/chat/constants.ts:15-215`                                                                                                                                                                                                                                                                                            | B9, B10, B11, D11, D12   | reading                                  |
+| `src/components/chat/ChatInput.tsx:110-260,360-500,1350-1624`                                                                                                                                                                                                                                                                        | B10, B11, D12            | reading                                  |
+| `src/components/chat/viewportBudget.ts:1-260`                                                                                                                                                                                                                                                                                        | B10, B19, D10            | reading                                  |
+| `src/components/chat/wrapText.ts:1-120`                                                                                                                                                                                                                                                                                              | B19                      | reading                                  |
+| `src/components/chat/CommandSuggestions.tsx:200-318`                                                                                                                                                                                                                                                                                 | B11                      | reading                                  |
+| `src/components/HeaderFrame.ts:53-588`                                                                                                                                                                                                                                                                                               | B3, D11                  | reading                                  |
+| `src/components/Header.tsx:1-35`                                                                                                                                                                                                                                                                                                     | B3, B19                  | reading                                  |
+| `src/components/MessageItem.tsx:400-609`                                                                                                                                                                                                                                                                                             | R1, R2, R7, R12          | reading                                  |
+| `src/components/ThinkingDisplay.tsx:1-152`                                                                                                                                                                                                                                                                                           | R3                       | reading                                  |
+| `src/components/TodoItem.tsx:1-48`, `src/components/PinnedTodoDisplay.tsx:1-108`                                                                                                                                                                                                                                                     | B9, R8                   | reading                                  |
+| `src/components/UnifiedToolDisplay.tsx:1-553`                                                                                                                                                                                                                                                                                        | B6, B7, R4, R5, R10      | reading                                  |
+| `src/components/ToolExecutionItem.tsx:1-106`                                                                                                                                                                                                                                                                                         | R9                       | reading                                  |
+| `src/components/tools/ToolDisplayShell.tsx:45-180`                                                                                                                                                                                                                                                                                   | B6, D10                  | reading                                  |
+| `src/components/tools/ToolHeader.tsx:34-250`                                                                                                                                                                                                                                                                                         | R4, D13                  | reading                                  |
+| `src/components/tools/implementations/DefaultTool.tsx:1-215`                                                                                                                                                                                                                                                                         | B7, R4, R5               | reading                                  |
+| `src/components/tools/implementations/TaskTool.tsx:229-470`                                                                                                                                                                                                                                                                          | R9                       | reading                                  |
+| `src/components/tools/implementations/subagentBadge.ts:1-50`                                                                                                                                                                                                                                                                         | D6, R9                   | reading                                  |
+| `src/components/tools/implementations/TodoWrite.tsx:1-60`                                                                                                                                                                                                                                                                            | R8                       | reading                                  |
+| `src/components/CollapsedToolGroup.tsx:300-640`                                                                                                                                                                                                                                                                                      | R13                      | reading                                  |
+| `src/components/DiffRenderer.tsx:190-680`                                                                                                                                                                                                                                                                                            | B8, R6, D10              | reading                                  |
+| `src/components/BatchToolConfirmationMessage.tsx:330-420,820-1240`                                                                                                                                                                                                                                                                   | R11                      | reading                                  |
+| `src/agent/tool-confirmation.ts:80-190`                                                                                                                                                                                                                                                                                              | R11 (option labels, `✕`) | reading                                  |
+| `src/components/common/MenuContainer.tsx:1-140`, `MenuOptionRow.tsx:1-45`                                                                                                                                                                                                                                                            | R11, D10, D11            | reading                                  |
+| `src/components/SelectableList.tsx:55-148`                                                                                                                                                                                                                                                                                           | B11, D12                 | reading                                  |
+| `src/components/common/StyledHelpText.tsx:1-61`                                                                                                                                                                                                                                                                                      | B13, D10                 | reading                                  |
+| `src/components/FooterStatusRow.tsx:80-876`                                                                                                                                                                                                                                                                                          | B13, D10, D12            | reading                                  |
+| `src/components/StatusLine.tsx:28-201`                                                                                                                                                                                                                                                                                               | B14                      | reading                                  |
+| `src/components/Spinner.tsx:1-38`, `src/utils/tuiSpinner/*`                                                                                                                                                                                                                                                                          | B21, D12, D13            | reading                                  |
+| `src/utils/constants.ts:207,344`                                                                                                                                                                                                                                                                                                     | D13, D10                 | reading                                  |
+| `src/utils/terminalSegments.ts:30-120,579-670`                                                                                                                                                                                                                                                                                       | B13, B20, D10            | reading                                  |
+| `src/keyboard/constants.ts:1-22`, `src/keyboard/keyboardChords.ts:1-660`                                                                                                                                                                                                                                                             | B15, D13, Key bindings   | reading                                  |
+| `src/hooks/useChatKeyboardInput.ts:240-250,520-540,1000-1045,1138-1180,1921-2200,2380-2600`                                                                                                                                                                                                                                          | B15, B16, Key bindings   | reading                                  |
+| `src/hooks/repeatedKeySequence.ts:1-20`, `src/hooks/constants.ts:155`                                                                                                                                                                                                                                                                | B15, D13                 | reading                                  |
+| `src/app.tsx:2216-2219,2463-2546,4100-4160,6097-6110,6335-6360,6467-6540,9990-10120,10170-10290,10620-10660,10825-11120`                                                                                                                                                                                                             | B2, B12, B13, B15, B19   | reading                                  |
+| `src/utils/interactiveTerminalState.ts:26-170`                                                                                                                                                                                                                                                                                       | B1                       | reading                                  |
+| `src/utils/trueColorDetector/index.ts:15-236`                                                                                                                                                                                                                                                                                        | B18                      | reading                                  |
+| `src/utils/terminalAppearanceDetector/index.ts:16-238`                                                                                                                                                                                                                                                                               | B17, B18                 | reading                                  |
+| `src/utils/terminalCapabilities.ts:1-162`                                                                                                                                                                                                                                                                                            | B18                      | reading                                  |
+| `src/utils/hyperlinks.ts:100-112`                                                                                                                                                                                                                                                                                                    | B18 (`TERM=dumb`)        | reading                                  |
+| `src/utils/isWsl.ts:1-60`                                                                                                                                                                                                                                                                                                            | B10 (platform layout)    | reading                                  |
+| `src/entrypoints/tui/bootstrap.ts:300-340`                                                                                                                                                                                                                                                                                           | B18 (non-TTY)            | reading                                  |
+| `src/utils/e2eClock.ts:1-40`                                                                                                                                                                                                                                                                                                         | Test determinism         | reading                                  |
+| `src/utils/images/svg.ts:1-60`                                                                                                                                                                                                                                                                                                       | D9                       | reading                                  |
+| `src/components/renderMarkdown.tsx:64-71,382-425,560-640,940-1035`                                                                                                                                                                                                                                                                   | R2, D10, D11, D12        | reading                                  |
+| `src/components/chat/ImageAttachment.tsx:1-130`                                                                                                                                                                                                                                                                                      | B16                      | reading                                  |
+| `en:chatInput.*`, `en:statusBar.*`, `en:pinnedTodo.*`, `en:toolDisplay.*`, `en:batchConfirmation.*`, `en:confirmation.*`, `en:imageAttachment.*`, `en:streamingTail.*`, `en:assistantTimer.*`, `en:footer.*`, `en:process.ctrlCToExit`, `en:header.*`, `en:keybindings.*`, `en:helpSections.*`, `en:placeholders.*`, `en:thinking.*` | all literal strings      | extraction from the English locale chunk |
 
 ## Open questions
 
@@ -1081,7 +1084,7 @@ All `src/…` and `packages/…` paths below resolve under `evidence/original/wi
   outcome is not).
 - Exact timing of frames (only intervals and windows are contractual) and terminal-specific
   rendering of the same SGR bytes.
-- i18n for non-English locales: the string *sets* exist, but this spec pins English only.
+- i18n for non-English locales: the string _sets_ exist, but this spec pins English only.
 - Mission Control, the custom-agents view, Workstream Control, plugin and marketplace surfaces, and every
   `MenuContainer` submenu's own copy.
 - Native image protocols, SVG→PNG rasterisation quality, and the fonts' internal metrics.

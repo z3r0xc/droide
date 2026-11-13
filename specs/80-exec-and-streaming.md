@@ -34,7 +34,7 @@ Out of scope, with the owning spec named:
   lifetime, exit) is stated here.
 - ACP (`acp`, `acp-daemon`) session semantics — a future `acp-server.md`.
 - Session file layout, ids' creation rules and transcript record persistence —
-  `session-store.md`. This spec states only what exec *emits*.
+  `session-store.md`. This spec states only what exec _emits_.
 - Tool selection semantics beyond the autonomy base set (`--only-tools`,
   `--add-tools`, `--remove-tools`, MCP selectors) — tool-registry spec. Their
   effects on exec output (`--list-tools`) are named here.
@@ -121,7 +121,7 @@ stdin.`, exit `1`, before any session exists
 **B8.** Autonomy mode is resolved once per run: `spec` when `--use-spec` or
 `--spec-model` is set, otherwise `auto`; the level is `--auto`'s value,
 defaulting to `low`
-(`commands/resolveToolSelection.ts:677-689`). A *mission* run forces
+(`commands/resolveToolSelection.ts:677-689`). A _mission_ run forces
 `high`.
 
 **B9.** Without `--auto` and without `--skip-permissions-unsafe`, the base
@@ -192,7 +192,7 @@ followed by one newline to stdout, and nothing else
 newline. Progress notes are ordinary assistant text in `stream-json` (B28) but
 never replace the final answer when the last assistant message has one (B19).
 
-**B19.** The final text is the last visible assistant answer of *this* run: the
+**B19.** The final text is the last visible assistant answer of _this_ run: the
 transcript may hold earlier turns of a resumed session, and none of them
 qualify; when the last assistant message has no answer text but has progress
 updates, the updates joined by a blank line stand in; otherwise the empty
@@ -208,16 +208,16 @@ string is the answer (`exec/renderlessExecRunner.ts:91-129`).
 array, no trailing records — and exits `0`
 (`entrypoints/exec/handler.ts:267-275`). The object's keys are exactly:
 
-| key | type | value |
-|---|---|---|
-| `type` | string | `"result"` |
-| `subtype` | string | `"success"` |
-| `is_error` | boolean | `false` |
-| `duration_ms` | number | wall time of the run |
-| `num_turns` | number | assistant messages in the transcript |
-| `result` | string | final assistant text |
-| `session_id` | string | the session that ran |
-| `usage` | object | see B23 |
+| key           | type    | value                                |
+| ------------- | ------- | ------------------------------------ |
+| `type`        | string  | `"result"`                           |
+| `subtype`     | string  | `"success"`                          |
+| `is_error`    | boolean | `false`                              |
+| `duration_ms` | number  | wall time of the run                 |
+| `num_turns`   | number  | assistant messages in the transcript |
+| `result`      | string  | final assistant text                 |
+| `session_id`  | string  | the session that ran                 |
+| `usage`       | object  | see B23                              |
 
 (`exec/exec-summary.ts:4-21`; literal values confirmed at
 `evidence/extracted/windows-x64/chunk-sm0347rw.js`.)
@@ -247,7 +247,7 @@ milliseconds; `session_id` is the session that owns the message.
 
 1. `system` / `init` — first record of every stream:
    `{"type":"system","subtype":"init","cwd":<string>,"session_id":<string>,
-   "tools":[<llmId>…],"model":<string>,"reasoning_effort":<string>}`
+"tools":[<llmId>…],"model":<string>,"reasoning_effort":<string>}`
    (`entrypoints/exec/handler.ts:1217-1226`,
    `exec/streamingExecRunner.ts:212-221`). `tools` is every currently
    registered tool's `llmId` (`entrypoints/exec/handler.ts:1205-1206`); `model`
@@ -256,33 +256,33 @@ milliseconds; `session_id` is the session that owns the message.
    (`entrypoints/exec/handler.ts:1208-1216`).
 2. `message` —
    `{"type":"message","role":"user"|"assistant","id":<string>,
-   "text":<string>,"timestamp":<number>,"session_id":<string>}`
+"text":<string>,"timestamp":<number>,"session_id":<string>}`
    (`exec/streamJsonEventHelpers.ts:76-84`, `:166-184`).
 3. `reasoning` —
    `{"type":"reasoning","id":<string>,"text":<string>,
-   "timestamp":<number>,"session_id":<string>}`
+"timestamp":<number>,"session_id":<string>}`
    (`exec/streamJsonEventHelpers.ts:48-57`, `:65-75`).
 4. `tool_call` —
    `{"type":"tool_call","id":<toolUseId>,"messageId":<string>,
-   "toolId":<string>,"toolName":<string>,"parameters":<object>,
-   "timestamp":<number>,"session_id":<string>}`; `parameters` is the model's
+"toolId":<string>,"toolName":<string>,"parameters":<object>,
+"timestamp":<number>,"session_id":<string>}`; `parameters` is the model's
    tool input verbatim, `toolId` and `toolName` are both the model-facing name
    (`exec/streamJsonEventHelpers.ts:85-100`).
 5. `tool_result` —
    `{"type":"tool_result","id":<toolUseId>,"messageId":<string>,
-   "toolId":<string>,"isError":<boolean>,"value"?:<string>,
-   "error"?:{"type":"tool_error","message":<string>},
-   "timestamp":<number>,"session_id":<string>}`
+"toolId":<string>,"isError":<boolean>,"value"?:<string>,
+"error"?:{"type":"tool_error","message":<string>},
+"timestamp":<number>,"session_id":<string>}`
    (`exec/streamJsonEventHelpers.ts:115-137`). Success carries `value`;
    failure carries `error` and omits `value`.
 6. `error` —
    `{"type":"error","source":"cli"|"agent_loop","message":<string>,
-   "timestamp":<number>,"session_id":<string>}`
+"timestamp":<number>,"session_id":<string>}`
    (`exec/streamJsonEventHelpers.ts:139-150`, `:192-208`).
 7. `completion` —
    `{"type":"completion","finalText":<string>,"numTurns":<number>,
-   "durationMs":<number>,"session_id":<string>,"timestamp":<number>,
-   "usage":{…}}` where `usage` is B23's object
+"durationMs":<number>,"session_id":<string>,"timestamp":<number>,
+"usage":{…}}` where `usage` is B23's object
    (`exec/streamJsonEventHelpers.ts:233-248`). `numTurns` counts assistant
    messages in the session transcript at the end of the run, so a continued
    session, or a later `--input-format stream-json` message, reports a
@@ -521,27 +521,27 @@ respective reason when the main turn failed or permission was denied
 
 ### CLI options consumed by this spec
 
-| Flag | Type / domain | Default | Effect |
-|---|---|---|---|
-| `[prompt]` | string | — | positional prompt (B4–B6) |
-| `-f, --file <path>` | path | — | prompt from file (B2) |
-| `-o, --output-format <format>` | `text\|json\|stream-json\|stream-jsonrpc\|acp\|acp-daemon\|debug` | `text` | output protocol (B18–B52) |
-| `--input-format <format>` | `stream-json\|stream-jsonrpc` | — | stdin protocol (B41–B51) |
-| `--auto <level>` | `low\|medium\|high` | — | autonomy level (B10) |
-| `--skip-permissions-unsafe` | boolean | false | bypass confirmations (B11) |
-| `-s, --session-id <id>` | session id | — | continue a session (B35) |
-| `--fork <id>` | session id | — | fork a session (B36) |
-| `-m, --model <id>` | model id / alias | settings default | session model |
-| `-r, --reasoning-effort <level>` | per model | per model | session effort |
-| `--use-spec`, `--spec-model`, `--spec-reasoning-effort` | — | — | spec mode (B8, B38) |
-| `--disable-builtin-skills` | boolean | false | refused in ACP (B52) |
-| `--list-tools` | boolean | false | catalogue and exit (B53) |
-| `--cwd <path>`, `-w/--worktree [name]` | path / name | — | run directory; mutually exclusive with each other |
-| `--tag <spec>` | repeatable name or JSON | — | session tags |
-| `--mission`, `--worker-*`, `--validator-*` | — | — | mission mode (B17) |
-| `--append-system-prompt[-file]`, `--settings` | text / path | — | prompt/settings overlays |
-| `--only-tools`, `--add-tools`, `--remove-tools` | tool id list | — | tool selection (tool-registry spec); visible in `exec --help` |
-| `--init-session-id`, `--calling-session-id`, `--calling-tool-use-id`, `--session-title`, `--depth`, `--request-id`, `--log-group-id`, `--tool-execution-mode`, `--allow-subagents-in-scripts`, `--enabled-tools`, `--additional-tools`, `--disabled-tools`, `--restrict-tools` | — | — | internal / delegated-run plumbing, hidden from `exec --help` (`entrypoints/exec/command.ts:60-230`) |
+| Flag                                                                                                                                                                                                                                                                           | Type / domain                                                     | Default          | Effect                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------- |
+| `[prompt]`                                                                                                                                                                                                                                                                     | string                                                            | —                | positional prompt (B4–B6)                                                                           |
+| `-f, --file <path>`                                                                                                                                                                                                                                                            | path                                                              | —                | prompt from file (B2)                                                                               |
+| `-o, --output-format <format>`                                                                                                                                                                                                                                                 | `text\|json\|stream-json\|stream-jsonrpc\|acp\|acp-daemon\|debug` | `text`           | output protocol (B18–B52)                                                                           |
+| `--input-format <format>`                                                                                                                                                                                                                                                      | `stream-json\|stream-jsonrpc`                                     | —                | stdin protocol (B41–B51)                                                                            |
+| `--auto <level>`                                                                                                                                                                                                                                                               | `low\|medium\|high`                                               | —                | autonomy level (B10)                                                                                |
+| `--skip-permissions-unsafe`                                                                                                                                                                                                                                                    | boolean                                                           | false            | bypass confirmations (B11)                                                                          |
+| `-s, --session-id <id>`                                                                                                                                                                                                                                                        | session id                                                        | —                | continue a session (B35)                                                                            |
+| `--fork <id>`                                                                                                                                                                                                                                                                  | session id                                                        | —                | fork a session (B36)                                                                                |
+| `-m, --model <id>`                                                                                                                                                                                                                                                             | model id / alias                                                  | settings default | session model                                                                                       |
+| `-r, --reasoning-effort <level>`                                                                                                                                                                                                                                               | per model                                                         | per model        | session effort                                                                                      |
+| `--use-spec`, `--spec-model`, `--spec-reasoning-effort`                                                                                                                                                                                                                        | —                                                                 | —                | spec mode (B8, B38)                                                                                 |
+| `--disable-builtin-skills`                                                                                                                                                                                                                                                     | boolean                                                           | false            | refused in ACP (B52)                                                                                |
+| `--list-tools`                                                                                                                                                                                                                                                                 | boolean                                                           | false            | catalogue and exit (B53)                                                                            |
+| `--cwd <path>`, `-w/--worktree [name]`                                                                                                                                                                                                                                         | path / name                                                       | —                | run directory; mutually exclusive with each other                                                   |
+| `--tag <spec>`                                                                                                                                                                                                                                                                 | repeatable name or JSON                                           | —                | session tags                                                                                        |
+| `--mission`, `--worker-*`, `--validator-*`                                                                                                                                                                                                                                     | —                                                                 | —                | mission mode (B17)                                                                                  |
+| `--append-system-prompt[-file]`, `--settings`                                                                                                                                                                                                                                  | text / path                                                       | —                | prompt/settings overlays                                                                            |
+| `--only-tools`, `--add-tools`, `--remove-tools`                                                                                                                                                                                                                                | tool id list                                                      | —                | tool selection (tool-registry spec); visible in `exec --help`                                       |
+| `--init-session-id`, `--calling-session-id`, `--calling-tool-use-id`, `--session-title`, `--depth`, `--request-id`, `--log-group-id`, `--tool-execution-mode`, `--allow-subagents-in-scripts`, `--enabled-tools`, `--additional-tools`, `--disabled-tools`, `--restrict-tools` | —                                                                 | —                | internal / delegated-run plumbing, hidden from `exec --help` (`entrypoints/exec/command.ts:60-230`) |
 
 `--output-format` values are the `ExecOutputFormat` enum
 (`packages/sdk-core/src/protocol/shared/enums.ts:134-143`); `--input-format`
@@ -551,13 +551,13 @@ values are `ExecInputFormat` (`:128-132`). Any other value is refused with
 
 ### Environment
 
-| Variable | Used for |
-|---|---|
-| `DROIDE_API_KEY` | managed models; an unauthenticated managed run fails with the auth message (B55) |
-| `DROIDE_ONE_SHOT_COMPLETION_OUTCOME_TIMEOUT_MS` | owed-work bound (B58) |
-| `DROIDE_EXEC_ORIGINAL_INVOCATION` | `0` marks a daemon-spawned worker, which suppresses origin attribution (`entrypoints/exec/handler.ts:619-632`) |
-| `DROIDE_HOME_OVERRIDE`, `DROIDE_ENV` | choose the `.droide` vs `.droide-dev` log directory (B33) |
-| `FORCE_COLOR`, `NO_COLOR` | set to `0`/`1` by exec itself when stdout is not a TTY (B33) |
+| Variable                                        | Used for                                                                                                       |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `DROIDE_API_KEY`                                | managed models; an unauthenticated managed run fails with the auth message (B55)                               |
+| `DROIDE_ONE_SHOT_COMPLETION_OUTCOME_TIMEOUT_MS` | owed-work bound (B58)                                                                                          |
+| `DROIDE_EXEC_ORIGINAL_INVOCATION`               | `0` marks a daemon-spawned worker, which suppresses origin attribution (`entrypoints/exec/handler.ts:619-632`) |
+| `DROIDE_HOME_OVERRIDE`, `DROIDE_ENV`            | choose the `.droide` vs `.droide-dev` log directory (B33)                                                      |
+| `FORCE_COLOR`, `NO_COLOR`                       | set to `0`/`1` by exec itself when stdout is not a TTY (B33)                                                   |
 
 ### Files
 
@@ -571,21 +571,21 @@ values are `ExecInputFormat` (`:128-132`). Any other value is refused with
 
 ## Errors
 
-| Trigger | Identity (stdout/stderr) | Exit | State after |
-|---|---|---|---|
-| Unknown option | Commander usage error on stderr | 1 | nothing created (`cli.ts:480`, `:583-590`) |
-| Invalid/conflicting flags | red `Invalid flags: …` on stderr | 1 | nothing created; `run.ts` marks startup failed (`entrypoints/exec/run.ts:575-590`) |
-| Bad `-f` file | `Prompt file not found: <path>` / `Prompt file is empty: <path>` / permission text | 1 | no session |
-| Empty stdin | `No prompt received on stdin (the input was empty). …` | 1 | no session |
-| No prompt | `No prompt provided. Usage:` | 1 | no session |
-| Denied Execute/Script/MCP call | assistant text `Exec ended early: insufficient permission to proceed. <guidance>`; text mode prints it on stderr as `Error during droide execution: …`, stream-json closes with an `error` record | 1 | turn and session persisted; retry with higher `--auto` |
-| Provider/model failure | `error` record (stream-json) or `Error during droide execution: <diagnostic>` | 1 | partial transcript persisted; retry is a new turn |
-| Unauthenticated managed run | auth message as the run's final text | 1 | no model call |
-| Turn cancelled without a signal | none added | 1 | turn persisted as cancelled |
-| SIGINT / SIGTERM (one-shot modes) | none added | 130 / 143 (B56) | turn persisted as cancelled |
-| SIGINT (`--input-format stream-json`) | final `error` record `Streaming session interrupted by user` | 0 | stream closed, no further records |
-| Fatal JSON-RPC error | process teardown | 1 | server stops |
-| Closed stdout pipe | none | 0 if the result was already chosen | run unaffected |
+| Trigger                               | Identity (stdout/stderr)                                                                                                                                                                          | Exit                               | State after                                                                        |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------- |
+| Unknown option                        | Commander usage error on stderr                                                                                                                                                                   | 1                                  | nothing created (`cli.ts:480`, `:583-590`)                                         |
+| Invalid/conflicting flags             | red `Invalid flags: …` on stderr                                                                                                                                                                  | 1                                  | nothing created; `run.ts` marks startup failed (`entrypoints/exec/run.ts:575-590`) |
+| Bad `-f` file                         | `Prompt file not found: <path>` / `Prompt file is empty: <path>` / permission text                                                                                                                | 1                                  | no session                                                                         |
+| Empty stdin                           | `No prompt received on stdin (the input was empty). …`                                                                                                                                            | 1                                  | no session                                                                         |
+| No prompt                             | `No prompt provided. Usage:`                                                                                                                                                                      | 1                                  | no session                                                                         |
+| Denied Execute/Script/MCP call        | assistant text `Exec ended early: insufficient permission to proceed. <guidance>`; text mode prints it on stderr as `Error during droide execution: …`, stream-json closes with an `error` record | 1                                  | turn and session persisted; retry with higher `--auto`                             |
+| Provider/model failure                | `error` record (stream-json) or `Error during droide execution: <diagnostic>`                                                                                                                     | 1                                  | partial transcript persisted; retry is a new turn                                  |
+| Unauthenticated managed run           | auth message as the run's final text                                                                                                                                                              | 1                                  | no model call                                                                      |
+| Turn cancelled without a signal       | none added                                                                                                                                                                                        | 1                                  | turn persisted as cancelled                                                        |
+| SIGINT / SIGTERM (one-shot modes)     | none added                                                                                                                                                                                        | 130 / 143 (B56)                    | turn persisted as cancelled                                                        |
+| SIGINT (`--input-format stream-json`) | final `error` record `Streaming session interrupted by user`                                                                                                                                      | 0                                  | stream closed, no further records                                                  |
+| Fatal JSON-RPC error                  | process teardown                                                                                                                                                                                  | 1                                  | server stops                                                                       |
+| Closed stdout pipe                    | none                                                                                                                                                                                              | 0 if the result was already chosen | run unaffected                                                                     |
 
 Validation errors (flags, prompt sources) are reported **once**, on stderr,
 before any model or session work; a retry with corrected flags is always safe.
@@ -611,37 +611,37 @@ Everything else — record kind, order, key names and other values — is compar
 exactly. `-o json` fixtures normalise `duration_ms` → `0` and `session_id` →
 `"<sid>"`.
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1 | `tests/exec/test_help_and_unknown_option` | none |
-| B2 | `tests/exec/test_prompt_from_file` | `fixtures/exec/prompt.md`, `fixtures/exec/empty.md` |
-| B3, B6 | `tests/exec/test_prompt_sources` | `fixtures/exec/echo.json` |
-| B4, B5 | `tests/exec/test_prompt_source_conflicts` | `fixtures/exec/prompt.md` |
-| B7 | `tests/exec/test_streaming_rejects_prompt` | none |
-| B8, B9 | `tests/exec/test_default_read_only_tools` | `fixtures/exec/settings.json` |
-| B10, B11, B12 | `tests/exec/test_autonomy_flags` | `fixtures/exec/settings.json`, `fixtures/exec/managed-max.json` |
-| B13–B15 | `tests/exec/test_permission_denied_exit` | `fixtures/exec/wants_shell.json` |
-| B16 | `tests/exec/test_delegated_auto_reject` | `fixtures/exec/delegated.json` |
-| B17 | `tests/exec/test_mission_flag_conflicts` | none |
-| B18, B19 | `tests/exec/test_text_output` | `fixtures/exec/one_turn_text.json` |
-| B20 | `tests/exec/test_text_output_error` | `fixtures/exec/provider_error.json` |
-| B21, B23 | `tests/exec/test_json_summary_success` | `fixtures/exec/one_turn_tools.json` |
-| B22 | `tests/exec/test_json_summary_failure` | `fixtures/exec/provider_error.json` |
-| B24, B25, B26, B27, B29, B30, B31 | `tests/exec/test_stream_json_one_turn_tool_call` | `fixtures/exec/one_turn_tools.json` |
-| B28 | `tests/exec/test_stream_json_progress_update` | `fixtures/exec/progress_update.json` |
-| B32 | `tests/exec/test_stream_json_error_close` | `fixtures/exec/provider_error.json` |
-| B33, B34 | `tests/exec/test_stdout_purity_and_broken_pipe` | `fixtures/exec/one_turn_tools.json` |
-| B35 | `tests/exec/test_session_continue` | `fixtures/exec/two_sessions.json` |
-| B36, B37, B38 | `tests/exec/test_session_fork_and_conflicts` | `fixtures/exec/two_sessions.json` |
-| B39 | `tests/exec/test_session_id_visibility` | `fixtures/exec/one_turn_text.json` |
-| B40, B42, B44, B45, B47 | `tests/exec/test_input_stream_json_multi_turn` | `fixtures/exec/stream_input.jsonl` |
-| B41 | `tests/exec/test_stream_json_input_requires_output` | none |
-| B43, B46 | `tests/exec/test_input_stream_json_errors_and_sigint` | `fixtures/exec/stream_input_bad.jsonl` |
-| B48–B52 | `tests/exec/test_protocol_mode_boundaries` | none |
-| B53 | `tests/exec/test_list_tools` | `fixtures/exec/settings.json` |
-| B54, B55 | `tests/exec/test_exit_codes` | `fixtures/exec/*.json` |
-| B56, B57 | `tests/exec/test_signal_exit_codes` | `fixtures/exec/slow_turn.json` |
-| B58 | `tests/exec/test_owed_work_drain` | `fixtures/exec/background_task.json` |
+| Clause                            | Test id                                               | Fixture                                                         |
+| --------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------- |
+| B1                                | `tests/exec/test_help_and_unknown_option`             | none                                                            |
+| B2                                | `tests/exec/test_prompt_from_file`                    | `fixtures/exec/prompt.md`, `fixtures/exec/empty.md`             |
+| B3, B6                            | `tests/exec/test_prompt_sources`                      | `fixtures/exec/echo.json`                                       |
+| B4, B5                            | `tests/exec/test_prompt_source_conflicts`             | `fixtures/exec/prompt.md`                                       |
+| B7                                | `tests/exec/test_streaming_rejects_prompt`            | none                                                            |
+| B8, B9                            | `tests/exec/test_default_read_only_tools`             | `fixtures/exec/settings.json`                                   |
+| B10, B11, B12                     | `tests/exec/test_autonomy_flags`                      | `fixtures/exec/settings.json`, `fixtures/exec/managed-max.json` |
+| B13–B15                           | `tests/exec/test_permission_denied_exit`              | `fixtures/exec/wants_shell.json`                                |
+| B16                               | `tests/exec/test_delegated_auto_reject`               | `fixtures/exec/delegated.json`                                  |
+| B17                               | `tests/exec/test_mission_flag_conflicts`              | none                                                            |
+| B18, B19                          | `tests/exec/test_text_output`                         | `fixtures/exec/one_turn_text.json`                              |
+| B20                               | `tests/exec/test_text_output_error`                   | `fixtures/exec/provider_error.json`                             |
+| B21, B23                          | `tests/exec/test_json_summary_success`                | `fixtures/exec/one_turn_tools.json`                             |
+| B22                               | `tests/exec/test_json_summary_failure`                | `fixtures/exec/provider_error.json`                             |
+| B24, B25, B26, B27, B29, B30, B31 | `tests/exec/test_stream_json_one_turn_tool_call`      | `fixtures/exec/one_turn_tools.json`                             |
+| B28                               | `tests/exec/test_stream_json_progress_update`         | `fixtures/exec/progress_update.json`                            |
+| B32                               | `tests/exec/test_stream_json_error_close`             | `fixtures/exec/provider_error.json`                             |
+| B33, B34                          | `tests/exec/test_stdout_purity_and_broken_pipe`       | `fixtures/exec/one_turn_tools.json`                             |
+| B35                               | `tests/exec/test_session_continue`                    | `fixtures/exec/two_sessions.json`                               |
+| B36, B37, B38                     | `tests/exec/test_session_fork_and_conflicts`          | `fixtures/exec/two_sessions.json`                               |
+| B39                               | `tests/exec/test_session_id_visibility`               | `fixtures/exec/one_turn_text.json`                              |
+| B40, B42, B44, B45, B47           | `tests/exec/test_input_stream_json_multi_turn`        | `fixtures/exec/stream_input.jsonl`                              |
+| B41                               | `tests/exec/test_stream_json_input_requires_output`   | none                                                            |
+| B43, B46                          | `tests/exec/test_input_stream_json_errors_and_sigint` | `fixtures/exec/stream_input_bad.jsonl`                          |
+| B48–B52                           | `tests/exec/test_protocol_mode_boundaries`            | none                                                            |
+| B53                               | `tests/exec/test_list_tools`                          | `fixtures/exec/settings.json`                                   |
+| B54, B55                          | `tests/exec/test_exit_codes`                          | `fixtures/exec/*.json`                                          |
+| B56, B57                          | `tests/exec/test_signal_exit_codes`                   | `fixtures/exec/slow_turn.json`                                  |
+| B58                               | `tests/exec/test_owed_work_drain`                     | `fixtures/exec/background_task.json`                            |
 
 ### `tests/exec/test_stream_json_one_turn_tool_call`
 
@@ -679,14 +679,14 @@ three UUID-shaped ids repeat consistently
 Four invocations, same mock harness, `settings.json` fixture, stdin
 `/dev/null`:
 
-| Scenario | Invocation | Fixture script | Expected stdout | Expected stderr | Exit |
-|---|---|---|---|---|---|
-| success | `droide exec --model custom:mock "say hi"` | assistant text `hi` | `hi\n` | empty | 0 |
-| denied permission | `droide exec --auto low --model custom:mock "delete it"` | assistant `tool_calls` → `Execute` with `{"command":"rm -rf ./build"}` | empty | `Error during droide execution: Exec ended early: insufficient permission to proceed. Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.` | 1 |
-| provider error | `droide exec --model custom:mock "say hi"` | server returns HTTP 500 on turn 1 | empty | `Error during droide execution: <provider diagnostic>` | 1 |
-| cancelled | `droide exec --model custom:mock "say hi"`, SIGINT sent once the first token is served | assistant stream never completes | empty (or the partial text, if the turn had already answered) | — | 130 |
+| Scenario          | Invocation                                                                             | Fixture script                                                         | Expected stdout                                               | Expected stderr                                                                                                                                                                           | Exit |
+| ----------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| success           | `droide exec --model custom:mock "say hi"`                                             | assistant text `hi`                                                    | `hi\n`                                                        | empty                                                                                                                                                                                     | 0    |
+| denied permission | `droide exec --auto low --model custom:mock "delete it"`                               | assistant `tool_calls` → `Execute` with `{"command":"rm -rf ./build"}` | empty                                                         | `Error during droide execution: Exec ended early: insufficient permission to proceed. Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.` | 1    |
+| provider error    | `droide exec --model custom:mock "say hi"`                                             | server returns HTTP 500 on turn 1                                      | empty                                                         | `Error during droide execution: <provider diagnostic>`                                                                                                                                    | 1    |
+| cancelled         | `droide exec --model custom:mock "say hi"`, SIGINT sent once the first token is served | assistant stream never completes                                       | empty (or the partial text, if the turn had already answered) | —                                                                                                                                                                                         | 130  |
 
-The denied-permission case must reach a *confirmation* rather than a
+The denied-permission case must reach a _confirmation_ rather than a
 tool-availability refusal: `--auto low` makes every tool selectable, and an
 `Execute` command above the low risk band is then auto-denied, taking B14's
 immediate exit. (Without `--auto` the same call would be filtered as
@@ -713,32 +713,32 @@ deprecation warning (B41).
 
 ## Evidence
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `ev_exec_cmd_1` | B1, B10, B11, B35–B38, option table | read `entrypoints/exec/command.ts:47-230` |
-| `ev_exec_help_1` | B1, B9, B35, B53 | read `entrypoints/exec/help.ts:100-303` and `.work/parity/expected/help-exec.json` |
-| `ev_exec_prompt_1` | B2–B6 | read `entrypoints/exec/handler.ts:177-244`, `:325-384` |
-| `ev_exec_validate_1` | B7, B10, B37, B38, B41, B48, B51, B52 | read `entrypoints/exec/assertValidOptions.ts:71-315`, `:354-367` |
-| `ev_exec_validate_2` | B7, B55 | read `entrypoints/exec/run.ts:575-590` |
-| `ev_exec_autonomy_1` | B8, B10, B12 | read `commands/resolveToolSelection.ts:316-322`, `:677-689`; `services/SessionService.ts:777-781` |
-| `ev_exec_perm_1` | B13–B15 | read `core/ToolExecutor.ts:840-861`, `:1056-1129` |
-| `ev_exec_perm_2` | B14, B55 | read `core/AgentLoop.ts:7667-7700`; `exec/sharedAgentRunner.ts:241-268`, `:1526-1530` |
-| `ev_exec_perm_3` | B16 | read `entrypoints/exec/handler.ts:1150-1160`; `exec/renderlessExecRunner.ts:176-200` |
-| `ev_exec_out_1` | B18–B23, B53 | read `entrypoints/exec/handler.ts:246-284`, `:449-573`, `:800-814`; `exec/exec-summary.ts:4-40` |
-| `ev_exec_out_2` | B21, B22 literal `"result"`/`"success"`/`"failure"` | grep of shipped locale/exec chunk `evidence/extracted/windows-x64/chunk-sm0347rw.js` **[derived]** |
-| `ev_exec_stream_1` | B24–B34 | read `exec/streamJsonEventHelpers.ts:41-248` |
-| `ev_exec_stream_2` | B25, B26, B32 | read `entrypoints/exec/handler.ts:1194-1227`, `:1294-1323` |
-| `ev_exec_stream_3` | B25, B33, B34, B39 | read `utils/safeStdoutWrite.ts:17-31`; `entrypoints/exec/run.ts:183-197` |
-| `ev_exec_session_1` | B35, B36, B39 | read `entrypoints/exec/handler.ts:1052-1180` |
-| `ev_exec_input_1` | B40–B47 | read `exec/streamingExecRunner.ts:53-355` |
-| `ev_exec_rpc_1` | B48–B51 | read `entrypoints/exec/constants.ts:14-53`; `entrypoints/exec/handler.ts:311-323`, `:933-982`; `exec/runStreamingJsonRpcExec.ts:20-88` |
-| `ev_exec_rpc_2` | B49, B50 | read `exec/wire/StdioWire.ts:70-250` |
-| `ev_exec_acp_1` | B52 | read `entrypoints/exec/handler.ts:821-833` |
-| `ev_exec_exit_1` | B54–B57 | read `utils/command-wrapper.ts:61-110`; `utils/shutdownCoordinator.ts:85-88`, `:433-444`; `utils/agentTurnCompletion.ts:26-52` |
-| `ev_exec_owed_1` | B58 | read `exec/owedWork.ts:84-114`; `exec/sharedAgentRunner.ts:1576-1600` |
-| `ev_exec_console_1` | B33 | read `utils/patch-console.ts:1-80`; `utils/command-wrapper.ts:12-24` |
-| `ev_exec_catalog_1` | B53 | read `utils/toolCatalog.ts:138-169` |
-| `ev_exec_model_1` | Acceptance fixtures (`custom:` model shape) | read `packages/sdk-core/src/protocol/settings/schema.ts:366-395`, `:586-608` |
+| Evidence             | Supports                                            | Method                                                                                                                                 |
+| -------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `ev_exec_cmd_1`      | B1, B10, B11, B35–B38, option table                 | read `entrypoints/exec/command.ts:47-230`                                                                                              |
+| `ev_exec_help_1`     | B1, B9, B35, B53                                    | read `entrypoints/exec/help.ts:100-303` and `tests/parity/expected/help-exec.json`                                                     |
+| `ev_exec_prompt_1`   | B2–B6                                               | read `entrypoints/exec/handler.ts:177-244`, `:325-384`                                                                                 |
+| `ev_exec_validate_1` | B7, B10, B37, B38, B41, B48, B51, B52               | read `entrypoints/exec/assertValidOptions.ts:71-315`, `:354-367`                                                                       |
+| `ev_exec_validate_2` | B7, B55                                             | read `entrypoints/exec/run.ts:575-590`                                                                                                 |
+| `ev_exec_autonomy_1` | B8, B10, B12                                        | read `commands/resolveToolSelection.ts:316-322`, `:677-689`; `services/SessionService.ts:777-781`                                      |
+| `ev_exec_perm_1`     | B13–B15                                             | read `core/ToolExecutor.ts:840-861`, `:1056-1129`                                                                                      |
+| `ev_exec_perm_2`     | B14, B55                                            | read `core/AgentLoop.ts:7667-7700`; `exec/sharedAgentRunner.ts:241-268`, `:1526-1530`                                                  |
+| `ev_exec_perm_3`     | B16                                                 | read `entrypoints/exec/handler.ts:1150-1160`; `exec/renderlessExecRunner.ts:176-200`                                                   |
+| `ev_exec_out_1`      | B18–B23, B53                                        | read `entrypoints/exec/handler.ts:246-284`, `:449-573`, `:800-814`; `exec/exec-summary.ts:4-40`                                        |
+| `ev_exec_out_2`      | B21, B22 literal `"result"`/`"success"`/`"failure"` | grep of shipped locale/exec chunk `evidence/extracted/windows-x64/chunk-sm0347rw.js` **[derived]**                                     |
+| `ev_exec_stream_1`   | B24–B34                                             | read `exec/streamJsonEventHelpers.ts:41-248`                                                                                           |
+| `ev_exec_stream_2`   | B25, B26, B32                                       | read `entrypoints/exec/handler.ts:1194-1227`, `:1294-1323`                                                                             |
+| `ev_exec_stream_3`   | B25, B33, B34, B39                                  | read `utils/safeStdoutWrite.ts:17-31`; `entrypoints/exec/run.ts:183-197`                                                               |
+| `ev_exec_session_1`  | B35, B36, B39                                       | read `entrypoints/exec/handler.ts:1052-1180`                                                                                           |
+| `ev_exec_input_1`    | B40–B47                                             | read `exec/streamingExecRunner.ts:53-355`                                                                                              |
+| `ev_exec_rpc_1`      | B48–B51                                             | read `entrypoints/exec/constants.ts:14-53`; `entrypoints/exec/handler.ts:311-323`, `:933-982`; `exec/runStreamingJsonRpcExec.ts:20-88` |
+| `ev_exec_rpc_2`      | B49, B50                                            | read `exec/wire/StdioWire.ts:70-250`                                                                                                   |
+| `ev_exec_acp_1`      | B52                                                 | read `entrypoints/exec/handler.ts:821-833`                                                                                             |
+| `ev_exec_exit_1`     | B54–B57                                             | read `utils/command-wrapper.ts:61-110`; `utils/shutdownCoordinator.ts:85-88`, `:433-444`; `utils/agentTurnCompletion.ts:26-52`         |
+| `ev_exec_owed_1`     | B58                                                 | read `exec/owedWork.ts:84-114`; `exec/sharedAgentRunner.ts:1576-1600`                                                                  |
+| `ev_exec_console_1`  | B33                                                 | read `utils/patch-console.ts:1-80`; `utils/command-wrapper.ts:12-24`                                                                   |
+| `ev_exec_catalog_1`  | B53                                                 | read `utils/toolCatalog.ts:138-169`                                                                                                    |
+| `ev_exec_model_1`    | Acceptance fixtures (`custom:` model shape)         | read `packages/sdk-core/src/protocol/settings/schema.ts:366-395`, `:586-608`                                                           |
 
 ## Open questions
 

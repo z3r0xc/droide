@@ -160,12 +160,12 @@ export function assertNoSymlinkEscape(
 }
 
 function protectedName(
-  factory: string,
+  root: string,
   candidate: string,
   names: Readonly<Record<string, true>>,
   prefixes: readonly string[],
 ): boolean {
-  const relative = nodePath.relative(factory, candidate);
+  const relative = nodePath.relative(root, candidate);
   if (relative === "" || relative.startsWith("..")) return false;
   const [first] = relative.split(nodePath.sep);
   if (first === undefined) return false;
@@ -176,11 +176,11 @@ function protectedName(
 }
 
 function protectedDirectory(
-  factory: string,
+  root: string,
   candidate: string,
   names: Readonly<Record<string, true>>,
 ): boolean {
-  const relative = nodePath.relative(factory, candidate);
+  const relative = nodePath.relative(root, candidate);
   if (relative === "" || relative.startsWith("..")) return false;
   const [first] = relative.split(nodePath.sep);
   return first !== undefined && Object.hasOwn(names, first);
@@ -197,14 +197,14 @@ export function assertWritablePath(
   given: string,
   resolved: string,
 ): void {
-  const factory = stateDir(context.environment);
+  const root = stateDir(context.environment);
   for (const candidate of [given, resolved]) {
     const absolute = isAbsolutePath(context.environment.platform, candidate)
       ? nodePath.normalize(candidate)
       : resolved;
     if (
-      protectedName(factory, absolute, TRUSTED_CONFIG_FILES, []) ||
-      protectedDirectory(factory, absolute, TRUSTED_CONFIG_DIRS)
+      protectedName(root, absolute, TRUSTED_CONFIG_FILES, []) ||
+      protectedDirectory(root, absolute, TRUSTED_CONFIG_DIRS)
     ) {
       throw new ToolFailure(`Sandbox: write denied to ${absolute}`);
     }
@@ -216,10 +216,10 @@ export function isCredentialFile(
   resolved: string,
   environment: Environment,
 ): boolean {
-  const factory = stateDir(environment);
+  const root = stateDir(environment);
   return (
-    protectedName(factory, resolved, CREDENTIAL_FILES, []) ||
-    protectedName(factory, resolved, {}, CREDENTIAL_PREFIXES)
+    protectedName(root, resolved, CREDENTIAL_FILES, []) ||
+    protectedName(root, resolved, {}, CREDENTIAL_PREFIXES)
   );
 }
 

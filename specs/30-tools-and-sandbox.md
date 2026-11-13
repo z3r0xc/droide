@@ -34,7 +34,7 @@ compilation beyond its tool-facing effect (`src/services/commandPolicy.ts`).
 
 Deferred deliberately: the daemon-side (`packages/daemon-core`) tool surface and
 the desktop-app-only tool sets, because they are registered outside the CLI
-registry (`@`McpService` and `src/tools/tui.ts` are the CLI's complete set).
+registry (`@`McpService`and`src/tools/tui.ts` are the CLI's complete set).
 
 ## Terms
 
@@ -76,56 +76,56 @@ registry (`@`McpService` and `src/tools/tui.ts` are the CLI's complete set).
 `requiresConfirmation` (metadata, see B41); effects per B1. Output is the declared
 result schema unless noted.
 
-| llmId | id | advertised | user | confirm | effects | output |
-|---|---|---|---|---|---|---|
-| `Read` | `read-cli` | yes | no | no | fs-read | string \| ImageBlock \| blocks |
-| `LS` | `ls-cli` | yes | no | no | fs-read | `{name,type,size}[]` |
-| `Glob` | `glob-search-cli` | yes | yes | no | fs-read | absolute paths |
-| `Grep` | `grep_tool_cli` | yes | yes | no | fs-read | paths \| `{path,line,text,kind}[]` |
-| `Create` | `create-cli` | yes | no | no | fs-write | `{success,file_path}` \| diff |
-| `Edit` | `edit-cli` | yes | no | no | fs-read, fs-write | line diff |
-| `ApplyPatch` | `apply-patch-cli` | yes | no | no | fs-read, fs-write | string |
-| `Execute` | `execute-cli` | yes | no | no | process | `{output,exitCode,signal,stoppedProcesses,pid?,outputFile?}` |
-| `Script` | `script-cli` | yes | no | no | process | `ScriptRunResult` |
-| `WaitForScript` | `wait-for-script-cli` | yes | no | no | process | `ScriptWaitResult` |
-| `TodoWrite` | `todo_write` | yes | no | no | — | string |
-| `Task` | `task-cli` | yes (read-only exec: no) | no | no | process | string |
-| `TaskOutput` | `task-output-cli` | yes | no | no | persistent-settings | string |
-| `TaskStop` | `task-stop-cli` | yes | no | no | process | string |
-| `Skill` | `SKILL_CLI_TOOL_ID` | yes | no | no | fs-read | string |
-| `ToolSearch` | `tool-search-cli` | yes | no | no | — | string |
-| `StructuredOutput` | `structured-output-cli` | gated | no | no | — | string |
-| `AskUser` | ask-user id | yes | yes | yes | — | answers |
-| `ExitSpecMode` | `exit-spec-mode` | spec mode | yes | yes | fs-write | `{approved}` |
-| `WebSearch` | `web_search` | deferred | yes | no | network | provider result union |
-| `FetchUrl` | `fetch_url` | deferred | yes | no | network | `{markdown,title,effectiveUrl,metadata,linkedUrls?}` |
-| `GenerateImage` | `generate-image` | gated (image models) | no | no | network | image result |
-| `DecisionModel` | `decision-model` | flag `DecisionModels` | yes | no | network | decision result |
-| `ListSettings` | `list_settings` | deferred | yes | no | — | operation catalog |
-| `StageSettingsChanges` | `stage_settings_changes` | deferred | yes | no | — | staged-change result |
-| `SearchSessions` | `search-sessions-cli` | flagged | yes | no | fs-read, network | string |
-| `UpgradeSessionModel` | `upgrade-session-model-cli` | yes | no | no | persistent-settings | string |
-| `ConnectApp` | connect-app id | not airgapped, deferred | yes | no | external-service | connect result |
-| `SlackPostFile` | slack id | explicit selection | yes | no | fs-read, external-service | string |
-| `SlackPostMessage` | slack id | explicit selection | yes | no | external-service | string |
-| `SlackCreateOrUpdateCodeChannel` | slack id | explicit selection | yes | no | external-service | string |
-| `SlackArchiveCodeChannel` | slack id | explicit selection | yes | no | external-service | string |
-| `SlackListChannels` | slack id | explicit selection | yes | no | external-service | string |
-| `ListComputers` / `ListServiceAccounts` | computers ids | yes | yes | no | — | list |
-| `CreateAutomation` | automation id | not airgapped | yes | yes | external-service | automation |
-| `ListAutomations` / `ReadAutomation` / `ListAutomationTemplates` | automation ids | not airgapped | yes | no | external-service | list/record |
-| `EditAutomation` / `DeleteAutomation` / `RunAutomation` | automation ids | not airgapped | yes | see definition | external-service | record |
-| `ReadAutomationFiles` / `EditAutomationFiles` | automation-file ids | not airgapped | yes | no | fs-read(+write) | file view / edit |
-| `SetAutomationRunOutcome` | automation outcome id | not airgapped | yes | no | external-service | string |
-| `LinkWorkItem` | link-work id | yes | yes | no | external-service | string |
-| `SendInboxMessage` | inbox id | yes | yes | yes | external-service | string |
-| `Loop` | loop id | schedulable hosts | yes | no | external-service | loop record |
-| `ProposeMission` / `StartMissionRun` / `EndFeatureRun` / `DismissHandoffItems` | mission ids | mission mode | yes | ProposeMission yes | fs/process per definition | result |
-| `SpawnAgent` / `ListAgents` / `SendMessage` / `InterruptAgent` / `RenameAgent` / `ArchiveAgent` / `CreateListener` | mission-v2 ids | flag `MissionsV2` | yes | no | external-service | result |
-| `GenerateAgent` | `generate-agent-cli` | yes | no | no | external-service | string |
-| `GetAgentEffectivenessUsage` / `StoreAgentReadinessReport` / `RenderAgentEffectivenessReport` | ids | command-gated | no | no | external-service / fs-write | report |
-| `ListEvalRuns` / `ListDatasets` / `ReadDataset` / `ReadEvalRun` / `CreateEvalRun` / `ListEvalPresets` / `SaveEvalPreset` / `CreateDataset` | eval ids | flag `AutoEvalPipeline` | yes | no (create/run yes) | network/fs per definition | eval records |
-| `<server>___<tool>` | `mcp_<server>_<tool>` | per server, maybe deferred | yes | yes | external-service | stringified result |
+| llmId                                                                                                                                      | id                          | advertised                 | user | confirm             | effects                     | output                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | -------------------------- | ---- | ------------------- | --------------------------- | ------------------------------------------------------------ |
+| `Read`                                                                                                                                     | `read-cli`                  | yes                        | no   | no                  | fs-read                     | string \| ImageBlock \| blocks                               |
+| `LS`                                                                                                                                       | `ls-cli`                    | yes                        | no   | no                  | fs-read                     | `{name,type,size}[]`                                         |
+| `Glob`                                                                                                                                     | `glob-search-cli`           | yes                        | yes  | no                  | fs-read                     | absolute paths                                               |
+| `Grep`                                                                                                                                     | `grep_tool_cli`             | yes                        | yes  | no                  | fs-read                     | paths \| `{path,line,text,kind}[]`                           |
+| `Create`                                                                                                                                   | `create-cli`                | yes                        | no   | no                  | fs-write                    | `{success,file_path}` \| diff                                |
+| `Edit`                                                                                                                                     | `edit-cli`                  | yes                        | no   | no                  | fs-read, fs-write           | line diff                                                    |
+| `ApplyPatch`                                                                                                                               | `apply-patch-cli`           | yes                        | no   | no                  | fs-read, fs-write           | string                                                       |
+| `Execute`                                                                                                                                  | `execute-cli`               | yes                        | no   | no                  | process                     | `{output,exitCode,signal,stoppedProcesses,pid?,outputFile?}` |
+| `Script`                                                                                                                                   | `script-cli`                | yes                        | no   | no                  | process                     | `ScriptRunResult`                                            |
+| `WaitForScript`                                                                                                                            | `wait-for-script-cli`       | yes                        | no   | no                  | process                     | `ScriptWaitResult`                                           |
+| `TodoWrite`                                                                                                                                | `todo_write`                | yes                        | no   | no                  | —                           | string                                                       |
+| `Task`                                                                                                                                     | `task-cli`                  | yes (read-only exec: no)   | no   | no                  | process                     | string                                                       |
+| `TaskOutput`                                                                                                                               | `task-output-cli`           | yes                        | no   | no                  | persistent-settings         | string                                                       |
+| `TaskStop`                                                                                                                                 | `task-stop-cli`             | yes                        | no   | no                  | process                     | string                                                       |
+| `Skill`                                                                                                                                    | `SKILL_CLI_TOOL_ID`         | yes                        | no   | no                  | fs-read                     | string                                                       |
+| `ToolSearch`                                                                                                                               | `tool-search-cli`           | yes                        | no   | no                  | —                           | string                                                       |
+| `StructuredOutput`                                                                                                                         | `structured-output-cli`     | gated                      | no   | no                  | —                           | string                                                       |
+| `AskUser`                                                                                                                                  | ask-user id                 | yes                        | yes  | yes                 | —                           | answers                                                      |
+| `ExitSpecMode`                                                                                                                             | `exit-spec-mode`            | spec mode                  | yes  | yes                 | fs-write                    | `{approved}`                                                 |
+| `WebSearch`                                                                                                                                | `web_search`                | deferred                   | yes  | no                  | network                     | provider result union                                        |
+| `FetchUrl`                                                                                                                                 | `fetch_url`                 | deferred                   | yes  | no                  | network                     | `{markdown,title,effectiveUrl,metadata,linkedUrls?}`         |
+| `GenerateImage`                                                                                                                            | `generate-image`            | gated (image models)       | no   | no                  | network                     | image result                                                 |
+| `DecisionModel`                                                                                                                            | `decision-model`            | flag `DecisionModels`      | yes  | no                  | network                     | decision result                                              |
+| `ListSettings`                                                                                                                             | `list_settings`             | deferred                   | yes  | no                  | —                           | operation catalog                                            |
+| `StageSettingsChanges`                                                                                                                     | `stage_settings_changes`    | deferred                   | yes  | no                  | —                           | staged-change result                                         |
+| `SearchSessions`                                                                                                                           | `search-sessions-cli`       | flagged                    | yes  | no                  | fs-read, network            | string                                                       |
+| `UpgradeSessionModel`                                                                                                                      | `upgrade-session-model-cli` | yes                        | no   | no                  | persistent-settings         | string                                                       |
+| `ConnectApp`                                                                                                                               | connect-app id              | not airgapped, deferred    | yes  | no                  | external-service            | connect result                                               |
+| `SlackPostFile`                                                                                                                            | slack id                    | explicit selection         | yes  | no                  | fs-read, external-service   | string                                                       |
+| `SlackPostMessage`                                                                                                                         | slack id                    | explicit selection         | yes  | no                  | external-service            | string                                                       |
+| `SlackCreateOrUpdateCodeChannel`                                                                                                           | slack id                    | explicit selection         | yes  | no                  | external-service            | string                                                       |
+| `SlackArchiveCodeChannel`                                                                                                                  | slack id                    | explicit selection         | yes  | no                  | external-service            | string                                                       |
+| `SlackListChannels`                                                                                                                        | slack id                    | explicit selection         | yes  | no                  | external-service            | string                                                       |
+| `ListComputers` / `ListServiceAccounts`                                                                                                    | computers ids               | yes                        | yes  | no                  | —                           | list                                                         |
+| `CreateAutomation`                                                                                                                         | automation id               | not airgapped              | yes  | yes                 | external-service            | automation                                                   |
+| `ListAutomations` / `ReadAutomation` / `ListAutomationTemplates`                                                                           | automation ids              | not airgapped              | yes  | no                  | external-service            | list/record                                                  |
+| `EditAutomation` / `DeleteAutomation` / `RunAutomation`                                                                                    | automation ids              | not airgapped              | yes  | see definition      | external-service            | record                                                       |
+| `ReadAutomationFiles` / `EditAutomationFiles`                                                                                              | automation-file ids         | not airgapped              | yes  | no                  | fs-read(+write)             | file view / edit                                             |
+| `SetAutomationRunOutcome`                                                                                                                  | automation outcome id       | not airgapped              | yes  | no                  | external-service            | string                                                       |
+| `LinkWorkItem`                                                                                                                             | link-work id                | yes                        | yes  | no                  | external-service            | string                                                       |
+| `SendInboxMessage`                                                                                                                         | inbox id                    | yes                        | yes  | yes                 | external-service            | string                                                       |
+| `Loop`                                                                                                                                     | loop id                     | schedulable hosts          | yes  | no                  | external-service            | loop record                                                  |
+| `ProposeMission` / `StartMissionRun` / `EndFeatureRun` / `DismissHandoffItems`                                                             | mission ids                 | mission mode               | yes  | ProposeMission yes  | fs/process per definition   | result                                                       |
+| `SpawnAgent` / `ListAgents` / `SendMessage` / `InterruptAgent` / `RenameAgent` / `ArchiveAgent` / `CreateListener`                         | mission-v2 ids              | flag `MissionsV2`          | yes  | no                  | external-service            | result                                                       |
+| `GenerateAgent`                                                                                                                            | `generate-agent-cli`        | yes                        | no   | no                  | external-service            | string                                                       |
+| `GetAgentEffectivenessUsage` / `StoreAgentReadinessReport` / `RenderAgentEffectivenessReport`                                              | ids                         | command-gated              | no   | no                  | external-service / fs-write | report                                                       |
+| `ListEvalRuns` / `ListDatasets` / `ReadDataset` / `ReadEvalRun` / `CreateEvalRun` / `ListEvalPresets` / `SaveEvalPreset` / `CreateDataset` | eval ids                    | flag `AutoEvalPipeline`    | yes  | no (create/run yes) | network/fs per definition   | eval records                                                 |
+| `<server>___<tool>`                                                                                                                        | `mcp_<server>_<tool>`       | per server, maybe deferred | yes  | yes                 | external-service            | stringified result                                           |
 
 Definitions: `@packages/core/src/tools/definitions/**`, registration
 `@src/tools/tui.ts:200-570`, automation/mission/inbox ids
@@ -569,23 +569,23 @@ reason (`denyRead_not_enforced`, `denyWriteFloor_not_enforced`,
 
 ## Data & config
 
-| Item | Location / key | Required | Default | Notes |
-|---|---|---|---|---|
-| sandbox settings | `sandbox` in `settings.json`, `settings.local.json`, org-managed settings | no | disabled, per-command | merged by the settings service; see `80-settings.md` |
-| sandbox mode | `sandbox.mode` | no | `per-command` | `whole-process` on Linux/macOS only |
-| allow/deny paths | `sandbox.filesystem.*` | no | `[]` | prefixes `/`, `~/`, relative |
-| network allow/deny | `sandbox.network.*` | no | `[]`, false | `*` only in `allowedDomains` |
-| user allow-always writes | `~/.droide/settings.json` `sandbox.filesystem.allowWrite`/`allowRead` | no | — | written by the Allow Always answer |
-| command allow/deny/block | `commandAllowlist`, `commandDenylist`, `commandBlocklist`, plus `permissionRules` behind `CliRulesEngine` | no | see defaults | deny = always ask; block = never run |
-| default allowlist | built-in | — | `ls, pwd, dir, git status/diff/log/show/blame/ls-files` | `@packages/common/src/settings/constants.ts:170-182` |
-| default denylist | built-in | — | `rm -rf /`, `mkfs*`, `dd of=/dev…`, `shutdown`, fork bombs, `chmod -R 777 /`, Windows `Format-Volume` | `@packages/common/src/policy/constants.ts:25-56` |
-| default blocklist | built-in | — | empty | orgs opt in |
-| seccomp helper | `~/.droide/sandbox-runtime/seccomp/apply-seccomp-<sha256>` | linux only | — | 0700, content-addressed |
-| sandbox operational writable roots | `~/.droide/{logs,sessions,cache,temp,…}` | — | — | always writable |
-| credential deny-read floor | `~/.droide/{auth.v2.*,auth.encrypted,computer-identity,prem-auth,config.json,mcp-oauth.*}` | — | — | never readable |
-| trusted-config deny-write floor | `~/.droide/{settings.json,settings.local.json,hooks.json,mcp.json,update-policy.json,org-managed-settings.json,host.json,computer.json,certs,bin,tools,sandbox-runtime,exit-spool,…}` + `DROIDE_ORG_MANAGED_SETTINGS_LOCAL_PATH` | — | — | never writable |
-| background log | `os.tmpdir()/droide-bg-<epoch>-<uuid>.out` | — | — | fire-and-forget only |
-| tool output spill | `~/.droide/tool-outputs/<…>` | — | — | named by the cut notice |
+| Item                               | Location / key                                                                                                                                                                                                                   | Required   | Default                                                                                               | Notes                                                |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| sandbox settings                   | `sandbox` in `settings.json`, `settings.local.json`, org-managed settings                                                                                                                                                        | no         | disabled, per-command                                                                                 | merged by the settings service; see `80-settings.md` |
+| sandbox mode                       | `sandbox.mode`                                                                                                                                                                                                                   | no         | `per-command`                                                                                         | `whole-process` on Linux/macOS only                  |
+| allow/deny paths                   | `sandbox.filesystem.*`                                                                                                                                                                                                           | no         | `[]`                                                                                                  | prefixes `/`, `~/`, relative                         |
+| network allow/deny                 | `sandbox.network.*`                                                                                                                                                                                                              | no         | `[]`, false                                                                                           | `*` only in `allowedDomains`                         |
+| user allow-always writes           | `~/.droide/settings.json` `sandbox.filesystem.allowWrite`/`allowRead`                                                                                                                                                            | no         | —                                                                                                     | written by the Allow Always answer                   |
+| command allow/deny/block           | `commandAllowlist`, `commandDenylist`, `commandBlocklist`, plus `permissionRules` behind `CliRulesEngine`                                                                                                                        | no         | see defaults                                                                                          | deny = always ask; block = never run                 |
+| default allowlist                  | built-in                                                                                                                                                                                                                         | —          | `ls, pwd, dir, git status/diff/log/show/blame/ls-files`                                               | `@packages/common/src/settings/constants.ts:170-182` |
+| default denylist                   | built-in                                                                                                                                                                                                                         | —          | `rm -rf /`, `mkfs*`, `dd of=/dev…`, `shutdown`, fork bombs, `chmod -R 777 /`, Windows `Format-Volume` | `@packages/common/src/policy/constants.ts:25-56`     |
+| default blocklist                  | built-in                                                                                                                                                                                                                         | —          | empty                                                                                                 | orgs opt in                                          |
+| seccomp helper                     | `~/.droide/sandbox-runtime/seccomp/apply-seccomp-<sha256>`                                                                                                                                                                       | linux only | —                                                                                                     | 0700, content-addressed                              |
+| sandbox operational writable roots | `~/.droide/{logs,sessions,cache,temp,…}`                                                                                                                                                                                         | —          | —                                                                                                     | always writable                                      |
+| credential deny-read floor         | `~/.droide/{auth.v2.*,auth.encrypted,computer-identity,prem-auth,config.json,mcp-oauth.*}`                                                                                                                                       | —          | —                                                                                                     | never readable                                       |
+| trusted-config deny-write floor    | `~/.droide/{settings.json,settings.local.json,hooks.json,mcp.json,update-policy.json,org-managed-settings.json,host.json,computer.json,certs,bin,tools,sandbox-runtime,exit-spool,…}` + `DROIDE_ORG_MANAGED_SETTINGS_LOCAL_PATH` | —          | —                                                                                                     | never writable                                       |
+| background log                     | `os.tmpdir()/droide-bg-<epoch>-<uuid>.out`                                                                                                                                                                                       | —          | —                                                                                                     | fire-and-forget only                                 |
+| tool output spill                  | `~/.droide/tool-outputs/<…>`                                                                                                                                                                                                     | —          | —                                                                                                     | named by the cut notice                              |
 
 Flags: `--auto low|medium|high`, `--skip-permissions-unsafe`, `--only-tools`,
 `--add-tools`, `--remove-tools`, `--use-spec` (`@src/entrypoints/exec/help.ts:96-125`).
@@ -596,60 +596,60 @@ Environment: `DROIDE_SANDBOXED`, `DROIDE_WHOLE_PROCESS_SANDBOX_GUARD_PATH`,
 
 ## Errors
 
-| Trigger | Model-visible text | Effect / retry |
-|---|---|---|
-| broken tool definition at registration | `Tool is missing sandbox side-effect metadata` / `Tool has invalid sandbox side-effect metadata` | registration throws; tool absent; startup surface |
-| native input fails schema | schema error + `accepts the following parameters:` guide + `Please retry with valid parameters.` | nothing executed; safe to retry |
-| `Execute.command` missing/empty | `EXECUTE_INVALID_COMMAND_REJECTION` text | nothing executed; safe to retry |
-| `Execute` missing `riskLevel` | missing-risk guidance naming the field | nothing executed; model must resupply |
-| blocked command | `This command is blocked by your organization's security policy and can never be run (matched blocked-command rule "<pattern>"). Do not run this command again…` | never executed; retrying is futile |
-| sandbox file denial | `Sandbox: read denied to <path>` / `Sandbox: write denied to <path>` / `Sandbox: <op> denied to <path>` | nothing written/read; retry after a grant is safe |
-| sandbox network denial | `Sandbox: network access denied to <domain>` | nothing fetched |
-| sandbox tool policy | `Sandbox: tool policy denied for <tool>; <reason>` (`tool is unknown or unregistered`, `missing sandbox side-effect metadata`, `declared side effect <x> has no sandbox policy handler`, `malformed <field> cannot be dispatched unchecked`) | call refused before execution |
-| non-interactive confirmation needed | `Exec ended early: insufficient permission to proceed. <guidance>` | run ends; the caller must re-run with a higher level |
-| tool filtered by `--only-tools` | `Tool <name> is not permitted in this exec session. Available tools: …` | refused |
-| `Read` non-absolute path | `file_path must be an absolute path, not a relative path` | refused |
-| `Read` limit ≤ 0 | `limit must be a positive number` | refused |
-| `Read` image > 5 MB | `Image file exceeds 5MB size limit. File size: <n>MB` | refused |
-| `Read` PDF unreadable | `Failed to read PDF: … could not extract text …` | refused |
-| `Edit` not read first | `Error: Cannot edit file that has not been read first. …` | refused |
-| `Edit` external change | `Error: File "<p>" has been modified externally since it was last read. …` | refused |
-| `Edit` ambiguous match | `Error: Found <n> occurrences of the specified text, but change_all is false. …` | refused |
-| `Create` at a directory | `Error: Cannot create file at "<p>" because a directory already exists there.` | refused |
-| protected write path | `Cannot <verb> files in artifacts directory…`, `Cannot <verb> mission system files…`, `Cannot <verb> features.json from a worker session`, `Cannot <verb> a path whose symlinks could not be resolved` | refused before write |
-| `Glob` empty patterns | `At least one pattern is required for glob search. …` | refused |
-| `Grep` over buffer | `Grep matched more than the 20 MB ripgrep buffer holds, so the list would be incomplete. …` | refused (program calls only) |
-| `Script` over a limit | call text over 128 outstanding / 1 MiB input throws where written; nested result over 32 MiB rejects | partial work may have committed |
-| whole-process unsupported | `Whole-process sandbox is unsupported on this platform` | sandbox not engaged |
-| whole-process deps missing | `Whole-process sandbox dependencies are unavailable` / `… secure seccomp dependencies are unavailable` | sandbox not engaged |
-| seal verification failure | reason names the failed probe (`denyRead_not_enforced`, …) | sealed child not run |
+| Trigger                                | Model-visible text                                                                                                                                                                                                                           | Effect / retry                                       |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| broken tool definition at registration | `Tool is missing sandbox side-effect metadata` / `Tool has invalid sandbox side-effect metadata`                                                                                                                                             | registration throws; tool absent; startup surface    |
+| native input fails schema              | schema error + `accepts the following parameters:` guide + `Please retry with valid parameters.`                                                                                                                                             | nothing executed; safe to retry                      |
+| `Execute.command` missing/empty        | `EXECUTE_INVALID_COMMAND_REJECTION` text                                                                                                                                                                                                     | nothing executed; safe to retry                      |
+| `Execute` missing `riskLevel`          | missing-risk guidance naming the field                                                                                                                                                                                                       | nothing executed; model must resupply                |
+| blocked command                        | `This command is blocked by your organization's security policy and can never be run (matched blocked-command rule "<pattern>"). Do not run this command again…`                                                                             | never executed; retrying is futile                   |
+| sandbox file denial                    | `Sandbox: read denied to <path>` / `Sandbox: write denied to <path>` / `Sandbox: <op> denied to <path>`                                                                                                                                      | nothing written/read; retry after a grant is safe    |
+| sandbox network denial                 | `Sandbox: network access denied to <domain>`                                                                                                                                                                                                 | nothing fetched                                      |
+| sandbox tool policy                    | `Sandbox: tool policy denied for <tool>; <reason>` (`tool is unknown or unregistered`, `missing sandbox side-effect metadata`, `declared side effect <x> has no sandbox policy handler`, `malformed <field> cannot be dispatched unchecked`) | call refused before execution                        |
+| non-interactive confirmation needed    | `Exec ended early: insufficient permission to proceed. <guidance>`                                                                                                                                                                           | run ends; the caller must re-run with a higher level |
+| tool filtered by `--only-tools`        | `Tool <name> is not permitted in this exec session. Available tools: …`                                                                                                                                                                      | refused                                              |
+| `Read` non-absolute path               | `file_path must be an absolute path, not a relative path`                                                                                                                                                                                    | refused                                              |
+| `Read` limit ≤ 0                       | `limit must be a positive number`                                                                                                                                                                                                            | refused                                              |
+| `Read` image > 5 MB                    | `Image file exceeds 5MB size limit. File size: <n>MB`                                                                                                                                                                                        | refused                                              |
+| `Read` PDF unreadable                  | `Failed to read PDF: … could not extract text …`                                                                                                                                                                                             | refused                                              |
+| `Edit` not read first                  | `Error: Cannot edit file that has not been read first. …`                                                                                                                                                                                    | refused                                              |
+| `Edit` external change                 | `Error: File "<p>" has been modified externally since it was last read. …`                                                                                                                                                                   | refused                                              |
+| `Edit` ambiguous match                 | `Error: Found <n> occurrences of the specified text, but change_all is false. …`                                                                                                                                                             | refused                                              |
+| `Create` at a directory                | `Error: Cannot create file at "<p>" because a directory already exists there.`                                                                                                                                                               | refused                                              |
+| protected write path                   | `Cannot <verb> files in artifacts directory…`, `Cannot <verb> mission system files…`, `Cannot <verb> features.json from a worker session`, `Cannot <verb> a path whose symlinks could not be resolved`                                       | refused before write                                 |
+| `Glob` empty patterns                  | `At least one pattern is required for glob search. …`                                                                                                                                                                                        | refused                                              |
+| `Grep` over buffer                     | `Grep matched more than the 20 MB ripgrep buffer holds, so the list would be incomplete. …`                                                                                                                                                  | refused (program calls only)                         |
+| `Script` over a limit                  | call text over 128 outstanding / 1 MiB input throws where written; nested result over 32 MiB rejects                                                                                                                                         | partial work may have committed                      |
+| whole-process unsupported              | `Whole-process sandbox is unsupported on this platform`                                                                                                                                                                                      | sandbox not engaged                                  |
+| whole-process deps missing             | `Whole-process sandbox dependencies are unavailable` / `… secure seccomp dependencies are unavailable`                                                                                                                                       | sandbox not engaged                                  |
+| seal verification failure              | reason names the failed probe (`denyRead_not_enforced`, …)                                                                                                                                                                                   | sealed child not run                                 |
 
 ## Acceptance tests
 
 All tests are offline and deterministic: fixtures are synthesised JSON, no real
 commands, no network, no credentials.
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1–B4 | `tests/tools/test_registry_identity` | `fixtures/tools/registry_stub.json` (2 tools, duplicate llmId, one missing `sideEffects`) |
-| B5 | `tests/tools/test_exec_readonly_catalog` | `fixtures/tools/registry_full.json` |
-| B6, B39 | `tests/tools/test_visibility_and_mcp_names` | `fixtures/tools/mcp_registration.json` |
-| B7–B10 | `tests/tools/test_input_validation` | `fixtures/tools/invalid_args/*.json` (one per tool) |
-| B11–B13 | `tests/tools/test_result_budgets` | `fixtures/tools/long_output.txt` (40 KiB), `fixtures/tools/nested_result_33mib.json` |
-| B14–B17 | `tests/tools/test_read` | `fixtures/files/{short,long,outline,utf16le,crlf}.txt`, `fixtures/files/{img_6mb.png,doc_120p.pdf}` |
-| B18 | `tests/tools/test_ls` | `fixtures/files/tree/` |
-| B19–B20 | `tests/tools/test_search_tools` | `fixtures/files/tree/` + pattern matrix |
-| B21–B25 | `tests/tools/test_write_tools` | `fixtures/files/edit_cases/*`, `fixtures/tools/patch_grammar/*.patch` |
-| B26–B31 | `tests/tools/test_execute_model` | `fixtures/tools/execute_env.json` (fake spawn recorder) |
-| B32 | `tests/tools/test_output_scrubbing` | `fixtures/tools/secret_output.txt` |
-| B33 | `tests/tools/test_script_limits` | `fixtures/tools/script_calls/*.ts` |
-| B34 | `tests/tools/test_todo_parse` | `fixtures/tools/todo_lists/*.txt` |
-| B35 | `tests/tools/test_task_schemas` | `fixtures/tools/task_args/*.json` |
-| B36–B40 | `tests/tools/test_web_spec_tools` | `fixtures/tools/web_args/*.json`, `fixtures/tools/spec_calls/*.json` |
-| B41–B47 | `tests/permissions/test_matrix` | `fixtures/permissions/matrix.json` |
-| B48–B52 | `tests/sandbox/test_policy_decisions` | `fixtures/sandbox/policy_cases.json` |
-| B53–B55 | `tests/sandbox/test_profile_assertions` | `fixtures/sandbox/profiles/*.json` |
-| B56 | `tests/sandbox/test_seal_reasons` | `fixtures/sandbox/probe_failures.json` |
+| Clause  | Test id                                     | Fixture                                                                                             |
+| ------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| B1–B4   | `tests/tools/test_registry_identity`        | `fixtures/tools/registry_stub.json` (2 tools, duplicate llmId, one missing `sideEffects`)           |
+| B5      | `tests/tools/test_exec_readonly_catalog`    | `fixtures/tools/registry_full.json`                                                                 |
+| B6, B39 | `tests/tools/test_visibility_and_mcp_names` | `fixtures/tools/mcp_registration.json`                                                              |
+| B7–B10  | `tests/tools/test_input_validation`         | `fixtures/tools/invalid_args/*.json` (one per tool)                                                 |
+| B11–B13 | `tests/tools/test_result_budgets`           | `fixtures/tools/long_output.txt` (40 KiB), `fixtures/tools/nested_result_33mib.json`                |
+| B14–B17 | `tests/tools/test_read`                     | `fixtures/files/{short,long,outline,utf16le,crlf}.txt`, `fixtures/files/{img_6mb.png,doc_120p.pdf}` |
+| B18     | `tests/tools/test_ls`                       | `fixtures/files/tree/`                                                                              |
+| B19–B20 | `tests/tools/test_search_tools`             | `fixtures/files/tree/` + pattern matrix                                                             |
+| B21–B25 | `tests/tools/test_write_tools`              | `fixtures/files/edit_cases/*`, `fixtures/tools/patch_grammar/*.patch`                               |
+| B26–B31 | `tests/tools/test_execute_model`            | `fixtures/tools/execute_env.json` (fake spawn recorder)                                             |
+| B32     | `tests/tools/test_output_scrubbing`         | `fixtures/tools/secret_output.txt`                                                                  |
+| B33     | `tests/tools/test_script_limits`            | `fixtures/tools/script_calls/*.ts`                                                                  |
+| B34     | `tests/tools/test_todo_parse`               | `fixtures/tools/todo_lists/*.txt`                                                                   |
+| B35     | `tests/tools/test_task_schemas`             | `fixtures/tools/task_args/*.json`                                                                   |
+| B36–B40 | `tests/tools/test_web_spec_tools`           | `fixtures/tools/web_args/*.json`, `fixtures/tools/spec_calls/*.json`                                |
+| B41–B47 | `tests/permissions/test_matrix`             | `fixtures/permissions/matrix.json`                                                                  |
+| B48–B52 | `tests/sandbox/test_policy_decisions`       | `fixtures/sandbox/policy_cases.json`                                                                |
+| B53–B55 | `tests/sandbox/test_profile_assertions`     | `fixtures/sandbox/profiles/*.json`                                                                  |
+| B56     | `tests/sandbox/test_seal_reasons`           | `fixtures/sandbox/probe_failures.json`                                                              |
 
 ### Permission matrix
 
@@ -659,25 +659,26 @@ root or an `allowWrite` path; `OUT` = outside both; `DW/FLOOR` = a `denyWrite` o
 deny-floor path. Sandbox disabled means only the middle column applies (modulo
 B24's protected paths).
 
-| Tool | off (interactive) | `--auto low` | `--auto medium` | `--auto high` | `--skip-permissions-unsafe` |
-|---|---|---|---|---|---|
-| Read / LS / Glob / Grep (any path class) | run | run | run | run | run |
-| TodoWrite / ToolSearch / TaskOutput / Skill | run | run | run | run | run |
-| Create / Edit / ApplyPatch — WS/AW | prompt | run | run | run | run |
-| Create / Edit / ApplyPatch — OUT | prompt | run | run | run | run |
-| Create / Edit / ApplyPatch — DW/FLOOR | refuse (protected/floor) | refuse | refuse | refuse | refuse (floor) / prompt (user DW) |
-| Execute, risk `low` (WS) | prompt unless policy-allow | run | run | run | run |
-| Execute, risk `medium` | prompt | prompt | run | run | run |
-| Execute, risk `high` | prompt | prompt | prompt | run | run |
-| Execute, policy `allow` | run | run | run | run | run |
-| Execute, policy `ask` | prompt | prompt | prompt | prompt | run |
-| Execute, policy `block` | refuse | refuse | refuse | refuse | refuse |
-| Script / Task (child calls re-checked) | unavailable in read-only exec; prompt interactively | run | run | run | run |
-| WebSearch / FetchUrl | prompt only when sandbox denies | same | same | same | same |
-| MCP tool | prompt (opaque impact) | prompt | prompt | prompt | run |
-| ExitSpecMode / AskUser | own modal | own modal | own modal | own modal | own modal |
+| Tool                                        | off (interactive)                                   | `--auto low` | `--auto medium` | `--auto high` | `--skip-permissions-unsafe`       |
+| ------------------------------------------- | --------------------------------------------------- | ------------ | --------------- | ------------- | --------------------------------- |
+| Read / LS / Glob / Grep (any path class)    | run                                                 | run          | run             | run           | run                               |
+| TodoWrite / ToolSearch / TaskOutput / Skill | run                                                 | run          | run             | run           | run                               |
+| Create / Edit / ApplyPatch — WS/AW          | prompt                                              | run          | run             | run           | run                               |
+| Create / Edit / ApplyPatch — OUT            | prompt                                              | run          | run             | run           | run                               |
+| Create / Edit / ApplyPatch — DW/FLOOR       | refuse (protected/floor)                            | refuse       | refuse          | refuse        | refuse (floor) / prompt (user DW) |
+| Execute, risk `low` (WS)                    | prompt unless policy-allow                          | run          | run             | run           | run                               |
+| Execute, risk `medium`                      | prompt                                              | prompt       | run             | run           | run                               |
+| Execute, risk `high`                        | prompt                                              | prompt       | prompt          | run           | run                               |
+| Execute, policy `allow`                     | run                                                 | run          | run             | run           | run                               |
+| Execute, policy `ask`                       | prompt                                              | prompt       | prompt          | prompt        | run                               |
+| Execute, policy `block`                     | refuse                                              | refuse       | refuse          | refuse        | refuse                            |
+| Script / Task (child calls re-checked)      | unavailable in read-only exec; prompt interactively | run          | run             | run           | run                               |
+| WebSearch / FetchUrl                        | prompt only when sandbox denies                     | same         | same            | same          | same                              |
+| MCP tool                                    | prompt (opaque impact)                              | prompt       | prompt          | prompt        | run                               |
+| ExitSpecMode / AskUser                      | own modal                                           | own modal    | own modal       | own modal     | own modal                         |
 
 Notes that the matrix pins:
+
 - Every cell is a function of `shouldConfirmExecution` (B42–B43) and the sandbox
   (B48–B52); "run" still means the executor's own guards apply.
 - `off` still runs allowlisted read-only `Execute` (policy `allow`, B43).
@@ -702,7 +703,7 @@ Each of these is a pure assertion over the profile/config document:
 6. `seccomp.applyPath` is present iff the platform is Linux and the embedded
    helper verified against its digest; absent on macOS/Windows.
 7. Whole-process mode on `win32` throws `Whole-process sandbox is unsupported on
-   this platform` before any child is spawned.
+this platform` before any child is spawned.
 8. A `deniedDomains` entry equal to `*` is rejected at settings parse time.
 
 ## Evidence
@@ -710,63 +711,63 @@ Each of these is a pure assertion over the profile/config document:
 Every path below is relative to `evidence/original/windows-x64/` unless it starts
 with `vendor:` (then `evidence/original-vendor/windows-x64/`).
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `packages/sdk-core/src/protocol/tools/constants.ts:22-115` | B1, B39 | read |
-| `packages/core/src/tools/registry.ts:12-140` | B1 | read |
-| `packages/core/src/tools/create-tool.ts:23-56` | B2 | read |
-| `packages/core/src/tools/enums.ts:1-71` | Terms, B52 | read |
-| `src/agent/tools.ts:1268-1312` | B3 | read |
-| `src/commands/resolveToolSelection.ts:316-323` | B5 | read |
-| `src/exec/tool-groups.ts:35-117` | B5 | read |
-| `src/agent/toolInputValidation.ts:74-84` | B7, B9 | read |
-| `packages/core/src/tools/utils/validate-tool-parameters.ts:89-320` | B7, B8, B10 | read |
-| `packages/core/src/tools/utils/constants.ts:21-40` | B11 | read |
-| `packages/core/src/tools/utils/large-output.ts:40-220` | B12, B13 | read |
-| `packages/core/src/tools/definitions/cli/schema.ts:81-111` | B14 | read |
-| `src/utils/truncate.ts:19-137` | B15 | read |
-| `packages/core/src/tools/utils/file-encoding.ts:1-200` | B16, B22 | read |
-| `src/tools/executors/client/read-cli.ts:72-800` | B16, B17 | read |
-| `packages/core/src/tools/definitions/cli/schema.ts:827-980` | B18–B20 | read |
-| `src/tools/executors/client/ls-cli.ts:140-250` | B18 | read |
-| `src/tools/executors/client/glob-search-cli.ts:29-233` | B19 | read |
-| `src/tools/executors/client/grep-search-cli.ts:287-381` | B20 | read |
-| `src/tools/executors/client/create-cli.ts:78-285` | B21 | read |
-| `packages/core/src/tools/utils/file-tools-utils.ts:29-84` | B22 | read |
-| `src/agent/file-edit/edit.ts:48-90`, `src/agent/file-edit/utils.ts:302-400` | B22 | read |
-| `src/tools/executors/client/utils/protectedWritePath.ts:182-268` | B24 | read |
-| `src/agent/file-edit/utils.ts:1047-1180` | B25 | read |
-| `packages/core/src/tools/definitions/cli/schema.ts:1033-1127` | B26, B27 | read |
-| `src/tools/executors/client/shell/shell-executor.ts:226-475` | B28, B29 | read |
-| `src/tools/executors/client/execute-cli.ts:1036-1360` | B30, B31 | read |
-| `src/services/TerminalService/LocalTerminalService.ts:1197-1320` | B30 | read |
-| `src/tools/executors/client/shell/shell-executor.ts:560-900` | B31, B32 | read |
-| `packages/core/src/tools/definitions/cli/script/schema.ts:5-203` | B33 | read |
-| `packages/utils/src/todo/schema.ts:1-45` | B34 | read |
-| `packages/core/src/tools/definitions/cli/task*.ts` | B35 | read |
-| `packages/core/src/tools/definitions/web/schema.ts:100-247` | B36 | read |
-| `packages/core/src/tools/definitions/cli/schema.ts:1169-1247` | B37, B38, B40 | read |
-| `src/services/mcp/McpService.ts:4429-4475` | B39 | read |
-| `src/tools/executors/client/mcp/McpToolExecutor.ts:215-345` | B39 | read |
-| `src/agent/shouldConfirmExecution.ts:820-1130` | B41–B43 | read |
-| `src/agent/autonomy.ts:60-201` | B43, B44 | read |
-| `src/services/SessionService.ts:4418-4526` | B42, B44, B45 | read |
-| `src/entrypoints/exec/help.ts:96-200` | B26, B45 | read |
-| `src/entrypoints/exec/assertValidOptions.ts:185-195` | B45 | read |
-| `src/core/ToolExecutor.ts:829-1132` | B41, B46 | read |
-| `src/agent/tools.ts:577-584` | B47 | read |
-| `src/sandbox/buildSandboxConfig.ts:11-46` | B48 | read |
-| `packages/common/src/settings/schema.ts:577-608` | B48 | read |
-| `packages/runtime/settings/src/sandbox-paths.ts:31-93` | B48 | read |
-| `src/sandbox/SandboxManager.ts:262-760` | B49–B51 | read |
-| `src/sandbox/SandboxManager.ts:1080-1385` | B53–B55 | read |
-| `src/sandbox/sandboxPreCheck.ts:563-1230` | B52 | read |
-| `src/sandbox/sandboxGuard.ts:64-262` | B52 | read |
-| `src/sandbox/allowAlwaysPersistence.ts:1-245` | B52 | read |
-| `src/sandbox/wholeProcessSandbox.ts:1060-1120`, `:1826-1862` | B53, B56 | read |
-| `src/utils/applySeccompEmbedded.ts:1-200` | B55 | read |
-| `vendor:node_modules/@anthropic-ai/sandbox-runtime/dist/sandbox/windows-sandbox-utils.js:1-24` | B54 | read |
-| `vendor:node_modules/@anthropic-ai/sandbox-runtime/dist/sandbox/sandbox-manager.js:332-380` | B53, B54 | read |
+| Evidence                                                                                       | Supports      | Method |
+| ---------------------------------------------------------------------------------------------- | ------------- | ------ |
+| `packages/sdk-core/src/protocol/tools/constants.ts:22-115`                                     | B1, B39       | read   |
+| `packages/core/src/tools/registry.ts:12-140`                                                   | B1            | read   |
+| `packages/core/src/tools/create-tool.ts:23-56`                                                 | B2            | read   |
+| `packages/core/src/tools/enums.ts:1-71`                                                        | Terms, B52    | read   |
+| `src/agent/tools.ts:1268-1312`                                                                 | B3            | read   |
+| `src/commands/resolveToolSelection.ts:316-323`                                                 | B5            | read   |
+| `src/exec/tool-groups.ts:35-117`                                                               | B5            | read   |
+| `src/agent/toolInputValidation.ts:74-84`                                                       | B7, B9        | read   |
+| `packages/core/src/tools/utils/validate-tool-parameters.ts:89-320`                             | B7, B8, B10   | read   |
+| `packages/core/src/tools/utils/constants.ts:21-40`                                             | B11           | read   |
+| `packages/core/src/tools/utils/large-output.ts:40-220`                                         | B12, B13      | read   |
+| `packages/core/src/tools/definitions/cli/schema.ts:81-111`                                     | B14           | read   |
+| `src/utils/truncate.ts:19-137`                                                                 | B15           | read   |
+| `packages/core/src/tools/utils/file-encoding.ts:1-200`                                         | B16, B22      | read   |
+| `src/tools/executors/client/read-cli.ts:72-800`                                                | B16, B17      | read   |
+| `packages/core/src/tools/definitions/cli/schema.ts:827-980`                                    | B18–B20       | read   |
+| `src/tools/executors/client/ls-cli.ts:140-250`                                                 | B18           | read   |
+| `src/tools/executors/client/glob-search-cli.ts:29-233`                                         | B19           | read   |
+| `src/tools/executors/client/grep-search-cli.ts:287-381`                                        | B20           | read   |
+| `src/tools/executors/client/create-cli.ts:78-285`                                              | B21           | read   |
+| `packages/core/src/tools/utils/file-tools-utils.ts:29-84`                                      | B22           | read   |
+| `src/agent/file-edit/edit.ts:48-90`, `src/agent/file-edit/utils.ts:302-400`                    | B22           | read   |
+| `src/tools/executors/client/utils/protectedWritePath.ts:182-268`                               | B24           | read   |
+| `src/agent/file-edit/utils.ts:1047-1180`                                                       | B25           | read   |
+| `packages/core/src/tools/definitions/cli/schema.ts:1033-1127`                                  | B26, B27      | read   |
+| `src/tools/executors/client/shell/shell-executor.ts:226-475`                                   | B28, B29      | read   |
+| `src/tools/executors/client/execute-cli.ts:1036-1360`                                          | B30, B31      | read   |
+| `src/services/TerminalService/LocalTerminalService.ts:1197-1320`                               | B30           | read   |
+| `src/tools/executors/client/shell/shell-executor.ts:560-900`                                   | B31, B32      | read   |
+| `packages/core/src/tools/definitions/cli/script/schema.ts:5-203`                               | B33           | read   |
+| `packages/utils/src/todo/schema.ts:1-45`                                                       | B34           | read   |
+| `packages/core/src/tools/definitions/cli/task*.ts`                                             | B35           | read   |
+| `packages/core/src/tools/definitions/web/schema.ts:100-247`                                    | B36           | read   |
+| `packages/core/src/tools/definitions/cli/schema.ts:1169-1247`                                  | B37, B38, B40 | read   |
+| `src/services/mcp/McpService.ts:4429-4475`                                                     | B39           | read   |
+| `src/tools/executors/client/mcp/McpToolExecutor.ts:215-345`                                    | B39           | read   |
+| `src/agent/shouldConfirmExecution.ts:820-1130`                                                 | B41–B43       | read   |
+| `src/agent/autonomy.ts:60-201`                                                                 | B43, B44      | read   |
+| `src/services/SessionService.ts:4418-4526`                                                     | B42, B44, B45 | read   |
+| `src/entrypoints/exec/help.ts:96-200`                                                          | B26, B45      | read   |
+| `src/entrypoints/exec/assertValidOptions.ts:185-195`                                           | B45           | read   |
+| `src/core/ToolExecutor.ts:829-1132`                                                            | B41, B46      | read   |
+| `src/agent/tools.ts:577-584`                                                                   | B47           | read   |
+| `src/sandbox/buildSandboxConfig.ts:11-46`                                                      | B48           | read   |
+| `packages/common/src/settings/schema.ts:577-608`                                               | B48           | read   |
+| `packages/runtime/settings/src/sandbox-paths.ts:31-93`                                         | B48           | read   |
+| `src/sandbox/SandboxManager.ts:262-760`                                                        | B49–B51       | read   |
+| `src/sandbox/SandboxManager.ts:1080-1385`                                                      | B53–B55       | read   |
+| `src/sandbox/sandboxPreCheck.ts:563-1230`                                                      | B52           | read   |
+| `src/sandbox/sandboxGuard.ts:64-262`                                                           | B52           | read   |
+| `src/sandbox/allowAlwaysPersistence.ts:1-245`                                                  | B52           | read   |
+| `src/sandbox/wholeProcessSandbox.ts:1060-1120`, `:1826-1862`                                   | B53, B56      | read   |
+| `src/utils/applySeccompEmbedded.ts:1-200`                                                      | B55           | read   |
+| `vendor:node_modules/@anthropic-ai/sandbox-runtime/dist/sandbox/windows-sandbox-utils.js:1-24` | B54           | read   |
+| `vendor:node_modules/@anthropic-ai/sandbox-runtime/dist/sandbox/sandbox-manager.js:332-380`    | B53, B54      | read   |
 
 Clauses B15's outline thresholds, B17's media caps, B29's env list, B30's
 2500 ms observation clamp, B33's numeric limits and B46's guidance strings are
@@ -842,7 +843,7 @@ filesystem enforcement" is `[observed]` in the vendored SRT comment and therefor
 - The pre-hydration display-name fallback map's ordering, the memoization
   internals (`decisionMemo`, `compileOutcomes`), and log/telemetry identifiers
   (`COMMAND_BLOCKED`, `[Tool] …` breadcrumbs).
-- The exact regexes used to *recognise* declaration lines for the `Read` outline,
+- The exact regexes used to _recognise_ declaration lines for the `Read` outline,
   provided the documented thresholds, exclusions (`.md`, `.mdx`), and fallbacks
   (return the whole file when the outline would be poor) hold.
 - Discovery/space-sync side channels (`queueDynamicContext`, `SpaceSyncService`)

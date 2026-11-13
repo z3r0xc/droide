@@ -64,13 +64,13 @@ function forcedDepth(value: string): ColorDepth {
 
 /** `COLORFGBG` last field → appearance (B18). */
 export function parseColorFgBg(value: string | undefined): ThemeName {
-  if (value === undefined) return "factory-dark";
+  if (value === undefined) return "droide-dark";
   const fields = value.split(";");
   const last = fields[fields.length - 1]?.trim();
   if (last === "default" || last === "7" || last === "15") {
-    return "factory-light";
+    return "droide-light";
   }
-  return "factory-dark";
+  return "droide-dark";
 }
 
 /**
