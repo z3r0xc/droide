@@ -1,0 +1,6 @@
+{
+ "case": "unknown-flag",
+ "exit_code": 1,
+ "stdout": "",
+ "stderr": "droide requires a terminal for interactive mode, but stdin is not one.\n  • Over SSH, add -t to allocate one: ssh -t <host> droide\n  • To run a prompt without a terminal, use droide exec: droide exec \"<prompt>\"\n  • \"--definitely-not-a-flag\" is not a droide command, so droide read it as a prompt. Run droide --help to list commands.\n"
+}

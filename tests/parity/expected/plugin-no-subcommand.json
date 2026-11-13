@@ -1,0 +1,6 @@
+{
+ "case": "plugin-no-subcommand",
+ "exit_code": 1,
+ "stdout": "",
+ "stderr": "Usage: droide plugin [options] [command]\n\nManage plugins\n\nOptions:\n  -h, --help                           display help for command\n\nCommands:\n  marketplace                          Manage plugin marketplaces\n  install|i [options] <plugin>         Install a plugin\n  uninstall|remove [options] <plugin>  Uninstall a plugin\n  update [options] [plugin]            Update plugins\n  list [options]                       List installed plugins\n  help [command]                       display help for command\n"
+}

@@ -1,0 +1,6 @@
+{
+ "case": "help-search",
+ "exit_code": 0,
+ "stdout": "Usage: droide search|find [options] <query>\n\nSearch across local sessions (messages, documents, tool results)\n\nArguments:\n  query                 Query text (case-insensitive substring)\n\nOptions:\n  --kind <kind>         Filter by kind:\n                        message_text|document|tool_use|tool_result|all (default:\n                        \"all\")\n  --limit-sessions <n>  Max sessions to return (default: 20)\n  --limit-hits <n>      Max matches per session (per kind per session without\n                        the session index) (default: 3)\n  --context-chars <n>   Characters of context around the match (default: 80)\n  --json                Output JSON\n  --reindex             Bring the session index up to date first\n  --include-archived    Include archived sessions\n  --exclude-children    Leave out sessions another session started\n  --include-hidden      Include sessions with no visible message\n  -h, --help            display help for command\n",
+ "stderr": ""
+}

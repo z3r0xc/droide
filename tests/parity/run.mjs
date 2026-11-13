@@ -7,7 +7,7 @@
  *   node tests/parity/run.mjs --check --filter help
  *
  * A case is JSON: {name, argv, stdin?, env?, files?, expect}.
- * Snapshots live in .work/parity/expected/<name>.json and hold the exit code,
+ * Snapshots live in tests/parity/expected/<name>.json and hold the exit code,
  * stdout and stderr after home-directory redaction. They are untracked: the
  * harness is a regression net for our own output, not a claim about anything
  * else.
@@ -25,7 +25,7 @@ const HERE = path.dirname(
 );
 const ROOT = path.resolve(HERE, "../..");
 const WORK_DIR =
-  process.env.DROIDE_PARITY_DIR ?? path.join(ROOT, ".work", "parity");
+  process.env.DROIDE_PARITY_DIR ?? path.join(ROOT, "tests", "parity");
 const CASES_DIR = path.join(HERE, "cases");
 const EXPECTED_DIR = path.join(WORK_DIR, "expected");
 const ENTRY = path.join(ROOT, "src/main.ts");

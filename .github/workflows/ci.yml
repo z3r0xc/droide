@@ -100,9 +100,9 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
-      - name: Goldens present?
+      - name: Snapshots present?
         id: goldens
-        run: test -d .work/parity/expected && echo "present=yes" >> "$GITHUB_OUTPUT" || echo "present=no" >> "$GITHUB_OUTPUT"
+        run: test -d tests/parity/expected && echo "present=yes" >> "$GITHUB_OUTPUT" || echo "present=no" >> "$GITHUB_OUTPUT"
       - name: Parity check
         if: steps.goldens.outputs.present == 'yes'
         run: npm run test:parity

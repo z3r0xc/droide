@@ -36,7 +36,7 @@ but the shipped artefact must not claim to be, or point at, another product.
    our own output — help text, exit codes, error strings — not a claim of
    equivalence with anything.
 4. **Snapshots never ship.** They stay in the untracked workspace
-   (`.work/parity/`), and CI runs the harness only when they exist, exactly as
+   (`tests/parity/expected/`), which are tracked, so CI always runs the harness,
    before.
 5. **Behaviour derived from evidence stays evidence.** The specifications still
    describe observed behaviour and cite the untracked corpus; ADR 0003 is

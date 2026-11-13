@@ -1,0 +1,6 @@
+{
+ "case": "help-computer",
+ "exit_code": 0,
+ "stdout": "Usage: droide computer [options] [command]\n\nManage Remote Control registrations\n\nOptions:\n  -h, --help                                            display help for command\n\nCommands:\n  register [options] [name]                             Register this machine for Remote Control\n  remove [options]                                      Remove this machine from Remote Control\n  list                                                  List computers registered for Remote Control\n  ssh [options] <computer-name> [command...]            Open SSH connection to a Remote Control computer\n  port-forward [options] <computer-name> <mappings...>  Forward local ports to a Remote Control computer\n  help [command]                                        display help for command\n",
+ "stderr": ""
+}

@@ -17,7 +17,7 @@ bumps both in the same commit; never "fix" one on its own.
 
 ```sh
 npm run typecheck && npm run format:check && npm test
-npm run test:parity          # требует локальных goldens
+npm run test:parity          # compares against tests/parity/expected
 npm run gaps:check
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace

@@ -7,7 +7,7 @@ clock, no dependence on any external binary, no shared state between tests.
 |---|---|---|---|
 | Unit | `tests/unit/**/*.test.ts` | `npm test` | Pure functions and modules: parser, help rendering, config precedence, store SQL, protocol framing |
 | Integration | `tests/integration/**/*.test.ts` | `npm test` | Things that cross a process or file boundary: spawning our CLI, migrating a real database file, the native helper over stdio |
-| Snapshots | `tests/parity/run.mjs` | `npm run test:parity` | Compares our CLI's observable output against snapshots recorded from this build (snapshots are local, in `.work/parity/`, never committed) |
+| Snapshots | `tests/parity/run.mjs` | `npm run test:parity` | Compares our CLI's observable output against snapshots recorded from this build (snapshots are tracked in `tests/parity/expected/`) |
 
 ## Conventions
 
@@ -32,6 +32,6 @@ plausible regressions, not to raise a count.
 ## Parity goldens
 
 `tests/parity/cases/*.json` are declarations (tracked locally only, in
-`.work/parity/`); the harness supports `--record` against our own build and
+`tests/parity/expected/`); the harness supports `--record` against our own build and
 `--check` against ours. See `docs/adr/0010-own-brand-and-snapshot-harness.md`.
 A case the sandbox cannot serve is reported `skipped` with a reason, never silently passed.
