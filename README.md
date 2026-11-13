@@ -50,7 +50,7 @@ What runs today, run against this tree:
 | `daemon`                                                                                   | works locally — WebSocket transport, JSON-RPC, auth gate, single instance, ordered shutdown; Remote Control and the port proxy are declared, not built                                                                                                                                                                                   |
 | `droide` with no arguments                                                                 | launches the interactive shell on a TTY pair; a typed prompt runs an agent turn with streamed rows, approvals and Esc-cancel                                                                                                                                                                                                             |
 | native helper                                                                              | 15 JSON-line methods (including PTY sessions), typed and validated on the TypeScript side, 69 Rust tests, plus a contract test that spawns a real process through the compiled binary (`npm run test:native`); the tool runtime uses it for discovery when the binary is present and degrades to the TypeScript implementation otherwise |
-| test suite                                                                                 | 1261 tests in 128 files: 1254 pass, 7 skipped, plus 69 Rust tests                                                                                                                                                                                                                                                                        |
+| test suite                                                                                 | 1266 tests in 129 files: 1259 pass, 7 skipped, plus 69 Rust tests                                                                                                                                                                                                                                                                        |
 
 `exec` needs a model credential. Without one it refuses instead of guessing:
 
@@ -81,7 +81,7 @@ $ node bin/droide.mjs exec --mission "build it"
 Current shape of the tree: 11 numbered specification documents — shared context
 plus ten subsystem specs, 9,414 lines under `specs/` — 147 TypeScript files
 under `src/` (52,048 lines), 9 Rust files under `crates/droide-native/src/`,
-9 ADRs, 1261 TypeScript tests and 69 Rust tests. Every place where the build is
+9 ADRs, 1266 TypeScript tests and 69 Rust tests. Every place where the build is
 narrower than the clause it cites is marked `TODO(spec …)` in the code and
 counted in [`docs/gaps.md`](./docs/gaps.md), which `npm run gaps` regenerates.
 
@@ -96,7 +96,7 @@ node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 12 named checks by default (--checks all: 16)
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 1261 tests
+npm test                        # 1266 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 69 tests

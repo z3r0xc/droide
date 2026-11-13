@@ -51,7 +51,7 @@
 | `daemon`                                                                                   | работает локально — транспорт WebSocket, JSON-RPC, шлюз аутентификации, единственный экземпляр, упорядоченное завершение; Remote Control и прокси порта заявлены, но не построены                                                                                                    |
 | `droide` без аргументов                                                                    | запускает интерактивную оболочку на паре TTY; введённый промпт выполняет ход агента с потоковыми строками, подтверждениями и отменой по Esc                                                                                                                                          |
 | нативный хелпер                                                                            | 15 JSON-lines-методов (включая PTY-сессии), типизированы и валидируются на стороне TypeScript, 69 Rust-тестов, плюс контрактный тест, который запускает настоящий процесс через скомпилированный бинарник (`npm run test:native`) — **пока не подключены к исполнению инструментов** |
-| набор тестов                                                                               | 1261 тест в 128 файлах: 1254 проходят, 7 пропущены, плюс 69 Rust-тестов                                                                                                                                                                                                            |
+| набор тестов                                                                               | 1265 тестов в 129 файлах: 1258 проходят, 7 пропущены, плюс 69 Rust-тестов                                                                                                                                                                                                            |
 
 `exec` требует учётных данных модели. Без них он отказывает, а не угадывает:
 
@@ -82,7 +82,7 @@ $ node bin/droide.mjs exec --mission "build it"
 Текущая форма дерева: 11 нумерованных документов спецификации — общий контекст
 плюс десять подсистемных спек, 9,414 строк в `specs/` — 147 TypeScript-файлов
 в `src/` (52,048 строки), 9 Rust-файлов в `crates/droide-native/src/`, 9 ADR,
-1261 TypeScript-тест и 69 Rust-тестов. Каждое место, где реализация покрывает
+1265 TypeScript-тестов и 69 Rust-тестов. Каждое место, где реализация покрывает
 меньше цитируемого пункта, помечено `TODO(spec …)` в коде и посчитано в
 [`docs/gaps.md`](./docs/gaps.md), который перегенерирует `npm run gaps`.
 
@@ -97,7 +97,7 @@ node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 12 именованных проверок по умолчанию (--checks all: 16)
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 1261 tests
+npm test                        # 1266 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 69 tests
@@ -188,7 +188,7 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 1. `npm run typecheck`
 2. `npm run format:check`
 3. `npm test`
-4. `npm run test:parity` (нужны локальные снапшоты в `.work/parity`)
+4. `npm run test:parity` (сверка с `tests/parity/expected/`)
 5. `cargo test --workspace`
 6. `npm run gaps:check`
 7. `npm run brand:check`
