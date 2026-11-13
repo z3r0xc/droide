@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **48** markers across **42** clauses.
+Total: **46** markers across **40** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -13,7 +13,7 @@ Total: **48** markers across **42** clauses.
 | `src/acp/protocol.ts:32` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
 | `src/acp/server.ts:582` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
 | `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
-| `src/app/interactive-turn.ts:558` | `95 B10` | steering and the queued-message list are not implemented, so a second submit is refused with a notice instead of being queued or delivered to the running turn. |
+| `src/app/interactive-turn.ts:573` | `95 B10` | steering and the queued-message list are not implemented, so a second submit is refused with a notice instead of being queued or delivered to the running turn. |
 | `src/cli/commands/resume.ts:67` | `10 B22` | the interactive shell cannot adopt a stored transcript yet, so the resumed session is named here but the shell still opens empty. |
 | `src/cli/mcp-mutations.ts:321` | `B7` | org MCP policy is remote-only and this build does not resolve it into AppContext, so a server the policy would block is not refused here. |
 | `src/cli/resume-commands.ts:419` | `10 B22` | the interactive session picker is not implemented, so a terminal gets the same bounded list as a pipe instead of a choice; --last is the one way to select without a picker. |
@@ -48,9 +48,7 @@ Total: **48** markers across **42** clauses.
 | `src/tools/shell/exec.ts:339` | `B31` | no watchdog and no inner-PID/creation-time report yet; the wrapper PID and the log path are what this build returns. |
 | `src/tools/shell/exec.ts:374` | `B9` | the exact wording is not quoted by the spec. |
 | `src/transport/client.ts:111` | `B41` | the Anthropic -remaining/-reset header pair is not implemented; the spec does not give the header names. |
-| `src/transport/errors.ts:540` | `B102` | replace with the exact fixed copy recorded in the evidence report for provider errors (constants module, see evidence/INVENTORY.md). |
-| `src/transport/errors.ts:724` | `B101` | the body markers for quota-vs-payment (non-proxy), content moderation, context limit, request-too-large and thinking-signature/PDF invalidity are not quoted in the spec; only the proxy's two code values and the status bands are implemented. |
-| `src/transport/errors.ts:79` | `B88` | the spec quotes only the certificate chain not trusted: … prefix and the two remediations; the exact full sentence is not quoted. |
+| `src/transport/errors.ts:719` | `B101` | the body markers for quota-vs-payment (non-proxy), content moderation, context limit, request-too-large and thinking-signature/PDF invalidity are not quoted in the spec; only the proxy's two code values and the status bands are implemented. |
 | `src/transport/llm.ts:315` | `B121` | thinking tokens are also estimated from the streamed character count before the provider breakdown arrives; the spec does not give the estimate's ratio, so only the provider field is used here. |
 | `src/transport/llm.ts:369` | `B117` | the spec does not quote the separator used between the two parts. |
 | `src/transport/llm.ts:449` | `B114` | the spec states the handled event order only. |
