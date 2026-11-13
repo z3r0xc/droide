@@ -3,7 +3,6 @@
  "argv": [
   "--version"
  ],
- "oracle": true,
  "expect": {
   "exit_code": 0,
   "stdout_lines": 1,

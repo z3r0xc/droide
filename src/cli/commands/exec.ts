@@ -1,10 +1,10 @@
 /**
  * `exec` command. Contract: `specs/80-exec-and-streaming.md`.
  *
- * The subject prints a curated help page for this command rather than
+ * This command prints a curated help page rather than
  * Commander's layout, so `-h, --help` is an ordinary option: Commander's
  * built-in help option would otherwise print the wrong page and exit before
- * the action runs. `droid help exec` deliberately keeps Commander's rendering
+ * the action runs. `droide help exec` deliberately keeps Commander's rendering
  * (specs/10-cli-surface.md B26).
  */
 import { randomUUID } from "node:crypto";
@@ -102,7 +102,7 @@ export function makeExecCommand(): Command {
     )
     .option(
       "--disable-builtin-skills",
-      "Disable Factory-provided builtin skills (not supported in ACP modes)",
+      "Disable built-in skills shipped with the CLI (not supported in ACP modes)",
     )
     .option(
       "-s, --session-id <id>",
@@ -172,7 +172,7 @@ export function makeExecCommand(): Command {
     .option("-w, --worktree [name]", "Run in a git worktree")
     .option(
       "--worktree-dir <path>",
-      "Deprecated: set the worktree directory in the Factory desktop app instead",
+      "Deprecated: set the worktree directory in settings instead",
     )
     .option("--log-group-id <id>", "Log group ID for filtering logs")
     .option(
@@ -267,8 +267,8 @@ export function makeExecCommand(): Command {
             : [];
         };
         if (flag("help")) {
-          // The golden page carries the subject's own trailing blank line, so the
-          // renderer ends with one newline and the write supplies the second.
+          // The recorded page ends with a blank line, so the renderer ends
+          // with one newline and the write supplies the second.
           process.stdout.write(`${renderExecHelp(execHelpModels())}\n`);
           return;
         }

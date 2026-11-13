@@ -21,7 +21,7 @@ function parseInteger(value: string, what: string): number {
 
 export function makeDaemonCommand(): Command {
   return new Command("daemon")
-    .description("Run the Factory daemon server")
+    .description("Run the daemon server")
     .option("-p, --port <number>", "TCP port to listen on")
     .option("--host <address>", "Host address to bind to", "127.0.0.1")
     .option("--unix <path>", "Unix socket path (alternative to TCP)")
@@ -32,7 +32,7 @@ export function makeDaemonCommand(): Command {
         .default("websocket"),
     )
     .option(
-      "--droid-path <path>",
+      "--droide-path <path>",
       `Path to ${PROGRAM} executable for spawning sessions`,
     )
     .option(
@@ -73,7 +73,7 @@ export function makeDaemonCommand(): Command {
 
         const host = text("host");
         const unixPath = text("unix");
-        const droidPath = text("droidPath");
+        const droidePath = text("droidePath");
         const port = integer("port");
         const livenessFd = integer("liveness-fd");
         const parentPid = integer("parent-pid");
@@ -83,7 +83,7 @@ export function makeDaemonCommand(): Command {
           ...(unixPath === undefined ? {} : { unixPath }),
           debug: flag("debug"),
           listen: text("listen") === "ipc" ? "ipc" : "websocket",
-          ...(droidPath === undefined ? {} : { droidPath }),
+          ...(droidePath === undefined ? {} : { droidePath }),
           ...(livenessFd === undefined ? {} : { livenessFd }),
           ...(parentPid === undefined ? {} : { parentPid }),
           remoteControl: flag("remoteControl") || flag("remoteAccess"),

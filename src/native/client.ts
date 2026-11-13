@@ -104,7 +104,7 @@ function messageOf(error: unknown): string {
 /**
  * One helper process. Construct it through `createNativeClient`, which also
  * performs the protocol handshake; constructing directly skips the version
- * check, so prefer the factory.
+ * check, so prefer the builder.
  */
 export class NativeClient {
   readonly helperPath: string;

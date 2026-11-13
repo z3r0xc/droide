@@ -1,5 +1,5 @@
 /**
- * `droid daemon` wiring. Clauses: `specs/70` B2, B3, B5, B7, B8, B10, B11 and
+ * `droide daemon` wiring. Clauses: `specs/70` B2, B3, B5, B7, B8, B10, B11 and
  * B28 (the Remote Control refusal in this build).
  */
 
@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { PRODUCT_VERSION } from "../../../src/cli/brand.ts";
 import type { Environment, Platform } from "../../../src/config/paths.ts";
 import {
   LOCAL_IDENTITY,
@@ -100,35 +101,34 @@ function capture(
   };
 }
 
-test("the ambient FACTORY_API_KEY becomes the single accepted apiKey", () => {
+test("the ambient DROIDE_API_KEY becomes the single accepted apiKey", () => {
   const policy = environmentAuthPolicy(
-    environmentOf({ FACTORY_API_KEY: " fk-abc " }),
+    environmentOf({ DROIDE_API_KEY: " fk-abc " }),
   );
   assert.deepEqual(policy.identity, LOCAL_IDENTITY);
   assert.equal(policy.apiKey, "fk-abc");
   assert.equal(policy.token, undefined);
   assert.equal(
-    environmentAuthPolicy(environmentOf({ FACTORY_API_KEY: "sk-other" }))
-      .apiKey,
+    environmentAuthPolicy(environmentOf({ DROIDE_API_KEY: "sk-other" })).apiKey,
     undefined,
   );
   assert.equal(environmentAuthPolicy(environmentOf()).apiKey, undefined);
 });
 
-test("the daemon log path lives under the Factory dir", () => {
+test("the daemon log path lives under the state dir", () => {
   const environment = environmentOf();
   assert.equal(
     daemonLogsPath(environment),
-    join(environment.home, ".factory", "logs", "factoryd.log"),
+    join(environment.home, ".droide", "logs", "daemon.log"),
   );
   assert.equal(
     daemonLogsPath(
       environmentOf({
-        FACTORY_HOME_OVERRIDE: environment.home,
-        FACTORY_ENV: "development",
+        DROIDE_HOME_OVERRIDE: environment.home,
+        DROIDE_ENV: "development",
       }),
     ),
-    join(environment.home, ".factory-dev", "logs", "factoryd.log"),
+    join(environment.home, ".droide-dev", "logs", "daemon.log"),
   );
 });
 
@@ -136,13 +136,13 @@ test("--settings is exported for the daemon process only when non-empty", () => 
   const env: Record<string, string | undefined> = {};
   exportSettingsEnvironment(undefined, env);
   exportSettingsEnvironment("", env);
-  assert.equal(env["FACTORY_RUNTIME_SETTINGS_PATH"], undefined);
+  assert.equal(env["DROIDE_RUNTIME_SETTINGS_PATH"], undefined);
   exportSettingsEnvironment("/tmp/settings.json", env);
-  assert.equal(env["FACTORY_RUNTIME_SETTINGS_PATH"], "/tmp/settings.json");
+  assert.equal(env["DROIDE_RUNTIME_SETTINGS_PATH"], "/tmp/settings.json");
 });
 
 test("flags map onto the server configuration with unix winning over port", () => {
-  const environment = environmentOf({ FACTORY_API_KEY: "fk-abc" });
+  const environment = environmentOf({ DROIDE_API_KEY: "fk-abc" });
   const options = daemonServerOptions(
     {
       port: 4321,
@@ -187,7 +187,7 @@ test("the default host is loopback and the version is the advertised one", () =>
   );
   assert.equal(options.host, "127.0.0.1");
   assert.equal(options.pid, 7);
-  assert.equal(DAEMON_VERSION, "1.9.0");
+  assert.equal(DAEMON_VERSION, PRODUCT_VERSION);
 });
 
 test("debug logging writes everything; a normal run only writes failures", () => {
@@ -349,7 +349,7 @@ test("a passed-in auth policy replaces the environment one", () => {
   const options = daemonServerOptions(
     {},
     {
-      ...capture(environmentOf({ FACTORY_API_KEY: "fk-abc" })).deps,
+      ...capture(environmentOf({ DROIDE_API_KEY: "fk-abc" })).deps,
       auth: policy,
     },
   );

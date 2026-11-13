@@ -12,6 +12,8 @@
 
 import type { Server } from "node:http";
 
+import { PRODUCT_VERSION } from "../cli/brand.ts";
+
 import {
   AUTHENTICATE_METHOD,
   CONNECTION_STATUS_METHOD,
@@ -34,7 +36,7 @@ import {
 import {
   DAEMON_BIND_RETRY_DELAYS_MS,
   DAEMON_SHUTDOWN_TIMEOUT_MS,
-  FACTORY_PROTOCOL_VERSION,
+  DROIDE_PROTOCOL_VERSION,
   JSON_RPC_ERRORS,
   attachVersionMismatch,
   createErrorObject,
@@ -72,7 +74,7 @@ import {
 } from "./web-socket.ts";
 
 /** Daemon product version carried in the ready message and banner. */
-export const DAEMON_VERSION = "1.9.0";
+export const DAEMON_VERSION = PRODUCT_VERSION;
 /** Loopback default (B1, B31). */
 export const DEFAULT_HOST = "127.0.0.1";
 
@@ -139,7 +141,7 @@ export interface DaemonServerOptions {
   readonly unixPath?: string;
   readonly auth: DaemonAuthPolicy;
   readonly version?: string;
-  /** Defaults to {@link FACTORY_PROTOCOL_VERSION}. */
+  /** Defaults to {@link DROIDE_PROTOCOL_VERSION}. */
   readonly protocolVersion?: string;
   readonly pid?: number;
   readonly platform?: string;
@@ -676,7 +678,7 @@ export class DaemonServer {
     this.parentChannel = options.parentChannel;
     this.remoteControl = options.remoteControl ?? false;
     this.version = options.version ?? DAEMON_VERSION;
-    this.protocolVersion = options.protocolVersion ?? FACTORY_PROTOCOL_VERSION;
+    this.protocolVersion = options.protocolVersion ?? DROIDE_PROTOCOL_VERSION;
     this.pid = options.pid ?? process.pid;
     this.methods = options.methods ?? {};
     this.logger = options.logger ?? silentLogger;
@@ -773,20 +775,20 @@ export class DaemonServer {
       if (this.remoteControl) {
         throw new DaemonStartupError(
           "--listen ipc cannot be combined with --remote-control",
-          { code: "droid.daemon.ipc-remote-access" },
+          { code: "droide.daemon.ipc-remote-access" },
         );
       }
       if (this.parentChannel === undefined) {
         throw new DaemonStartupError(
           "--listen ipc requires the daemon to be spawned with an inherited IPC channel",
-          { code: "droid.daemon.ipc-unavailable" },
+          { code: "droide.daemon.ipc-unavailable" },
         );
       }
     }
     if (this.parentChannel?.connected === false) {
       throw new DaemonStartupError(
         "The inherited IPC channel is already disconnected",
-        { code: "droid.daemon.ipc-disconnected" },
+        { code: "droide.daemon.ipc-disconnected" },
       );
     }
   }
@@ -962,7 +964,7 @@ export class DaemonServer {
     }
     this.parentChannel?.send(
       JSON.stringify({
-        type: "factory.daemon.ready",
+        type: "droide.daemon.ready",
         pid: this.pid,
         version: this.version,
       }),

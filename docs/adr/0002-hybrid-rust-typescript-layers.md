@@ -6,17 +6,17 @@
 
 ## Context
 
-The subject ships as a Bun single-file executable whose application layer is
-TypeScript (2,889 recovered files across the `app:src` tree and eleven
-`@factory/*` workspace packages) and whose native layer is a set of helper
+The reference build ships as a Bun single-file executable whose application
+layer is TypeScript (2,889 files across the `app:src` tree and eleven workspace
+packages) and whose native layer is a set of helper
 blobs embedded beside it: `rust_pty` (`.dll`/`.so`/`.dylib` per platform),
 `keytar` (credential storage), `libsqlite3`, a ripgrep-style search binary, a
 fuzzy-file-finder C library (`fff_c`), an `agent-browser` executable, a
 WebAssembly module, and a 54 MB `script-runtime`.
 
-The reimplementation must reach behavioural parity, including native effects:
-pseudo-terminal sessions, keychain secrets, SQLite, fast file search and the
-process sandbox.
+The build must reach behavioural agreement with the recorded cases, including
+native effects: pseudo-terminal sessions, keychain secrets, SQLite, fast file
+search and the process sandbox.
 
 ## Decision
 
@@ -28,8 +28,8 @@ Two layers, one repository:
    runtime already present on the machine; the build target is a plain
    `node`-runnable package with a thin launcher.
 2. **`crates/` — Rust native layer** as a Cargo workspace exposing narrow,
-   versioned interfaces through one JSON-over-stdio helper binary (the same
-   shape the subject uses for its helpers):
+   versioned interfaces through one JSON-over-stdio helper binary (the shape the
+   reference build uses for its helpers):
    - `pty` — terminal sessions, resize, process-tree teardown;
    - `search` — ripgrep-compatible walking/matching with the same output
      records the TypeScript layer formats;
@@ -45,7 +45,7 @@ them at the boundary.
 
 - Two toolchains and two test suites; the boundary must be versioned and
   validated on every call (schema check, not trust).
-- Native behaviour that the subject hides inside prebuilt blobs (e.g. PTY
+- Native behaviour the reference build hides inside prebuilt blobs (e.g. PTY
   quirks) becomes our responsibility; each such difference needs a spec entry
   and a test.
 - Distribution stays simple: one `npm` package plus one helper binary per
@@ -55,11 +55,11 @@ them at the boundary.
 
 - **TypeScript only** (node-pty, chokidar, better-sqlite3): fastest start, but
   inherits third-party native modules we cannot specify or pin at the level the
-  subject does, and adds supply-chain surface.
+  reference build does, and adds supply-chain surface.
 - **Rust only**: strongest parity for native effects and single-binary
   distribution, but the product layer is ~33 MB of TypeScript with heavy
   dynamic shapes (tool schemas, provider streams); re-writing it in Rust would
   slow the specification work rather than accelerate parity.
-- **Bun runtime for the TypeScript layer**: closest to the original packaging
+- **Bun runtime for the TypeScript layer**: closest to the reference packaging
   (`bun build --compile`), rejected only because Bun is not installed here and
-  because parity tests must run on the same Node the rest of the repo uses.
+  because the CLI cases must run on the same Node the rest of the repo uses.

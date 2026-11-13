@@ -2,31 +2,31 @@
 
 <div align="center">
   <img src="./docs/assets/hero.svg" width="100%"
-       alt="Droide — терминальный кодинг-агент, восстановленный по своей спецификации; одна настоящая цепочка из репозитория: spec → код → тест">
+       alt="Droide — терминальный кодинг-агент; одна настоящая цепочка из репозитория: spec → код → тест">
 </div>
 
-**Droide** — clean-room реализация `droid` CLI v1.9.0: та же поверхность
-команд, страницы help, отказы и коды выхода, восстановленные по
-письменной спецификации, а не по скопированным исходникам.
+**Droide** — терминальный кодинг-агент для вашего репозитория: одна
+поверхность команд для промптов, сессий, инструментов, серверов MCP, плагинов и
+локального демона, управляемая из терминала.
 
 Продуктовый слой — TypeScript: Node 24, ESM, типы срезаются при загрузке, шага
 сборки нет. Нативный слой — Rust, за одним дочерним процессом на JSON-lines.
 Оба написаны против одного контракта: [`specs/`](./specs/README.md).
 
-## Зачем это существует
+## Как это устроено
 
 Поставляемый результат — спецификация. Реализация — это проверка того, что
 спецификация достаточно полна и однозначна, чтобы по ней можно было строить.
 
 - **SDD — сначала spec.** У каждой подсистемы один документ в `specs/`, и
   ничего не реализуется до того, как оно специфицировано. Пункты помечены
-  `[observed]`, `[derived]` или `[inferred]`, и каждый несёт ссылку —
-  восстановленный файл и номер строки либо записанный golden.
+  `[observed]`, `[derived]` или `[inferred]`, и каждый несёт ссылку — на
+  источник или на записанный кейс.
 - **ADD — решения как записи.** Всё, что ограничивает структуру, — это ADR
   в [`docs/adr/`](./docs/adr/0000-template.md), написанный в момент принятия
   решения. Разделение на два рантайма —
   [ADR 0002](./docs/adr/0002-hybrid-rust-typescript-layers.md); правило, что
-  код субъекта не копируется, —
+  восстановленный материал не попадает в сборку, —
   [ADR 0003](./docs/adr/0003-evidence-first-clean-room-policy.md).
 - **TDD — пункты компилируются в тесты.** Каждый поведенческий пункт называет
   хотя бы один детерминированный тест: без сети, без учётных данных, без
@@ -38,52 +38,51 @@
 
 Что работает сегодня — проверено на этом дереве:
 
-| Поверхность | Сейчас |
-| --- | --- |
-| `--version`, `--help`, help подкоманд | работает — сообщает `1.9.0`; 20/20 записанных parity-кейсов против субъекта (goldens локальные, см. [ADR 0004](./docs/adr/0004-parity-harness-with-optional-oracle.md)) |
-| `doctor` | работает — 16 именованных проверок; десять из них — реальные пробы (config, environment, system, binaries, filesystem, git, proxy, certs, auth, mcp), остальные сообщают `skip` с указанием причины |
-| `search` / `find` | работает — обслуживается локальным индексом транскриптов с доказывающим откатом на буквальный скан; `--reindex` обновляет его |
-| `mcp list`, `mcp add`, `mcp remove`, `mcp permissions` | работают — объединённая конфигурация, точечные правки JSONC с сохранением комментариев, атомарные записи, список, отзыв и очистка разрешений |
-| `plugin list`, `plugin marketplace`, `plugin install`, `plugin uninstall`, `plugin update` | работают — маркетплейсы на git, валидируемые до принятия, атомарные слияния реестра, отказы при коллизиях и битых ссылках |
-| `exec` | работает для вывода `text`, `json` и `stream-json` с промптом, `-f` или stdin, продолжением сессии и потоковым вводом; `stream-jsonrpc`, ACP, `--mission` и `--list-tools` отказывают |
-| `resume` | работает — перечисляет сессии, принимает UUID или ссылку, продолжает через путь `exec -s`, форкает с `--fork` |
-| `daemon` | работает локально — транспорт WebSocket, JSON-RPC, шлюз аутентификации, единственный экземпляр, упорядоченное завершение; Remote Control и прокси порта заявлены, но не построены |
-| `droide` без аргументов | запускает интерактивную оболочку на паре TTY; введённый промпт выполняет ход агента с потоковыми строками, подтверждениями и отменой по Esc |
-| нативный хелпер | 15 JSON-lines-методов (включая PTY-сессии), типизированы и валидируются на стороне TypeScript, 69 Rust-тестов, плюс контрактный тест, который запускает настоящий процесс через скомпилированный бинарник (`npm run test:native`) — **пока не подключены к исполнению инструментов** |
-| набор тестов | 1096 тестов в 116 файлах: 1090 проходят, 6 пропущены, плюс 69 Rust-тестов |
+| Поверхность                                                                                | Сейчас                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--version`, `--help`, help подкоманд                                                      | работает — сообщает `0.5.0`; 20 записанных CLI-кейсов проходят (снапшоты локальные, см. [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md))                                                                                                                               |
+| `doctor`                                                                                   | работает — 16 именованных проверок, двенадцать из них по умолчанию: config, environment, system, binaries, updates, filesystem, git, proxy, certs, connectivity, auth, daemon; `--checks all` добавляет custom-models, inference, mcp и exec, которые запускают серверы или тратят деньги. Проверка, которая не может выполниться, сообщает `skip` с причиной |
+| `search` / `find`                                                                          | работает — обслуживается локальным индексом транскриптов с доказывающим откатом на буквальный скан; `--reindex` обновляет его                                                                                                                                                        |
+| `mcp list`, `mcp add`, `mcp remove`, `mcp permissions`                                     | работают — объединённая конфигурация, точечные правки JSONC с сохранением комментариев, атомарные записи, список, отзыв и очистка разрешений                                                                                                                                         |
+| `plugin list`, `plugin marketplace`, `plugin install`, `plugin uninstall`, `plugin update` | работают — маркетплейсы на git, валидируемые до принятия, атомарные слияния реестра, отказы при коллизиях и битых ссылках                                                                                                                                                            |
+| `exec`                                                                                     | работает для вывода `text`, `json` и `stream-json` с промптом, `-f` или stdin, продолжением сессии и потоковым вводом; `--list-tools` печатает инструменты выбранной модели без учётных данных; `stream-jsonrpc`, ACP и `--mission` отказывают |
+| `resume`                                                                                   | работает — перечисляет сессии, принимает UUID или ссылку, продолжает через путь `exec -s`, форкает с `--fork`                                                                                                                                                                        |
+| `update`, `update --check`, `update -v <version>`                                          | работают — проверка читает ленту релизов этого репозитория; установка потоково пишет архив в staging, хешируя его, меняет атомарно и откатывается, если единственная проба не прошла                                                     |
+| `daemon`                                                                                   | работает локально — транспорт WebSocket, JSON-RPC, шлюз аутентификации, единственный экземпляр, упорядоченное завершение; Remote Control и прокси порта заявлены, но не построены                                                                                                    |
+| `droide` без аргументов                                                                    | запускает интерактивную оболочку на паре TTY; введённый промпт выполняет ход агента с потоковыми строками, подтверждениями и отменой по Esc                                                                                                                                          |
+| нативный хелпер                                                                            | 15 JSON-lines-методов (включая PTY-сессии), типизированы и валидируются на стороне TypeScript, 69 Rust-тестов, плюс контрактный тест, который запускает настоящий процесс через скомпилированный бинарник (`npm run test:native`) — **пока не подключены к исполнению инструментов** |
+| набор тестов                                                                               | 1261 тест в 128 файлах: 1254 проходят, 7 пропущены, плюс 69 Rust-тестов                                                                                                                                                                                                            |
 
 `exec` требует учётных данных модели. Без них он отказывает, а не угадывает:
 
 ```console
 $ node bin/droide.mjs exec -o json "hi"
-Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY environment variable.
+Authentication failed. Please log in using /login or set a valid DROIDE_API_KEY environment variable.
 ```
 
 Заявлено, в работе:
 
-| Поверхность | Состояние |
-| --- | --- |
-| `mcp auth` | PKCE, loopback-колбэк, обмен токена и герметичное хранилище учётных данных реализованы и протестированы; команды, которая их связывает, нет |
-| `computer register\|remove\|ssh\|port-forward`, `update` без `--check` | опции разбираются, help печатается, любое действие отказывает с кодом 1 или 2 |
-| хранилища учётных данных macOS/Linux | существует только Windows DPAPI; хранилище отказывает, а не пишет открытым текстом |
-| Remote Control, relay и прокси порта; интерактивный выбор сессии | заявлены в `specs/70` и `specs/10`; `docs/gaps.md` называет каждый пункт |
-| нативный слой внутри рантайма инструментов | хелпер протестирован end to end, но инструменты пока достигают его через fake |
+| Поверхность                                                    | Состояние                                                                     |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `computer register\|remove\|ssh\|port-forward`                 | опции разбираются, help печатается, любое действие отказывает с кодом 64      |
+| хранилища учётных данных macOS/Linux                           | существует только Windows DPAPI; хранилище отказывает, а не пишет открытым текстом |
+| Remote Control, relay и прокси порта; интерактивный выбор сессии | заявлены в `specs/70` и `specs/10`; `docs/gaps.md` называет каждый пункт    |
 
 Отказ намеренный и наблюдаемый — код 64 для команды, которая специфицирована,
 но не построена, код 1 для опции, которой нет:
 
 ```console
-$ node bin/droide.mjs update
-droide: the "update" command is specified but not implemented in this build.
+$ node bin/droide.mjs computer register
+droide: the "computer register" command is specified but not implemented in this build.
 
-$ node bin/droide.mjs exec --list-tools
---list-tools is not implemented in this build.
+$ node bin/droide.mjs exec --mission "build it"
+--mission is not implemented in this build.
 ```
 
 Текущая форма дерева: 11 нумерованных документов спецификации — общий контекст
-плюс десять подсистемных спек, 9,333 строки в `specs/` — 123 TypeScript-файла
-в `src/` (33,069 строк), 8 Rust-файлов в `crates/droide-native/src/`, 8 ADR,
-1096 TypeScript-тестов и 69 Rust-тестов. Каждое место, где реализация покрывает
+плюс десять подсистемных спек, 9,414 строк в `specs/` — 147 TypeScript-файлов
+в `src/` (52,048 строки), 9 Rust-файлов в `crates/droide-native/src/`, 9 ADR,
+1261 TypeScript-тест и 69 Rust-тестов. Каждое место, где реализация покрывает
 меньше цитируемого пункта, помечено `TODO(spec …)` в коде и посчитано в
 [`docs/gaps.md`](./docs/gaps.md), который перегенерирует `npm run gaps`.
 
@@ -93,15 +92,15 @@ Node 24 или новее и Rust-toolchain для нативного слоя.
 
 ```sh
 npm ci                          # install once; there is no build step
-node bin/droide.mjs --version   # 1.9.0
+node bin/droide.mjs --version   # 0.5.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 16 named checks (11 реальных проб), text or --json
+node bin/droide.mjs doctor      # 12 именованных проверок по умолчанию (--checks all: 16)
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 906 tests
+npm test                        # 1261 tests
 npm run typecheck
 npm run test:parity             # 20/20
-cargo test --workspace          # 57 tests
+cargo test --workspace          # 69 tests
 ```
 
 `exec` — поверхность для машин (`text`, `json`, `stream-json`):
@@ -134,7 +133,7 @@ node bin/droide.mjs exec -f prompt.txt --auto low
   который сбрасывает один кадр на запрос; `protocol.rs` кадрирует и
   диспетчеризует; `paths.rs` обеспечивает containment; `search.rs` обходит и
   ищет; `sandbox.rs` описывает профили bubblewrap, seatbelt или «без изоляции»;
-  `pty.rs` квотирует командную строку так, как её переразбивает субъект;
+  `pty.rs` квотирует командную строку так, как её переразбивает оболочка;
   `secrets.rs` хранит секреты через DPAPI в Windows.
 - Методов пятнадцать: `native.version`, `hash.sha256`, `search.walk`,
   `search.text`, `path.resolve`, `sandbox.profile`, `pty.quote`, `pty.spawn`,
@@ -146,39 +145,40 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 
 ## Спецификации и решения
 
-| Документ | Тема |
-| --- | --- |
-| [`00-context.md`](./specs/00-context.md) | общий контекст: субъект, его доказательства и словарь |
-| [`10-cli-surface.md`](./specs/10-cli-surface.md) | команды, опции, help, отказы, коды выхода |
-| [`20-agent-loop.md`](./specs/20-agent-loop.md) | модель сообщений, цикл хода, адаптер провайдера |
-| [`30-tools-and-sandbox.md`](./specs/30-tools-and-sandbox.md) | реестр инструментов, валидаторы, разрешения, песочница |
-| [`40-sessions-and-storage.md`](./specs/40-sessions-and-storage.md) | файлы сессий, миграции, транскрипт, поиск |
-| [`50-transport-and-auth.md`](./specs/50-transport-and-auth.md) | URL, заголовки, SSE, идентичность ошибок, аутентификация |
-| [`60-extensions-mcp-and-skills.md`](./specs/60-extensions-mcp-and-skills.md) | серверы MCP, именование инструментов, skills, плагины |
-| [`70-daemon-and-remote-control.md`](./specs/70-daemon-and-remote-control.md) | поверхность RPC демона и удалённое управление |
-| [`80-exec-and-streaming.md`](./specs/80-exec-and-streaming.md) | неинтерактивные запуски и форматы потоков |
-| [`90-native-layer.md`](./specs/90-native-layer.md) | процесс-хелпер и его методы |
-| [`95-terminal-ui.md`](./specs/95-terminal-ui.md) | токены, возможности терминала, раскладка оболочки, кадры |
+| Документ                                                                     | Тема                                                                  |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [`00-context.md`](./specs/00-context.md)                                     | общий контекст: термины, политика доказательств и правила цитирования |
+| [`10-cli-surface.md`](./specs/10-cli-surface.md)                             | команды, опции, help, отказы, коды выхода                             |
+| [`20-agent-loop.md`](./specs/20-agent-loop.md)                               | модель сообщений, цикл хода, адаптер провайдера                       |
+| [`30-tools-and-sandbox.md`](./specs/30-tools-and-sandbox.md)                 | реестр инструментов, валидаторы, разрешения, песочница                |
+| [`40-sessions-and-storage.md`](./specs/40-sessions-and-storage.md)           | файлы сессий, миграции, транскрипт, поиск                             |
+| [`50-transport-and-auth.md`](./specs/50-transport-and-auth.md)               | URL, заголовки, SSE, идентичность ошибок, аутентификация              |
+| [`60-extensions-mcp-and-skills.md`](./specs/60-extensions-mcp-and-skills.md) | серверы MCP, именование инструментов, skills, плагины                 |
+| [`70-daemon-and-remote-control.md`](./specs/70-daemon-and-remote-control.md) | поверхность RPC демона и удалённое управление                         |
+| [`80-exec-and-streaming.md`](./specs/80-exec-and-streaming.md)               | неинтерактивные запуски и форматы потоков                             |
+| [`90-native-layer.md`](./specs/90-native-layer.md)                           | процесс-хелпер и его методы                                           |
+| [`95-terminal-ui.md`](./specs/95-terminal-ui.md)                             | токены, возможности терминала, раскладка оболочки, кадры              |
 
 Словарь статусов — `draft`, `review`, `stable`, `blocked` — определён в
 [`specs/README.md`](./specs/README.md); состояние по каждой спеке лежит в
 [`docs/status.md`](./docs/status.md), а вехи и их гейты — в
-[`docs/plan.md`](./docs/plan.md). Как была восстановлена каждая часть субъекта,
-отображено в [`docs/architecture/README.md`](./docs/architecture/README.md) и в
-реестре [`evidence/`](./evidence/README.md).
+[`docs/plan.md`](./docs/plan.md). Карта слоёв референсного дерева, выведенная из
+доказательств, — в [`docs/architecture/README.md`](./docs/architecture/README.md),
+а соглашения реестра — в [`evidence/`](./evidence/README.md).
 
 Решения, определившие сборку:
 
-| ADR | Решение |
-| --- | --- |
-| [0001](./docs/adr/0001-bun-standalone-extraction.md) | восстановить встроенный JavaScript-бандл до декомпиляции нативного кода |
-| [0002](./docs/adr/0002-hybrid-rust-typescript-layers.md) | Rust для нативного слоя, TypeScript для продуктового |
-| [0003](./docs/adr/0003-evidence-first-clean-room-policy.md) | политика clean-room по принципу «сначала доказательства» |
-| [0004](./docs/adr/0004-parity-harness-with-optional-oracle.md) | декларативные parity-кейсы с опциональным оракулом |
-| [0005](./docs/adr/0005-project-name-and-parity-normalisation.md) | проект — `droide`; дизайн CLI остаётся идентичным |
-| [0006](./docs/adr/0006-terminal-ui-stack.md) | терминальный UI — React + Ink, токены из спеки |
-| [0007](./docs/adr/0007-update-channel.md) | обновления приходят из релизов этого репозитория, никогда от субъекта |
-| [0008](./docs/adr/0008-oauth-credential-envelope.md) | учётные данные MCP OAuth запечатываются ОС, а не файлом ключа |
+| ADR                                                         | Решение                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [0001](./docs/adr/0001-bun-standalone-extraction.md)        | восстановить встроенный JavaScript-бандл до декомпиляции нативного кода                    |
+| [0002](./docs/adr/0002-hybrid-rust-typescript-layers.md)    | Rust для нативного слоя, TypeScript для продуктового                                       |
+| [0003](./docs/adr/0003-evidence-first-clean-room-policy.md) | политика clean-room по принципу «сначала доказательства»                                   |
+| [0006](./docs/adr/0006-terminal-ui-stack.md)                | терминальный UI — React + Ink, токены из спеки                                             |
+| [0007](./docs/adr/0007-update-channel.md)                   | обновления приходят из релизов этого репозитория                                           |
+| [0008](./docs/adr/0008-oauth-credential-envelope.md)        | учётные данные MCP OAuth запечатываются ОС, а не файлом ключа                              |
+| [0009](./docs/adr/0009-update-installation.md)              | обновления скачиваются в staging, сверяются по дайджесту, меняются атомарно и откатываются |
+| [0010](./docs/adr/0010-own-brand-and-snapshot-harness.md)   | Droide — самостоятельный продукт; харнесс записывает наши собственные снапшоты             |
+| [0011](./docs/adr/0011-own-disk-layout-and-env.md)          | собственный каталог состояния, раскладка плагинов и имена переменных окружения             |
 
 ## Участие
 
@@ -188,10 +188,11 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 1. `npm run typecheck`
 2. `npm run format:check`
 3. `npm test`
-4. `npm run test:parity` (нужны локальные goldens в `.work/parity`)
+4. `npm run test:parity` (нужны локальные снапшоты в `.work/parity`)
 5. `cargo test --workspace`
 6. `npm run gaps:check`
-7. пункт спеки, который оно реализует, процитирован в сообщении коммита или в
+7. `npm run brand:check`
+8. пункт спеки, который оно реализует, процитирован в сообщении коммита или в
    теле PR
 
 Метод сохраняют два правила: ничего не реализуется до того, как оно
@@ -206,6 +207,6 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 
 ## Лицензия
 
-MIT — см. [`LICENSE`](./LICENSE). Код субъекта не копируется, и никакой
+MIT — см. [`LICENSE`](./LICENSE). Никакой сторонний код не копируется, и никакой
 проприетарный артефакт здесь не хранится
 ([ADR 0003](./docs/adr/0003-evidence-first-clean-room-policy.md)).

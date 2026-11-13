@@ -99,7 +99,7 @@ function flow(
       allowedByPolicy: overrides.allowedByPolicy ?? true,
     },
     config,
-    store: { factoryDir: store },
+    store: { stateDir: store },
     sealer: overrides.sealer ?? plainSealer,
     openBrowser,
     fetch: globalThis.fetch,
@@ -178,7 +178,7 @@ test("the dance registers a client, exchanges the code and stores the credential
   assert.equal(token?.redirectUri, authorization?.redirectUri);
 
   const document = await readCredentials({
-    factoryDir: store,
+    stateDir: store,
     sealer: plainSealer,
   });
   assert.equal(document.servers["linear"]?.issuer, server.issuer);
@@ -411,7 +411,7 @@ test("a refused token exchange surfaces as a token error", async (t) => {
     "token",
   );
   const document = await readCredentials({
-    factoryDir: store,
+    stateDir: store,
     sealer: plainSealer,
   });
   assert.deepEqual(document.servers, {});

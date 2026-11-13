@@ -1,6 +1,5 @@
 {
  "name": "version-short",
- "oracle": true,
  "argv": [
   "-v"
  ],

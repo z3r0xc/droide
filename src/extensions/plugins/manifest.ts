@@ -14,16 +14,16 @@ import { isRecord } from "../guards.ts";
 import { JsoncParseError, parseJsonc } from "../jsonc.ts";
 
 /**
- * Manifest locations, most specific first (B33). `.factory-plugin/` is the
- * Factory layout; `.claude-plugin/` is the Claude Code root marker.
+ * Manifest locations, most specific first (B33). `.droide-plugin/` is the
+ * plugin layout; `.claude-plugin/` is the Claude Code root marker.
  *
- * TODO(spec): B33 states that `.factory-plugin/plugin.json` is read and that
+ * TODO(spec): B33 states that `.droide-plugin/plugin.json` is read and that
  * `.claude-plugin/` marks a plugin root, but does not pin reading
  * `.claude-plugin/plugin.json` directly. The fallback mirrors B32's
  * marketplace rule until the install path is implemented.
  */
 export const PLUGIN_MANIFEST_PATHS = [
-  ".factory-plugin/plugin.json",
+  ".droide-plugin/plugin.json",
   ".claude-plugin/plugin.json",
 ] as const;
 
@@ -84,7 +84,7 @@ export type PluginHookDeclaration =
     }
   | { readonly kind: "hook-files"; readonly paths: readonly string[] };
 
-export type PluginLayout = "factory" | "claude";
+export type PluginLayout = "managed" | "claude";
 
 export interface PluginManifest {
   readonly path: string;
@@ -95,7 +95,7 @@ export interface PluginManifest {
 }
 
 function layoutForPath(path: string): PluginLayout {
-  return path.includes(".claude-plugin") ? "claude" : "factory";
+  return path.includes(".claude-plugin") ? "claude" : "managed";
 }
 
 function readHooks(

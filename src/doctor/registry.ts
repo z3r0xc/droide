@@ -7,7 +7,7 @@
  */
 export interface CheckDescriptor {
   readonly name: string;
-  /** Whether `droid doctor` runs this check by default (B49's trailer). */
+  /** Whether `droide doctor` runs this check by default (B49's trailer). */
   readonly byDefault: boolean;
   /** Starts servers or costs money — excluded from the default set. */
   readonly expensive?: boolean;

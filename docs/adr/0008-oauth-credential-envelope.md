@@ -9,7 +9,7 @@
 `specs/60-extensions-mcp-and-skills.md` §B29 requires per-server OAuth credentials
 with the issuing issuer, the registered client-metadata subset, tokens, a
 `revision` and `updatedAt`, and **tombstones** so a stale write cannot resurrect
-a cleared credential. The subject stores them as an encrypted file pair
+a cleared credential. The reference build stores them as an encrypted file pair
 (`mcp-oauth.v2.file` + `mcp-oauth.v2.key`).
 
 Two facts constrain the choice here:
@@ -18,7 +18,7 @@ Two facts constrain the choice here:
    already proven by `npm run test:native`.
 2. Writing our own key file next to the ciphertext is exactly the design that
    fails review: the key sits beside the lock, and a copied directory is
-   readable. The subject accepts that trade-off because its key file is
+   readable. The reference build accepts that trade-off because its key file is
    additionally protected by the OS; copying only the pair still leaks.
 
 ## Decision
@@ -30,7 +30,7 @@ Two facts constrain the choice here:
    clearing, per-server identity) is identical.
 2. **Sealing goes through the native helper.** The serialised document is sealed
    with `secrets.protect` (DPAPI on Windows; a platform store on macOS/Linux when
-   that lands) and written to `<factory>/mcp-oauth.v2.sealed` plus a small
+   that lands) and written to `<state dir>/mcp-oauth.v2.sealed` plus a small
    plaintext header `{schemaVersion, updatedAt, revision}` used for fast staleness
    checks. No plaintext token ever touches disk.
 3. **No fallback.** Where the helper cannot seal (no DPAPI, missing binary), the
@@ -46,15 +46,15 @@ Two facts constrain the choice here:
 
 - The credential file is bound to the OS user account: copying the directory to
   another machine or account yields an unreadable blob, which is the intended
-  behaviour and differs from the subject's portable-key design.
+  behaviour and differs from the reference build's portable-key design.
 - Tests never seal real secrets: they use the fake helper for the envelope and a
   DPAPI round-trip only where the platform supports it (`npm run test:native`).
 - A future export/import feature must re-seal, never copy the blob.
 
 ## Alternatives considered
 
-- **Copy the subject's file pair**: hashes and keys are not behaviour, and the
-  design is weaker; rejected.
+- **Copy the reference build's file pair**: hashes and keys are not behaviour,
+  and the design is weaker; rejected.
 - **Store tokens in the settings file**: the settings file is plaintext and
   user-editable; rejected outright.
 - **No persistence (re-authenticate every run)**: hostile to users on every

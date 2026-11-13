@@ -10,7 +10,7 @@
  * the conversation only when it is activated (`activateSkill`).
  */
 import type { Environment } from "../../config/paths.ts";
-import { factoryDir, projectDir } from "../../config/paths.ts";
+import { stateDir, projectDir } from "../../config/paths.ts";
 import { join } from "node:path";
 
 import {
@@ -42,7 +42,7 @@ export function skillRoots(
     ...extraRoots,
     // Project before user: a repository may shadow a personal skill.
     { bucket: "ProjectDir", dir: join(projectDir(environment), "skills") },
-    { bucket: "UserDir", dir: join(factoryDir(environment), "skills") },
+    { bucket: "UserDir", dir: join(stateDir(environment), "skills") },
   ];
 }
 

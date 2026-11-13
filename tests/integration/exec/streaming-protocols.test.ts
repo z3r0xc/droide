@@ -40,7 +40,7 @@ const PURITY_STDOUT =
     '{"type":"tool_call","id":"t1","messageId":"m1","toolId":"Read","toolName":"Read","parameters":{"file_path":"fixture.txt"},"timestamp":0,"session_id":"sid"}',
     '{"type":"tool_result","id":"t1","messageId":"r1","toolId":"Read","isError":false,"value":"hello fixture\\n","timestamp":0,"session_id":"sid"}',
     '{"type":"message","role":"assistant","id":"m2","text":"Done.","timestamp":0,"session_id":"sid"}',
-    '{"type":"completion","finalText":"Done.","numTurns":2,"durationMs":0,"session_id":"sid","timestamp":0,"usage":{"input_tokens":11,"output_tokens":7,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"factory_credits":0,"thinking_tokens":0}}',
+    '{"type":"completion","finalText":"Done.","numTurns":2,"durationMs":0,"session_id":"sid","timestamp":0,"usage":{"input_tokens":11,"output_tokens":7,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"droide_credits":0,"thinking_tokens":0}}',
   ].join("\n") + "\n";
 
 test("a real process puts records and nothing else on stdout", () => {
@@ -86,7 +86,7 @@ test(
 );
 
 test("the writer flushes a real file as JSON lines", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "droid-exec-"));
+  const directory = await mkdtemp(join(tmpdir(), "droide-exec-"));
   try {
     const path = join(directory, "stream.jsonl");
     const stream = createWriteStream(path);
@@ -129,7 +129,7 @@ test("the writer flushes a real file as JSON lines", async () => {
 });
 
 test("the json summary flushes one object to a real file", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "droid-exec-"));
+  const directory = await mkdtemp(join(tmpdir(), "droide-exec-"));
   try {
     const path = join(directory, "summary.jsonl");
     const stream = createWriteStream(path);
@@ -173,7 +173,7 @@ test("the json summary flushes one object to a real file", async () => {
         output_tokens: 7,
         cache_read_input_tokens: 0,
         cache_creation_input_tokens: 0,
-        factory_credits: 0,
+        droide_credits: 0,
         thinking_tokens: 0,
       },
     });

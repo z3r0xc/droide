@@ -9,16 +9,15 @@ Semantic versioning on the product surface (`src/cli`):
 - **minor** — a command or behaviour from a spec becomes implemented.
 - **patch** — fixes that keep every documented contract intact.
 
-The CLI's `--version` is pinned to the subject's version (`src/cli/brand.ts`) so
-parity stays meaningful; the *package* version (`package.json`) tracks our own
-progress. They are intentionally different numbers — do not "fix" one to match
-the other.
+The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, and a
+unit test keeps it equal to the *package* version (`package.json`). A release
+bumps both in the same commit; never "fix" one on its own.
 
 ## Gates before a release
 
 ```sh
 npm run typecheck && npm run format:check && npm test
-npm run test:parity          # требует локальных goldens
+npm run test:parity          # compares against tests/parity/expected
 npm run gaps:check
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
@@ -50,5 +49,5 @@ Then, in order:
 ## Rollback
 
 A bad release is rolled back by publishing the previous tag (`npm dist-tag`),
-never by rewriting tags on `main`. The subject's version stays pinned, so a
-rollback cannot silently change what parity means.
+never by rewriting tags on `main`. The recorded cases check the version line by
+shape, so a rollback cannot silently change what they compare.

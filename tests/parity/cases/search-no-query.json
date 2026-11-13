@@ -1,6 +1,5 @@
 {
  "name": "search-no-query",
- "oracle": true,
  "argv": [
   "search"
  ],

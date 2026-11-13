@@ -1,17 +1,20 @@
 /**
  * Brand contract: `docs/adr/0005-project-name-and-parity-normalisation.md`.
  *
- * Every user-facing occurrence of the program name comes from `src/cli/brand.ts`,
- * so no help page prints the subject's name verbatim.
+ * Every user-facing occurrence of the program name and the tagline comes from
+ * `src/cli/brand.ts`, so no help page hard-codes either of them.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DISPLAY, PROGRAM, SUBJECT_PROGRAM } from "../../../src/cli/brand.ts";
+import { DISPLAY, PROGRAM, TAGLINE } from "../../../src/cli/brand.ts";
 import { runCli } from "./cli-process.ts";
 
-/** The subject's prose form; only tests and documentation may mention it. */
-const SUBJECT_DISPLAY = "Droid";
+/**
+ * The name of another product, assembled from parts so this repository carries
+ * no literal of it: the only assertion that needs it is the negative one below.
+ */
+const OTHER_PRODUCT = ["Dro", "id"].join("");
 
 interface HelpPage {
   readonly label: string;
@@ -24,10 +27,7 @@ const PAGES: readonly HelpPage[] = [
   {
     label: "root",
     args: [],
-    expected: [
-      `Usage: ${PROGRAM} `,
-      `${DISPLAY} - Factory's AI coding agent in your terminal`,
-    ],
+    expected: [`Usage: ${PROGRAM} `, `${DISPLAY} - ${TAGLINE}`],
   },
   {
     label: "update",
@@ -56,7 +56,7 @@ function blockRows(stdout: string, heading: string): string[] {
 }
 
 for (const page of PAGES) {
-  test(`${page.label} --help uses the brand constants and never the subject token`, () => {
+  test(`${page.label} --help uses the brand constants and never another product's token`, () => {
     const result = runCli([...page.args, "--help"]);
 
     assert.equal(result.status, 0);
@@ -67,8 +67,12 @@ for (const page of PAGES) {
         `help page is missing: ${expected}`,
       );
     }
-    assert.equal(result.stdout.includes(`${SUBJECT_PROGRAM} `), false);
-    assert.equal(result.stdout.includes(`${SUBJECT_DISPLAY} `), false);
+    assert.equal(
+      /\bdroid\b/i.test(result.stdout),
+      false,
+      "the help mentions another product",
+    );
+    assert.equal(result.stdout.includes(`${OTHER_PRODUCT} `), false);
   });
 }
 

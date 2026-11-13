@@ -28,20 +28,17 @@ async function fixture(
   const root = await mkdtemp(join(tmpdir(), "droide-plugin-cmd-"));
   const home = join(root, "home");
   const project = join(root, "project");
-  const factoryDir = join(home, ".factory");
-  await mkdir(join(factoryDir, "plugins"), { recursive: true });
-  await mkdir(join(project, ".factory"), { recursive: true });
+  const stateDir = join(home, ".droide");
+  await mkdir(join(stateDir, "plugins"), { recursive: true });
+  await mkdir(join(project, ".droide"), { recursive: true });
   if (document !== null) {
     await writeFile(
-      join(factoryDir, "plugins", "installed_plugins.json"),
+      join(stateDir, "plugins", "installed_plugins.json"),
       JSON.stringify(document),
     );
   }
   if (Object.keys(settings).length > 0) {
-    await writeFile(
-      join(factoryDir, "settings.json"),
-      JSON.stringify(settings),
-    );
+    await writeFile(join(stateDir, "settings.json"), JSON.stringify(settings));
   }
 
   const environment: Environment = {
@@ -125,11 +122,7 @@ test("a broken registry exits 1 and still prints the listing", async () => {
   const sandbox = await fixture(null);
   try {
     await writeFile(
-      join(
-        sandbox.context.paths.factoryDir,
-        "plugins",
-        "installed_plugins.json",
-      ),
+      join(sandbox.context.paths.stateDir, "plugins", "installed_plugins.json"),
       "{ broken",
     );
     await runPluginList({}, sandbox.deps);

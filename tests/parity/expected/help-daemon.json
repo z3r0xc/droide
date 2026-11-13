@@ -1,0 +1,6 @@
+{
+ "case": "help-daemon",
+ "exit_code": 0,
+ "stdout": "Usage: droide daemon [options]\n\nRun the daemon server\n\nOptions:\n  -p, --port <number>   TCP port to listen on\n  --host <address>      Host address to bind to (default: \"127.0.0.1\")\n  --unix <path>         Unix socket path (alternative to TCP)\n  -d, --debug           Enable debug logging (default: false)\n  --listen <transport>  Daemon transport to listen on (choices: \"websocket\",\n                        \"ipc\", default: \"websocket\")\n  --droide-path <path>  Path to droide executable for spawning sessions\n  --liveness-fd <fd>    Monitor parent process liveness via inherited pipe\n  --parent-pid <pid>    Monitor parent process\n  --remote-control      Enable Remote Control\n  --remote-access       Alias for --remote-control (default: false)\n  --settings <path>     Path to runtime settings file merged for this process\n                        only\n  -h, --help            display help for command\n",
+ "stderr": ""
+}

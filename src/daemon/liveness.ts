@@ -4,7 +4,7 @@
  *
  * Two monitors, one shape: `--parent-pid` polls `process.kill(pid, 0)` every
  * 2000 ms, and `--liveness-fd` reads the inherited pipe and reports once when
- * it closes. Both are injectable (`timers`, `isAlive`, the pipe factory) so a
+ * it closes. Both are injectable (`timers`, `isAlive`, the pipe opener) so a
  * test can fire them without a real parent or a real pipe.
  */
 

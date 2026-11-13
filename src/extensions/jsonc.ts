@@ -1,11 +1,11 @@
 /**
  * JSON with comments. Contract: `specs/60-extensions-mcp-and-skills.md` B2
- * (`mcp.json` is JSONC) and B33 (`.factory-plugin/plugin.json` is optional
+ * (`mcp.json` is JSONC) and B33 (`.droide-plugin/plugin.json` is optional
  * JSONC).
  *
- * The subject's readers accept comments and trailing commas; everything else
- * is plain JSON. The scanner copies string literals verbatim so a `//` inside
- * a string is never mistaken for a comment.
+ * The readers accept comments and trailing commas; everything else is plain
+ * JSON. The scanner copies string literals verbatim so a `//` inside a string
+ * is never mistaken for a comment.
  */
 
 export class JsoncParseError extends Error {

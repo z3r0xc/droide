@@ -37,10 +37,10 @@ const ANSWER: readonly MockResponse[] = [
 ];
 
 function providerEnvironment(server: { readonly url: string }): {
-  readonly FACTORY_API_KEY: string;
-  readonly FACTORY_API_BASE_URL: string;
+  readonly DROIDE_API_KEY: string;
+  readonly DROIDE_API_BASE_URL: string;
 } {
-  return { FACTORY_API_KEY: "test", FACTORY_API_BASE_URL: server.url };
+  return { DROIDE_API_KEY: "test", DROIDE_API_BASE_URL: server.url };
 }
 
 test(
@@ -78,7 +78,7 @@ test(
           "the turn wrote nothing into the resumed transcript",
         );
       },
-      () => ({ droidCoreModel: "mock-1" }),
+      () => ({ model: "mock-1" }),
     );
   },
 );
@@ -117,7 +117,7 @@ test(
         assert.ok(forked.length > history.length);
         assert.deepEqual(storedRecords(directory, OLD_SESSION), history);
       },
-      () => ({ droidCoreModel: "mock-1" }),
+      () => ({ model: "mock-1" }),
     );
   },
 );

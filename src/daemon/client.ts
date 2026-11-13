@@ -28,7 +28,7 @@ import {
   DaemonTimeoutError,
 } from "./errors.ts";
 import {
-  FACTORY_PROTOCOL_VERSION,
+  DROIDE_PROTOCOL_VERSION,
   JSON_RPC_ERRORS,
   createErrorResponse,
   createNotification,
@@ -160,7 +160,7 @@ export class DaemonClient {
   constructor(options: DaemonClientOptions) {
     this.target = options.target;
     this.credential = options.credential;
-    this.protocolVersion = options.protocolVersion ?? FACTORY_PROTOCOL_VERSION;
+    this.protocolVersion = options.protocolVersion ?? DROIDE_PROTOCOL_VERSION;
     this.requestTimeoutMs =
       options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 10_000;
@@ -476,8 +476,8 @@ export class DaemonClient {
         this.replyToServerRequest({
           type: "response",
           jsonrpc: "2.0",
-          factoryApiVersion: "1.0.0",
-          factoryProtocolVersion: this.protocolVersion,
+          droideApiVersion: "1.0.0",
+          droideProtocolVersion: this.protocolVersion,
           id: request.id,
           result,
         });

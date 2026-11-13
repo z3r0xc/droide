@@ -9,10 +9,10 @@ import { test } from "node:test";
 import { DaemonProtocolError } from "../../../src/daemon/errors.ts";
 import {
   COMPRESSED_PAYLOAD_TAG,
-  FACTORY_PROTOCOL_VERSION,
+  DROIDE_PROTOCOL_VERSION,
   JSONRPC_VERSION,
   JSON_RPC_ERRORS,
-  LEGACY_FACTORY_API_VERSION,
+  LEGACY_DROIDE_API_VERSION,
   MAX_FRAME_BYTES,
   assertFrameWithinBounds,
   attachVersionMismatch,
@@ -49,8 +49,8 @@ test("a request envelope carries the frozen fields and a UUID v4 id", () => {
   const envelope = createRequest("daemon.authenticate", { token: "t" });
   assert.equal(envelope.type, "request");
   assert.equal(envelope.jsonrpc, JSONRPC_VERSION);
-  assert.equal(envelope.factoryApiVersion, LEGACY_FACTORY_API_VERSION);
-  assert.equal(envelope.factoryProtocolVersion, FACTORY_PROTOCOL_VERSION);
+  assert.equal(envelope.droideApiVersion, LEGACY_DROIDE_API_VERSION);
+  assert.equal(envelope.droideProtocolVersion, DROIDE_PROTOCOL_VERSION);
   assert.equal(envelope.method, "daemon.authenticate");
   assert.ok(isUuidV4(envelope.id));
   assert.deepEqual(envelope.params, { token: "t" });
@@ -120,7 +120,7 @@ test("an envelope with an unknown type is a parse error", () => {
       JSON.stringify({
         type: "event",
         jsonrpc: "2.0",
-        factoryApiVersion: "1.0.0",
+        droideApiVersion: "1.0.0",
       }),
     ),
   );
@@ -132,7 +132,7 @@ test("a response carrying both result and error is refused", () => {
     parseEnvelopeValue({
       type: "response",
       jsonrpc: "2.0",
-      factoryApiVersion: "1.0.0",
+      droideApiVersion: "1.0.0",
       id: ID,
       result: 1,
       error: { code: -32603, message: "both" },
@@ -147,7 +147,7 @@ test("a response carrying neither result nor error is refused", () => {
     parseEnvelopeValue({
       type: "response",
       jsonrpc: "2.0",
-      factoryApiVersion: "1.0.0",
+      droideApiVersion: "1.0.0",
       id: ID,
     }),
   );
@@ -160,7 +160,7 @@ test("a success response with a null id is refused, an error response is not", (
       parseEnvelopeValue({
         type: "response",
         jsonrpc: "2.0",
-        factoryApiVersion: "1.0.0",
+        droideApiVersion: "1.0.0",
         id: null,
         result: {},
       }),
@@ -170,7 +170,7 @@ test("a success response with a null id is refused, an error response is not", (
   const parsed = parseEnvelopeValue({
     type: "response",
     jsonrpc: "2.0",
-    factoryApiVersion: "1.0.0",
+    droideApiVersion: "1.0.0",
     id: null,
     error: { code: -32700, message: "Parse error" },
   });
@@ -182,7 +182,7 @@ test("a request id that is not a UUID v4 is refused", () => {
     parseEnvelopeValue({
       type: "request",
       jsonrpc: "2.0",
-      factoryApiVersion: "1.0.0",
+      droideApiVersion: "1.0.0",
       id: "1",
       method: "ping",
     }),
@@ -197,7 +197,7 @@ test("an empty method and a non-string jsonrpc are refused", () => {
       parseEnvelopeValue({
         type: "notification",
         jsonrpc: "2.0",
-        factoryApiVersion: "1.0.0",
+        droideApiVersion: "1.0.0",
         method: "",
       }),
     ).code,
@@ -208,7 +208,7 @@ test("an empty method and a non-string jsonrpc are refused", () => {
       parseEnvelopeValue({
         type: "notification",
         jsonrpc: "1.0",
-        factoryApiVersion: "1.0.0",
+        droideApiVersion: "1.0.0",
         method: "ping",
       }),
     ).code,
@@ -222,7 +222,7 @@ test("_meta must be an object when present", () => {
       parseEnvelopeValue({
         type: "notification",
         jsonrpc: "2.0",
-        factoryApiVersion: "1.0.0",
+        droideApiVersion: "1.0.0",
         method: "ping",
         _meta: "trace",
       }),
@@ -292,8 +292,8 @@ test("a missing protocol version is not a mismatch; a different one is", () => {
   assert.equal(protocolVersionMismatch("1.321.0", ""), undefined);
   assert.equal(protocolVersionMismatch("1.321.0", "1.321.0"), undefined);
   assert.deepEqual(protocolVersionMismatch("1.321.0", "1.300.0"), {
-    localFactoryProtocolVersion: "1.321.0",
-    peerFactoryProtocolVersion: "1.300.0",
+    localPeerProtocolVersion: "1.321.0",
+    remotePeerProtocolVersion: "1.300.0",
   });
 });
 
@@ -306,8 +306,8 @@ test("envelopeVersionMismatch names the message type, method and request id", ()
     "1.321.0",
   );
   assert.deepEqual(mismatch, {
-    localFactoryProtocolVersion: "1.321.0",
-    peerFactoryProtocolVersion: "1.300.0",
+    localPeerProtocolVersion: "1.321.0",
+    remotePeerProtocolVersion: "1.300.0",
     messageType: "request",
     method: "list_sessions",
     requestId: ID,
@@ -326,25 +326,25 @@ test("attachVersionMismatch keeps existing data and adds the record", () => {
   const decorated = attachVersionMismatch(
     createErrorObject(-32601, "Method not found: x", { reason: "unknown" }),
     {
-      localFactoryProtocolVersion: "1.321.0",
-      peerFactoryProtocolVersion: "1.300.0",
+      localPeerProtocolVersion: "1.321.0",
+      remotePeerProtocolVersion: "1.300.0",
     },
   );
   assert.deepEqual(decorated.data, {
     reason: "unknown",
     protocolVersionMismatch: {
-      localFactoryProtocolVersion: "1.321.0",
-      peerFactoryProtocolVersion: "1.300.0",
+      localPeerProtocolVersion: "1.321.0",
+      remotePeerProtocolVersion: "1.300.0",
     },
   });
   const noData = attachVersionMismatch(createErrorObject(-32601, "x"), {
-    localFactoryProtocolVersion: "1.321.0",
-    peerFactoryProtocolVersion: "1.300.0",
+    localPeerProtocolVersion: "1.321.0",
+    remotePeerProtocolVersion: "1.300.0",
   });
   assert.deepEqual(noData.data, {
     protocolVersionMismatch: {
-      localFactoryProtocolVersion: "1.321.0",
-      peerFactoryProtocolVersion: "1.300.0",
+      localPeerProtocolVersion: "1.321.0",
+      remotePeerProtocolVersion: "1.300.0",
     },
   });
 });

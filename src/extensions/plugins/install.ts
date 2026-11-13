@@ -38,6 +38,7 @@ import {
   DEFAULT_GIT_TIMEOUT_MS,
   defaultGitRunner,
   defaultPluginIo,
+  ensureConfiguredMarketplace,
   hashMarketplaceSource,
   loadMarketplaceManifest,
   PluginOperationError,
@@ -45,9 +46,22 @@ import {
   readKnownMarketplaces,
   writeTextAtomic,
   type GitRunner,
+  type MarketplaceDeps,
   type MarketplaceEntry,
+  type MarketplacePluginSource,
   type PluginIo,
 } from "./marketplace.ts";
+import {
+  formatPluginSource,
+  isSourceAllowed,
+  materializeSource,
+  NO_PLUGIN_POLICY,
+  serialisePluginSource,
+  type InstalledNpmMetadata,
+  type PluginPolicy,
+  type PluginSource,
+  type SourceDeps,
+} from "./sources.ts";
 
 /** Registry file inside `plugins/` (B31). */
 export const INSTALLED_PLUGINS_FILE = "installed_plugins.json";
@@ -65,6 +79,12 @@ export interface PluginInstallDeps {
   readonly runGit?: GitRunner;
   readonly now?: () => Date;
   readonly timeoutMs?: number;
+  /** Resolved enablement policy (B36): allowlist, configured sources, tokens. */
+  readonly policy?: PluginPolicy;
+  /** Fetch/fs surface for external sources; `runGit`/`timeoutMs` win above. */
+  readonly sourceDeps?: SourceDeps;
+  /** Environment for `authTokenEnvVar` lookups (never read globally). */
+  readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
 export interface InstalledPluginEntry {
@@ -79,6 +99,15 @@ export interface InstalledPluginEntry {
   readonly source: string;
   /** SHA-256 of the marketplace source at install time (B35). */
   readonly marketplaceSourceHash?: string;
+  /**
+   * The source outside the marketplace this artifact came from (B35). The
+   * load path re-authorizes it against policy instead of the mutable manifest.
+   */
+  readonly externalSource?: PluginSource;
+  /** The full commit an unpinned external source was cloned at. */
+  readonly externalCommit?: string;
+  /** Resolved npm metadata, so auto-update can see a new publish. */
+  readonly npm?: InstalledNpmMetadata;
 }
 
 export interface PluginInstallOptions {
@@ -167,6 +196,13 @@ function serialiseEntry(entry: InstalledPluginEntry): Record<string, unknown> {
     ...(entry.marketplaceSourceHash === undefined
       ? {}
       : { marketplaceSourceHash: entry.marketplaceSourceHash }),
+    ...(entry.externalSource === undefined
+      ? {}
+      : { externalSource: serialisePluginSource(entry.externalSource) }),
+    ...(entry.externalCommit === undefined
+      ? {}
+      : { externalCommit: entry.externalCommit }),
+    ...(entry.npm === undefined ? {} : { npm: entry.npm }),
   };
 }
 
@@ -297,7 +333,7 @@ async function copyIntoPlace(
   io.makeDirectory(dirname(installPath));
   try {
     // TODO(spec B42): the Claude Code layout translation (.claude-plugin to
-    // .factory-plugin, agents to droids, .mcp.json to mcp.json) is not
+    // .droide-plugin, agents to droids, .mcp.json to mcp.json) is not
     // applied, so the plugin directory is copied verbatim.
     await cp(sourceDirectory, staging, { recursive: true });
     adoptDirectory(staging, installPath, io);
@@ -314,6 +350,166 @@ async function copyIntoPlace(
           `Plugin files could not be copied to ${installPath}: ${error instanceof Error ? error.message : String(error)}`,
           { cause: error },
         );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Source resolution
+// ---------------------------------------------------------------------------
+
+function policyFor(deps: PluginInstallDeps): PluginPolicy {
+  return deps.policy ?? NO_PLUGIN_POLICY;
+}
+
+/** The fetch/fs surface an external source is materialised through (B34). */
+function sourceDepsFor(
+  deps: PluginInstallDeps,
+  policy: PluginPolicy,
+): SourceDeps {
+  const tokenHosts: Record<string, string> = {};
+  for (const [name, host] of policy.tokenHosts) tokenHosts[name] = host;
+  return {
+    ...(deps.sourceDeps ?? {}),
+    ...(deps.runGit === undefined ? {} : { runGit: deps.runGit }),
+    ...(deps.timeoutMs === undefined ? {} : { timeoutMs: deps.timeoutMs }),
+    ...(deps.env === undefined ? {} : { env: deps.env }),
+    tokenHosts,
+  };
+}
+
+function marketplaceDepsFor(
+  scopeRoot: string,
+  deps: PluginInstallDeps,
+  policy: PluginPolicy,
+): MarketplaceDeps {
+  return {
+    scopeRoot,
+    ...(deps.io === undefined ? {} : { io: deps.io }),
+    ...(deps.runGit === undefined ? {} : { runGit: deps.runGit }),
+    ...(deps.now === undefined ? {} : { now: deps.now }),
+    ...(deps.timeoutMs === undefined ? {} : { timeoutMs: deps.timeoutMs }),
+    ...(policy.allowedSources === undefined
+      ? {}
+      : { policy: { allowedSources: policy.allowedSources } }),
+    sourceDeps: sourceDepsFor(deps, policy),
+  };
+}
+
+/**
+ * Resolve a marketplace for one scope (B36/B37). A name `extraKnownMarketplaces`
+ * declares is registered on demand; a registration that no longer matches the
+ * configured source is refused with the documented message.
+ */
+async function resolveMarketplace(
+  scopeRoot: string,
+  name: string,
+  scope: PluginScope,
+  deps: PluginInstallDeps,
+  policy: PluginPolicy,
+  io: PluginIo,
+): Promise<MarketplaceEntry> {
+  const configured = policy.extraMarketplaces.get(name);
+  if (configured !== undefined)
+    return ensureConfiguredMarketplace(
+      name,
+      configured,
+      marketplaceDepsFor(scopeRoot, deps, policy),
+    );
+  const marketplace = readKnownMarketplaces(scopeRoot, io).entries.get(name);
+  if (marketplace === undefined)
+    throw new PluginOperationError(
+      "marketplace-not-found",
+      `Marketplace "${name}" is not registered at ${scope} scope.`,
+    );
+  return marketplace;
+}
+
+interface PreparedArtifact {
+  readonly sourceDirectory: string;
+  readonly version: string;
+  readonly externalSource?: PluginSource;
+  readonly externalCommit?: string;
+  readonly npm?: InstalledNpmMetadata;
+  /** Removes a scratch directory the caller copied out of. */
+  readonly cleanup?: () => void;
+}
+
+/**
+ * Resolve one plugin entry to a directory plus the identity it should be
+ * installed under. A path entry is used from the marketplace checkout; an
+ * external entry is fetched through `sources.ts`, with the org allowlist and
+ * the token-host binding applied before anything leaves the machine.
+ */
+async function prepareArtifact(
+  root: string,
+  marketplace: MarketplaceEntry,
+  plugin: { readonly source: MarketplacePluginSource },
+  id: string,
+  deps: PluginInstallDeps,
+  policy: PluginPolicy,
+  io: PluginIo,
+): Promise<PreparedArtifact> {
+  if (plugin.source.kind === "path") {
+    const sourceDirectory = containedSourceDirectory(
+      marketplace.installLocation,
+      plugin.source.path,
+      id,
+    );
+    if (!io.exists(sourceDirectory))
+      throw new PluginOperationError(
+        "source-missing",
+        `Plugin "${id}" has no directory at ${sourceDirectory}.`,
+      );
+    return {
+      sourceDirectory,
+      version: await resolveVersion(marketplace, deps),
+    };
+  }
+
+  const external = plugin.source.source;
+  if (!isSourceAllowed(policy.allowedSources, external))
+    throw new PluginOperationError(
+      "source-denied",
+      `Your organization doesn't allow plugins from "${formatPluginSource(external)}". Ask an administrator to allow it.`,
+    );
+
+  const staging = join(
+    pluginsDirectory(root),
+    `.staging-${randomUUID().replace(/-/g, "")}`,
+  );
+  try {
+    const materialized = await materializeSource(external, {
+      target: staging,
+      baseDirectory: marketplace.installLocation,
+      deps: sourceDepsFor(deps, policy),
+    });
+    return {
+      sourceDirectory: materialized.directory,
+      version: materialized.version,
+      ...(external.source === "archive" ? {} : { externalSource: external }),
+      ...(external.source === "github" ||
+      external.source === "url" ||
+      external.source === "git-subdir"
+        ? external.sha === undefined && materialized.commit !== undefined
+          ? { externalCommit: materialized.commit }
+          : {}
+        : {}),
+      ...(materialized.npm === undefined ? {} : { npm: materialized.npm }),
+      cleanup: () => {
+        try {
+          io.remove(staging);
+        } catch {
+          // A leftover scratch directory is inert.
+        }
+      },
+    };
+  } catch (error) {
+    try {
+      io.remove(staging);
+    } catch {
+      // A leftover scratch directory is inert.
+    }
+    throw error;
   }
 }
 
@@ -351,17 +547,21 @@ export async function installPlugin(
     );
   }
 
-  // TODO(spec B37): the recorded-source drift refusal and the organization
-  // policy denial are not applied: this build resolves neither configured
-  // marketplace sources nor org policy into the context.
-  const marketplaces = readKnownMarketplaces(root, io);
-  const marketplace = marketplaces.entries.get(resolved.marketplace);
-  if (marketplace === undefined) {
+  const policy = policyFor(deps);
+  const marketplace = await resolveMarketplace(
+    root,
+    resolved.marketplace,
+    scope,
+    deps,
+    policy,
+    io,
+  );
+  if (!isSourceAllowed(policy.allowedSources, marketplace.source))
     throw new PluginOperationError(
-      "marketplace-not-found",
-      `Marketplace "${resolved.marketplace}" is not registered at ${scope} scope.`,
+      "source-denied",
+      `Installing plugins from "${resolved.marketplace}" is not allowed by organization policy`,
     );
-  }
+
   const manifest = loadMarketplaceManifest(marketplace.installLocation, io);
   const plugin = manifest.plugins.find(
     (candidate) => candidate.name === resolved.name,
@@ -372,40 +572,44 @@ export async function installPlugin(
       `Plugin "${resolved.name}" was not found in marketplace "${resolved.marketplace}".`,
     );
   }
-  if (plugin.source.kind === "external") {
-    // TODO(spec B34): plugin sources fetched outside the marketplace (github,
-    // url, git-subdir, npm, archive) are not downloaded by this build.
-    throw new PluginOperationError(
-      "source-unsupported",
-      `Plugin "${resolved.id}" comes from a "${plugin.source.type}" source, which this build does not install.`,
-    );
-  }
-  const sourceDirectory = containedSourceDirectory(
-    marketplace.installLocation,
-    plugin.source.path,
-    resolved.id,
-  );
-  if (!io.exists(sourceDirectory)) {
-    throw new PluginOperationError(
-      "source-missing",
-      `Plugin "${resolved.id}" has no directory at ${sourceDirectory}.`,
-    );
-  }
 
-  const version = await resolveVersion(marketplace, deps);
-  const installPath = join(pluginsDirectory(root), resolved.id, version);
-  await copyIntoPlace(sourceDirectory, installPath, io);
+  const artifact = await prepareArtifact(
+    root,
+    marketplace,
+    plugin,
+    resolved.id,
+    deps,
+    policy,
+    io,
+  );
+  const installPath = join(
+    pluginsDirectory(root),
+    resolved.id,
+    artifact.version,
+  );
+  try {
+    await copyIntoPlace(artifact.sourceDirectory, installPath, io);
+  } finally {
+    artifact.cleanup?.();
+  }
 
   const timestamp = (deps.now ?? (() => new Date()))().toISOString();
   const entry: InstalledPluginEntry = {
     id: resolved.id,
     scope,
     installPath,
-    version,
+    version: artifact.version,
     installedAt: timestamp,
     lastUpdated: timestamp,
     source: resolved.marketplace,
     marketplaceSourceHash: hashMarketplaceSource(marketplace.source),
+    ...(artifact.externalSource === undefined
+      ? {}
+      : { externalSource: artifact.externalSource }),
+    ...(artifact.externalCommit === undefined
+      ? {}
+      : { externalCommit: artifact.externalCommit }),
+    ...(artifact.npm === undefined ? {} : { npm: artifact.npm }),
   };
 
   const registry = readInstalledRegistry(root, io);
@@ -439,6 +643,12 @@ export async function installPlugin(
       io.remove(previousPath);
     }
   }
+
+  // TODO(spec B37): the flow stops at the registry write. The clause also says
+  // the install writes the enablement map, but this build has no settings
+  // writer (src/config reads `settings.json` and never rewrites it), so
+  // `general.enabledPlugins` is left alone and the plugin resolves as enabled
+  // by absence. A settings-write surface has to exist before this can land.
   return entry;
 }
 
@@ -627,14 +837,20 @@ async function updateOne(
       };
     }
 
-    const marketplaces = readKnownMarketplaces(root, io);
-    const marketplace = marketplaces.entries.get(resolved.marketplace);
-    if (marketplace === undefined) {
+    const policy = policyFor(deps);
+    const marketplace = await resolveMarketplace(
+      root,
+      resolved.marketplace,
+      scope,
+      deps,
+      policy,
+      io,
+    );
+    if (!isSourceAllowed(policy.allowedSources, marketplace.source))
       throw new PluginOperationError(
-        "marketplace-not-found",
-        `Marketplace "${resolved.marketplace}" is not registered at ${scope} scope.`,
+        "source-denied",
+        `Installing plugins from "${resolved.marketplace}" is not allowed by organization policy`,
       );
-    }
     const manifest = loadMarketplaceManifest(marketplace.installLocation, io);
     const plugin = manifest.plugins.find(
       (candidate) => candidate.name === resolved.name,
@@ -645,35 +861,56 @@ async function updateOne(
         `Plugin "${resolved.name}" is no longer in marketplace "${resolved.marketplace}".`,
       );
     }
-    if (plugin.source.kind === "external") {
-      throw new PluginOperationError(
-        "source-unsupported",
-        `Plugin "${resolved.id}" comes from a "${plugin.source.type}" source, which this build does not install.`,
-      );
-    }
-    const sourceDirectory = containedSourceDirectory(
-      marketplace.installLocation,
-      plugin.source.path,
+
+    const artifact = await prepareArtifact(
+      root,
+      marketplace,
+      plugin,
       resolved.id,
+      deps,
+      policy,
+      io,
     );
-    if (!io.exists(sourceDirectory)) {
-      throw new PluginOperationError(
-        "source-missing",
-        `Plugin "${resolved.id}" has no directory at ${sourceDirectory}.`,
-      );
+    if (artifact.version === current.version) {
+      artifact.cleanup?.();
+      return {
+        id: resolved.id,
+        scope,
+        version: artifact.version,
+        changed: false,
+      };
     }
 
-    const version = await resolveVersion(marketplace, deps);
-    if (version === current.version) {
-      return { id: resolved.id, scope, version, changed: false };
+    const installPath = join(
+      pluginsDirectory(root),
+      resolved.id,
+      artifact.version,
+    );
+    try {
+      await copyIntoPlace(artifact.sourceDirectory, installPath, io);
+    } finally {
+      artifact.cleanup?.();
     }
-
-    const installPath = join(pluginsDirectory(root), resolved.id, version);
-    await copyIntoPlace(sourceDirectory, installPath, io);
     const timestamp = (deps.now ?? (() => new Date()))().toISOString();
     const updatedEntries = entries.map((value) =>
       value === current.raw
-        ? { ...current.raw, installPath, version, lastUpdated: timestamp }
+        ? {
+            ...current.raw,
+            installPath,
+            version: artifact.version,
+            lastUpdated: timestamp,
+            ...(artifact.externalSource === undefined
+              ? {}
+              : {
+                  externalSource: serialisePluginSource(
+                    artifact.externalSource,
+                  ),
+                }),
+            ...(artifact.externalCommit === undefined
+              ? {}
+              : { externalCommit: artifact.externalCommit }),
+            ...(artifact.npm === undefined ? {} : { npm: artifact.npm }),
+          }
         : value,
     );
     writeInstalledRegistry(
@@ -687,7 +924,12 @@ async function updateOne(
     ) {
       io.remove(current.installPath);
     }
-    return { id: resolved.id, scope, version, changed: true };
+    return {
+      id: resolved.id,
+      scope,
+      version: artifact.version,
+      changed: true,
+    };
   } catch (error) {
     return {
       id: resolved.id,

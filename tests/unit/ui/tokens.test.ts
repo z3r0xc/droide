@@ -273,17 +273,17 @@ test("resolved palettes contain every slot and respect the theme", () => {
     assert.equal(PALETTE_DARK[slot], dark, `dark ${slot}`);
     assert.equal(PALETTE_LIGHT[slot], light, `light ${slot}`);
     assert.equal(
-      themeColor(slot, "factory-dark"),
+      themeColor(slot, "droide-dark"),
       dark,
       `themeColor dark ${slot}`,
     );
     assert.equal(
-      themeColor(slot, "factory-light"),
+      themeColor(slot, "droide-light"),
       light,
       `themeColor light ${slot}`,
     );
-    assert.equal(paletteFor("factory-dark"), PALETTE_DARK);
-    assert.equal(paletteFor("factory-light"), PALETTE_LIGHT);
+    assert.equal(paletteFor("droide-dark"), PALETTE_DARK);
+    assert.equal(paletteFor("droide-light"), PALETTE_LIGHT);
   }
   assert.equal(
     PALETTE_LIGHT["text.selectionBg"],
@@ -421,7 +421,7 @@ test("D13 timings match the spec", () => {
 test("resolveColor degrades truecolour to 256 to 16 to nothing", () => {
   const truecolor = resolveColor("primary", {
     colorDepth: "truecolor",
-    theme: "factory-dark",
+    theme: "droide-dark",
   });
   assert.equal(truecolor, "#d75f00");
 
@@ -430,18 +430,18 @@ test("resolveColor degrades truecolour to 256 to 16 to nothing", () => {
   assert.equal(nearestAnsi256("#878787"), 102);
   assert.equal(nearestAnsi256("#d78700"), 172);
   assert.equal(
-    resolveColor("primary", { colorDepth: "256", theme: "factory-dark" }),
+    resolveColor("primary", { colorDepth: "256", theme: "droide-dark" }),
     "ansi256(166)",
   );
 
   // Nearest ANSI-16 by squared RGB distance; the speced slot per token is
   // chalk's conversion (B18, Open question 3), so this pins our documented one.
   assert.equal(
-    resolveColor("primary", { colorDepth: "16", theme: "factory-dark" }),
+    resolveColor("primary", { colorDepth: "16", theme: "droide-dark" }),
     "yellow",
   );
   assert.equal(
-    resolveColor("primary", { colorDepth: "none", theme: "factory-dark" }),
+    resolveColor("primary", { colorDepth: "none", theme: "droide-dark" }),
     undefined,
   );
 });

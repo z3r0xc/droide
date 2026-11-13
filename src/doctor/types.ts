@@ -5,6 +5,8 @@
  * E18. A check never throws: it reports `ok`, `warn`, `fail` or `skip`, and the
  * report — not the check — decides the exit code.
  */
+import type { Settings } from "../config/schema.ts";
+
 export type CheckStatus = "ok" | "warn" | "fail" | "skip";
 
 export interface CheckResult {
@@ -23,7 +25,7 @@ export interface CheckResult {
 
 export interface DoctorContext {
   /** Resolved settings and paths for this process. */
-  readonly settings: Readonly<Record<string, unknown>>;
+  readonly settings: Settings;
   readonly paths: Readonly<Record<string, string>>;
   /** Injected so checks never read the process environment directly. */
   readonly environment: {
@@ -37,11 +39,36 @@ export interface DoctorContext {
   readonly timeoutMs: number;
   /** Injected HTTP client for probes that need one; defaults to the global. */
   readonly fetch?: typeof fetch;
+  /**
+   * Injected DNS resolver for the connectivity probe; defaults to the system
+   * one. Tests inject it so a probe never touches the network.
+   */
+  readonly resolveHost?: (hostname: string) => Promise<readonly string[]>;
+  /**
+   * The daemon this process was told about, and how to reach it. The daemon
+   * writes no discovery file (70 B4), so an absent value means "not
+   * configured" and the check reports `skip`.
+   */
+  readonly daemon?: DoctorDaemonProbe;
   /** Runs a probe with the budget applied; rejects with a timeout error. */
   readonly withTimeout: <T>(
     label: string,
     run: (signal: AbortSignal) => Promise<T>,
   ) => Promise<T>;
+}
+
+/** What a daemon answers with once the handshake succeeded. */
+export interface DoctorDaemonAnswer {
+  /** The protocol version the connection negotiated. */
+  readonly protocolVersion: string;
+}
+
+/** One daemon endpoint this process may probe. */
+export interface DoctorDaemonProbe {
+  /** Shown in the report: `127.0.0.1:8080` or a Unix socket path. */
+  readonly endpoint: string;
+  /** Connect and authenticate; rejects with the handshake failure. */
+  connect(signal: AbortSignal): Promise<DoctorDaemonAnswer>;
 }
 
 export interface DoctorCheck {

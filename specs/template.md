@@ -7,7 +7,7 @@ genuinely empty, and say in Scope why. Header fields are required.
 
 # <Subsystem>
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft | review | stable | blocked
 - **Owner:** <role>
 - **Related:** <ADR ids, other specs, tool ids>
@@ -25,8 +25,8 @@ why.
 
 ## Terms
 
-Every domain term used below, defined once. Prefer the target's own vocabulary
-where the evidence establishes it; otherwise say the term is ours. Note
+Every domain term used below, defined once. Prefer the vocabulary the evidence
+establishes; otherwise say the term is ours. Note
 spelling, casing, and on-disk key names exactly as they appear.
 
 ## Observable behaviour
@@ -66,21 +66,21 @@ by message wording.
 A table mapping each behavioural clause to the test ids that pin it, plus the
 fixture each test needs:
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1 | `tests/<area>/test_<name>` | `fixtures/<name>` |
+| Clause | Test id                    | Fixture           |
+| ------ | -------------------------- | ----------------- |
+| B1     | `tests/<area>/test_<name>` | `fixtures/<name>` |
 
 Every clause above must appear at least once. Fixtures are synthesised, never
-copies of proprietary artefacts.
+copies of a proprietary artefact.
 
 ## Evidence
 
 Ledger ids backing the clauses, with the clause they support and the method that
 produced them:
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `ev_<topic>_<n>` | B1, B2 | <tool, command, or reading> |
+| Evidence         | Supports | Method                      |
+| ---------------- | -------- | --------------------------- |
+| `ev_<topic>_<n>` | B1, B2   | <tool, command, or reading> |
 
 Anything "derived" or "inferred" per `evidence/README.md` is labelled as such.
 A clause whose only support is inferred stays `draft`.

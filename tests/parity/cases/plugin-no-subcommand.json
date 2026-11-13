@@ -1,6 +1,5 @@
 {
  "name": "plugin-no-subcommand",
- "oracle": true,
  "argv": [
   "plugin"
  ],

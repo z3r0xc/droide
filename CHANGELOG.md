@@ -1,8 +1,8 @@
 # Changelog
 
-The CLI's `--version` reports the subject's version (`1.9.0`) so parity stays
-meaningful; the package version below tracks this implementation. See
-`docs/release.md`.
+The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, which a
+unit test keeps equal to the package version; a release bumps both. The recorded
+CLI cases check the version line by shape, not by number. See `docs/release.md`.
 
 ## 0.4.0 — 2026-11-13
 
@@ -27,8 +27,22 @@ meaningful; the package version below tracks this implementation. See
 - `doctor --checks updates` compares the running version with the release feed.
 - A command-tree smoke net: every command group must answer `--help`, unknown
   words are refused as prompts, and a declared-but-unbuilt mode fails loudly.
-- CI is live (the repository is public): five jobs — typescript, rust,
-  rust-windows, supply-chain, parity.
+- CI is live (the repository is public): six jobs — typescript,
+  typescript-windows, rust, rust-windows, supply-chain, parity.
+
+### Changed
+
+- **The product is Droide** (ADR 0010): `--version` reports `0.4.0`, the help
+  tagline and the docs link are ours, and the CLI harness records our own
+  snapshots instead of comparing against another build.
+- **Our own state directory and environment variables** (ADR 0011): `~/.droide`,
+  `<cwd>/.droide`, `.droide-plugin/`, `DROIDE_API_KEY`,
+  `DROIDE_HOME_OVERRIDE`, `DROIDE_RUNTIME_SETTINGS_PATH`, `DROIDE_ENV`. Nothing
+  is migrated from the previous layout: 0.4.0 is the first release under these
+  names, and no earlier installation is in use.
+- The specifications keep neutral provenance language: behaviour is cited from an
+  untracked evidence corpus (ADR 0003), and no document names another product,
+  its version or its vendor.
 
 ### Fixed
 

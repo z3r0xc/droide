@@ -123,7 +123,7 @@ function cutTitle(title: string): string {
 /**
  * A session id from a bare UUID or from a session link. A link is any absolute
  * URL whose last path segment is the id, which covers both the app's
- * `/sessions/<id>` pages and a `factory://sessions/<id>` deep link.
+ * `/sessions/<id>` pages and a `droide://sessions/<id>` deep link.
  */
 export function parseSessionArgument(value: string): string | null {
   const trimmed = value.trim();

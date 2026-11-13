@@ -281,7 +281,7 @@ test("a second daemon on the same address exits 1 and the first keeps answering 
 
     assert.deepEqual(await httpGet(first.endpoint.port, "/health"), {
       status: 200,
-      body: "factory-daemon ok",
+      body: "droide-daemon ok",
     });
   } finally {
     await first.close();
@@ -366,7 +366,7 @@ test("a stray response frame never disturbs the connection", async () => {
     const stray: DaemonEnvelope = {
       type: "response",
       jsonrpc: "2.0",
-      factoryApiVersion: "1.0.0",
+      droideApiVersion: "1.0.0",
       id: AUTH_ID,
       result: "stray",
     };

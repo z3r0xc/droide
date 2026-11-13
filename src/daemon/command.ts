@@ -1,5 +1,5 @@
 /**
- * `droid daemon` wiring: parsed flags in, process exit code out. Contract:
+ * `droide daemon` wiring: parsed flags in, process exit code out. Contract:
  * `specs/70-daemon-and-remote-control.md` B1–B3, B5, B7, B8, B10, B11, B28
  * (refusal) and B31.
  *
@@ -10,8 +10,8 @@
  */
 
 import {
-  factoryDir,
-  factoryHome,
+  stateDir,
+  stateHome,
   joinPath,
   type Environment,
 } from "../config/paths.ts";
@@ -44,7 +44,7 @@ export const REMOTE_CONTROL_UNAVAILABLE =
  *
  * TODO(spec B15): the spec verifies a WorkOS token or `fk-` key against the
  * backend and answers with that account's `userId`/`orgId`; this build has no
- * backend client, so it accepts the ambient `FACTORY_API_KEY` and reports a
+ * backend client, so it accepts the ambient `DROIDE_API_KEY` and reports a
  * local identity.
  */
 export const LOCAL_IDENTITY: DaemonIdentity = {
@@ -59,7 +59,7 @@ export interface DaemonArgv {
   readonly unixPath?: string;
   readonly debug?: boolean;
   readonly listen?: "websocket" | "ipc";
-  readonly droidPath?: string;
+  readonly droidePath?: string;
   readonly livenessFd?: number;
   readonly parentPid?: number;
   readonly remoteControl?: boolean;
@@ -90,27 +90,27 @@ export interface DaemonCommandDeps {
 }
 
 /**
- * B15/B31: the credential the daemon accepts is the ambient `FACTORY_API_KEY`
+ * B15/B31: the credential the daemon accepts is the ambient `DROIDE_API_KEY`
  * (the only `fk-` credential this build can read). Without one every
  * `daemon.authenticate` is refused, which fails closed.
  */
 export function environmentAuthPolicy(
   environment: Environment,
 ): DaemonAuthPolicy {
-  const apiKey = environment.env["FACTORY_API_KEY"]?.trim();
+  const apiKey = environment.env["DROIDE_API_KEY"]?.trim();
   return {
     identity: LOCAL_IDENTITY,
     ...(apiKey !== undefined && apiKey.startsWith("fk-") ? { apiKey } : {}),
   };
 }
 
-/** Where the daemon's own log lives: `<Factory dir>/logs/factoryd.log`. */
+/** Where the daemon's own log lives: `<state dir>/logs/daemon.log`. */
 export function daemonLogsPath(environment: Environment): string {
   return joinPath(
     environment.platform,
-    factoryDir(environment),
+    stateDir(environment),
     "logs",
-    "factoryd.log",
+    "daemon.log",
   );
 }
 
@@ -123,7 +123,7 @@ export function exportSettingsEnvironment(
   environment: Record<string, string | undefined>,
 ): void {
   if (settings === undefined || settings.length === 0) return;
-  environment["FACTORY_RUNTIME_SETTINGS_PATH"] = settings;
+  environment["DROIDE_RUNTIME_SETTINGS_PATH"] = settings;
 }
 
 /**
@@ -167,7 +167,7 @@ export function processParentChannel(): DaemonParentChannel | undefined {
  * Translate the parsed flags into the server configuration. Pure: the only
  * side effects are the injected sinks.
  *
- * TODO(spec B1): `--droid-path` is parsed but no session spawner in this build
+ * TODO(spec B1): `--droide-path` is parsed but no session spawner in this build
  * consumes it; spawned sessions are outside the implemented slice.
  */
 export function daemonServerOptions(
@@ -182,7 +182,7 @@ export function daemonServerOptions(
     ...(argv.port === undefined ? {} : { port: argv.port }),
     ...(argv.unixPath === undefined ? {} : { unixPath: argv.unixPath }),
     auth: deps.auth ?? environmentAuthPolicy(environment),
-    homedir: factoryHome(environment),
+    homedir: stateHome(environment),
     platform: environment.platform,
     pid: deps.pid ?? process.pid,
     logsPath: daemonLogsPath(environment),

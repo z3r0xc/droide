@@ -42,8 +42,8 @@ function runCli(home: string, argv: readonly string[]): Promise<RunResult> {
 test("a malformed user settings file fails the run before any command acts", async () => {
   const home = await mkdtemp(join(tmpdir(), "droide-startup-"));
   try {
-    await mkdir(join(home, ".factory"), { recursive: true });
-    await writeFile(join(home, ".factory", "settings.json"), "{ broken");
+    await mkdir(join(home, ".droide"), { recursive: true });
+    await writeFile(join(home, ".droide", "settings.json"), "{ broken");
 
     const result = await runCli(home, []);
 
@@ -59,9 +59,9 @@ test("a malformed user settings file fails the run before any command acts", asy
 test("a valid settings file lets the unimplemented interactive mode fail loudly", async () => {
   const home = await mkdtemp(join(tmpdir(), "droide-startup-"));
   try {
-    await mkdir(join(home, ".factory"), { recursive: true });
+    await mkdir(join(home, ".droide"), { recursive: true });
     await writeFile(
-      join(home, ".factory", "settings.json"),
+      join(home, ".droide", "settings.json"),
       JSON.stringify({ locale: "en" }),
     );
 
@@ -77,8 +77,8 @@ test("a valid settings file lets the unimplemented interactive mode fail loudly"
 test("help and version never load settings, so they survive a broken file", async () => {
   const home = await mkdtemp(join(tmpdir(), "droide-startup-"));
   try {
-    await mkdir(join(home, ".factory"), { recursive: true });
-    await writeFile(join(home, ".factory", "settings.json"), "{ broken");
+    await mkdir(join(home, ".droide"), { recursive: true });
+    await writeFile(join(home, ".droide", "settings.json"), "{ broken");
 
     const version = await runCli(home, ["--version"]);
     assert.equal(version.code, 0);

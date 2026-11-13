@@ -87,7 +87,7 @@ export const STATUSES: readonly HeaderStatus[] = [
 
 export function headerContent(changelog: boolean): HeaderContent {
   return {
-    version: "1.9.0",
+    version: "0.4.0",
     tip: "Use /model to switch models",
     statuses: STATUSES,
     shortcuts: HEADER_SHORTCUTS,

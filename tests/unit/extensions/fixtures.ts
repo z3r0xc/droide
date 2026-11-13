@@ -13,7 +13,7 @@ export interface TempDirectory {
 }
 
 export function createTempDirectory(): TempDirectory {
-  const path = mkdtempSync(join(tmpdir(), "droid-ext-"));
+  const path = mkdtempSync(join(tmpdir(), "droide-ext-"));
   return {
     path,
     cleanup(): void {

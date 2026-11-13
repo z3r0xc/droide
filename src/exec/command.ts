@@ -14,7 +14,7 @@
  * 3. the app context supplies settings and the effective working directory;
  * 4. the model target supplies model, endpoint, headers and dialect. A
  *    `custom:<id>` selector reads `customModels[]`; a managed model reads
- *    `FACTORY_API_KEY`. Missing credentials fail here, before a provider
+ *    `DROIDE_API_KEY`. Missing credentials fail here, before a provider
  *    exists, so no socket is opened;
  * 5. tools are selected from the autonomy level, the provider is built, and
  *    the turn runs.
@@ -43,6 +43,11 @@ import { buildHeaders } from "../transport/headers.ts";
 import type { LlmDialect } from "../transport/llm.ts";
 import { joinApiPath, parseApiBaseUrl } from "../transport/urls.ts";
 import { createSessionTooling } from "../app/tooling.ts";
+import {
+  buildToolListRows,
+  renderToolListJson,
+  renderToolListText,
+} from "./list-tools.ts";
 import type { SearchBackend } from "../tools/native-backend.ts";
 import type { AutonomyLevel } from "../tools/permissions.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
@@ -55,10 +60,19 @@ import {
   selectExecTools,
 } from "./runner.ts";
 import {
+  adoptExecSession,
   openExecSession,
+  projectKeyFor,
   type ExecSession,
   type TurnTranscript,
 } from "./session.ts";
+import {
+  createAcpConfirm,
+  runAcpDaemon,
+  type AcpTurnRunner,
+} from "./acp-runner.ts";
+import type { AcpSessionStore } from "../acp/server.ts";
+import { TranscriptUnavailableError } from "../session/errors.ts";
 import { runStreamingInput } from "./streaming.ts";
 import {
   runOneShot,
@@ -84,8 +98,10 @@ import {
 import { createJsonLineWriter, isBrokenPipeError } from "./writer.ts";
 
 import type { SessionStore, SessionStoreOptions } from "../session/store.ts";
+import { openSessionStore } from "../session/store.ts";
+import type { PermissionContext } from "../tools/permissions.ts";
 
-/** The default model when neither `-m` nor `droidCoreModel` names one. */
+/** The default model when neither `-m` nor `model` names one. */
 export const DEFAULT_MODEL_ID = "gpt-6.1-sol";
 
 /** B23/B56: the managed model's cost ceiling is a provider concern, not ours. */
@@ -93,15 +109,15 @@ const DEFAULT_MAX_TOKENS = 8192;
 
 /** The recorded unauthenticated managed-run message. */
 export const AUTHENTICATION_REQUIRED =
-  "Authentication failed. Please log in using /login or set a valid FACTORY_API_KEY environment variable.";
+  "Authentication failed. Please log in using /login or set a valid DROIDE_API_KEY environment variable.";
 
 const CUSTOM_MODEL_PREFIX = "custom:";
 
-/** The baked managed base URL; `FACTORY_API_BASE_URL` overrides it (50 B3). */
-const DEFAULT_API_BASE_URL = "https://api.factory.ai";
+/** This build bakes no endpoint; `DROIDE_API_BASE_URL` is the only source (50 B3). */
+const DEFAULT_API_BASE_URL = "";
 
 /** B20: the one failure prefix for a turn, in `text` mode. */
-export const EXEC_FAILURE_PREFIX = "Error during droid execution: ";
+export const EXEC_FAILURE_PREFIX = "Error during droide execution: ";
 
 /** The options Commander has already parsed, normalised for this module. */
 export interface ExecArgv {
@@ -145,6 +161,11 @@ export interface ExecCommandDeps {
    * newlines; the CLI streams them as they arrive.
    */
   readonly readStdinLines?: () => AsyncIterable<string>;
+  /**
+   * `-o acp` frames. Defaults to `process.stdin`; the ACP server reads
+   * newline-delimited JSON until the stream ends.
+   */
+  readonly stdin?: AsyncIterable<string | Uint8Array>;
   readonly clock: () => number;
   readonly nextId: () => string;
   /** Defaults to `createAppContext`; tests inject a fixture. */
@@ -398,18 +419,20 @@ function managedModelTarget(
   reasoningEffort: string | undefined,
   env: Readonly<Record<string, string | undefined>>,
 ): ExecModelTarget {
-  const apiKey = env["FACTORY_API_KEY"]?.trim();
+  const apiKey = env["DROIDE_API_KEY"]?.trim();
   if (apiKey === undefined || apiKey === "") {
     throw new ExecCommandError(AUTHENTICATION_REQUIRED);
   }
-  const configured = env["FACTORY_API_BASE_URL"]?.trim();
-  const baseValue =
-    configured === undefined || configured === ""
-      ? DEFAULT_API_BASE_URL
-      : configured;
+  const configured = env["DROIDE_API_BASE_URL"]?.trim();
+  if (configured === undefined || configured === "") {
+    throw new ExecCommandError(
+      `no API endpoint configured: set DROIDE_API_BASE_URL (or choose a custom model in settings)`,
+    );
+  }
+  const baseValue = configured;
   let base: URL;
   try {
-    base = parseApiBaseUrl(baseValue, "FACTORY_API_BASE_URL");
+    base = parseApiBaseUrl(baseValue, "DROIDE_API_BASE_URL");
   } catch (error) {
     throw new ExecCommandError(messageOf(error), { cause: error });
   }
@@ -431,13 +454,12 @@ function managedModelTarget(
 /**
  * Model, endpoint, headers and dialect for one run. A `custom:<id>` selector
  * resolves through `customModels[]` and uses that entry's base URL; anything
- * else is a managed model using `FACTORY_API_KEY`.
+ * else is a managed model using `DROIDE_API_KEY`.
  */
 export function resolveModelTarget(
   input: ResolveModelTargetInput,
 ): ExecModelTarget {
-  const modelId =
-    input.model ?? input.settings.droidCoreModel ?? DEFAULT_MODEL_ID;
+  const modelId = input.model ?? input.settings.model ?? DEFAULT_MODEL_ID;
   if (modelId.startsWith(CUSTOM_MODEL_PREFIX)) {
     const name = modelId.slice(CUSTOM_MODEL_PREFIX.length);
     const models = input.settings.customModels ?? [];
@@ -478,7 +500,7 @@ const IMPLEMENTED_OUTPUT_FORMATS: Readonly<Record<ExecOutputFormat, boolean>> =
     json: true,
     "stream-json": true,
     "stream-jsonrpc": false,
-    acp: false,
+    acp: true,
     "acp-daemon": false,
     debug: true,
   };
@@ -504,11 +526,6 @@ function assertImplemented(
   if (argv.useSpec || argv.specModel !== undefined) {
     throw new ExecCommandError(
       "--use-spec and --spec-model are not implemented in this build.",
-    );
-  }
-  if (argv.listTools) {
-    throw new ExecCommandError(
-      "--list-tools is not implemented in this build.",
     );
   }
   if (
@@ -615,6 +632,192 @@ function linesFrom(read: () => Promise<string>): AsyncIterable<string> {
 }
 
 /* -------------------------------------------------------------------------- */
+/* ACP output (B52, B60-B71)                                                  */
+/* -------------------------------------------------------------------------- */
+
+interface AcpOutputOptions {
+  readonly argv: ExecArgv;
+  readonly deps: ExecCommandDeps;
+  readonly context: AppContext;
+  readonly autonomy: AutonomyLevel | undefined;
+  readonly registry: ToolRegistry;
+  readonly allowed: readonly string[];
+  readonly nativeBackend?: SearchBackend;
+}
+
+/** The ACP mode that mirrors the operator's autonomy flags (B70). */
+function acpModeFor(
+  autonomy: AutonomyLevel | undefined,
+  skipPermissionsUnsafe: boolean,
+): string {
+  if (autonomy !== undefined) return `auto-${autonomy}`;
+  return skipPermissionsUnsafe ? "auto-high" : "normal";
+}
+
+/**
+ * `-o acp`: the process becomes an ACP agent on stdin/stdout (B52, B60).
+ *
+ * The tool registry, the settings and the permission policy are the flags'
+ * and are built once; the client cannot raise them, which keeps
+ * `--skip-permissions-unsafe` the operator's decision. What a session owns is
+ * its stored transcript (one row per `session/new`, appended by the same turn
+ * path exec uses) and the model target, resolved per prompt so that a client
+ * without a credential gets a protocol error on `session/prompt` rather than a
+ * process that will not start.
+ *
+ * The tool root is the launch directory (`--cwd` or the process cwd); an ACP
+ * session's `cwd` names the stored session's directory and the turn's
+ * `request.cwd`, not a second workspace.
+ */
+async function runAcpOutput(options: AcpOutputOptions): Promise<number> {
+  const { argv, deps, context, autonomy, registry, allowed } = options;
+  if (argv.disableBuiltinSkills) {
+    throw new ExecUsageError(
+      "Invalid flags: --disable-builtin-skills is not supported in ACP modes.",
+    );
+  }
+
+  const store = (deps.openStore ?? openSessionStore)({
+    dbPath: context.paths.sessionIndexDatabase,
+    sessionsDir: context.paths.sessionsDir,
+    clock: { now: deps.clock },
+  });
+  const sessions = new Map<string, ExecSession>();
+  const catalogue = createToolCatalogue(registry, allowed);
+  const permission: PermissionContext = {
+    autonomy: autonomy ?? "low",
+    interactionMode: "auto",
+    skipConfirmations: argv.skipPermissionsUnsafe,
+    interactive: true,
+  };
+  let startup: Promise<string> | undefined;
+  const startupPrompt = (): Promise<string> => {
+    startup ??= buildStartupPrompt({
+      context,
+      ...(argv.appendSystemPrompt === undefined
+        ? {}
+        : { appendSystemPrompt: argv.appendSystemPrompt }),
+      ...(argv.appendSystemPromptFile === undefined
+        ? {}
+        : { appendSystemPromptFile: argv.appendSystemPromptFile }),
+    });
+    return startup;
+  };
+
+  const sessionFor = (sessionId: string): ExecSession => {
+    const existing = sessions.get(sessionId);
+    if (existing !== undefined) return existing;
+    const adopted = adoptExecSession({ store, sessionId, clock: deps.clock });
+    sessions.set(sessionId, adopted);
+    return adopted;
+  };
+
+  // One turn path for every ACP prompt: the same provider, tool runner and
+  // transcript the one-shot exec modes use, with permission asks routed to the
+  // client (B69) instead of an interactive terminal.
+  const turnRunner: AcpTurnRunner = {
+    async run(request, sink) {
+      const target = resolveModelTarget({
+        model: request.model === "" ? argv.model : request.model,
+        reasoningEffort: request.reasoningEffort,
+        settings: context.settings,
+        env: context.environment.env,
+      });
+      const provider = createLlmProvider({
+        url: target.url,
+        headers: target.headers,
+        dialect: target.dialect,
+        model: target.wireModel,
+        system: await startupPrompt(),
+        tools: catalogue,
+        maxTokens: DEFAULT_MAX_TOKENS,
+        ...(deps.fetch === undefined ? {} : { fetch: deps.fetch }),
+        operation: target.url.pathname,
+      });
+      const tools = createExecToolRunner({
+        registry,
+        root: context.environment.cwd,
+        environment: context.environment,
+        permission,
+        allowed,
+        confirm: createAcpConfirm({
+          sessionId: request.sessionId,
+          ask: (params) => sink.requestPermission(params),
+        }),
+        ...(options.nativeBackend === undefined
+          ? {}
+          : { nativeBackend: options.nativeBackend }),
+      });
+      const runner = createExecTurnRunner({
+        provider,
+        tools,
+        clock: { now: deps.clock, sleep: sleepFor },
+        maxTurns: deps.maxTurns ?? DEFAULT_EXEC_MAX_TURNS,
+        nextMessageId: () => deps.nextId(),
+        transcript: sessionFor(request.sessionId),
+      });
+      return runner.run(request, sink);
+    },
+  };
+
+  // B63/B71: `session/new` owns the row, `session/list` reads the index, and a
+  // session with no transcript file yet is an empty history rather than a
+  // missing session.
+  const acpStore: AcpSessionStore = {
+    registerSession(input) {
+      const sessionId = input.sessionId ?? deps.nextId();
+      if (store.getSession(sessionId) !== null) return { sessionId };
+      const cwd = input.cwd ?? context.environment.cwd;
+      store.registerSession({
+        sessionId,
+        cwd,
+        projectKey: projectKeyFor(cwd, context.environment.platform),
+        firstEventAt: input.firstEventAt ?? deps.clock(),
+      });
+      return { sessionId };
+    },
+    deleteSession(sessionId) {
+      sessions.delete(sessionId);
+      return store.deleteSession(sessionId);
+    },
+    listSessions: (listOptions) => store.listSessions(listOptions),
+    readSession: (sessionId) => {
+      try {
+        return store.readSession(sessionId);
+      } catch (error) {
+        if (error instanceof TranscriptUnavailableError) return [];
+        throw error;
+      }
+    },
+  };
+
+  try {
+    return await runAcpDaemon({
+      ...(deps.stdin === undefined ? {} : { stdin: deps.stdin }),
+      stdout: deps.stdout,
+      stderr: deps.stderr,
+      clock: deps.clock,
+      store: acpStore,
+      turnRunner,
+      // The launching user already chose this process, its settings and its
+      // credentials; `initialize` and the session methods answer without a
+      // second login, and a prompt without a credential fails as a protocol
+      // error (B55).
+      authenticated: true,
+      model: argv.model ?? context.settings.model ?? DEFAULT_MODEL_ID,
+      ...(argv.reasoningEffort === undefined
+        ? {}
+        : { reasoningEffort: argv.reasoningEffort }),
+      mode: acpModeFor(autonomy, argv.skipPermissionsUnsafe),
+      tools: allowed,
+      installSignalHandlers: true,
+    });
+  } finally {
+    store.close();
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Entry point                                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -693,7 +896,14 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
   });
 
   let prompt = "";
-  if (inputFormat !== "stream-json") {
+  // B9: `--list-tools` answers without a prompt, a session or a socket. An ACP
+  // run takes its prompts from the protocol, so stdin is its frame stream and
+  // must not be read as a prompt (B52/B60).
+  if (
+    inputFormat !== "stream-json" &&
+    !argv.listTools &&
+    outputFormat !== "acp"
+  ) {
     prompt = await resolvePrompt({
       program: deps.program,
       promptArg: argv.prompt,
@@ -703,14 +913,6 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
       environment: context.environment,
     });
   }
-
-  // B55: a missing model or credential fails here, before any socket exists.
-  const target = resolveModelTarget({
-    model: argv.model,
-    reasoningEffort: argv.reasoningEffort,
-    settings: context.settings,
-    env: context.environment.env,
-  });
 
   // B9/B10: the advertised set follows the autonomy level. When the caller did
   // not inject a registry, this is the real one: core tools plus every MCP
@@ -731,6 +933,71 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     skipPermissionsUnsafe: argv.skipPermissionsUnsafe,
   });
   const catalogue = createToolCatalogue(registry, allowed);
+
+  // B9: `--list-tools` answers and exits before a prompt, a session, a
+  // credential or a provider request exists: the listing is a property of the
+  // tool registry, not of a resolved model target.
+  if (argv.listTools) {
+    // B53: `-o json` is a single-line array; every other format is the text
+    // listing. The default set is membership at the strictest autonomy.
+    const rows = buildToolListRows(
+      registry.all(),
+      new Set(allowed),
+      new Set(selectExecTools(registry, { autonomy: "off" })),
+    );
+    // The header names the wire model when one resolves, and the configured id
+    // when it does not — a listing must never fail for want of a credential.
+    const requestedModel =
+      argv.model ?? context.settings.model ?? DEFAULT_MODEL_ID;
+    let label: string;
+    try {
+      label = resolveModelTarget({
+        model: requestedModel,
+        reasoningEffort: argv.reasoningEffort,
+        settings: context.settings,
+        env: context.environment.env,
+      }).wireModel;
+    } catch {
+      label = requestedModel;
+    }
+    await writeText(
+      deps.stdout,
+      outputFormat === "json"
+        ? renderToolListJson(rows)
+        : renderToolListText(rows, {
+            model: label,
+            autonomy: autonomy ?? "off",
+          }),
+    );
+    return 0;
+  }
+
+  // B52/B60: `-o acp` hands the process to the ACP agent before a model target
+  // or a credential is resolved, so `initialize` answers for a client that has
+  // not logged in yet.
+  if (outputFormat === "acp") {
+    try {
+      return await runAcpOutput({
+        argv,
+        deps,
+        context,
+        autonomy,
+        registry,
+        allowed,
+        ...(nativeBackend === undefined ? {} : { nativeBackend }),
+      });
+    } finally {
+      await closeTooling?.();
+    }
+  }
+
+  // B55: a missing model or credential fails here, before any socket exists.
+  const target = resolveModelTarget({
+    model: argv.model,
+    reasoningEffort: argv.reasoningEffort,
+    settings: context.settings,
+    env: context.environment.env,
+  });
 
   const toolRunner = createExecToolRunner({
     registry,

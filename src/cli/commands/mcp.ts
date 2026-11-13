@@ -29,7 +29,7 @@ function runWithContext(
     try {
       const context = await createAppContext();
       await action({
-        factoryDir: context.paths.factoryDir,
+        stateDir: context.paths.stateDir,
         projectRoot: context.environment.cwd,
         write: (text) => process.stdout.write(text),
         writeError: (text) => process.stderr.write(text),

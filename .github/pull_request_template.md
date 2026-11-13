@@ -26,5 +26,5 @@
 
 ## Provenance
 
-<!-- Confirm no recovered subject code, extracted binary or parity golden is added
+<!-- Confirm no recovered reference-build code, extracted binary or snapshot is added
      to the tracked tree (ADR 0003). -->

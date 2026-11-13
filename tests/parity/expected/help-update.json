@@ -1,0 +1,6 @@
+{
+ "case": "help-update",
+ "exit_code": 0,
+ "stdout": "Usage: droide update [options]\n\nCheck for and install Droide updates\n\nOptions:\n  -c, --check              Only check for updates without installing\n  -v, --version <version>  Update to a specific version (e.g., 1.2.3)\n  -h, --help               display help for command\n",
+ "stderr": ""
+}

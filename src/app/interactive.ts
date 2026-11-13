@@ -19,7 +19,7 @@ import { StringDecoder } from "node:string_decoder";
 import { createLlmProvider } from "../agent/adapters/llm-provider.ts";
 import type { Provider } from "../agent/ports.ts";
 import { DEFAULT_MODEL_ID } from "../cli/models.ts";
-import { VERSION } from "../cli/brand.ts";
+import { PRODUCT_VERSION } from "../cli/brand.ts";
 import {
   DEFAULT_COMPACTION_LIMIT,
   createExecToolRunner,
@@ -306,7 +306,7 @@ export async function runInteractiveShell(
     width,
     height,
     header: {
-      version: options.version ?? VERSION,
+      version: options.version ?? PRODUCT_VERSION,
       tip: STARTUP_PLACEHOLDER,
       statuses: statuses(),
       shortcuts: HEADER_SHORTCUTS,
@@ -324,9 +324,7 @@ export async function runInteractiveShell(
     modeRow: {
       autonomy: MODE_ROW_AUTONOMY_OFF,
       model:
-        options.model ??
-        options.context.settings.droidCoreModel ??
-        DEFAULT_MODEL_ID,
+        options.model ?? options.context.settings.model ?? DEFAULT_MODEL_ID,
     },
     footer: {},
     ...(driver?.statusText === undefined

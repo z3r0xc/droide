@@ -16,7 +16,7 @@ async function fixture(): Promise<{ root: string; environment: Environment }> {
   const home = join(root, "home");
   const project = join(root, "project");
   await mkdir(home, { recursive: true });
-  await mkdir(join(project, ".factory"), { recursive: true });
+  await mkdir(join(project, ".droide"), { recursive: true });
   return {
     root,
     environment: { env: {}, home, platform: "linux", cwd: project },
@@ -41,13 +41,13 @@ test("skills are read from the user and project directories", async () => {
   const { root, environment } = await fixture();
   try {
     await writeSkill(
-      join(environment.home, ".factory"),
+      join(environment.home, ".droide"),
       "user-skill",
       "from the user",
       "user body",
     );
     await writeSkill(
-      join(environment.cwd, ".factory"),
+      join(environment.cwd, ".droide"),
       "project-skill",
       "from the project",
       "project body",
@@ -74,7 +74,7 @@ test("the listing block carries one line per skill, never the body", async () =>
   const { root, environment } = await fixture();
   try {
     await writeSkill(
-      join(environment.cwd, ".factory"),
+      join(environment.cwd, ".droide"),
       "deploy",
       "ship it",
       "SECRET BODY TEXT",
@@ -94,7 +94,7 @@ test("a disabled skill is not listed", async () => {
   const { root, environment } = await fixture();
   try {
     await writeSkill(
-      join(environment.cwd, ".factory"),
+      join(environment.cwd, ".droide"),
       "gone",
       "disabled one",
       "body",

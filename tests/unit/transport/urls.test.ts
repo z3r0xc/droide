@@ -21,12 +21,12 @@ const BAKED: BakedApiUrls = {
   apiBaseUrlEu: "https://eu.example",
 };
 
-function factoryConfig(
+function helperConfig(
   env: Readonly<Record<string, string | undefined>>,
   baked: BakedApiUrls = BAKED,
 ): ApiUrlConfig {
   return createApiUrlConfig({
-    deployment: { kind: "factory" },
+    deployment: { kind: "managed" },
     environment: { env },
     baked,
   });
@@ -34,7 +34,7 @@ function factoryConfig(
 
 interface BaseUrlCase {
   readonly name: string;
-  readonly deployment: "factory" | "customer-prem";
+  readonly deployment: "managed" | "customer-prem";
   readonly region: "global" | "eu";
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly baked: BakedApiUrls;
@@ -44,7 +44,7 @@ interface BaseUrlCase {
 const MATRIX: readonly BaseUrlCase[] = [
   {
     name: "factory + global uses the global base",
-    deployment: "factory",
+    deployment: "managed",
     region: "global",
     env: {},
     baked: BAKED,
@@ -52,7 +52,7 @@ const MATRIX: readonly BaseUrlCase[] = [
   },
   {
     name: "factory + eu uses the EU base when configured",
-    deployment: "factory",
+    deployment: "managed",
     region: "eu",
     env: {},
     baked: BAKED,
@@ -60,7 +60,7 @@ const MATRIX: readonly BaseUrlCase[] = [
   },
   {
     name: "factory + eu falls back when the EU base is absent",
-    deployment: "factory",
+    deployment: "managed",
     region: "eu",
     env: {},
     baked: { apiBaseUrl: "https://api.example", apiBaseUrlEu: null },
@@ -76,17 +76,17 @@ const MATRIX: readonly BaseUrlCase[] = [
   },
   {
     name: "the environment beats the baked define",
-    deployment: "factory",
+    deployment: "managed",
     region: "global",
-    env: { FACTORY_API_BASE_URL: "https://env.example" },
+    env: { DROIDE_API_BASE_URL: "https://env.example" },
     baked: BAKED,
     expected: "https://env.example/",
   },
   {
     name: "the EU environment value beats the baked EU define",
-    deployment: "factory",
+    deployment: "managed",
     region: "eu",
-    env: { FACTORY_API_BASE_URL_EU: "https://eu-env.example" },
+    env: { DROIDE_API_BASE_URL_EU: "https://eu-env.example" },
     baked: BAKED,
     expected: "https://eu-env.example/",
   },
@@ -96,8 +96,8 @@ for (const testCase of MATRIX) {
   test(`base URL matrix: ${testCase.name}`, () => {
     const config = createApiUrlConfig({
       deployment:
-        testCase.deployment === "factory"
-          ? { kind: "factory" }
+        testCase.deployment === "managed"
+          ? { kind: "managed" }
           : { kind: "customer-prem", origin: "https://prem.example" },
       environment: { env: testCase.env },
       baked: testCase.baked,
@@ -111,8 +111,8 @@ for (const testCase of MATRIX) {
 
 test("an explicit override beats the environment and the baked define", () => {
   const config = createApiUrlConfig({
-    deployment: { kind: "factory" },
-    environment: { env: { FACTORY_API_BASE_URL: "https://env.example" } },
+    deployment: { kind: "managed" },
+    environment: { env: { DROIDE_API_BASE_URL: "https://env.example" } },
     baked: BAKED,
     overrides: { apiBaseUrl: "https://override.example" },
   });
@@ -121,7 +121,7 @@ test("an explicit override beats the environment and the baked define", () => {
 
 test("an explicit null EU override removes the EU branch", () => {
   const config = createApiUrlConfig({
-    deployment: { kind: "factory" },
+    deployment: { kind: "managed" },
     environment: { env: {} },
     baked: BAKED,
     overrides: { apiBaseUrlEu: null },
@@ -170,14 +170,14 @@ test("a configured base URL carrying credentials or a query is refused", () => {
 });
 
 test("an empty environment value falls through to the baked define", () => {
-  const config = factoryConfig({ FACTORY_API_BASE_URL: "" });
+  const config = helperConfig({ DROIDE_API_BASE_URL: "" });
   assert.equal(config.apiBaseUrl.href, "https://api.example/");
 });
 
 test("resolveRegion: no credential, no identity region and customer Prem are global", () => {
   assert.equal(
     resolveRegion({
-      deployment: { kind: "factory" },
+      deployment: { kind: "managed" },
       hasCredential: false,
       identityRegion: "eu",
     }),
@@ -185,7 +185,7 @@ test("resolveRegion: no credential, no identity region and customer Prem are glo
   );
   assert.equal(
     resolveRegion({
-      deployment: { kind: "factory" },
+      deployment: { kind: "managed" },
       hasCredential: true,
       identityRegion: null,
     }),
@@ -201,7 +201,7 @@ test("resolveRegion: no credential, no identity region and customer Prem are glo
   );
   assert.equal(
     resolveRegion({
-      deployment: { kind: "factory" },
+      deployment: { kind: "managed" },
       hasCredential: true,
       identityRegion: "eu",
     }),
@@ -219,18 +219,18 @@ test("resolvePremBaseHost: customer origin, premBaseHostV2, or hosted", () => {
   );
   assert.equal(
     resolvePremBaseHost({
-      deployment: { kind: "factory" },
+      deployment: { kind: "managed" },
       identity: { premBaseHostV2: "https://managed.example" },
     })?.origin,
     "https://managed.example",
   );
   assert.equal(
-    resolvePremBaseHost({ deployment: { kind: "factory" }, identity: null }),
+    resolvePremBaseHost({ deployment: { kind: "managed" }, identity: null }),
     null,
   );
   assert.equal(
     resolvePremBaseHost({
-      deployment: { kind: "factory" },
+      deployment: { kind: "managed" },
       identity: { premBaseHostV2: "" },
     }),
     null,
@@ -276,7 +276,7 @@ test("joinApiPath keeps a base path prefix and refuses absolute paths", () => {
     "https://prem.example/prefix/api/sessions/v2",
   );
   assert.equal(
-    resolveApiRequestUrl(factoryConfig({}), "global", "/api/cli/whoami").href,
+    resolveApiRequestUrl(helperConfig({}), "global", "/api/cli/whoami").href,
     "https://api.example/api/cli/whoami",
   );
   assert.throws(() => joinApiPath(base, "api/x"), InvalidBaseUrlError);

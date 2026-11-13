@@ -1,0 +1,6 @@
+{
+ "case": "help-mcp",
+ "exit_code": 0,
+ "stdout": "Usage: droide mcp [options] [command]\n\nManage MCP servers\n\nOptions:\n  -h, --help                              display help for command\n\nCommands:\n  add [options] <name> <urlOrCommand...>  Add a new MCP server\n  remove [name]                           Remove an MCP server\n  list                                    List configured MCP servers with connection and authentication status\n  auth                                    Authenticate every MCP server that needs authentication, one at a time\n  permissions                             Manage persistent MCP tool permissions\n  help [command]                          display help for command\n",
+ "stderr": ""
+}

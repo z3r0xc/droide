@@ -1,18 +1,18 @@
-# ADR 0007 — Updates come from this repository's releases, never from the subject's channel
+# ADR 0007 — Updates come from this repository's releases
 
 - Status: accepted
 - Date: 2026-11-12
 
 ## Context
 
-The subject's `droid update` checks `downloads.factory.ai` and replaces its own
-binary. A reimplementation must not call the original vendor's distribution
-endpoint: it would misappropriate their release channel, and the artefact it
-installed would not be ours.
+An updater that replaces the running binary is the one command that can install
+code from somewhere we do not control. Pointing it at another vendor's
+distribution endpoint would misappropriate that vendor's release channel, and the
+artefact it installed would not be ours.
 
 `specs/10-cli-surface.md` §B75 pins the _command surface_ (`-c/--check`,
 `-v/--version <v>`) and the exit-code behaviour, but not the transport — the
-endpoint is an implementation choice of the original build.
+endpoint is our choice to make.
 
 ## Decision
 
@@ -39,13 +39,13 @@ endpoint is an implementation choice of the original build.
 
 - `update --check` works in CI and offline deterministically: the HTTP client is
   injected, so tests never open a socket.
-- Users are never pointed at the vendor's binaries, and the installed artefact
-  is always built from this repository.
+- Users are never pointed at another vendor's binaries, and the installed
+  artefact is always built from this repository.
 - Until installation lands, the command is honest about being read-only.
 
 ## Alternatives considered
 
-- **Call the subject's endpoint**: appropriates another vendor's channel and
+- **Call another vendor's endpoint**: appropriates that vendor's channel and
   installs an artefact that is not this project. Rejected.
 - **No update command at all**: leaves a documented command permanently
   unimplemented; the CLI surface is part of the contract.

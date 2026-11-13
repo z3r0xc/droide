@@ -272,10 +272,10 @@ test("a deny-floor refusal uses the sandbox wording", () => {
     toolId: "edit-cli",
     toolClass: "file-edit",
     pathClass: "deny-floor",
-    path: "/home/me/.factory/settings.json",
+    path: "/home/me/.droide/settings.json",
   };
   assert.equal(
     refusal(request, contextFor("high")),
-    "Sandbox: write denied to /home/me/.factory/settings.json",
+    "Sandbox: write denied to /home/me/.droide/settings.json",
   );
 });

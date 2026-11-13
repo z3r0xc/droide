@@ -1,7 +1,7 @@
 //! Real pseudo-terminal sessions for the native helper.
 //!
 //! Contract: `specs/90-native-layer.md` §"PTY (`rust_pty`)" and the session
-//! registry in `crates/README.md`. The subject hands `bun-pty` a quoted command
+//! registry in `crates/README.md`. The reference build hands its PTY helper a quoted command
 //! line, reads raw byte chunks (never lines), reports the child's exit code and
 //! closes the terminal on request. This module reproduces that surface as a
 //! long-lived session object the JSON-lines dispatcher owns.

@@ -63,21 +63,21 @@ function contextFor(directory: string): AppContext {
       cwd: join(directory, "project"),
     },
     paths: {
-      factoryDir: join(directory, "factory"),
-      userSettingsFile: join(directory, "factory", "settings.json"),
+      stateDir: join(directory, "managed"),
+      userSettingsFile: join(directory, "managed", "settings.json"),
       projectDir: join(directory, "project"),
       projectSettingsFile: join(
         directory,
         "project",
-        ".factory",
+        ".droide",
         "settings.json",
       ),
-      sessionsDir: join(directory, "factory", "sessions"),
-      sessionIndexDir: join(directory, "factory", "index"),
-      sessionIndexDatabase: join(directory, "factory", "index", "sessions.db"),
-      cacheDir: join(directory, "factory", "cache"),
-      logsDir: join(directory, "factory", "logs"),
-      worktreesRoot: join(directory, "factory", "worktrees"),
+      sessionsDir: join(directory, "managed", "sessions"),
+      sessionIndexDir: join(directory, "managed", "index"),
+      sessionIndexDatabase: join(directory, "managed", "index", "sessions.db"),
+      cacheDir: join(directory, "managed", "cache"),
+      logsDir: join(directory, "managed", "logs"),
+      worktreesRoot: join(directory, "managed", "worktrees"),
     },
     settings: {},
     layers: [],
@@ -281,14 +281,14 @@ function recordsOf(
 test("a bare uuid, an app link and a deep link all name the session", () => {
   assert.equal(parseSessionArgument(ID_A), ID_A);
   assert.equal(
-    parseSessionArgument(`  https://app.factory.ai/sessions/${ID_A}  `),
+    parseSessionArgument(`  https://app.example.test/sessions/${ID_A}  `),
     ID_A,
   );
-  assert.equal(parseSessionArgument(`factory://sessions/${ID_A}`), ID_A);
+  assert.equal(parseSessionArgument(`droide://sessions/${ID_A}`), ID_A);
   assert.equal(parseSessionArgument(ID_A.toUpperCase()), null);
   assert.equal(parseSessionArgument("not-a-session"), null);
   assert.equal(
-    parseSessionArgument("https://app.factory.ai/sessions/nope"),
+    parseSessionArgument("https://app.example.test/sessions/nope"),
     null,
   );
 });
@@ -388,7 +388,7 @@ test("a session link resumes the session it names", async () => {
     seed(store, context, { sessionId: ID_A, title: "Alpha" });
     const captured = harness(context);
     await runResumeCommand(
-      options({ sessionId: `https://app.factory.ai/sessions/${ID_A}` }),
+      options({ sessionId: `https://app.example.test/sessions/${ID_A}` }),
       captured.deps,
     );
 

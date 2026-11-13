@@ -1,9 +1,9 @@
 /**
  * Glob matching for the filesystem tools.
  *
- * Contract: `specs/30-tools-and-sandbox.md` B18-B20. The conversion mirrors the
- * subject's (`packages/utils/src/text/glob.ts`, `globToRegex.ts`): no start
- * anchor (partial path matching), an end anchor, `**` across separators, `*`
+ * Contract: `specs/30-tools-and-sandbox.md` B18-B20. The conversion
+ * (`packages/utils/src/text/glob.ts`, `globToRegex.ts`): no start anchor
+ * (partial path matching), an end anchor, `**` across separators, `*`
  * within one segment, `?` for one character, `[...]` classes, `{a,b}` braces,
  * and a leading `!` negating the match.
  */

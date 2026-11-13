@@ -19,7 +19,7 @@ export interface ComputerListDeps {
 }
 
 export async function runComputerList(deps: ComputerListDeps): Promise<void> {
-  const file = readHostConfig(deps.context.paths.factoryDir);
+  const file = readHostConfig(deps.context.paths.stateDir);
   deps.write(renderComputerList([file]));
   deps.setExitCode(file?.diagnostic === undefined ? 0 : 1);
 }

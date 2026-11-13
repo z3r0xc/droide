@@ -1,0 +1,6 @@
+{
+ "case": "search-no-query",
+ "exit_code": 1,
+ "stdout": "",
+ "stderr": "error: missing required argument 'query'\n"
+}

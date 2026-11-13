@@ -1,0 +1,6 @@
+{
+ "case": "help-doctor",
+ "exit_code": 0,
+ "stdout": "Usage: droide doctor [options]\n\nDiagnose configuration, connectivity, certificate, proxy, auth, and daemon\nissues\n\nOptions:\n  --json            Output results as JSON\n  --verbose         Expand all checks with details, fixes, timings, and metadata\n  --timeout <ms>    Per-probe timeout in milliseconds, cleanup included\n                    (default: 10000; MCP server: 36000; exec full turn: 60000)\n  --checks <names>  Run only these comma-separated checks: config, environment,\n                    system, binaries, updates, filesystem, git, custom-models,\n                    proxy, certs, connectivity, auth, daemon, inference, mcp,\n                    exec. Use all to include checks that start servers or cost\n                    FSC or provider money\n  -h, --help        display help for command\n\nBy default, doctor runs every check except inference, custom-models, mcp, and exec.\nMCP checks can start configured servers but call no tools.\nModel checks can use FSC or provider money. Exec also runs normal startup hooks.\nExample: droide doctor --checks config,connectivity,mcp\n\n",
+ "stderr": ""
+}

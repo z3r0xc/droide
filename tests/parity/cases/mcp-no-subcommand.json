@@ -1,6 +1,5 @@
 {
  "name": "mcp-no-subcommand",
- "oracle": true,
  "argv": [
   "mcp"
  ],

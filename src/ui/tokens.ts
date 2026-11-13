@@ -13,7 +13,7 @@
  */
 
 /** The two shipped themes (B17). `auto` resolution is a later slice. */
-export type ThemeName = "factory-dark" | "factory-light";
+export type ThemeName = "droide-dark" | "droide-light";
 
 /** Colour depth the terminal can render, after B18 degradation. */
 export type ColorDepth = "truecolor" | "256" | "16" | "none";
@@ -244,7 +244,7 @@ export type PaletteSlot =
 
 /** The flat, theme-resolved palette every renderer reads (B17). */
 function themePalette(theme: ThemeName): Readonly<Record<PaletteSlot, string>> {
-  const side = theme === "factory-dark" ? "dark" : "light";
+  const side = theme === "droide-dark" ? "dark" : "light";
   return {
     ...CORE_PALETTE[side],
     ...TEXT_PALETTE[side],
@@ -260,25 +260,25 @@ function themePalette(theme: ThemeName): Readonly<Record<PaletteSlot, string>> {
   };
 }
 
-/** factory-dark resolved to one flat slot map. */
+/** droide-dark resolved to one flat slot map. */
 export const PALETTE_DARK: Readonly<Record<PaletteSlot, string>> =
-  themePalette("factory-dark");
+  themePalette("droide-dark");
 
-/** factory-light resolved to one flat slot map (unpublished slots inherit dark). */
+/** droide-light resolved to one flat slot map (unpublished slots inherit dark). */
 export const PALETTE_LIGHT: Readonly<Record<PaletteSlot, string>> =
-  themePalette("factory-light");
+  themePalette("droide-light");
 
 /** Resolve a theme name to its flat palette. */
 export function paletteFor(
   theme: ThemeName,
 ): Readonly<Record<PaletteSlot, string>> {
-  return theme === "factory-light" ? PALETTE_LIGHT : PALETTE_DARK;
+  return theme === "droide-light" ? PALETTE_LIGHT : PALETTE_DARK;
 }
 
 /** Read a slot's literal hex for a theme, before capability degradation. */
 export function themeColor(
   slot: PaletteSlot,
-  theme: ThemeName = "factory-dark",
+  theme: ThemeName = "droide-dark",
 ): string {
   return paletteFor(theme)[slot];
 }
@@ -387,8 +387,8 @@ export const BORDERS = {
 } as const;
 
 /**
- * D11 — Mini logo (3 rows, 21 columns, `D R O I D` in the subject).
- * The letters are the parity-normalised program name; shape and width stay.
+ * D11 — Mini logo (3 rows, 21 columns, the program name letterspaced).
+ * Shape and width are fixed; the letters come from the product name.
  */
 export const LOGO_MINI_ROWS = [
   "╔═══════════════════╗",
@@ -404,7 +404,7 @@ export const LOGO_FULL_HEIGHT = 6;
 
 /**
  * D11 — Full logo (6 rows, block letters, 52 columns).
- * The subject spells its own name; the glyph shape and centring rule stay.
+ * The block glyphs spell the product name; shape and centring rule stay.
  */
 export const LOGO_FULL_ROWS = [
   "██████   ██████   █████    ███████  ██████   ███████",

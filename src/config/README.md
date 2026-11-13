@@ -11,21 +11,21 @@ it left absent; lists and scalars are replaced whole.
 
 1. **org policy** — remote; injected as `orgSettings`.
 2. **runtime overlay** — `--settings <path>`, else
-   `FACTORY_RUNTIME_SETTINGS_PATH`; trimmed, `~` expanded, anchored at the
+   `DROIDE_RUNTIME_SETTINGS_PATH`; trimmed, `~` expanded, anchored at the
    launch dir (B65/B68), blank flag falls through. Unreadable paths are
    _dropped_ and recorded (B79); invalid content throws.
-3. **project** — `<cwd>/.factory/settings.json`.
+3. **project** — `<cwd>/.droide/settings.json`.
 4. **user** — `<base>/settings.json`.
 
 ## Files
 
-`<base>` is `<home>/.factory` in production, `<home>/.factory-dev` otherwise
-(`FACTORY_ENV`), with `<home>` from `FACTORY_HOME_OVERRIDE` else the OS home.
+`<base>` is `<home>/.droide` in production, `<home>/.droide-dev` otherwise
+(`DROIDE_ENV`), with `<home>` from `DROIDE_HOME_OVERRIDE` else the OS home.
 
 | Path                                  | Purpose                                         |
 | ------------------------------------- | ----------------------------------------------- |
 | `<base>/settings.json`                | user settings                                   |
-| `<cwd>/.factory/settings.json`        | project settings                                |
+| `<cwd>/.droide/settings.json`        | project settings                                |
 | `<base>/sessions/`                    | transcripts, `<project key>/<session id>.jsonl` |
 | `<base>/cache/session-index/index.db` | session index                                   |
 | `<base>/worktrees/`                   | default `worktreeDirectory` root                |
@@ -37,4 +37,4 @@ it left absent; lists and scalars are replaced whole.
 other module takes an injected `Environment` (`env`, `home`, `platform`,
 `cwd`), so tests never touch a real home. `schema.ts` rejects a wrong type with
 `InvalidSettingsError` naming the dotted key path; unknown keys are ignored
-there because the subject's zod objects strip them.
+there because the parser strips them.

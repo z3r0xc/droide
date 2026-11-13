@@ -6,7 +6,7 @@ out.
 
 `Glob` and `Grep` reach it through `src/tools/native-backend.ts`: the binary is
 used only when the session asks for `nativeBackend: "helper"` **and** the file
-exists (the factory `bin/`, or `DROIDE_NATIVE_BIN`). Every helper failure
+exists (the state `bin/`, or `DROIDE_NATIVE_BIN`). Every helper failure
 degrades that session to the TypeScript walk and is recorded as a diagnostic,
 so a missing or broken helper never fails a tool call.
 

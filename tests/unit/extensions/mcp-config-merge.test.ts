@@ -138,10 +138,10 @@ test("test_mcp_config_merge_precedence: disabled servers are not in the enabled 
 test("test_mcp_config_discovery_and_tolerance: two files merge project over user", () => {
   const temp = createTempDirectory();
   try {
-    const factoryDir = temp.path + "/factory";
+    const stateDir = temp.path + "/factory";
     const projectRoot = temp.path + "/project";
     writeFixture(
-      factoryDir,
+      stateDir,
       "mcp.json",
       `{
         // user servers
@@ -153,12 +153,12 @@ test("test_mcp_config_discovery_and_tolerance: two files merge project over user
     );
     writeFixture(
       projectRoot,
-      ".factory/mcp.json",
+      ".droide/mcp.json",
       `{ "mcpServers": { "shared": { "command": "project" } } }`,
     );
 
     const configuration = loadMcpConfiguration(
-      mcpConfigFileSources(factoryDir, projectRoot),
+      mcpConfigFileSources(stateDir, projectRoot),
     );
     assert.deepEqual([...configuration.servers.keys()].sort(), [
       "shared",
@@ -182,17 +182,17 @@ test("test_mcp_config_discovery_and_tolerance: two files merge project over user
 test("test_mcp_config_discovery_and_tolerance: a broken file contributes nothing and is reported", () => {
   const temp = createTempDirectory();
   try {
-    const factoryDir = temp.path + "/factory";
+    const stateDir = temp.path + "/factory";
     const projectRoot = temp.path + "/project";
     writeFixture(
-      factoryDir,
+      stateDir,
       "mcp.json",
       `{ "mcpServers": { "ok": { "command": "ok" } } }`,
     );
-    writeFixture(projectRoot, ".factory/mcp.json", `{ "mcpServers": { "bad": `);
+    writeFixture(projectRoot, ".droide/mcp.json", `{ "mcpServers": { "bad": `);
 
     const configuration = loadMcpConfiguration(
-      mcpConfigFileSources(factoryDir, projectRoot),
+      mcpConfigFileSources(stateDir, projectRoot),
     );
     assert.deepEqual([...configuration.servers.keys()], ["ok"]);
     assert.ok(

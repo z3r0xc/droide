@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DOCS_URL, PROGRAM, VERSION } from "../../../src/cli/brand.ts";
+import { DOCS_URL, PROGRAM, PRODUCT_VERSION } from "../../../src/cli/brand.ts";
 import { runCli } from "./cli-process.ts";
 
 /** Terms of the help block introduced by `heading`, up to the next blank line. */
@@ -29,7 +29,7 @@ test("--version prints one semver line on stdout and nothing on stderr", () => {
 
   assert.equal(result.status, 0);
   assert.equal(result.stderr, "");
-  assert.equal(result.stdout, `${VERSION}\n`);
+  assert.equal(result.stdout, `${PRODUCT_VERSION}\n`);
   assert.match(result.stdout, /^\d+\.\d+\.\d+\n$/);
 });
 

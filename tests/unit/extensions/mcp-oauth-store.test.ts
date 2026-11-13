@@ -28,13 +28,13 @@ const NOW = 1_700_000_000_000;
 
 async function dir(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "droide-mcp-creds-"));
-  const factoryDir = join(root, ".factory");
-  await mkdir(factoryDir, { recursive: true });
-  return factoryDir;
+  const stateDir = join(root, ".droide");
+  await mkdir(stateDir, { recursive: true });
+  return stateDir;
 }
 
-function options(factoryDir: string, sealerImpl: CredentialSealer = sealer) {
-  return { factoryDir, sealer: sealerImpl, now: () => NOW };
+function options(stateDir: string, sealerImpl: CredentialSealer = sealer) {
+  return { stateDir, sealer: sealerImpl, now: () => NOW };
 }
 
 function credential(serverName = "linear") {
@@ -53,60 +53,60 @@ function credential(serverName = "linear") {
 }
 
 test("a missing store reads as empty", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    const document = await readCredentials(options(factoryDir));
+    const document = await readCredentials(options(stateDir));
     assert.deepEqual(document, {
       schemaVersion: 1,
       servers: {},
       tombstones: {},
     });
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("a credential round-trips and never appears in plaintext on disk", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    const stored = await putCredential(options(factoryDir), {
+    const stored = await putCredential(options(stateDir), {
       credential: credential(),
     });
     assert.equal(stored.revision, 1);
     assert.equal(stored.updatedAt, new Date(NOW).toISOString());
 
-    const document = await readCredentials(options(factoryDir));
+    const document = await readCredentials(options(stateDir));
     assert.equal(document.servers["linear"]?.tokens.accessToken, "at-secret");
 
-    const bytes = await readFile(join(factoryDir, CREDENTIAL_SEALED_FILE));
+    const bytes = await readFile(join(stateDir, CREDENTIAL_SEALED_FILE));
     assert.equal(bytes.includes(Buffer.from("at-secret")), false);
     assert.equal(bytes.includes(Buffer.from("accessToken")), false);
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("each write bumps the revision", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    await putCredential(options(factoryDir), { credential: credential() });
-    const second = await putCredential(options(factoryDir), {
+    await putCredential(options(stateDir), { credential: credential() });
+    const second = await putCredential(options(stateDir), {
       credential: credential(),
     });
     assert.equal(second.revision, 2);
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("a write from a stale revision is refused", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    await putCredential(options(factoryDir), { credential: credential() });
-    await putCredential(options(factoryDir), { credential: credential() });
+    await putCredential(options(stateDir), { credential: credential() });
+    await putCredential(options(stateDir), { credential: credential() });
 
     await assert.rejects(
-      putCredential(options(factoryDir), {
+      putCredential(options(stateDir), {
         credential: credential(),
         expectedRevision: 1,
       }),
@@ -120,69 +120,69 @@ test("a write from a stale revision is refused", async () => {
       },
     );
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("deleting writes a tombstone that outranks the stored revision", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    await putCredential(options(factoryDir), { credential: credential() });
-    const tombstone = await deleteCredential(options(factoryDir), {
+    await putCredential(options(stateDir), { credential: credential() });
+    const tombstone = await deleteCredential(options(stateDir), {
       serverName: "linear",
     });
 
     assert.equal(tombstone.revision, 2);
-    const document = await readCredentials(options(factoryDir));
+    const document = await readCredentials(options(stateDir));
     assert.equal(document.servers["linear"], undefined);
     assert.equal(document.tombstones["linear"]?.revision, 2);
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("a tombstone prevents resurrection by an older writer", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    await putCredential(options(factoryDir), { credential: credential() });
-    await deleteCredential(options(factoryDir), { serverName: "linear" });
+    await putCredential(options(stateDir), { credential: credential() });
+    await deleteCredential(options(stateDir), { serverName: "linear" });
 
     await assert.rejects(
-      putCredential(options(factoryDir), {
+      putCredential(options(stateDir), {
         credential: credential(),
         expectedRevision: 1,
       }),
       /re-read before writing/,
     );
-    const document = await readCredentials(options(factoryDir));
+    const document = await readCredentials(options(stateDir));
     assert.equal(document.servers["linear"], undefined);
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("a fresh write after a tombstone is allowed and clears it", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    await putCredential(options(factoryDir), { credential: credential() });
-    await deleteCredential(options(factoryDir), { serverName: "linear" });
-    const restored = await putCredential(options(factoryDir), {
+    await putCredential(options(stateDir), { credential: credential() });
+    await deleteCredential(options(stateDir), { serverName: "linear" });
+    const restored = await putCredential(options(stateDir), {
       credential: credential(),
     });
 
     assert.equal(restored.revision, 3);
-    const document = await readCredentials(options(factoryDir));
+    const document = await readCredentials(options(stateDir));
     assert.equal(document.tombstones["linear"], undefined);
     assert.equal(document.servers["linear"]?.revision, 3);
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("an unopenable blob is a typed error, never a plaintext fallback", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    await putCredential(options(factoryDir), { credential: credential() });
+    await putCredential(options(stateDir), { credential: credential() });
     const brokenSealer: CredentialSealer = {
       seal: sealer.seal,
       async open() {
@@ -191,7 +191,7 @@ test("an unopenable blob is a typed error, never a plaintext fallback", async ()
     };
 
     await assert.rejects(
-      readCredentials(options(factoryDir, brokenSealer)),
+      readCredentials(options(stateDir, brokenSealer)),
       (error: unknown) => {
         assert.equal(error instanceof CredentialStoreError, true);
         assert.equal(
@@ -202,15 +202,15 @@ test("an unopenable blob is a typed error, never a plaintext fallback", async ()
       },
     );
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("a sealed document with the wrong shape is refused", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    await putCredential(options(factoryDir), { credential: credential() });
-    const sealed = await readFile(join(factoryDir, CREDENTIAL_SEALED_FILE));
+    await putCredential(options(stateDir), { credential: credential() });
+    const sealed = await readFile(join(stateDir, CREDENTIAL_SEALED_FILE));
     const plaintext = Buffer.from(
       sealer.open ? await sealer.open(sealed) : sealed,
     ).toString("utf8");
@@ -219,27 +219,27 @@ test("a sealed document with the wrong shape is refused", async () => {
     };
     tampered.servers["linear"] = { tokens: {} };
     await writeFile(
-      join(factoryDir, CREDENTIAL_SEALED_FILE),
+      join(stateDir, CREDENTIAL_SEALED_FILE),
       await sealer.seal(Buffer.from(JSON.stringify(tampered))),
     );
 
     await assert.rejects(
-      readCredentials(options(factoryDir)),
+      readCredentials(options(stateDir)),
       /has no access token/,
     );
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });
 
 test("clearing removes both files", async () => {
-  const factoryDir = await dir();
+  const stateDir = await dir();
   try {
-    await putCredential(options(factoryDir), { credential: credential() });
-    await clearCredentialStore(options(factoryDir));
-    const document = await readCredentials(options(factoryDir));
+    await putCredential(options(stateDir), { credential: credential() });
+    await clearCredentialStore(options(stateDir));
+    const document = await readCredentials(options(stateDir));
     assert.deepEqual(document.servers, {});
   } finally {
-    await rm(factoryDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true });
   }
 });

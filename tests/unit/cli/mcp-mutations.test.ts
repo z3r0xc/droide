@@ -27,7 +27,7 @@ import { startAuthorizationServer } from "../extensions/oauth-fixtures.ts";
 
 interface Sandbox {
   readonly root: string;
-  readonly factoryDir: string;
+  readonly stateDir: string;
   readonly projectRoot: string;
   readonly userFile: string;
   readonly projectFile: string;
@@ -35,16 +35,16 @@ interface Sandbox {
 
 async function sandbox(): Promise<Sandbox> {
   const root = await mkdtemp(join(tmpdir(), "droide-mcp-cli-"));
-  const factoryDir = join(root, "home", ".factory");
+  const stateDir = join(root, "home", ".droide");
   const projectRoot = join(root, "project");
-  await mkdir(factoryDir, { recursive: true });
-  await mkdir(join(projectRoot, ".factory"), { recursive: true });
+  await mkdir(stateDir, { recursive: true });
+  await mkdir(join(projectRoot, ".droide"), { recursive: true });
   return {
     root,
-    factoryDir,
+    stateDir,
     projectRoot,
-    userFile: join(factoryDir, "mcp.json"),
-    projectFile: join(projectRoot, ".factory", "mcp.json"),
+    userFile: join(stateDir, "mcp.json"),
+    projectFile: join(projectRoot, ".droide", "mcp.json"),
   };
 }
 
@@ -61,7 +61,7 @@ function capture(box: Sandbox): Capture {
   let exitCode: number | undefined;
   return {
     deps: {
-      factoryDir: box.factoryDir,
+      stateDir: box.stateDir,
       projectRoot: box.projectRoot,
       write: (text) => {
         stdout += text;
@@ -283,7 +283,7 @@ test("auth runs the flow for a server that needs authentication", async (t) => {
     assert.equal(await readFile(box.userFile, "utf8"), before);
 
     const document = await readCredentials({
-      factoryDir: box.factoryDir,
+      stateDir: box.stateDir,
       sealer: plainSealer,
     });
     assert.equal(document.servers["remote"]?.issuer, server.issuer);
@@ -335,7 +335,7 @@ test("a failed flow exits 1 and names the server", async (t) => {
       /MCP server "remote" cannot be authenticated: .*registration/,
     );
     const document = await readCredentials({
-      factoryDir: box.factoryDir,
+      stateDir: box.stateDir,
       sealer: plainSealer,
     });
     assert.deepEqual(document.servers, {});

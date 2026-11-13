@@ -1,10 +1,10 @@
 /**
  * `plugin` command group. Contract: `specs/60-extensions-mcp-and-skills.md`.
  *
- * Option shapes and defaults mirror the subject's command factory; the
- * behavioural half lives in `plugin-commands.ts`. `--branch` on `marketplace
- * add` is hidden: the recorded `plugin --help` and every subcommand help page
- * are byte-identical to the subject, which has no such option.
+ * Option shapes and defaults are the CLI contract; the behavioural half lives
+ * in `plugin-commands.ts`. `--branch` on `marketplace add` is hidden: the
+ * recorded `plugin --help` and every subcommand help page carry no such
+ * option.
  */
 import { Command, Help, Option, type HelpConfiguration } from "commander";
 
@@ -113,7 +113,7 @@ export function makePluginCommand(): Command {
     .description("Install a plugin")
     .argument(
       "<plugin>",
-      "Plugin to install (format: plugin@marketplace, e.g., security-engineer@factory-plugins)",
+      "Plugin to install (format: plugin@marketplace, e.g., security-engineer@droide-plugins)",
     )
     .addOption(scopeOption)
     .action((pluginSpec: string, options: { readonly scope?: string }) => {
@@ -126,7 +126,7 @@ export function makePluginCommand(): Command {
     .description("Uninstall a plugin")
     .argument(
       "<plugin>",
-      "Plugin ID to uninstall (e.g., security-engineer@factory-plugins)",
+      "Plugin ID to uninstall (e.g., security-engineer@droide-plugins)",
     )
     .addOption(scopeOption)
     .action((pluginSpec: string, options: { readonly scope?: string }) => {

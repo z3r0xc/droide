@@ -19,10 +19,10 @@ async function sandbox(
   const root = await mkdtemp(join(tmpdir(), "droide-tooling-"));
   const home = join(root, "home");
   const project = join(root, "project");
-  await mkdir(join(home, ".factory"), { recursive: true });
-  await mkdir(join(project, ".factory"), { recursive: true });
+  await mkdir(join(home, ".droide"), { recursive: true });
+  await mkdir(join(project, ".droide"), { recursive: true });
   await writeFile(
-    join(home, ".factory", "mcp.json"),
+    join(home, ".droide", "mcp.json"),
     JSON.stringify({ mcpServers }, null, 2),
   );
   const platform: Environment["platform"] =

@@ -63,7 +63,7 @@ export const TEST_USAGE: ExecUsage = {
   output_tokens: 7,
   cache_read_input_tokens: 0,
   cache_creation_input_tokens: 0,
-  factory_credits: 0,
+  droide_credits: 0,
   thinking_tokens: 0,
 };
 

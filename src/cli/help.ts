@@ -2,7 +2,7 @@
  * Static help blocks and shared option groups.
  *
  * Contract: `specs/10-cli-surface.md`. Commander renders usage, options and
- * commands; the subject adds two kinds of extra block, which are formatted here:
+ * commands; this module adds two kinds of extra block, formatted here:
  * an aligned `Examples:` table and a literal footer paragraph.
  */
 import type { Command } from "commander";
@@ -33,7 +33,7 @@ export function examplesBlock(rows: readonly Row[]): string {
   return `Examples:\n${formatRows(rows)}`;
 }
 
-/** Options every session-launching command shares, in the subject's order. */
+/** Options every session-launching command shares, in the recorded order. */
 export function addRuntimeOptions(command: Command): Command {
   return command
     .option(
@@ -52,12 +52,12 @@ export function addRuntimeOptions(command: Command): Command {
     .option("-w, --worktree [name]", "Run in a git worktree")
     .option(
       "--worktree-dir <path>",
-      "Deprecated: set the worktree directory in the Factory desktop app instead",
+      "Deprecated: set the worktree directory in settings instead",
     )
     .option("--auto <level>", "Autonomy level: low|medium|high")
     .option("--use-spec", "Start in spec mode")
     .option(
       "--disable-builtin-skills",
-      "Disable Factory-provided builtin skills",
+      "Disable built-in skills shipped with the CLI",
     );
 }

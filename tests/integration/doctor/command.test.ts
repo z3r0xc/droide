@@ -7,7 +7,7 @@ import type { DoctorContext } from "../../../src/doctor/types.ts";
 function context(): DoctorContext {
   return {
     settings: {},
-    paths: { factoryDir: "/tmp/factory" },
+    paths: { stateDir: "/tmp/factory" },
     environment: {
       platform: "linux",
       nodeVersion: "24.0.0",

@@ -39,9 +39,9 @@ function marketplaceDeps(
   root: string,
   runGit?: MarketplaceDeps["runGit"],
 ): MarketplaceDeps {
-  const factoryDir = join(root, "home", ".factory");
+  const stateDir = join(root, "home", ".droide");
   return {
-    scopeRoot: factoryDir,
+    scopeRoot: stateDir,
     timeoutMs: 60_000,
     ...(runGit === undefined ? {} : { runGit }),
   };
@@ -49,7 +49,7 @@ function marketplaceDeps(
 
 function readRegistry(root: string): string {
   return readFileSync(
-    knownMarketplacesPath(join(root, "home", ".factory")),
+    knownMarketplacesPath(join(root, "home", ".droide")),
     "utf8",
   );
 }
@@ -75,12 +75,12 @@ test("add clones a file-URL marketplace, validates it and records provenance", a
     assert.equal(info.entry.source.source, "url");
     assert.ok(
       info.entry.installLocation.startsWith(
-        marketplacesDirectory(join(root.path, "home", ".factory")),
+        marketplacesDirectory(join(root.path, "home", ".droide")),
       ),
     );
     assert.ok(
       existsSync(
-        join(info.entry.installLocation, ".factory-plugin", "marketplace.json"),
+        join(info.entry.installLocation, ".droide-plugin", "marketplace.json"),
       ),
     );
 
@@ -142,7 +142,7 @@ test("add validates the manifest before adopting and leaves no checkout on failu
     assert.equal(
       existsSync(
         join(
-          join(root.path, "home", ".factory"),
+          join(root.path, "home", ".droide"),
           "plugins",
           "known_marketplaces.json",
         ),
@@ -152,7 +152,7 @@ test("add validates the manifest before adopting and leaves no checkout on failu
     assert.equal(
       existsSync(
         join(
-          marketplacesDirectory(join(root.path, "home", ".factory")),
+          marketplacesDirectory(join(root.path, "home", ".droide")),
           "broken-marketplace",
         ),
       ),
@@ -250,7 +250,7 @@ test("update fetches a new commit and keeps the checkout in place", async () => 
     writeAt(repo.path, "plugins/second/SKILL.md", "# second\n");
     const newHead = commitFile(
       repo.path,
-      ".factory-plugin/marketplace.json",
+      ".droide-plugin/marketplace.json",
       updatedManifest,
       "second plugin",
     );
@@ -285,7 +285,7 @@ test("update reports one failure without dropping the other marketplaces", async
     // Commit a manifest without plugins so the second refresh fails validation.
     commitFile(
       second.path,
-      ".factory-plugin/marketplace.json",
+      ".droide-plugin/marketplace.json",
       "{}",
       "break the manifest",
     );
@@ -365,7 +365,7 @@ test("a throwing registry rename leaves known_marketplaces.json untouched", asyn
         second.path,
         {},
         {
-          scopeRoot: join(root.path, "home", ".factory"),
+          scopeRoot: join(root.path, "home", ".droide"),
           io: failing,
         },
       ),

@@ -42,7 +42,7 @@ async function runCli(home: string, argv: readonly string[]): Promise<Run> {
 /**
  * Every command group in the tree must be able to describe itself.
  *
- * The parity goldens pin the exact help text for the pages the subject has; this
+ * The recorded snapshots pin the exact help text for the main pages; this
  * test is the broad net: a broken registration, a missing description or a
  * command that throws while building its help fails here, for every group, not
  * just the recorded ones.

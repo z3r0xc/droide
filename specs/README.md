@@ -1,6 +1,6 @@
 # Specifications
 
-One file per subsystem of the reimplementation, numbered by layer. A spec is the
+One file per subsystem, numbered by layer. A spec is the
 contract the code is written against and judged by: **nothing is implemented
 before it is specified.**
 
@@ -16,42 +16,43 @@ before it is specified.**
 3. **Every clause is labelled and cited.** `[observed]` (read directly),
    `[derived]` (computed from several observations) or `[inferred]` (judgement),
    with a location (`evidence/original/windows-x64/<path>:<line>`) or a recorded
-   golden (`tests/parity/expected/<case>.json`). A clause without a citation is
-   an open question, not a clause.
+   case (`tests/parity/expected/<case>.json`). A clause without a citation is an
+   open question, not a clause.
 4. **Every clause has a test.** Acceptance tests name at least one deterministic
    test per behavioural clause. Determinism: no network, no credentials, no wall
-   clock, no dependence on the subject binary.
+   clock, no dependence on a reference binary.
 5. **Gaps are explicit.** Where evidence is incomplete — re-export barrels and
    type-only modules were elided from the bundle — write the narrowest supported
    clause and put the rest under Open questions. Never smooth a gap with a guess.
-6. **Version-locked.** Specs describe `droid` v1.9.0. A different version needs a
-   new recovery run and new specs, never a silent edit.
+6. **Version-locked.** Every spec pins the contract of one release line. A
+   behaviour change needs a clause change, a re-recorded case and a new spec
+   revision, never a silent edit.
 7. **Open questions name what would settle them** (a file to read, a probe to
    run, a decision to make).
 
 ## Status vocabulary
 
-| Status | Meaning |
-|---|---|
-| `draft` | Being written; clauses may still be incomplete |
-| `review` | Every clause cited and mapped to a test; awaiting check |
-| `stable` | Implemented; its tests pass; changes need a new clause |
-| `blocked` | Waiting on an open question or missing evidence |
+| Status    | Meaning                                                 |
+| --------- | ------------------------------------------------------- |
+| `draft`   | Being written; clauses may still be incomplete          |
+| `review`  | Every clause cited and mapped to a test; awaiting check |
+| `stable`  | Implemented; its tests pass; changes need a new clause  |
+| `blocked` | Waiting on an open question or missing evidence         |
 
 ## Index
 
-| Spec | Status | Covers |
-|---|---|---|
-| `10-cli-surface.md` | review | Router, root options, visible and hidden commands, argument classification, precedence chain, exit codes, error strings |
-| `40-sessions-and-storage.md` | review | SQLite schema and migrations, transcript records, ordering, on-disk layout, search |
-| `80-exec-and-streaming.md` | review | Non-interactive mode, stream formats, exit codes |
-| `90-native-layer.md` | review | Native helpers (pty, search, secrets, sqlite, browser), framing and contracts |
-| `95-terminal-ui.md` | review | Design tokens, layout, transcript renderers, keys, capability handling |
-| `20-agent-loop.md` | review | Provider message model, tool-call cycle, context assembly, model catalogue |
-| `30-tools-and-sandbox.md` | review | Tool registry, permission matrix, filesystem and shell models, sandbox |
-| `50-transport-and-auth.md` | review | Backend routes, auth flows, error taxonomy, LLM transport |
-| `60-extensions-mcp-and-skills.md` | draft | MCP, plugins, skills, ACP |
-| `70-daemon-and-remote-control.md` | review | Daemon lifecycle, client protocol, remote control |
+| Spec                              | Status | Covers                                                                                                                  |
+| --------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `10-cli-surface.md`               | draft  | Router, root options, visible and hidden commands, argument classification, precedence chain, exit codes, error strings |
+| `40-sessions-and-storage.md`      | review | SQLite schema and migrations, transcript records, ordering, on-disk layout, search                                      |
+| `80-exec-and-streaming.md`        | draft  | Non-interactive mode, stream formats, exit codes                                                                        |
+| `90-native-layer.md`              | draft  | Native helpers (pty, search, secrets, sqlite, browser), framing and contracts                                           |
+| `95-terminal-ui.md`               | draft  | Design tokens, layout, transcript renderers, keys, capability handling                                                  |
+| `20-agent-loop.md`                | draft  | Provider message model, tool-call cycle, context assembly, model catalogue                                              |
+| `30-tools-and-sandbox.md`         | draft  | Tool registry, permission matrix, filesystem and shell models, sandbox                                                  |
+| `50-transport-and-auth.md`        | draft  | Backend routes, auth flows, error taxonomy, LLM transport                                                               |
+| `60-extensions-mcp-and-skills.md` | draft  | MCP, plugins, skills, ACP                                                                                               |
+| `70-daemon-and-remote-control.md` | draft  | Daemon lifecycle, client protocol, remote control                                                                       |
 
 `pending` means the spec file does not exist yet; the subsystem must not be
 implemented until it does.

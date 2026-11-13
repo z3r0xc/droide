@@ -104,7 +104,7 @@ test("one request, no retry: a 500 becomes FetchError with the status and body",
       assert.equal(error.message, "500 boom");
       assert.equal(error.statusCode, 500);
       assert.equal(error.operation, "list-sessions");
-      assert.equal(error.factoryBackend, true);
+      assert.equal(error.droideBackend, true);
       assert.equal(error.requestUrl, "https://api.example/api/sessions/v2");
       return true;
     },
@@ -429,14 +429,14 @@ test("error paths carry redacted request headers and never the token", async () 
       request({
         headers: {
           Authorization: "Bearer super-secret",
-          "X-Factory-Org-Id": "org",
+          "X-Droide-Org-Id": "org",
         },
       }),
     ),
     (error: unknown) => {
       assert.ok(error instanceof FetchError);
       assert.equal(error.requestHeaders.Authorization, REDACTED);
-      assert.equal(error.requestHeaders["X-Factory-Org-Id"], "org");
+      assert.equal(error.requestHeaders["X-Droide-Org-Id"], "org");
       assert.equal(
         JSON.stringify(error.requestHeaders).includes("super-secret"),
         false,
@@ -449,7 +449,7 @@ test("error paths carry redacted request headers and never the token", async () 
   const sent = testHarness.calls[0]?.init.headers;
   assert.deepEqual(sent, {
     Authorization: "Bearer super-secret",
-    "X-Factory-Org-Id": "org",
+    "X-Droide-Org-Id": "org",
   });
 });
 
@@ -459,7 +459,7 @@ test("request headers are sent verbatim, bodies only when provided", async () =>
     jsonResponse({ ok: true }),
   ]);
   await testHarness.client.request(
-    request({ method: "GET", headers: { "X-Factory-Client": "cli" } }),
+    request({ method: "GET", headers: { "X-Droide-Client": "cli" } }),
   );
   assert.equal(testHarness.calls[0]?.init.body, undefined);
   assert.equal(testHarness.calls[0]?.init.credentials, "omit");

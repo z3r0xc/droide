@@ -16,7 +16,7 @@ export interface ExecUsage {
   readonly output_tokens: number;
   readonly cache_read_input_tokens: number;
   readonly cache_creation_input_tokens: number;
-  readonly factory_credits: number;
+  readonly droide_credits: number;
   readonly thinking_tokens: number;
   readonly ttft_ms?: number;
 }
@@ -26,7 +26,7 @@ export const ZERO_USAGE: ExecUsage = Object.freeze({
   output_tokens: 0,
   cache_read_input_tokens: 0,
   cache_creation_input_tokens: 0,
-  factory_credits: 0,
+  droide_credits: 0,
   thinking_tokens: 0,
 });
 

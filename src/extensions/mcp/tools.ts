@@ -4,7 +4,7 @@
  * (registration identity and the `external-service` side effect) and B17
  * (provider-safe llmIds).
  *
- * The factory is pure: it takes each server's live listing and a `callTool`
+ * The builder is pure: it takes each server's live listing and a `callTool`
  * seam, and returns definitions. It is deliberately not called by
  * `createCoreRegistry` — the orchestrator decides when MCP tools join the
  * catalog.
@@ -41,7 +41,7 @@ export const MCP_TOOL_INPUT_SCHEMA: Schema = {
   description: "Arguments object as declared by the MCP server's inputSchema",
 };
 
-/** The slice of a connected server the factory needs. */
+/** The slice of a connected server the builder needs. */
 export interface McpServerTools {
   /** Canonical (normalized) server name. */
   readonly name: string;

@@ -46,11 +46,9 @@ function readString(
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-/** Read `<factoryDir>/host.json`. A missing file is not a problem. */
-export function readHostConfig(
-  factoryDir: string,
-): HostConfigResult | undefined {
-  const path = join(factoryDir, "host.json");
+/** Read `<stateDir>/host.json`. A missing file is not a problem. */
+export function readHostConfig(stateDir: string): HostConfigResult | undefined {
+  const path = join(stateDir, "host.json");
   let document: string;
   try {
     document = readFileSync(path, "utf8");

@@ -1,29 +1,29 @@
 # Native layer (non-JS payload)
 
-- **Target:** Factory AI `droid` 1.9.0
+- **Target:** the `droide` CLI shipped from this repository
 - **Status:** draft
 - **Owner:** native/bundled-runtime owner
 - **Related:** `specs/00-context.md`; session-index spec (SQLite schema/search semantics); tools spec (Grep/Glob/Script tool surfaces); daemon spec (JSON-RPC transport and terminal callers); agent-browser tool/skill spec
 
 ## Purpose
 
-`droid` ships a single Bun executable plus eight kinds of non-JavaScript
+`droide` ships a single Bun executable plus eight kinds of non-JavaScript
 payload: a PTY library, a Rust browser-automation CLI, a ripgrep binary, an
 fuzzy-finder shared library, a V8 script worker, a N-API keyring addon, a pinned
-SQLite library and two WebAssembly modules. This spec fixes the *boundary* at
+SQLite library and two WebAssembly modules. This spec fixes the _boundary_ at
 each of them — how it is located, extracted, started, fed and torn down, and
-what a user sees when it is missing or broken — so that a clean-room
-reimplementation can swap any one of them for an equivalent without changing
-observable CLI behaviour.
+what a user sees when it is missing or broken — so that a conforming build
+can swap any one of them for an equivalent without changing observable CLI
+behaviour.
 
 ## Scope
 
 Covers the payloads inventoried in §Data & config, their on-disk placement under the
-Factory home, the environment variables that override or redirect them, the
+state root, the environment variables that override or redirect them, the
 wire contracts at each boundary (FFI symbol table, child-process argv/stdio
 framing, WASM instantiation) and the failure text those boundaries produce.
 
-Does **not** cover: what the payloads *compute* (fuzzy-ranking quality, the SQL
+Does **not** cover: what the payloads _compute_ (fuzzy-ranking quality, the SQL
 schema and search semantics of the session index, the Script language itself,
 agent-browser's own CLI), which belong to the session-index/tools/agent-browser
 specs; the JSON-RPC transport that carries terminal notifications (daemon
@@ -38,17 +38,17 @@ Open questions.
 `evidence/original-vendor/windows-x64/node_modules/`; `X:…` is relative to
 `evidence/extracted/windows-x64/`.
 
-| Term | Meaning |
-|---|---|
-| **Factory home** | `getFactoryHome()` + `getFactoryDirName()`; `~/.factory` in production tier (`src/utils/ripgrepEmbedded.ts:48-56`). |
-| **bin dir** | `<factory home>/bin` — every extracted native payload except the script worker's own directory lives here. |
-| **PTY library** | `bun-pty`'s Rust `.dll`/`.so`/`.dylib`; exports `bun_pty_*` (X:`rust_pty-fazdxkv2.dll`, `librust_pty-*`). |
-| **PTY handle** | Non-negative `i32` returned by `bun_pty_spawn`; `-1`-style negative values mean failure (`vendor:bun-pty/src/terminal.ts:165-172`). |
-| **Bundled binary state** | One of `current`, `stale`, `modified`, `missing`, `removed`, `override`, `override-ignored`, `not-bundled` (`src/utils/enums.ts:270-290`). |
-| **fff** | The fuzzy finder engine (`libfff_c` / `fff_c.dll`), `@ff-labs/fff-bun` in a compiled binary (`packages/daemon-core/src/utils/file-search/index.ts:236-284`). |
-| **slot** | A string of ≥16 KiB UTF-8 lifted out of a Script frame header into a trailing byte buffer (`src/repl/protocol/constants.ts:24-29`). |
-| **worker** | The extracted `droid-script-runtime` process that evaluates a Script (`src/repl/worker/nativeBinary.ts:53-69`). |
-| **ipc frame** | `u32le` header length + JSON header + slot buffers (`src/repl/protocol/frame.ts:21-25`). |
+| Term                     | Meaning                                                                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **state root**           | `homePath()` + `dirName()` (vendor prefix elided); `~/.droide` in production tier (`src/utils/ripgrepEmbedded.ts:48-56`).                                    |
+| **bin dir**              | `<state root>/bin` — every extracted native payload except the script worker's own directory lives here.                                                     |
+| **PTY library**          | `bun-pty`'s Rust `.dll`/`.so`/`.dylib`; exports `bun_pty_*` (X:`rust_pty-fazdxkv2.dll`, `librust_pty-*`).                                                    |
+| **PTY handle**           | Non-negative `i32` returned by `bun_pty_spawn`; `-1`-style negative values mean failure (`vendor:bun-pty/src/terminal.ts:165-172`).                          |
+| **Bundled binary state** | One of `current`, `stale`, `modified`, `missing`, `removed`, `override`, `override-ignored`, `not-bundled` (`src/utils/enums.ts:270-290`).                   |
+| **fff**                  | The fuzzy finder engine (`libfff_c` / `fff_c.dll`), `@ff-labs/fff-bun` in a compiled binary (`packages/daemon-core/src/utils/file-search/index.ts:236-284`). |
+| **slot**                 | A string of ≥16 KiB UTF-8 lifted out of a Script frame header into a trailing byte buffer (`src/repl/protocol/constants.ts:24-29`).                          |
+| **worker**               | The extracted `script-runtime` process that evaluates a Script (`src/repl/worker/nativeBinary.ts:53-69`).                                                    |
+| **ipc frame**            | `u32le` header length + JSON header + slot buffers (`src/repl/protocol/frame.ts:21-25`).                                                                     |
 
 ## Observable behaviour
 
@@ -125,7 +125,7 @@ constant string `"shell"`; no process title is ever read
 **B13** — `daemon.create_terminal` takes `{terminalId, cols?, rows?, cwd?,
 env?}`; a second create for a live or pending id returns
 `{success:false, error:"TerminalIdExists"}`, never an error frame
-(`packages/droid-sdk-core/src/protocol/daemon/schemas/terminal.ts:15-49`;
+(`packages/sdk-core/src/protocol/daemon/schemas/terminal.ts:15-49`;
 `packages/daemon-core/src/server/handlers/terminal-request-handler.ts:298-315`).
 
 **B14** — Shell selection: a configured shell is accepted only from
@@ -182,9 +182,9 @@ before cleanup; orphan sweeps are opt-in by interval
 
 ### ripgrep (`rg`)
 
-**B23** — Resolution order: `FACTORY_RIPGREP_PATH` → `FACTORY_NPM_MODULES_DIR`
+**B23** — Resolution order: `DROIDE_RIPGREP_PATH` → `DROIDE_NPM_MODULES_DIR`
 sub-path (`@vscode/ripgrep/bin/rg[.exe]`) → non-production: symlink
-`~/.factory/bin/rg` to `which rg` (never on Windows) → production: extract the
+`~/.droide/bin/rg` to `which rg` (never on Windows) → production: extract the
 embedded binary and stamp `.rg-version` with `CLI_VERSION`. An override that is
 not an absolute, existing, regular (and on POSIX executable) file is logged and
 ignored (`src/utils/ripgrepEmbedded.ts:93-110,139-215`;
@@ -210,7 +210,7 @@ carry kind `unavailable`, `exitCode: null`, `stderr: ''`
 `maxBuffer` 100 MB; the `daemon.list_files` RPC passes 6 MiB output buffer,
 `maxFiles` 25 000 and `maxBytes` 4 MiB because the reply travels over the
 daemon frame limit (`packages/daemon-core/src/utils/file-listing.ts:23-26,91-110,174-180`;
-`packages/daemon-core/src/server/handlers/droid-request-handler.ts:9834-9854`).
+`packages/daemon-core/src/server/handlers/request-handler.ts:9834-9854`).
 
 **B27** — Listing output is NUL-terminated records with a leading `./` stripped
 and no reordering. When a cap is hit, the list is sorted shallowest-first, cut,
@@ -312,14 +312,14 @@ returning a result envelope with `success`/`handle`/`error`
 
 ### agent-browser
 
-**B43** — `agent-browser` is **never spawned by droid for work**. It is a Rust
+**B43** — `agent-browser` is **never spawned by the CLI for work**. It is a Rust
 CLI (`agent-browser/0.37.1`) extracted once, put on the child `PATH`, and then
-invoked by the model through the shell tool; droid only (a) extracts it lazily,
+invoked by the model through the shell tool; the CLI only (a) extracts it lazily,
 (b) injects `AGENT_BROWSER_*` defaults, (c) cleans stale sockets at startup
 (`X:agent-browser-wcst4wbn` strings; `src/tools/executors/client/shell/shell-executor.ts:428-453`).
 
 **B44** — Extraction targets `<bin dir>/agent-browser(.exe)` plus
-`<factory home>/tools/agent-browser/skill-data/*`; it is triggered by a SHA-256
+`<state root>/tools/agent-browser/skill-data/*`; it is triggered by a SHA-256
 mismatch against the build's recorded digest **or** an absent skill-data dir,
 guarded by `<tool dir>/.extracting.lock` (`wx`). A loser waits up to 30 s and
 then, if either artefact is still absent, throws
@@ -339,7 +339,7 @@ operator/whitespace/bracket, ignoring lines that begin with
 (`src/tools/executors/client/shell/shell-executor.ts:195-206`).
 
 **B47** — Every detected invocation also sets
-`AGENT_BROWSER_SKILLS_DIR=<factory home>/tools/agent-browser/skill-data` and
+`AGENT_BROWSER_SKILLS_DIR=<state root>/tools/agent-browser/skill-data` and
 prepends `<bin dir>` to `PATH` (Windows: a single `Path` key, all casings
 removed first) (`src/tools/executors/client/shell/shell-executor.ts:428-484`;
 `src/services/TerminalService/LocalTerminalService.ts:1411-1412`).
@@ -350,14 +350,14 @@ attaches to another browser, an `agent-browser` command gets
 (`packages/utils/src/agent-browser/desktopCdp.ts:17,127-151`).
 
 **B49** — For the desktop's CDP proxy URL
-`ws://127.0.0.1:<FACTORY_DESKTOP_CDP_PORT>/devtools/browser/<id>` the CLI
+`ws://127.0.0.1:<DROIDE_DESKTOP_CDP_PORT>/devtools/browser/<id>` the CLI
 derives `AGENT_BROWSER_CDP` (adding `?session=`, `?agent=`) and
 `AGENT_BROWSER_SESSION="fcdp-<port>-<16 hex of sha256([sessionId, agentSessionId])>"`;
 an unrecognised identity shape yields no settings at all
 (`packages/utils/src/agent-browser/desktopCdp.ts:19-73`).
 
 **B50** — Pinning discovery only happens when `AGENT_BROWSER_CDP` is the desktop
-proxy, `FACTORY_DESKTOP_CDP_IDENTITY=1`, no
+proxy, `DROIDE_DESKTOP_CDP_IDENTITY=1`, no
 `AGENT_BROWSER_{PIN_TAB,PROVIDER,PROFILE,AUTO_CONNECT,ENGINE,CONFIG}` is set and
 the command's connection is unambiguous; a `read <url>`-only command then runs
 without `AGENT_BROWSER_CDP`, otherwise `AGENT_BROWSER_PIN_TAB=1`. A command that
@@ -375,7 +375,7 @@ invocations are exempt (`src/tools/executors/client/execute-cli.ts:115-120,1037-
 sockets whose `connect` is refused within 250 ms and whose inode is unchanged.
 It is a no-op on Windows (`src/utils/agentBrowserCleanup.ts:30-109,117-141`).
 
-**B53** — `FACTORY_AGENT_BROWSER_PATH` accepts an absolute file or the package
+**B53** — `DROIDE_AGENT_BROWSER_PATH` accepts an absolute file or the package
 root; on Windows arm64 the x64 binary
 (`agent-browser/bin/agent-browser-win32-x64.exe`) is an accepted fallback. Any
 unusable override is reported by doctor as
@@ -386,13 +386,13 @@ unusable override is reported by doctor as
 
 **B54** — The worker is content-addressed: bytes of the embedded
 `script-runtime` are hashed and extracted to
-`<factory home>/bin/script-runtime-<sha256>/droid-script-runtime(.exe)` with mode
+`<state root>/bin/script-runtime-<sha256>/script-runtime(.exe)` with mode
 0700, staged as `<uuid>.tmp` and renamed. The installed copy is verified by byte
 equality, never by a stamp; concurrent callers share one extraction and a failed
 attempt is forgotten (`src/repl/worker/nativeBinary.ts:53-135`).
 
 **B55** — If the embedded asset cannot be read the user sees
-`The isolated Script runtime is not installed. Rebuild or reinstall Droid.`
+`The isolated Script runtime is not installed. Rebuild or reinstall Droide.`
 (`src/repl/worker/nativeBinary.ts:95-104`).
 
 **B56** — Start: the absolute binary path is quoted and handed to
@@ -430,7 +430,7 @@ stream with `Script protocol frame too large` **before** buffering the bytes. A
 malformed header or slot path fails with `Invalid Script protocol frame`. A
 terminal Script result returned inline by WaitForScript is capped at 64 KiB
 (`src/repl/protocol/constants.ts:18-22,42-61`;
-`packages/droid-core/src/tools/definitions/cli/script/schema.ts:23-32`;
+`packages/core/src/tools/definitions/cli/script/schema.ts:23-32`;
 `src/repl/protocol/frame.ts:469-487`).
 
 **B61** — Inbound `evaluate` carries `{type, code (transpiled), bindings[],
@@ -446,7 +446,7 @@ inner tool calls concurrently (a Task takes no slot) and may queue up to 64 MiB
 of unsent results on the worker's stdin; the worker itself refuses beyond
 `outstandingCalls: 128`, 1 MiB of input per call and 5 MiB / 1 024 items of
 output per evaluation (`src/repl/worker/processClient.ts:70,101-120`;
-`packages/droid-core/src/tools/definitions/cli/script/schema.ts:23-32`).
+`packages/core/src/tools/definitions/cli/script/schema.ts:23-32`).
 
 **B63** — Teardown `abort`: kill the whole process group with `SIGKILL`
 immediately, drop content dispatches. `complete`: end stdin, then
@@ -456,14 +456,14 @@ one final group `SIGKILL` even after a clean leader exit
 
 **B64** — A worker that cannot start produces
 `Script worker could not start.<mismatch detail> Use direct tools instead;
-Script is disabled until Droid restarts.` and disables the Script tool for the
+Script is disabled until Droide restarts.` and disables the Script tool for the
 process; a protocol mismatch's own message is appended
 (`src/repl/worker/processClient.ts:1441-1450`).
 
 **B65** — Only two things start a worker: the Script run path
 (`createReplWorkerClient` at `src/repl/ScriptRuns.ts:2704-2707`) and the TUI's
 prewarm (`prewarmReplWorker`, `src/entrypoints/tui/bootstrap.ts:556-562`;
-`src/services/SessionService.ts:283`). `droid doctor` runs the binary with
+`src/services/SessionService.ts:283`). `droide doctor` runs the binary with
 `--check-sandbox` and expects the exact line `V8 memory sandbox enabled`
 (`src/entrypoints/doctor/checks/binaries.ts:142-150`; X:script-runtime strings).
 
@@ -474,7 +474,7 @@ export; `napi_*` imports; `node-keytar/src/main.cc` in its PDB path) exposing
 `getPassword(service, account)`, `setPassword(service, account, value)` and
 `findCredentials` (`X:keytar-hqpjzrak`; `src/utils/keytarEmbedded.ts:131-139`).
 
-**B67** — Resolution order: `FACTORY_KEYTAR_PATH` → `FACTORY_NPM_MODULES_DIR` +
+**B67** — Resolution order: `DROIDE_KEYTAR_PATH` → `DROIDE_NPM_MODULES_DIR` +
 `keytar/build/Release/keytar.node` → extract the embedded copy to
 `<bin dir>/keytar.node` (mode 0755) stamped with the embedded SHA-256 in
 `<bin dir>/.keytar-sha256`. Re-extraction happens only when the stamp differs
@@ -486,7 +486,7 @@ dlopen` and resolves to `null`, never throws
 (`src/utils/keytarEmbedded.ts:131-152,165-186`).
 
 **B69** — Keyring calls always use a service name and an account: default
-service `Factory CLI`, default account `auth-encryption-key`, suffixed `-dev`
+service `Droide CLI`, default account `auth-encryption-key`, suffixed `-dev`
 when the build is not production tier, or the macOS `security`-CLI variant
 `auth-encryption-key-security-cli`; Prem uses
 `<keyringAccount|"prem-auth">-<sha256(directory) hex>`
@@ -507,7 +507,7 @@ and its own error (`…/KeyringClient.ts:134-157,204-231`).
 **B72** — The stored envelope key is base64 of a 32-byte key. A missing or
 wrong-length key marks secure storage failed for the process and falls back to
 the keyfile (`auth.v2.key`); a failed store never triggers creating a
-replacement key (`CredentialsStorage.ts:334-408`). `FACTORY_DISABLE_KEYRING`
+replacement key (`CredentialsStorage.ts:334-408`). `DROIDE_DISABLE_KEYRING`
 disables the keyring path entirely (`packages/environment/src/constants/index.ts:111`).
 
 ### SQLite
@@ -543,12 +543,12 @@ refused, and the index keeps running
 applied_at)`. Each pending migration runs in one `BEGIN IMMEDIATE` transaction
 covering the ledger re-read, the DDL and its ledger row; the checksum is the
 first 16 hex of sha256 over `version\0name\0normalised-sql`. A checksum
-disagreement for a *known* version throws
+disagreement for a _known_ version throws
 `Session index migration checksum mismatch`; a ledger that is merely ahead is
 tolerated. A file with nothing pending is not written to at all
 (`packages/runtime/session-index/src/migrate.ts:172-229,296-359`).
 
-**B78** — The database path is `<factory dir>/cache/session-index/index.db`; the
+**B78** — The database path is `<state dir>/cache/session-index/index.db`; the
 directory is marked `.metadata_never_index`. An unusable file is moved into
 `quarantine/<timestamp>-<pid>/` beside it and a fresh file is created — never
 deleted, and never unlinked from under a peer
@@ -579,11 +579,11 @@ never grows (`packages/runtime/session-index/src/int8-dot.ts:23-107`).
 
 ### Discovery surface
 
-**B82** — `droid doctor --checks binaries` inspects every payload without
+**B82** — `droide doctor --checks binaries` inspects every payload without
 extracting: `current`/`stale`/`override` are probed; `missing` reports
 `not extracted yet` (plus a folder-writability warning for ripgrep);
 `removed` reports `removed after extraction`; `modified` reports `does not match
-this build; Droid replaces it before use` (and is not executed); `not-bundled`
+this build; Droide replaces it before use` (and is not executed); `not-bundled`
 reports `not bundled for <platform> <arch>`; `override-ignored` names the
 variable and value (`src/entrypoints/doctor/installationLayers.ts:603-629`;
 `src/entrypoints/doctor/checks/binaries.ts:222-295`).
@@ -592,81 +592,81 @@ variable and value (`src/entrypoints/doctor/installationLayers.ts:603-629`;
 
 ### Shipped artefacts (Windows x64 extraction of this build)
 
-| Artefact in `X:` | Size | Format / arch | Becomes |
-|---|---|---|---|
-| `rust_pty-fazdxkv2.dll` | 492 032 B | PE32+ DLL, x86-64 | `BUN_PTY_LIB` (Windows) |
-| `librust_pty-6h2x94h6.so` | 610 024 B | ELF shared, x86-64 | `BUN_PTY_LIB` (Linux x64) |
-| `librust_pty_arm64-kkpzdzzv.so` | 555 704 B | ELF shared, aarch64 | `BUN_PTY_LIB` (Linux arm64) |
-| `librust_pty-0ydm4m2h.dylib` | 516 976 B | Mach-O dylib, x86_64 | `BUN_PTY_LIB` (macOS x64) |
-| `librust_pty_arm64-b7hv765h.dylib` | 504 576 B | Mach-O dylib, arm64 | `BUN_PTY_LIB` (macOS arm64) |
-| `keytar-hqpjzrak` | 707 584 B | PE32+ DLL (N-API), x86-64 | `bin/keytar.node` |
-| `fff_c-43ptfmbb.dll` | 13 906 944 B | PE32+ DLL, x86-64, 91 exports | dlopen'd from the embedded `$bunfs` path, no extraction |
-| `rg-56avgsjb` | 4 919 520 B | PE32+ console, x86-64 | `bin/rg.exe` + `.rg-version` |
-| `agent-browser-wcst4wbn` | 13 942 272 B | PE32+ console, x86-64 | `bin/agent-browser.exe` |
-| `script-runtime-m53sgqc3` | 54 478 336 B | PE32+ console, x86-64 | `bin/script-runtime-<sha256>/droid-script-runtime.exe` |
-| `index_bg-904m1xk3.wasm` | 2 478 606 B | WASM v1 (resvg, wasm-bindgen) | instantiated in-process |
-| `libsqlite3-vvvada9m.dylib` + `.sha256` | 0 B / 0 B | (empty in this extraction) | `bin/libsqlite3-<16 hex>.dylib` on macOS |
-| `apply-seccomp-vvvada9m` | 0 B | (empty in this extraction) | Linux seccomp helper — out of scope |
+| Artefact in `X:`                        | Size         | Format / arch                 | Becomes                                                 |
+| --------------------------------------- | ------------ | ----------------------------- | ------------------------------------------------------- |
+| `rust_pty-fazdxkv2.dll`                 | 492 032 B    | PE32+ DLL, x86-64             | `BUN_PTY_LIB` (Windows)                                 |
+| `librust_pty-6h2x94h6.so`               | 610 024 B    | ELF shared, x86-64            | `BUN_PTY_LIB` (Linux x64)                               |
+| `librust_pty_arm64-kkpzdzzv.so`         | 555 704 B    | ELF shared, aarch64           | `BUN_PTY_LIB` (Linux arm64)                             |
+| `librust_pty-0ydm4m2h.dylib`            | 516 976 B    | Mach-O dylib, x86_64          | `BUN_PTY_LIB` (macOS x64)                               |
+| `librust_pty_arm64-b7hv765h.dylib`      | 504 576 B    | Mach-O dylib, arm64           | `BUN_PTY_LIB` (macOS arm64)                             |
+| `keytar-hqpjzrak`                       | 707 584 B    | PE32+ DLL (N-API), x86-64     | `bin/keytar.node`                                       |
+| `fff_c-43ptfmbb.dll`                    | 13 906 944 B | PE32+ DLL, x86-64, 91 exports | dlopen'd from the embedded `$bunfs` path, no extraction |
+| `rg-56avgsjb`                           | 4 919 520 B  | PE32+ console, x86-64         | `bin/rg.exe` + `.rg-version`                            |
+| `agent-browser-wcst4wbn`                | 13 942 272 B | PE32+ console, x86-64         | `bin/agent-browser.exe`                                 |
+| `script-runtime-m53sgqc3`               | 54 478 336 B | PE32+ console, x86-64         | `bin/script-runtime-<sha256>/script-runtime.exe`        |
+| `index_bg-904m1xk3.wasm`                | 2 478 606 B  | WASM v1 (resvg, wasm-bindgen) | instantiated in-process                                 |
+| `libsqlite3-vvvada9m.dylib` + `.sha256` | 0 B / 0 B    | (empty in this extraction)    | `bin/libsqlite3-<16 hex>.dylib` on macOS                |
+| `apply-seccomp-vvvada9m`                | 0 B          | (empty in this extraction)    | Linux seccomp helper — out of scope                     |
 
 Only the Windows PTY DLL is present for `win32`; a Windows arm64 host therefore
 hits B1's warning and B4's missing-library error.
 
 ### Environment variables
 
-| Name | Payload | Required | Semantics |
-|---|---|---|---|
-| `BUN_PTY_LIB` | PTY | no | Absolute path to the PTY library; set by the CLI at boot, honoured only if the file exists (`vendor:bun-pty/src/terminal.ts:31-33`). |
-| `FACTORY_RIPGREP_PATH` | rg | no | Absolute file or package root; validated (absolute, file, regular, +x on POSIX) (`src/utils/npmDepResolver.ts:41-49,192-230`). |
-| `FACTORY_AGENT_BROWSER_PATH` | agent-browser | no | Same validation; package root resolves `bin/agent-browser(-win32-<arch>[.exe])` (`…/npmDepResolver.ts:50-60`). |
-| `FACTORY_KEYTAR_PATH` | keytar | no | Same validation; package root resolves `build/Release/keytar.node` (`…/npmDepResolver.ts:61-65`). |
-| `FACTORY_NPM_MODULES_DIR` | all three | no | Absolute existing directory; each dep resolved at its canonical sub-path; per-dep overrides win (`src/utils/npmDepResolver.ts:141-184`). |
-| `CLI_VERSION` | rg, agent-browser | no | Stamped into `.rg-version`; absent → sentinel `unknown` (`src/utils/ripgrepEmbedded.ts:44-46`). |
-| `FACTORY_ENV` | rg | no | Anything but `production` enables the dev symlink path and skips stamp checks (`src/utils/ripgrepEmbedded.ts:104,152`). |
-| `FACTORY_DISABLE_KEYRING` | keytar | no | Truthy disables the keyring path (`packages/environment/src/constants/index.ts:111`; `…/CredentialsStorage.ts:320-322`). |
-| `AGENT_BROWSER_*` | agent-browser | no | Read/passed through; the CLI injects `CDP`, `SESSION`, `PIN_TAB`, `IDLE_TIMEOUT_MS`, `SKILLS_DIR` — never overwriting a user value (`src/utils/agentBrowserEmbedded.ts:101-144`). |
-| `FACTORY_DESKTOP_CDP_PORT`, `FACTORY_DESKTOP_CDP_IDENTITY` | agent-browser | no | Gate desktop identity/pinning (`packages/utils/src/agent-browser/desktopCdp.ts:40-48,161-181`). |
-| `AGENT_BROWSER_SOCKET_DIR`, `XDG_RUNTIME_DIR`, `AGENT_BROWSER_NAMESPACE` | agent-browser | no | Runtime-dir precedence and namespace scoping for cleanup (`src/utils/agentBrowserCleanup.ts:30-55`). |
+| Name                                                                     | Payload           | Required | Semantics                                                                                                                                                                         |
+| ------------------------------------------------------------------------ | ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BUN_PTY_LIB`                                                            | PTY               | no       | Absolute path to the PTY library; set by the CLI at boot, honoured only if the file exists (`vendor:bun-pty/src/terminal.ts:31-33`).                                              |
+| `DROIDE_RIPGREP_PATH`                                                    | rg                | no       | Absolute file or package root; validated (absolute, file, regular, +x on POSIX) (`src/utils/npmDepResolver.ts:41-49,192-230`).                                                    |
+| `DROIDE_AGENT_BROWSER_PATH`                                              | agent-browser     | no       | Same validation; package root resolves `bin/agent-browser(-win32-<arch>[.exe])` (`…/npmDepResolver.ts:50-60`).                                                                    |
+| `DROIDE_KEYTAR_PATH`                                                     | keytar            | no       | Same validation; package root resolves `build/Release/keytar.node` (`…/npmDepResolver.ts:61-65`).                                                                                 |
+| `DROIDE_NPM_MODULES_DIR`                                                 | all three         | no       | Absolute existing directory; each dep resolved at its canonical sub-path; per-dep overrides win (`src/utils/npmDepResolver.ts:141-184`).                                          |
+| `CLI_VERSION`                                                            | rg, agent-browser | no       | Stamped into `.rg-version`; absent → sentinel `unknown` (`src/utils/ripgrepEmbedded.ts:44-46`).                                                                                   |
+| `DROIDE_ENV`                                                             | rg                | no       | Anything but `production` enables the dev symlink path and skips stamp checks (`src/utils/ripgrepEmbedded.ts:104,152`).                                                           |
+| `DROIDE_DISABLE_KEYRING`                                                 | keytar            | no       | Truthy disables the keyring path (`packages/environment/src/constants/index.ts:111`; `…/CredentialsStorage.ts:320-322`).                                                          |
+| `AGENT_BROWSER_*`                                                        | agent-browser     | no       | Read/passed through; the CLI injects `CDP`, `SESSION`, `PIN_TAB`, `IDLE_TIMEOUT_MS`, `SKILLS_DIR` — never overwriting a user value (`src/utils/agentBrowserEmbedded.ts:101-144`). |
+| `DROIDE_DESKTOP_CDP_PORT`, `DROIDE_DESKTOP_CDP_IDENTITY`                 | agent-browser     | no       | Gate desktop identity/pinning (`packages/utils/src/agent-browser/desktopCdp.ts:40-48,161-181`).                                                                                   |
+| `AGENT_BROWSER_SOCKET_DIR`, `XDG_RUNTIME_DIR`, `AGENT_BROWSER_NAMESPACE` | agent-browser     | no       | Runtime-dir precedence and namespace scoping for cleanup (`src/utils/agentBrowserCleanup.ts:30-55`).                                                                              |
 
-### On-disk locations (all under `<factory home>`)
+### On-disk locations (all under `<state root>`)
 
-| Path | Payload | Notes |
-|---|---|---|
-| `bin/rg[.exe]` + `bin/.rg-version` | rg | mode 0755, version-stamped. |
-| `bin/agent-browser[.exe]` + `tools/agent-browser/skill-data/` + `tools/agent-browser/.extracting.lock` | agent-browser | digest-verified, lock-guarded. |
-| `bin/keytar.node` + `bin/.keytar-sha256` | keytar | mode 0755, SHA stamped. |
-| `bin/script-runtime-<sha256>/droid-script-runtime[.exe]` | script worker | content-addressed, mode 0700. |
-| `bin/libsqlite3-<16 hex>.dylib` | SQLite | macOS only. |
-| `cache/session-index/index.db` (+ `-wal`, `-shm`), `cache/session-index/.metadata_never_index`, `quarantine/<ts>-<pid>/` | SQLite | WAL mode. |
-| `tools/agent-browser/skill-data/` | agent-browser | exported as `AGENT_BROWSER_SKILLS_DIR`. |
+| Path                                                                                                                     | Payload       | Notes                                   |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------- | --------------------------------------- |
+| `bin/rg[.exe]` + `bin/.rg-version`                                                                                       | rg            | mode 0755, version-stamped.             |
+| `bin/agent-browser[.exe]` + `tools/agent-browser/skill-data/` + `tools/agent-browser/.extracting.lock`                   | agent-browser | digest-verified, lock-guarded.          |
+| `bin/keytar.node` + `bin/.keytar-sha256`                                                                                 | keytar        | mode 0755, SHA stamped.                 |
+| `bin/script-runtime-<sha256>/script-runtime[.exe]`                                                                       | script worker | content-addressed, mode 0700.           |
+| `bin/libsqlite3-<16 hex>.dylib`                                                                                          | SQLite        | macOS only.                             |
+| `cache/session-index/index.db` (+ `-wal`, `-shm`), `cache/session-index/.metadata_never_index`, `quarantine/<ts>-<pid>/` | SQLite        | WAL mode.                               |
+| `tools/agent-browser/skill-data/`                                                                                        | agent-browser | exported as `AGENT_BROWSER_SKILLS_DIR`. |
 
-Precedence everywhere is: per-dep env override → `FACTORY_NPM_MODULES_DIR`
+Precedence everywhere is: per-dep env override → `DROIDE_NPM_MODULES_DIR`
 sub-path → extracted/embedded copy; a configured-but-unusable override is
 ignored and reported, never fatal.
 
 ## Errors
 
-| Trigger | Identity | Observable effect |
-|---|---|---|
-| No PTY library found for the platform | `librust_pty shared library not found.` + `Checked:` list | Every `daemon.create_terminal` fails; `console.warn` at boot when the arch is unsupported (`src/embed-native-libs.ts:46-49`). |
-| `bun_pty_spawn` returns a negative handle | `PTY spawn failed` | The create request fails with `Failed to spawn terminal with shell`; the terminal is not registered (`…/terminal-manager.ts:181-198`). |
-| Read loop sees a non-`-2` negative | none (silent) | No exit notification; the terminal stays in the registry until the client closes it. |
-| ripgrep unresolvable, retries left | `Ripgrep binary not found. Initialization failed but retries are still available — subsequent calls may succeed.` | Grep/Glob fail for that call only. |
-| ripgrep unresolvable, 3 attempts spent | `Ripgrep binary not found and could not be restored after retries. Do NOT retry Grep or Glob tools — …` | Grep/Glob/Glob-suggestions stay broken for the process (daemon listing throws its own `Ripgrep is unavailable`). |
-| ripgrep killed by the 10 s cap | kind `timed-out`, `Search timed out after <n>s. Narrow the pattern, …` | Results of that run are discarded. |
-| ripgrep exit 2 in the daemon listing | none | Partial stdout merged with a bounded walk; `truncated:true`. |
-| fff library/instance/scan failure | `[Daemon] File search … , using ripgrep path` (log only) | Request silently served by ripgrep; no user-visible error. |
-| fff index creation failure | same log + negative cache | 10 min of ripgrep for that root. |
-| agent-browser extraction lock never released | `agent-browser extraction by another process did not complete successfully` | The shell command that triggered extraction fails. |
-| agent-browser `--version` non-zero | `agent-browser availability check failed: exit code <n>: <stderr>` | (Only reachable through `ensureAgentBrowserAvailable`, currently uncalled — see Open questions.) |
-| Script runtime asset unreadable | `The isolated Script runtime is not installed. Rebuild or reinstall Droid.` | Script tool reports the worker-startup failure. |
-| Script worker fails to start | `Script worker could not start. Use direct tools instead; Script is disabled until Droid restarts.` | `isReplWorkerAvailable()` false for the process. |
-| Worker speaks v1 / wrong version | `ScriptProtocolMismatchError` (message appended to the startup error) | Same as above; fix is reinstalling the build. |
-| Frame over its cap | `Script protocol frame too large` | The whole worker transport fails; the run errors. |
-| keytar module unavailable | `Cannot read from keyring: keytar module unavailable. Credentials cannot be read securely.` / `Cannot save to keyring: … cannot be stored securely.` | Reads/writes fail distinctly from "no credential"; the caller falls back to the keyfile path. |
-| SQLite pin/extract failure | `Could not extract the bundled SQLite library; using the system SQLite` (log once) | Index runs on the runtime's SQLite; version reported in doctor/log. |
-| Migration checksum disagreement | `Session index migration checksum mismatch` | The open fails; the file is left in place (not quarantined). |
-| Corrupt database file | quarantine + fresh file | User data is the JSONL transcripts, not the index. |
-| SVG with no measurable size | `SVG has no size to fit` | The image read that requested the preview fails; no partial image. |
+| Trigger                                      | Identity                                                                                                                                             | Observable effect                                                                                                                      |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| No PTY library found for the platform        | `librust_pty shared library not found.` + `Checked:` list                                                                                            | Every `daemon.create_terminal` fails; `console.warn` at boot when the arch is unsupported (`src/embed-native-libs.ts:46-49`).          |
+| `bun_pty_spawn` returns a negative handle    | `PTY spawn failed`                                                                                                                                   | The create request fails with `Failed to spawn terminal with shell`; the terminal is not registered (`…/terminal-manager.ts:181-198`). |
+| Read loop sees a non-`-2` negative           | none (silent)                                                                                                                                        | No exit notification; the terminal stays in the registry until the client closes it.                                                   |
+| ripgrep unresolvable, retries left           | `Ripgrep binary not found. Initialization failed but retries are still available — subsequent calls may succeed.`                                    | Grep/Glob fail for that call only.                                                                                                     |
+| ripgrep unresolvable, 3 attempts spent       | `Ripgrep binary not found and could not be restored after retries. Do NOT retry Grep or Glob tools — …`                                              | Grep/Glob/Glob-suggestions stay broken for the process (daemon listing throws its own `Ripgrep is unavailable`).                       |
+| ripgrep killed by the 10 s cap               | kind `timed-out`, `Search timed out after <n>s. Narrow the pattern, …`                                                                               | Results of that run are discarded.                                                                                                     |
+| ripgrep exit 2 in the daemon listing         | none                                                                                                                                                 | Partial stdout merged with a bounded walk; `truncated:true`.                                                                           |
+| fff library/instance/scan failure            | `[Daemon] File search … , using ripgrep path` (log only)                                                                                             | Request silently served by ripgrep; no user-visible error.                                                                             |
+| fff index creation failure                   | same log + negative cache                                                                                                                            | 10 min of ripgrep for that root.                                                                                                       |
+| agent-browser extraction lock never released | `agent-browser extraction by another process did not complete successfully`                                                                          | The shell command that triggered extraction fails.                                                                                     |
+| agent-browser `--version` non-zero           | `agent-browser availability check failed: exit code <n>: <stderr>`                                                                                   | (Only reachable through `ensureAgentBrowserAvailable`, currently uncalled — see Open questions.)                                       |
+| Script runtime asset unreadable              | `The isolated Script runtime is not installed. Rebuild or reinstall Droide.`                                                                         | Script tool reports the worker-startup failure.                                                                                        |
+| Script worker fails to start                 | `Script worker could not start. Use direct tools instead; Script is disabled until Droide restarts.`                                                 | `isReplWorkerAvailable()` false for the process.                                                                                       |
+| Worker speaks v1 / wrong version             | `ScriptProtocolMismatchError` (message appended to the startup error)                                                                                | Same as above; fix is reinstalling the build.                                                                                          |
+| Frame over its cap                           | `Script protocol frame too large`                                                                                                                    | The whole worker transport fails; the run errors.                                                                                      |
+| keytar module unavailable                    | `Cannot read from keyring: keytar module unavailable. Credentials cannot be read securely.` / `Cannot save to keyring: … cannot be stored securely.` | Reads/writes fail distinctly from "no credential"; the caller falls back to the keyfile path.                                          |
+| SQLite pin/extract failure                   | `Could not extract the bundled SQLite library; using the system SQLite` (log once)                                                                   | Index runs on the runtime's SQLite; version reported in doctor/log.                                                                    |
+| Migration checksum disagreement              | `Session index migration checksum mismatch`                                                                                                          | The open fails; the file is left in place (not quarantined).                                                                           |
+| Corrupt database file                        | quarantine + fresh file                                                                                                                              | User data is the JSONL transcripts, not the index.                                                                                     |
+| SVG with no measurable size                  | `SVG has no size to fit`                                                                                                                             | The image read that requested the preview fails; no partial image.                                                                     |
 
 ## Acceptance tests
 
@@ -674,50 +674,50 @@ Every test is deterministic: stub executables/libraries are built from fixtures
 in the repo, no network, no wall-clock dependence beyond injected timers, and no
 use of the original binary.
 
-| Clause | Test id | Fixture |
-|---|---|---|
-| B1, B2, B4 | `tests/native/test_pty_library_selection_and_missing` | `fixtures/native/pty/` (empty dir) + `BUN_PTY_LIB` unset |
-| B4 | `tests/native/test_pty_missing_library_message` | `fixtures/native/pty/` empty, `BUN_PTY_LIB` unset |
-| B3, B5 | `tests/native/test_pty_spawn_argv_env_block` | `fixtures/native/stub_pty` (echoes received argv/env) |
-| B6 | `tests/native/test_pty_spawn_failure_throws` | `fixtures/native/stub_pty_neg` |
-| B7 | `tests/native/test_pty_data_streaming_utf8` | `fixtures/native/stub_pty_chunks` |
-| B8, B12 | `tests/native/test_pty_exit_code_and_accessors` | `fixtures/native/stub_pty_exit7` |
-| B9, B10, B11 | `tests/native/test_pty_kill_write_resize` | `fixtures/native/stub_pty_exit7` |
-| B13, B19 | `tests/native/test_daemon_terminal_duplicate_and_unknown` | in-memory manager |
-| B14, B15, B16 | `tests/native/test_daemon_terminal_shell_and_env` | `fixtures/native/stub_pty` |
-| B17, B18 | `tests/native/test_daemon_terminal_notifications` | `fixtures/native/stub_pty_chunks` |
-| B20, B21, B22 | `tests/native/test_daemon_terminal_close_and_list` | stub + fake clock |
-| B23, B24 | `tests/native/test_ripgrep_resolution_order` | `fixtures/native/rg_stub.sh` |
-| B25 | `tests/native/test_ripgrep_missing_error_text` | none (resolver returns undefined) |
-| B26, B27 | `tests/native/test_file_listing_args_and_framing` | `fixtures/native/rg_stub.sh` recording argv/stdout |
-| B28, B29, B30 | `tests/native/test_ripgrep_runner_outcomes` | `fixtures/native/rg_stub.sh` modes: ok/no-match/timeout/overflow/err |
-| B31, B32, B33 | `tests/native/test_fff_eligibility_and_missing` | `fixtures/native/fff_stub` |
-| B34, B35, B40 | `tests/native/test_fff_readiness_and_eviction` | `fixtures/native/fff_stub_slow`, fake clock |
-| B36, B37, B38, B39 | `tests/native/test_fff_query_mapping_and_paging` | `fixtures/native/fff_stub_pages` |
-| B41 | `tests/native/test_file_search_fallback_order` | fff stub failing + rg stub |
-| B42 | `tests/native/test_fff_options_struct_layout` | `fixtures/native/fff_reader` |
-| B43, B44, B45 | `tests/native/test_agent_browser_extract_layout` | `fixtures/agent-browser/` fake binary + digest |
-| B44 | `tests/native/test_agent_browser_missing_after_lock` | `fixtures/agent-browser/lock_only/` (lock present, no binary) |
-| B46, B47 | `tests/native/test_agent_browser_detection_and_path` | none |
-| B48, B49, B50 | `tests/native/test_agent_browser_env_defaults` | none |
-| B51, B52, B53 | `tests/native/test_agent_browser_timeout_cleanup_override` | `fixtures/agent-browser/sockets/` |
-| B54, B55 | `tests/native/test_script_runtime_extract_and_missing` | `fixtures/native/fake-runtime` |
-| B55 | `tests/native/test_script_runtime_missing_message` | none (embedded-asset read forced to fail) |
-| B56 | `tests/native/test_worker_env_allowlist` | `fixtures/native/fake-runtime` (dumps env) |
-| B57, B64 | `tests/native/test_worker_ready_handshake` | `fixtures/native/fake-runtime` modes: none/twice/v1/premature |
-| B58, B59, B60 | `tests/native/test_frame_roundtrip_and_caps` | none |
-| B61, B62, B63 | `tests/native/test_worker_evaluate_and_teardown` | `fixtures/native/fake-runtime` |
-| B65 | `tests/native/test_script_worker_starters` | `fixtures/native/fake-runtime` |
-| B66, B67, B68 | `tests/native/test_keytar_resolution_and_stamp` | `fixtures/native/fake-keytar.node` |
-| B69, B72 | `tests/native/test_keyring_accounts_and_keyfile_fallback` | temp factory dir |
-| B68, B70 | `tests/native/test_keyring_missing_module_errors` | loader returning `null` |
-| B71 | `tests/native/test_keyring_get_dedup_set_order` | fake keytar with promises |
-| B73, B75, B76 | `tests/native/test_sqlite_open_pragmas` | temp db, injected sqlite module |
-| B74 | `tests/native/test_sqlite_pin_darwin_only` | temp factory dir, fake platform |
-| B77, B78 | `tests/native/test_sqlite_migrations_and_quarantine` | `fixtures/sqlite/` migrations |
-| B79, B80 | `tests/native/test_resvg_single_init` | `fixtures/svg/` inputs |
-| B81 | `tests/native/test_int8_dot_kernel_and_fallback` | generated 16-dim rows |
-| B82 | `tests/native/test_doctor_binary_states` | temp factory dir per state |
+| Clause             | Test id                                                    | Fixture                                                              |
+| ------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| B1, B2, B4         | `tests/native/test_pty_library_selection_and_missing`      | `fixtures/native/pty/` (empty dir) + `BUN_PTY_LIB` unset             |
+| B4                 | `tests/native/test_pty_missing_library_message`            | `fixtures/native/pty/` empty, `BUN_PTY_LIB` unset                    |
+| B3, B5             | `tests/native/test_pty_spawn_argv_env_block`               | `fixtures/native/stub_pty` (echoes received argv/env)                |
+| B6                 | `tests/native/test_pty_spawn_failure_throws`               | `fixtures/native/stub_pty_neg`                                       |
+| B7                 | `tests/native/test_pty_data_streaming_utf8`                | `fixtures/native/stub_pty_chunks`                                    |
+| B8, B12            | `tests/native/test_pty_exit_code_and_accessors`            | `fixtures/native/stub_pty_exit7`                                     |
+| B9, B10, B11       | `tests/native/test_pty_kill_write_resize`                  | `fixtures/native/stub_pty_exit7`                                     |
+| B13, B19           | `tests/native/test_daemon_terminal_duplicate_and_unknown`  | in-memory manager                                                    |
+| B14, B15, B16      | `tests/native/test_daemon_terminal_shell_and_env`          | `fixtures/native/stub_pty`                                           |
+| B17, B18           | `tests/native/test_daemon_terminal_notifications`          | `fixtures/native/stub_pty_chunks`                                    |
+| B20, B21, B22      | `tests/native/test_daemon_terminal_close_and_list`         | stub + fake clock                                                    |
+| B23, B24           | `tests/native/test_ripgrep_resolution_order`               | `fixtures/native/rg_stub.sh`                                         |
+| B25                | `tests/native/test_ripgrep_missing_error_text`             | none (resolver returns undefined)                                    |
+| B26, B27           | `tests/native/test_file_listing_args_and_framing`          | `fixtures/native/rg_stub.sh` recording argv/stdout                   |
+| B28, B29, B30      | `tests/native/test_ripgrep_runner_outcomes`                | `fixtures/native/rg_stub.sh` modes: ok/no-match/timeout/overflow/err |
+| B31, B32, B33      | `tests/native/test_fff_eligibility_and_missing`            | `fixtures/native/fff_stub`                                           |
+| B34, B35, B40      | `tests/native/test_fff_readiness_and_eviction`             | `fixtures/native/fff_stub_slow`, fake clock                          |
+| B36, B37, B38, B39 | `tests/native/test_fff_query_mapping_and_paging`           | `fixtures/native/fff_stub_pages`                                     |
+| B41                | `tests/native/test_file_search_fallback_order`             | fff stub failing + rg stub                                           |
+| B42                | `tests/native/test_fff_options_struct_layout`              | `fixtures/native/fff_reader`                                         |
+| B43, B44, B45      | `tests/native/test_agent_browser_extract_layout`           | `fixtures/agent-browser/` fake binary + digest                       |
+| B44                | `tests/native/test_agent_browser_missing_after_lock`       | `fixtures/agent-browser/lock_only/` (lock present, no binary)        |
+| B46, B47           | `tests/native/test_agent_browser_detection_and_path`       | none                                                                 |
+| B48, B49, B50      | `tests/native/test_agent_browser_env_defaults`             | none                                                                 |
+| B51, B52, B53      | `tests/native/test_agent_browser_timeout_cleanup_override` | `fixtures/agent-browser/sockets/`                                    |
+| B54, B55           | `tests/native/test_script_runtime_extract_and_missing`     | `fixtures/native/fake-runtime`                                       |
+| B55                | `tests/native/test_script_runtime_missing_message`         | none (embedded-asset read forced to fail)                            |
+| B56                | `tests/native/test_worker_env_allowlist`                   | `fixtures/native/fake-runtime` (dumps env)                           |
+| B57, B64           | `tests/native/test_worker_ready_handshake`                 | `fixtures/native/fake-runtime` modes: none/twice/v1/premature        |
+| B58, B59, B60      | `tests/native/test_frame_roundtrip_and_caps`               | none                                                                 |
+| B61, B62, B63      | `tests/native/test_worker_evaluate_and_teardown`           | `fixtures/native/fake-runtime`                                       |
+| B65                | `tests/native/test_script_worker_starters`                 | `fixtures/native/fake-runtime`                                       |
+| B66, B67, B68      | `tests/native/test_keytar_resolution_and_stamp`            | `fixtures/native/fake-keytar.node`                                   |
+| B69, B72           | `tests/native/test_keyring_accounts_and_keyfile_fallback`  | temp `<state dir>`                                                   |
+| B68, B70           | `tests/native/test_keyring_missing_module_errors`          | loader returning `null`                                              |
+| B71                | `tests/native/test_keyring_get_dedup_set_order`            | fake keytar with promises                                            |
+| B73, B75, B76      | `tests/native/test_sqlite_open_pragmas`                    | temp db, injected sqlite module                                      |
+| B74                | `tests/native/test_sqlite_pin_darwin_only`                 | temp `<state dir>`, fake platform                                    |
+| B77, B78           | `tests/native/test_sqlite_migrations_and_quarantine`       | `fixtures/sqlite/` migrations                                        |
+| B79, B80           | `tests/native/test_resvg_single_init`                      | `fixtures/svg/` inputs                                               |
+| B81                | `tests/native/test_int8_dot_kernel_and_fallback`           | generated 16-dim rows                                                |
+| B82                | `tests/native/test_doctor_binary_states`                   | temp `<state dir>` per state                                         |
 
 Each helper's "missing payload" case is covered by its own row (`B4`, `B25`,
 `B32/B33`, `B44`, `B55`, `B67/B70`, `B74`), and each asserts the exact
@@ -730,31 +730,31 @@ Method legend: **PE/ELF header** = `file`, `objdump -h`; **exports** = `objdump
 `rg`; **reading** = direct source read; **WASM parse** = section/import/export
 walk of the module bytes.
 
-| Evidence | Supports | Method |
-|---|---|---|
-| `X:rust_pty-fazdxkv2.dll`, `X:librust_pty-*` | B2 | PE32+ x86-64 DLL / ELF x86-64 & aarch64 / Mach-O x86_64 & arm64; exports exactly the eight `bun_pty_*` symbols |
-| `X:rust_pty-fazdxkv2.dll` strings (`conpty.dll`, `portable-pty-0.8.1`, `failed to create psuedo console`, `this system does not support conpty`) | B2, B16 | strings |
-| `src/embed-native-libs.ts` | B1, B2 | reading |
-| `vendor:bun-pty/src/terminal.ts`, `interfaces.ts` | B3–B12 | reading |
-| `packages/daemon-core/src/terminal/terminal-manager.ts` | B13–B22 | reading |
-| `packages/droid-sdk-core/src/protocol/daemon/schemas/{terminal,enums}.ts` | B13, B17, B18 | reading |
-| `src/utils/ripgrepEmbedded.ts`, `src/utils/npmDepResolver.ts` | B23, B24, B25 | reading |
-| `packages/daemon-core/src/utils/{file-listing,file-search/*}.ts` | B26, B27, B31–B41 | reading |
-| `src/utils/grep-utils.ts`, `src/utils/constants.ts`, `src/utils/enums.ts` | B25, B28–B30 | reading |
-| `vendor:@ff-labs/fff-bun/src/{ffi,finder,embedded,platform}.ts` | B32, B42 | reading |
-| `X:fff_c-43ptfmbb.dll` | B42 | PE32+ x86-64, 91 `fff_*` exports incl. `fff_create_instance_with`, `fff_search_mixed`, `fff_watch_events_get_path` |
-| `X:agent-browser-wcst4wbn` | B43 | PE32+ console, x86-64; strings `agent-browser/0.37.1`, `src/native/interaction.rs`, `agent-browser.plugin.v1` |
-| `src/utils/agentBrowserEmbedded.ts`, `src/utils/agentBrowserCleanup.ts`, `packages/utils/src/agent-browser/*` | B43–B53 | reading |
-| `src/tools/executors/client/{shell/shell-executor,execute-cli}.ts` | B46, B47, B51 | reading |
-| `src/repl/worker/{nativeBinary,processClient}.ts`, `src/repl/protocol/*` | B54–B65 | reading |
-| `X:script-runtime-m53sgqc3` | B65 | PE32+ x86-64, 54 MB; strings `V8 memory sandbox enabled`, `src\protocol.rs`, `Script protocol frame too large` |
-| `X:keytar-hqpjzrak` | B66 | PE32+ DLL; single export `_register_keytar_`; `napi_*` imports; PDB path `node-keytar/build/Release/keytar.pdb` |
-| `src/utils/keytarEmbedded.ts`, `packages/runtime/auth/src/**` | B66–B72 | reading |
-| `src/utils/sqliteEmbedded.ts`, `packages/runtime/session-index/src/{driver,migrate,cache,constants}.ts` | B73–B78 | reading |
-| `X:index_bg-904m1xk3.wasm` | B79 | WASM v1, 2 478 606 B; imports `wbg.*`, exports `resvg_new`, `resvg_render`, `renderedimage_asPng/pixels` |
-| `src/utils/images/svg.ts`, `packages/runtime/session-index/src/int8-dot.ts` | B79–B81 | reading |
-| `src/entrypoints/doctor/{checks/binaries,installationLayers}.ts`, `src/utils/enums.ts` | B82 | reading |
-| `X:libsqlite3-vvvada9m.{dylib,sha256}`, `X:apply-seccomp-vvvada9m` | — | **extraction gap**: both are 0 bytes, so no digest or code claim is made from them |
+| Evidence                                                                                                                                         | Supports          | Method                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `X:rust_pty-fazdxkv2.dll`, `X:librust_pty-*`                                                                                                     | B2                | PE32+ x86-64 DLL / ELF x86-64 & aarch64 / Mach-O x86_64 & arm64; exports exactly the eight `bun_pty_*` symbols     |
+| `X:rust_pty-fazdxkv2.dll` strings (`conpty.dll`, `portable-pty-0.8.1`, `failed to create psuedo console`, `this system does not support conpty`) | B2, B16           | strings                                                                                                            |
+| `src/embed-native-libs.ts`                                                                                                                       | B1, B2            | reading                                                                                                            |
+| `vendor:bun-pty/src/terminal.ts`, `interfaces.ts`                                                                                                | B3–B12            | reading                                                                                                            |
+| `packages/daemon-core/src/terminal/terminal-manager.ts`                                                                                          | B13–B22           | reading                                                                                                            |
+| `packages/sdk-core/src/protocol/daemon/schemas/{terminal,enums}.ts`                                                                              | B13, B17, B18     | reading                                                                                                            |
+| `src/utils/ripgrepEmbedded.ts`, `src/utils/npmDepResolver.ts`                                                                                    | B23, B24, B25     | reading                                                                                                            |
+| `packages/daemon-core/src/utils/{file-listing,file-search/*}.ts`                                                                                 | B26, B27, B31–B41 | reading                                                                                                            |
+| `src/utils/grep-utils.ts`, `src/utils/constants.ts`, `src/utils/enums.ts`                                                                        | B25, B28–B30      | reading                                                                                                            |
+| `vendor:@ff-labs/fff-bun/src/{ffi,finder,embedded,platform}.ts`                                                                                  | B32, B42          | reading                                                                                                            |
+| `X:fff_c-43ptfmbb.dll`                                                                                                                           | B42               | PE32+ x86-64, 91 `fff_*` exports incl. `fff_create_instance_with`, `fff_search_mixed`, `fff_watch_events_get_path` |
+| `X:agent-browser-wcst4wbn`                                                                                                                       | B43               | PE32+ console, x86-64; strings `agent-browser/0.37.1`, `src/native/interaction.rs`, `agent-browser.plugin.v1`      |
+| `src/utils/agentBrowserEmbedded.ts`, `src/utils/agentBrowserCleanup.ts`, `packages/utils/src/agent-browser/*`                                    | B43–B53           | reading                                                                                                            |
+| `src/tools/executors/client/{shell/shell-executor,execute-cli}.ts`                                                                               | B46, B47, B51     | reading                                                                                                            |
+| `src/repl/worker/{nativeBinary,processClient}.ts`, `src/repl/protocol/*`                                                                         | B54–B65           | reading                                                                                                            |
+| `X:script-runtime-m53sgqc3`                                                                                                                      | B65               | PE32+ x86-64, 54 MB; strings `V8 memory sandbox enabled`, `src\protocol.rs`, `Script protocol frame too large`     |
+| `X:keytar-hqpjzrak`                                                                                                                              | B66               | PE32+ DLL; single export `_register_keytar_`; `napi_*` imports; PDB path `node-keytar/build/Release/keytar.pdb`    |
+| `src/utils/keytarEmbedded.ts`, `packages/runtime/auth/src/**`                                                                                    | B66–B72           | reading                                                                                                            |
+| `src/utils/sqliteEmbedded.ts`, `packages/runtime/session-index/src/{driver,migrate,cache,constants}.ts`                                          | B73–B78           | reading                                                                                                            |
+| `X:index_bg-904m1xk3.wasm`                                                                                                                       | B79               | WASM v1, 2 478 606 B; imports `wbg.*`, exports `resvg_new`, `resvg_render`, `renderedimage_asPng/pixels`           |
+| `src/utils/images/svg.ts`, `packages/runtime/session-index/src/int8-dot.ts`                                                                      | B79–B81           | reading                                                                                                            |
+| `src/entrypoints/doctor/{checks/binaries,installationLayers}.ts`, `src/utils/enums.ts`                                                           | B82               | reading                                                                                                            |
+| `X:libsqlite3-vvvada9m.{dylib,sha256}`, `X:apply-seccomp-vvvada9m`                                                                               | —                 | **extraction gap**: both are 0 bytes, so no digest or code claim is made from them                                 |
 
 ## Open questions
 
@@ -793,7 +793,7 @@ walk of the module bytes.
 
 ## Clean-room notes
 
-A reimplementation **must** reproduce:
+A conforming build **must** reproduce:
 
 - One library per platform with the eight `bun_pty_*` symbols and the exact
   call signatures in B3; `BUN_PTY_LIB` honoured first; the documented
@@ -820,7 +820,7 @@ A reimplementation **must** reproduce:
   protocol version 2 handshake inside 10 s, `u32le` + JSON + slot framing,
   16 KiB slot threshold, frame caps and their error strings, and the
   abort/complete teardown ladder.
-- keytar resolution order + SHA stamp, `process.dlopen` loading, `Factory CLI`
+- keytar resolution order + SHA stamp, `process.dlopen` loading, `Droide CLI`
   service with environment-scoped accounts, the two "module unavailable"
   messages, per-account get dedup and set serialisation, keyfile fallback.
 - The SQLite driver's module choice, macOS-only pin with digest-named file, the
@@ -840,6 +840,6 @@ Explicitly **not** part of the contract:
 - The SEA asset naming in `X:` (`…-<suffix>`) — an packaging detail of the
   extraction, not of the deployed layout.
 - The `apply-seccomp` helper and Linux cgroup workload placement
-  (`wrapWorkloadCommand` reduces to identity off `factoryd` hosts).
+  (`wrapWorkloadCommand` reduces to identity off daemon hosts).
 - Interning/placement of the wasm modules: only their observable API and
   fallbacks are contractual.

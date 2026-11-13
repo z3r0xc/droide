@@ -35,7 +35,7 @@ import { parseJsonc } from "../../../src/extensions/jsonc.ts";
 
 interface Sandbox {
   readonly root: string;
-  readonly factoryDir: string;
+  readonly stateDir: string;
   readonly projectRoot: string;
   readonly userTarget: McpEditTarget;
   readonly projectTarget: McpEditTarget;
@@ -45,16 +45,16 @@ async function sandbox(): Promise<Sandbox> {
   const root = await mkdtemp(join(tmpdir(), "droide-mcp-edit-"));
   const home = join(root, "home");
   const projectRoot = join(root, "project");
-  const factoryDir = join(home, ".factory");
-  await mkdir(factoryDir, { recursive: true });
-  await mkdir(join(projectRoot, ".factory"), { recursive: true });
+  const stateDir = join(home, ".droide");
+  await mkdir(stateDir, { recursive: true });
+  await mkdir(join(projectRoot, ".droide"), { recursive: true });
   return {
     root,
-    factoryDir,
+    stateDir,
     projectRoot,
-    userTarget: { path: join(factoryDir, "mcp.json"), scope: "user" },
+    userTarget: { path: join(stateDir, "mcp.json"), scope: "user" },
     projectTarget: {
-      path: join(projectRoot, ".factory", "mcp.json"),
+      path: join(projectRoot, ".droide", "mcp.json"),
       scope: "project",
     },
   };
@@ -77,7 +77,7 @@ for (const scope of ["user", "project"] as const) {
       addMcpServer(target, "docs-server", stdioConfig("node", ["server.mjs"]));
 
       const merged = loadMcpConfiguration(
-        mcpConfigFileSources(box.factoryDir, box.projectRoot),
+        mcpConfigFileSources(box.stateDir, box.projectRoot),
       );
       assert.equal(merged.servers.has("docs-server"), true);
       assert.equal(
@@ -88,7 +88,7 @@ for (const scope of ["user", "project"] as const) {
       const removed = removeMcpServer(target, "docs-server");
       assert.deepEqual(removed.removed, ["docs-server"]);
       const after = loadMcpConfiguration(
-        mcpConfigFileSources(box.factoryDir, box.projectRoot),
+        mcpConfigFileSources(box.stateDir, box.projectRoot),
       );
       assert.equal(after.servers.has("docs-server"), false);
       assert.equal(after.diagnostics.length, 0);
@@ -185,7 +185,7 @@ test("a JSONC edit preserves every comment and the existing key order", async ()
       "otherSetting",
     ]);
     const merged = loadMcpConfiguration(
-      mcpConfigFileSources(box.factoryDir, box.projectRoot),
+      mcpConfigFileSources(box.stateDir, box.projectRoot),
     );
     assert.deepEqual([...merged.servers.keys()].sort(), ["alpha", "beta"]);
 
@@ -196,7 +196,7 @@ test("a JSONC edit preserves every comment and the existing key order", async ()
     assert.match(removed, /\/\/ trailing alpha comment/);
     assert.match(removed, /"otherSetting": true/);
     const after = loadMcpConfiguration(
-      mcpConfigFileSources(box.factoryDir, box.projectRoot),
+      mcpConfigFileSources(box.stateDir, box.projectRoot),
     );
     assert.deepEqual([...after.servers.keys()], ["beta"]);
     assert.equal(after.diagnostics.length, 0);
@@ -216,7 +216,7 @@ test("a BOM-prefixed document is read and preserved", async () => {
     const text = await readFile(box.userTarget.path, "utf8");
     assert.equal(text.charCodeAt(0), 0xfeff);
     const merged = loadMcpConfiguration(
-      mcpConfigFileSources(box.factoryDir, box.projectRoot),
+      mcpConfigFileSources(box.stateDir, box.projectRoot),
     );
     assert.equal(merged.servers.has("alpha"), true);
   } finally {
@@ -278,7 +278,7 @@ test("a failed atomic write leaves the old file byte-for-byte intact", async () 
       editErrorCode("write-failed"),
     );
     assert.equal(await readFile(box.userTarget.path, "utf8"), original);
-    const leftovers = (await readdir(join(box.factoryDir))).filter((name) =>
+    const leftovers = (await readdir(join(box.stateDir))).filter((name) =>
       name.endsWith(".tmp"),
     );
     assert.deepEqual(leftovers, []);

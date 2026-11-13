@@ -13,7 +13,7 @@ function context(
 ): DoctorContext {
   return {
     settings: {},
-    paths: { factoryDir: join(tmpdir(), "droide-doctor-provider") },
+    paths: { stateDir: join(tmpdir(), "droide-doctor-provider") },
     environment: {
       platform: "linux",
       nodeVersion: "24.0.0",
@@ -79,7 +79,7 @@ test("a readable extra CA bundle is ok", async () => {
 
 test("an API key in the environment is reported by length only", async () => {
   const result = await check("auth").run(
-    context({ FACTORY_API_KEY: "fk-secret-value" }),
+    context({ DROIDE_API_KEY: "fk-secret-value" }),
   );
   assert.equal(result.status, "ok");
   assert.equal(JSON.stringify(result).includes("fk-secret-value"), false);
@@ -89,7 +89,7 @@ test("an API key in the environment is reported by length only", async () => {
 test("no credential warns and names the fix", async () => {
   const result = await check("auth").run(context());
   assert.equal(result.status, "warn");
-  assert.match(result.fixes?.[0] ?? "", /FACTORY_API_KEY/);
+  assert.match(result.fixes?.[0] ?? "", /DROIDE_API_KEY/);
 });
 
 test("every registered check has a unique name and a title", () => {

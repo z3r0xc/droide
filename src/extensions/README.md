@@ -9,8 +9,8 @@ posts to an endpoint, and it does so only when a caller opens a client.
 
 | Mechanism | Config and assets                                                                                | Merge direction                                                                                                                                                                   |
 | --------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MCP       | `<factoryDir>/mcp.json`, `<projectRoot>/.factory/mcp.json` (`mcpServers.<name>`)                 | Levels lowest-first; the first in `MCP_SETTINGS_LEVELS_HIGHEST_FIRST` wins. Whole entry per raw name (no field merge), then re-keyed by canonical name; the higher alias wins.    |
-| Plugins   | `.factory-plugin/plugin.json`, falling back to `.claude-plugin/plugin.json`                      | Manifest is optional JSONC; only `hooks` is read. Enablement (`general.enabledPlugins`) belongs to settings resolution.                                                           |
+| MCP       | `<stateDir>/mcp.json`, `<projectRoot>/.droide/mcp.json` (`mcpServers.<name>`)                    | Levels lowest-first; the first in `MCP_SETTINGS_LEVELS_HIGHEST_FIRST` wins. Whole entry per raw name (no field merge), then re-keyed by canonical name; the higher alias wins.    |
+| Plugins   | `.droide-plugin/plugin.json`, falling back to `.claude-plugin/plugin.json`                       | Manifest is optional JSONC; only `hooks` is read. Enablement (`general.enabledPlugins`) belongs to settings resolution.                                                           |
 | Skills    | `<settingsFolder>/skills/<name>/SKILL.md`, `.agent/skills`, `.agents/skills`, `<mission>/skills` | Eleven buckets highest-first; the first bucket to claim a sanitized name wins; within a bucket the first input wins. The `disabledSkills` ledger is a union: it can only disable. |
 
 ## Modules
@@ -27,13 +27,21 @@ posts to an endpoint, and it does so only when a caller opens a client.
   cache, cancellation and result marshalling.
 - `mcp/errors.ts` — `McpConnectError`, `McpProtocolError`, `McpToolError`,
   `McpTimeoutError`, `McpCancelledError`; each carries its server name.
-- `mcp/tools.ts` — `createMcpToolDefinitions(servers)`, a pure factory turning a
+- `mcp/tools.ts` — `createMcpToolDefinitions(servers)`, a pure builder turning a
   live listing into registry definitions (not wired into `createCoreRegistry`).
 - `skills/discovery.ts` — strict YAML-subset frontmatter, bucket discovery,
   collision/shadow resolution, the disable ledger, the listing budget and the
   activation payload.
 - `plugins/manifest.ts` — plugin-id parsing, manifest lookup and `hooks`
   validation.
+- `plugins/marketplace.ts` — the marketplace registry, git checkout through an
+  injected runner, atomic adoption and the `marketplace` commands' bodies.
+- `plugins/sources.ts` — the six source kinds (`github`, `url`, `local`,
+  `git-subdir`, `npm`, `archive`) parsed once at the boundary, materialised
+  through an injected `runGit`/`fetch`/fs surface; the published archive limits,
+  npm's recorded `spec`/`version`/`resolved`/`integrity`, the provenance hash
+  the load path re-authorizes, the `strictKnownMarketplaces` allowlist and the
+  user/org-only `pluginTokenHosts` binding.
 - `jsonc.ts`, `guards.ts` — shared JSONC scanner and the untrusted-object guard.
 
 ## MCP client lifecycle
@@ -53,7 +61,7 @@ transport and closes it on every failure path.
    failure here is a connect failure: the transport is closed and the promise
    rejects.
 4. **`tools/list`.** Follows `nextCursor` until a page has none, all inside one
-   15 s budget (`FACTORY_MCP_LIST_TOOLS_TIMEOUT_MS` in the subject). A page is
+   15 s budget (`DROIDE_MCP_LIST_TOOLS_TIMEOUT_MS`). A page is
    parsed strictly first; if any tool fails, the same payload is parsed per tool
    and the refusals are returned as `skipped` instead of discarding the listing.
    Pages are capped at 100 and a repeated cursor is refused.

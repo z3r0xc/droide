@@ -170,8 +170,8 @@ export async function editFile(
     replacements = changeAll ? occurrences : 1;
   }
 
-  // `TODO(spec B22)`: the match runs against the secret-scrubbed view in the
-  // subject; this build has no scrubber yet, so the raw content is matched.
+  // `TODO(spec B22)`: the match runs against the secret-scrubbed view; this
+  // build has no scrubber yet, so the raw content is matched.
   await writeFileAtomic(
     resolved,
     encodeText(next, decoded.encoding, decoded.hadBom, decoded.lineEnding),

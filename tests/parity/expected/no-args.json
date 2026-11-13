@@ -1,0 +1,6 @@
+{
+ "case": "no-args",
+ "exit_code": 64,
+ "stdout": "",
+ "stderr": "droide: the \"interactive\" command is specified but not implemented in this build.\n"
+}

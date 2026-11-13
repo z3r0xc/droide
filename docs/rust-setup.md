@@ -5,7 +5,7 @@
 The local toolchain builds and tests the workspace:
 
 ```sh
-cargo test --workspace      # 39 tests
+cargo test --workspace      # 69 tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```

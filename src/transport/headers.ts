@@ -12,15 +12,15 @@
 /** The literal header names this layer emits (spec: "Header names (literal)"). */
 export const HEADER_NAMES = {
   authorization: "Authorization",
-  organization: "X-Factory-Org-Id",
-  client: "X-Factory-Client",
-  sdk: "X-Factory-Sdk",
-  requestSurface: "X-Factory-Request-Surface",
-  execOutputFormat: "X-Factory-Exec-Output-Format",
-  execInputFormat: "X-Factory-Exec-Input-Format",
+  organization: "X-Droide-Org-Id",
+  client: "X-Droide-Client",
+  sdk: "X-Droide-Sdk",
+  requestSurface: "X-Droide-Request-Surface",
+  execOutputFormat: "X-Droide-Exec-Output-Format",
+  execInputFormat: "X-Droide-Exec-Input-Format",
   clientVersion: "X-Client-Version",
-  whoamiExtended: "X-Factory-Whoami-Extended",
-  sessionAttribution: "X-Factory-Session-Attribution",
+  whoamiExtended: "X-Droide-Whoami-Extended",
+  sessionAttribution: "X-Droide-Session-Attribution",
   contentType: "Content-Type",
   traceparent: "traceparent",
 } as const;
@@ -38,7 +38,7 @@ export type HeaderPurpose = "operational" | "usage";
 /**
  * One consistent read of the credential: token, active organization and the
  * caller's attribution. `purpose` decides whether the operational
- * `X-Factory-Client` default applies (B11/B12).
+ * `X-Droide-Client` default applies (B11/B12).
  */
 export interface CredentialSnapshot {
   readonly token: string | null;
@@ -141,7 +141,7 @@ export function buildHeaders(
 /**
  * B22: a customer-Prem authentication request carries exactly the bearer
  * credential, the selected organization and a JSON content type when a body is
- * present. It is deliberately not `buildHeaders`: the Factory client
+ * present. It is deliberately not `buildHeaders`: the CLI client
  * attribution and version headers do not belong on the Prem authority.
  */
 export function buildCustomerPremAuthHeaders(

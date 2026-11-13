@@ -25,7 +25,7 @@ argv ──▶ cli/router.ts ──▶ commander program
   the flag.
 - **Failures are typed.** A malformed settings file aborts the run with
   `InvalidSettingsError` (naming the file); an unreadable `--settings` overlay is
-  dropped and recorded in `droppedOverlays`, because the subject tolerates it.
+  dropped and recorded in `droppedOverlays`, because the contract tolerates it.
 
 ## Adding a subsystem
 

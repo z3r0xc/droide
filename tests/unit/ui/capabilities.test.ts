@@ -89,7 +89,7 @@ test("NO_COLOR skips probing and falls back to COLORFGBG", () => {
     environment({}, { NO_COLOR: "1", COLORFGBG: "0;7" }),
   );
   assert.equal(caps.colorDepth, "none");
-  assert.equal(caps.theme, "factory-light");
+  assert.equal(caps.theme, "droide-light");
   assert.deepEqual(caps.probes, { trueColor: false, appearance: false });
 });
 
@@ -125,17 +125,17 @@ test("win32 writes neither probe and resolves from COLORFGBG only", () => {
   );
   assert.equal(caps.platform, "windows");
   assert.equal(caps.colorDepth, "16");
-  assert.equal(caps.theme, "factory-dark");
+  assert.equal(caps.theme, "droide-dark");
   assert.deepEqual(caps.probes, { trueColor: false, appearance: false });
 });
 
 test("COLORFGBG parsing follows the last field", () => {
-  assert.equal(parseColorFgBg(undefined), "factory-dark");
-  assert.equal(parseColorFgBg("15;0"), "factory-dark");
-  assert.equal(parseColorFgBg("0;default"), "factory-light");
-  assert.equal(parseColorFgBg("0;7"), "factory-light");
-  assert.equal(parseColorFgBg("0;8"), "factory-dark");
-  assert.equal(parseColorFgBg("0;3"), "factory-dark");
+  assert.equal(parseColorFgBg(undefined), "droide-dark");
+  assert.equal(parseColorFgBg("15;0"), "droide-dark");
+  assert.equal(parseColorFgBg("0;default"), "droide-light");
+  assert.equal(parseColorFgBg("0;7"), "droide-light");
+  assert.equal(parseColorFgBg("0;8"), "droide-dark");
+  assert.equal(parseColorFgBg("0;3"), "droide-dark");
 });
 
 test("COLUMNS and LINES are read from the injected environment", () => {

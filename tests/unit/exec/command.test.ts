@@ -380,7 +380,7 @@ test("an unknown, unconfigured or unsupported custom model is refused", () => {
   );
 });
 
-test("a managed model needs FACTORY_API_KEY and routes through the proxy", () => {
+test("a managed model needs DROIDE_API_KEY and routes through the proxy", () => {
   assert.throws(
     () =>
       resolveModelTarget({
@@ -399,8 +399,8 @@ test("a managed model needs FACTORY_API_KEY and routes through the proxy", () =>
     reasoningEffort: "medium",
     settings: {},
     env: {
-      FACTORY_API_KEY: "key",
-      FACTORY_API_BASE_URL: "https://api.example.test",
+      DROIDE_API_KEY: "key",
+      DROIDE_API_BASE_URL: "https://api.example.test",
     },
   });
   assert.equal(
@@ -418,10 +418,10 @@ function fakeContext(environment: Environment, settings: Settings): AppContext {
     layers: [],
     droppedOverlays: [],
     paths: {
-      factoryDir: "/factory",
+      stateDir: "/factory",
       userSettingsFile: "/factory/settings.json",
-      projectDir: "/project/.factory",
-      projectSettingsFile: "/project/.factory/settings.json",
+      projectDir: "/project/.droide",
+      projectSettingsFile: "/project/.droide/settings.json",
       sessionsDir: "/factory/sessions",
       sessionIndexDir: "/factory/cache/session-index",
       sessionIndexDatabase: "/factory/cache/session-index/index.db",
@@ -512,7 +512,7 @@ test("a missing managed credential opens no provider and exits non-zero", async 
   try {
     const environment: Environment = {
       ...temp.environment,
-      env: { FACTORY_API_BASE_URL: "http://127.0.0.1:9" },
+      env: { DROIDE_API_BASE_URL: "http://127.0.0.1:9" },
     };
     const stderr = new CollectingStream();
     let fetchCalls = 0;

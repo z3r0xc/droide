@@ -2,8 +2,10 @@
 
 ## The gate
 
-`npm run verify` runs every TypeScript-side gate below in order; `npm run verify:rust`
-runs the Rust side, including the contract test against the compiled helper.
+`npm run verify` runs the TypeScript gates in order, plus the parity snapshots;
+`npm run verify:rust` runs the Rust side, including the contract test against the
+compiled helper. `npm run brand:check` is a separate step, which CI runs on its
+own line.
 
 Every change must pass, in this order:
 
@@ -11,16 +13,17 @@ Every change must pass, in this order:
 npm run typecheck      # tsc --noEmit
 npm run format:check   # prettier over src/tests/json
 npm test               # unit + integration (node --test)
-npm run test:parity    # CLI parity against recorded goldens (local only)
+npm run test:parity    # CLI snapshots recorded from this build (local only)
 npm run gaps:check     # docs/gaps.md matches the TODO(spec …) markers in src/
+npm run brand:check    # no other product's name, release number or vendor host
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI runs all of it except the parity suites that need goldens (those are recorded
-from the subject locally and never committed — see
-`docs/adr/0004-parity-harness-with-optional-oracle.md`).
+CI runs all of it except the parity suites that need recorded goldens (those are
+recorded locally and never committed — see
+`docs/adr/0010-own-brand-and-snapshot-harness.md`).
 
 ## Spec first
 
@@ -37,7 +40,7 @@ between the specification and the build is visible.
 
 ## Provenance
 
-Recovered subject code, extracted binaries and parity goldens live under
+Recovered reference sources, extracted binaries and recorded cases live under
 `raw/`, `evidence/` and `.work/`, which are git-ignored. Nothing from those trees
 may be committed, pasted into `src/`, or cited as a source in a commit message.
 Specs cite them; code does not copy them (`docs/adr/0003-…`).

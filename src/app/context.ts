@@ -8,7 +8,7 @@
 import {
   type Environment,
   cacheDir,
-  factoryDir,
+  stateDir,
   logsDir,
   processEnvironment,
   projectDir,
@@ -28,7 +28,7 @@ import {
 import type { Settings } from "../config/schema.ts";
 
 export interface AppPaths {
-  readonly factoryDir: string;
+  readonly stateDir: string;
   readonly userSettingsFile: string;
   readonly projectDir: string;
   readonly projectSettingsFile: string;
@@ -55,7 +55,7 @@ export interface CreateAppContextOptions {
   readonly environment?: Environment;
   /** `--cwd`, as typed. Resolved against the launch directory. */
   readonly cwd?: string;
-  /** `--settings`, as typed. Wins over `FACTORY_RUNTIME_SETTINGS_PATH`. */
+  /** `--settings`, as typed. Wins over `DROIDE_RUNTIME_SETTINGS_PATH`. */
   readonly settingsFlag?: string;
   /** Organization policy, already fetched (it is remote-only). */
   readonly orgSettings?: Settings;
@@ -93,7 +93,7 @@ export async function createAppContext(
     droppedOverlays:
       resolved.overlay.kind === "dropped" ? [resolved.overlay] : [],
     paths: {
-      factoryDir: factoryDir(environment),
+      stateDir: stateDir(environment),
       userSettingsFile: userSettingsFile(environment),
       projectDir: projectDir(environment),
       projectSettingsFile: projectSettingsFile(environment),

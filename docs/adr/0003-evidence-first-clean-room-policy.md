@@ -5,7 +5,7 @@
 
 ## Context
 
-The subject's original TypeScript is recoverable from source maps embedded in
+The reference build's original TypeScript is recoverable from source maps embedded in
 the shipped binary (`tools/bunsmap/recover.py`). That creates a licensing and
 provenance hazard: recovered code is proprietary, and a reimplementation that
 copies it inherits the original's licence obligations and is not a clean-room

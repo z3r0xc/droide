@@ -417,15 +417,15 @@ export interface McpConfigFileSource {
 }
 
 export function mcpConfigFileSources(
-  factoryDir: string,
+  stateDir: string,
   projectRoot: string,
 ): readonly McpConfigFileSource[] {
   return [
     {
       level: "project-settings",
-      path: join(projectRoot, ".factory", "mcp.json"),
+      path: join(projectRoot, ".droide", "mcp.json"),
     },
-    { level: "user-settings", path: join(factoryDir, "mcp.json") },
+    { level: "user-settings", path: join(stateDir, "mcp.json") },
   ];
 }
 

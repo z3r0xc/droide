@@ -31,18 +31,18 @@ async function createFixture(): Promise<Fixture> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "droide-config-"));
   const home = path.join(root, "home");
   const cwd = path.join(root, "project");
-  await fs.mkdir(path.join(home, ".factory"), { recursive: true });
+  await fs.mkdir(path.join(home, ".droide"), { recursive: true });
   await fs.mkdir(cwd, { recursive: true });
   return {
     root,
     environment: {
-      env: { FACTORY_HOME_OVERRIDE: home },
+      env: { DROIDE_HOME_OVERRIDE: home },
       home,
       platform: HOST_PLATFORM,
       cwd,
     },
-    userSettings: path.join(home, ".factory", "settings.json"),
-    projectSettings: path.join(cwd, ".factory", "settings.json"),
+    userSettings: path.join(home, ".droide", "settings.json"),
+    projectSettings: path.join(cwd, ".droide", "settings.json"),
     overlay: path.join(root, "overlay.json"),
     overlayFromEnv: path.join(root, "overlay-env.json"),
   };
@@ -146,7 +146,7 @@ test("a key absent from every layer stays absent", async () => {
   });
 });
 
-test("the --settings flag wins over FACTORY_RUNTIME_SETTINGS_PATH", async () => {
+test("the --settings flag wins over DROIDE_RUNTIME_SETTINGS_PATH", async () => {
   await withFixture(async (fixture) => {
     await writeJson(fixture.overlay, { theme: "from-flag" });
     await writeJson(fixture.overlayFromEnv, { theme: "from-env" });
@@ -156,7 +156,7 @@ test("the --settings flag wins over FACTORY_RUNTIME_SETTINGS_PATH", async () => 
         ...fixture.environment,
         env: {
           ...fixture.environment.env,
-          FACTORY_RUNTIME_SETTINGS_PATH: fixture.overlayFromEnv,
+          DROIDE_RUNTIME_SETTINGS_PATH: fixture.overlayFromEnv,
         },
       },
       { flagSettings: fixture.overlay },
@@ -167,7 +167,7 @@ test("the --settings flag wins over FACTORY_RUNTIME_SETTINGS_PATH", async () => 
       ...fixture.environment,
       env: {
         ...fixture.environment.env,
-        FACTORY_RUNTIME_SETTINGS_PATH: fixture.overlayFromEnv,
+        DROIDE_RUNTIME_SETTINGS_PATH: fixture.overlayFromEnv,
       },
     });
     assert.equal(fromEnv.settings.theme, "from-env");
@@ -177,7 +177,7 @@ test("the --settings flag wins over FACTORY_RUNTIME_SETTINGS_PATH", async () => 
         ...fixture.environment,
         env: {
           ...fixture.environment.env,
-          FACTORY_RUNTIME_SETTINGS_PATH: fixture.overlayFromEnv,
+          DROIDE_RUNTIME_SETTINGS_PATH: fixture.overlayFromEnv,
         },
       },
       { flagSettings: "   " },

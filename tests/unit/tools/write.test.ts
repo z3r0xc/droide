@@ -80,7 +80,7 @@ test("creating at an existing directory is refused with the documented text", as
 test("a protected write is refused and nothing is created", async () => {
   const fixture = makeToolFixture();
   try {
-    const factory = join(fixture.home, ".factory");
+    const factory = join(fixture.home, ".droide");
     mkdirSync(factory, { recursive: true });
     const target = join(factory, "settings.json");
     await assert.rejects(

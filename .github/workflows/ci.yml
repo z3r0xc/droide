@@ -25,6 +25,23 @@ jobs:
         run: npm run format:check
       - name: Specification gaps are current
         run: npm run gaps:check
+      - name: Our identity only
+        run: npm run brand:check
+      - name: Unit and integration tests
+        run: npm test
+
+  typescript-windows:
+    # The suite runs where most development happens; the config-context fixture
+    # once passed here and failed on Linux, and path rules are per platform.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
       - name: Unit and integration tests
         run: npm test
 
@@ -73,8 +90,8 @@ jobs:
 
   parity:
     # The parity suite compares our CLI against goldens recorded from the
-    # subject. Goldens are local artefacts (never committed), so this job only
-    # runs where they exist and fails loudly if they are missing.
+    # our own build. Snapshots are local artefacts (never committed), so this job
+    # only runs where they exist and warns when they are missing.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,12 +100,12 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
-      - name: Goldens present?
+      - name: Snapshots present?
         id: goldens
-        run: test -d .work/parity/expected && echo "present=yes" >> "$GITHUB_OUTPUT" || echo "present=no" >> "$GITHUB_OUTPUT"
+        run: test -d tests/parity/expected && echo "present=yes" >> "$GITHUB_OUTPUT" || echo "present=no" >> "$GITHUB_OUTPUT"
       - name: Parity check
         if: steps.goldens.outputs.present == 'yes'
         run: npm run test:parity
       - name: Explain skip
         if: steps.goldens.outputs.present != 'yes'
-        run: echo "::warning::parity goldens are absent; run 'npm run test:parity:record' locally with the subject binary"
+        run: echo "::warning::no CLI snapshots recorded; run 'node tests/parity/run.mjs --record' locally"

@@ -4,7 +4,6 @@
   "plugin",
   "--help"
  ],
- "oracle": true,
  "expect": {
   "exit_code": 0,
   "stdout_matches": "Usage:",

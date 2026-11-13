@@ -1,6 +1,5 @@
 {
  "name": "no-args",
- "oracle": false,
  "argv": [],
  "expect": {
   "exit_code": 64,

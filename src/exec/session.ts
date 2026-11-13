@@ -1,5 +1,5 @@
 /**
- * Session lifecycle for `droid exec`.
+ * Session lifecycle for `droide exec`.
  *
  * Contract: `specs/80-exec-and-streaming.md` B35-B40 (continue, fork, streaming
  * session reuse) and `specs/40-sessions-and-storage.md` (transcript layout and
@@ -33,6 +33,7 @@ import {
   type SessionStore,
   type SessionStoreOptions,
 } from "../session/store.ts";
+import { TranscriptUnavailableError } from "../session/errors.ts";
 import {
   isJsonObject,
   type JsonObject,
@@ -94,9 +95,9 @@ function isRole(value: string): value is Role {
 
 /**
  * `specs/40-sessions-and-storage.md` "On-disk layout": the transcript's
- * directory is derived from the run's working directory. Mirrors the subject's
- * `sanitizePathToDirectoryName`: resolve, canonicalise when the directory
- * exists, drop trailing separators, then prefix `-` and flatten separators.
+ * directory is derived from the run's working directory: resolve, canonicalise
+ * when the directory exists, drop trailing separators, then prefix `-` and
+ * flatten separators.
  */
 export function projectKeyFor(cwd: string, platform: Platform): string {
   const path = platform === "win32" ? nodePath.win32 : nodePath.posix;
@@ -189,7 +190,7 @@ function completionRecord(input: {
       output_tokens: input.usage.output_tokens,
       cache_read_input_tokens: input.usage.cache_read_input_tokens,
       cache_creation_input_tokens: input.usage.cache_creation_input_tokens,
-      factory_credits: input.usage.factory_credits,
+      droide_credits: input.usage.droide_credits,
       thinking_tokens: input.usage.thinking_tokens,
       ...(input.usage.ttft_ms === undefined
         ? {}
@@ -559,4 +560,41 @@ export function openExecSession(options: OpenExecSessionOptions): ExecSession {
       cause: error,
     });
   }
+}
+
+export interface AdoptExecSessionOptions {
+  /** The store that already holds this session's row. */
+  readonly store: SessionStore;
+  readonly sessionId: string;
+  readonly clock: () => number;
+}
+
+/**
+ * The transcript of a session whose row already exists — ACP's `session/new`
+ * registers it — so the turn path appends to that session instead of minting a
+ * second one. A row with no transcript file yet is an empty history.
+ *
+ * The caller owns the store: {@link ExecSession.close} is a no-op here, and one
+ * `store.close()` ends the whole run.
+ */
+export function adoptExecSession(
+  options: AdoptExecSessionOptions,
+): ExecSession {
+  let history: Message[] = [];
+  try {
+    history = messagesFromRecords(options.store.readSession(options.sessionId));
+  } catch (error) {
+    if (!(error instanceof TranscriptUnavailableError)) throw error;
+  }
+  return new AdoptedExecSession(
+    options.store,
+    options.sessionId,
+    options.clock,
+    history,
+  );
+}
+
+/** A stored session whose `close` leaves the shared store open. */
+class AdoptedExecSession extends StoredExecSession {
+  override close(): void {}
 }
