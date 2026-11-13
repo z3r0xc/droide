@@ -4,6 +4,17 @@ The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, which a
 unit test keeps equal to the package version; a release bumps both. The recorded
 CLI cases check the version line by shape, not by number. See `docs/release.md`.
 
+## 0.8.1 — 2026-11-13
+
+### Fixed
+
+- **A rate-limited release feed is named as one.** An anonymous client is
+  limited per address, and a blocked network answers the same way; both are
+  temporary, so `update` and `update --check` now report
+  `the release feed is rate-limited (HTTP 403)` and, when `x-ratelimit-reset`
+  is present, how many minutes to wait, instead of a bare status that reads
+  like a broken feed. Evidence: ADR 0007.
+
 ## 0.8.0 — 2026-11-13
 
 ### Added
