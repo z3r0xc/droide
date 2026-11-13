@@ -154,6 +154,58 @@ test("images become data URLs in the chat dialect", () => {
   });
 });
 
+test("an anthropic tool result carries its image block in the content array", () => {
+  const body = encodeAnthropicRequest(options, [
+    {
+      role: "user",
+      content: [
+        {
+          type: "tool_result",
+          toolUseId: "call_1",
+          content: "Read of a.png: image/png, 3 bytes",
+          media: [{ type: "image", mediaType: "image/png", data: "AAAA" }],
+        },
+      ],
+    },
+  ]);
+  const messages = body["messages"] as Array<{
+    content: Array<Record<string, unknown>>;
+  }>;
+  assert.deepEqual(messages[0]?.content[0], {
+    type: "tool_result",
+    tool_use_id: "call_1",
+    content: [
+      { type: "text", text: "Read of a.png: image/png, 3 bytes" },
+      {
+        type: "image",
+        source: { type: "base64", media_type: "image/png", data: "AAAA" },
+      },
+    ],
+  });
+});
+
+test("a chat tool result keeps the text summary and drops the image", () => {
+  const body = encodeChatRequest(options, [
+    {
+      role: "user",
+      content: [
+        {
+          type: "tool_result",
+          toolUseId: "call_1",
+          content: "Read of a.png: image/png, 3 bytes",
+          media: [{ type: "image", mediaType: "image/png", data: "AAAA" }],
+        },
+      ],
+    },
+  ]);
+  const messages = body["messages"] as Array<Record<string, unknown>>;
+  assert.deepEqual(messages[1], {
+    role: "tool",
+    tool_call_id: "call_1",
+    content: "Read of a.png: image/png, 3 bytes",
+  });
+});
+
 test("encodeRequest routes by dialect", () => {
   const anthropic = encodeRequest("anthropic", options, conversation);
   assert.equal("system" in anthropic, true);

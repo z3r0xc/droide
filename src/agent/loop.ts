@@ -18,6 +18,7 @@ import {
   type ContentBlock,
   type Message,
   type ToolResultBlock,
+  type ToolResultContent,
   isSendableToProvider,
   toolCallId,
 } from "./messages.ts";
@@ -240,13 +241,20 @@ async function settleCall(
       signal,
       toolUseId: call.id,
     });
+    // B35: media rides beside the text as one content array; a text-only result
+    // keeps the plain string every transcript renderer already draws.
+    const media = result.media ?? [];
+    const content: ToolResultContent =
+      media.length === 0
+        ? result.content
+        : [{ type: "text", text: result.content }, ...media];
     return {
       type: "tool_result",
       toolUseId: call.id,
-      content: result.content,
-      ...(result.modelContent === undefined
-        ? {}
-        : { modelContent: result.modelContent }),
+      content,
+      ...(media.length === 0 && result.modelContent !== undefined
+        ? { modelContent: result.modelContent }
+        : {}),
       ...(result.isError === true ? { isError: true } : {}),
     };
   } catch (error) {

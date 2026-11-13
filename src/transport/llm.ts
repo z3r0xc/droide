@@ -61,6 +61,12 @@ export interface LlmToolResultBlock {
   readonly type: "tool_result";
   readonly toolUseId: string;
   readonly content: string;
+  /**
+   * Images a dialect that carries them sends inside the tool result
+   * (`specs/20-agent-loop.md` B35). A dialect without that shape reads
+   * `content` and ignores this.
+   */
+  readonly media?: readonly LlmImageBlock[];
   readonly isError?: boolean;
 }
 

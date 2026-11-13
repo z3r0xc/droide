@@ -53,7 +53,11 @@ import {
   type ToolClass,
 } from "../tools/permissions.ts";
 import type { ToolDefinition, ToolRegistry } from "../tools/registry.ts";
-import { MODEL_RESULT_BUDGET_BYTES, boundText } from "../tools/result.ts";
+import {
+  MODEL_RESULT_BUDGET_BYTES,
+  boundText,
+  isMediaToolOutput,
+} from "../tools/result.ts";
 import type { Schema } from "../tools/validate.ts";
 import type {
   AssistantBlock,
@@ -403,6 +407,13 @@ export function createExecToolRunner(
       }
 
       if (!outcome.ok) return errorResult(outcome.error);
+
+      // B17/spec 20 B35: a media tool keeps its text summary as `content` and
+      // hands the image blocks to the loop separately.
+      if (isMediaToolOutput(outcome.value)) {
+        const text = bounded(outcome.value.content);
+        return { content: text, media: outcome.value.media, isError: false };
+      }
 
       const text = bounded(flattenValue(outcome.value));
       return { content: text, modelContent: text, isError: false };

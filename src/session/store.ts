@@ -108,6 +108,11 @@ export interface SessionRow {
   readonly worktree: string | null;
   readonly artifacts: string | null;
   readonly settingsWriteSeq: number | null;
+  /**
+   * The producer that created the row, when it named one: `cli_acp` for an
+   * ACP `session/new` (spec 60 B63), NULL when the producer owes no hint.
+   */
+  readonly originHint: string | null;
 }
 
 export interface NewSessionInput {
@@ -124,6 +129,8 @@ export interface NewSessionInput {
   readonly hostId?: string | null;
   readonly firstEventAt?: number | null;
   readonly archivedAt?: string | null;
+  /** `cli_acp` for an ACP-created session (spec 40 B57, spec 60 B63). */
+  readonly originHint?: string | null;
 }
 
 export interface AppendResult {
@@ -151,6 +158,8 @@ export interface SessionListItem {
   readonly messagesCount: number;
   readonly archived: boolean;
   readonly tags: Readonly<Record<string, JsonValue>>;
+  /** The row's producer hint, NULL when it named none (spec 40 B57). */
+  readonly originHint: string | null;
 }
 
 export interface SearchOptions {
@@ -302,6 +311,7 @@ function rowToSession(row: Record<string, unknown>): SessionRow {
     worktree: readString(row, "worktree"),
     artifacts: readString(row, "artifacts"),
     settingsWriteSeq: readInt(row, "settings_write_seq"),
+    originHint: readString(row, "origin_hint"),
   };
 }
 
@@ -690,7 +700,7 @@ const SESSION_COLUMNS = `
   session_id, project_key, cwd, title, org_id, owner, parent,
   calling_session_id, calling_tool_use_id, mission, json(tags) AS tags_json,
   has_user_visible_messages, archived_at, first_event_at, last_event_at,
-  messages_count, host_id, worktree, artifacts, settings_write_seq
+  messages_count, host_id, worktree, artifacts, settings_write_seq, origin_hint
 `;
 
 export class SessionStore {
@@ -739,8 +749,8 @@ export class SessionStore {
                session_id, project_key, cwd, title, org_id, owner, parent,
                calling_session_id, calling_tool_use_id, mission,
                has_user_visible_messages, archived_at, first_event_at, last_event_at,
-               messages_count, host_id
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, 0, ?)`,
+               messages_count, host_id, origin_hint
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, 0, ?, ?)`,
           )
           .run(
             sessionId,
@@ -756,6 +766,7 @@ export class SessionStore {
             input.archivedAt ?? null,
             input.firstEventAt ?? null,
             input.hostId ?? null,
+            input.originHint ?? null,
           );
         this.#db
           .prepare("INSERT INTO session_ingest (session_id) VALUES (?)")
@@ -885,6 +896,7 @@ export class SessionStore {
       .prepare(
         `SELECT s.session_id, s.project_key, s.cwd, s.title, s.archived_at,
                 s.first_event_at, s.messages_count, json(s.tags) AS tags_json,
+                s.origin_hint,
                 NULLIF(MAX(COALESCE(i.transcript_mtime_ms, 0),
                            COALESCE(s.last_event_at, 0)), 0) AS modified_time_ms
            FROM sessions s
@@ -914,6 +926,7 @@ export class SessionStore {
         messagesCount: readInt(row, "messages_count") ?? 0,
         archived: readString(row, "archived_at") !== null,
         tags: parseTags(sessionId, row),
+        originHint: readString(row, "origin_hint"),
       });
     }
     return items;

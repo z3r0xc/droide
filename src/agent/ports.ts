@@ -5,7 +5,7 @@
  * HTTP, the filesystem or the CLI: providers, tools, permissions and time are
  * injected, which is what makes every branch testable without a network.
  */
-import type { ContentBlock, Message, Role } from "./messages.ts";
+import type { ContentBlock, ImageBlock, Message, Role } from "./messages.ts";
 
 /** One incremental piece of a provider response. */
 export type ProviderDelta =
@@ -57,6 +57,13 @@ export interface ToolResult {
   readonly content: string;
   /** What the model reads, when it differs. */
   readonly modelContent?: string;
+  /**
+   * Image blocks the model receives with this result (`specs/20-agent-loop.md`
+   * B35). Absent or empty keeps the result text-only; `content` still draws the
+   * transcript either way. The loop turns these into the `tool_result` block's
+   * content array, and a dialect that cannot carry images reads `content`.
+   */
+  readonly media?: readonly ImageBlock[];
   readonly isError?: boolean;
 }
 

@@ -4,8 +4,8 @@
  * Contract: `specs/30-tools-and-sandbox.md` B14 (input), B15 (whole file,
  * outline, range note, budgets), B16 (encodings, the 8 MiB scan path and the
  * two refusals) and B11/B12 (the cut and its whole-output spill). Media reads
- * (B17) are refused rather than decoded as text: this build has no image or
- * PDF block layer.
+ * (B17) return a base64 image block for PNG and JPEG up to 3 MiB; a GIF, a PDF
+ * or any other media kind is refused instead of decoded as text.
  */
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
@@ -14,7 +14,11 @@ import type { Environment } from "../../config/paths.ts";
 import type { ToolContext } from "../context.ts";
 import { ToolFailure } from "../errors.ts";
 import { defineTool, type ToolDefinition } from "../registry.ts";
-import { MODEL_TEXT_BUDGET_BYTES, boundText } from "../result.ts";
+import {
+  MODEL_TEXT_BUDGET_BYTES,
+  boundText,
+  type MediaToolOutput,
+} from "../result.ts";
 import type { ObjectSchema, Schema } from "../validate.ts";
 import { decodeText, detectEncoding, normalizeToLF } from "./encoding.ts";
 import {
@@ -29,6 +33,12 @@ import {
 } from "./paths.ts";
 
 const MIB = 1024 * 1024;
+/**
+ * The decoded-byte ceiling for one image Read returns (B17). 3 MiB encodes to
+ * 4 MiB of base64, inside a provider's 5 MB per-image base64 ceiling and ACP's
+ * 8 MiB frame; the 5 MiB a turn attachment may carry would exceed both.
+ */
+export const MAX_READ_IMAGE_BYTES = 3 * MIB;
 const LARGE_TEXT_FILE_BYTES = 8 * MIB;
 const DIRECT_READ_WINDOW_MAX_BYTES = 5 * MIB;
 const SCAN_CHUNK_BYTES = MIB;
@@ -267,29 +277,87 @@ async function scanLineWindow(
   }
 }
 
-function refuseMedia(filePath: string, buffer: Buffer): void {
-  const isPng = buffer
-    .subarray(0, 4)
-    .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
-  const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-  const isGif = buffer.subarray(0, 4).toString("latin1") === "GIF8";
-  const isPdf = buffer.subarray(0, 4).toString("latin1") === "%PDF";
-  if (isPng || isJpeg || isGif || isPdf) {
-    // `TODO(spec B17)`: image and PDF reads are not implemented; refusing beats
-    // decoding binary bytes as text.
-    throw new ToolFailure(
-      `Read of ${filePath}: image and PDF content is not supported by this build. ` +
-        "Use Execute to extract text from it.",
-    );
+type MediaKind = "image/png" | "image/jpeg" | "image/gif" | "application/pdf";
+
+export const PNG_SIGNATURE = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
+
+/** The media kind a file's leading bytes identify, if any (B17). */
+function mediaKindOf(head: Buffer): MediaKind | undefined {
+  if (
+    head.length >= PNG_SIGNATURE.length &&
+    head.subarray(0, 8).equals(PNG_SIGNATURE)
+  ) {
+    return "image/png";
   }
+  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (head.subarray(0, 4).toString("latin1") === "GIF8") return "image/gif";
+  if (head.subarray(0, 4).toString("latin1") === "%PDF") {
+    return "application/pdf";
+  }
+  return undefined;
 }
 
-/** Reads a text file and renders the requested window (B14-B16). */
-export async function readText(
+/** The refusal an unsupported media kind earns (B17). */
+function refuseMedia(filePath: string, kind: MediaKind): never {
+  const label = kind === "application/pdf" ? "PDF" : kind;
+  throw new ToolFailure(
+    `Read of ${filePath}: ${label} content is not supported by this build; ` +
+      `supported media are PNG and JPEG images up to ${MAX_READ_IMAGE_BYTES / MIB} MiB. ` +
+      "Use Execute to convert it to text.",
+  );
+}
+
+/** An image read: the base64 block plus the one-line summary (B17). */
+async function readImage(
+  filePath: string,
+  kind: "image/png" | "image/jpeg",
+  stats: { readonly size: number; readonly mtimeMs: number },
+  context: ToolContext,
+): Promise<MediaToolOutput> {
+  if (stats.size > MAX_READ_IMAGE_BYTES) {
+    throw new ToolFailure(
+      `Read of ${filePath}: ${kind} is ${stats.size} bytes, over the ` +
+        `${MAX_READ_IMAGE_BYTES} byte cap for an image a read may return; ` +
+        "use Execute to resize or crop it first.",
+    );
+  }
+  const bytes = await fs.promises.readFile(filePath);
+  if (bytes.length > MAX_READ_IMAGE_BYTES) {
+    throw new ToolFailure(
+      `Read of ${filePath}: ${kind} is ${bytes.length} bytes, over the ` +
+        `${MAX_READ_IMAGE_BYTES} byte cap for an image a read may return; ` +
+        "use Execute to resize or crop it first.",
+    );
+  }
+  context.reads?.record(filePath, {
+    mtimeMs: stats.mtimeMs,
+    size: bytes.length,
+  });
+  return {
+    content: `Read of ${filePath}: ${kind}, ${bytes.length} bytes`,
+    media: [
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          mediaType: kind,
+          data: bytes.toString("base64"),
+        },
+      },
+    ],
+  };
+}
+
+/** Reads a file: text renders the requested window, PNG/JPEG return a block. */
+async function readContent(
   input: ReadInput,
   context: ToolContext,
   options: ReadOptions = {},
-): Promise<string> {
+): Promise<string | MediaToolOutput> {
   const filePath = resolveInputPath(context, input.file_path, {
     requireAbsolute: options.requireAbsolute === true,
   });
@@ -327,7 +395,11 @@ export async function readText(
   } finally {
     await head.close();
   }
-  refuseMedia(filePath, headBytes);
+  const kind = mediaKindOf(headBytes);
+  if (kind === "image/png" || kind === "image/jpeg") {
+    return await readImage(filePath, kind, stats, context);
+  }
+  if (kind !== undefined) refuseMedia(filePath, kind);
 
   let text: string;
   if (stats.size > LARGE_TEXT_FILE_BYTES) {
@@ -430,6 +502,28 @@ export async function readText(
 }
 
 /**
+ * The tool's entry: a text result as its rendered string (B14-B16), a PNG or
+ * JPEG as a media result carrying the base64 block (B17).
+ */
+export async function readFile(
+  input: ReadInput,
+  context: ToolContext,
+  options: ReadOptions = {},
+): Promise<string | MediaToolOutput> {
+  return await readContent(input, context, options);
+}
+
+/** A text read; an image read yields its one-line summary. */
+export async function readText(
+  input: ReadInput,
+  context: ToolContext,
+  options: ReadOptions = {},
+): Promise<string> {
+  const output = await readContent(input, context, options);
+  return typeof output === "string" ? output : output.content;
+}
+
+/**
  * The rendered result, or its cut with a notice naming the whole output (B12).
  * An over-budget result is spilled under `<stateDir>/tool-outputs` first; an
  * unwritable or oversized spill falls back to the offset/limit remedy.
@@ -456,10 +550,10 @@ export const readTool: ToolDefinition = defineTool<ReadInput, ToolContext>({
   llmId: "Read",
   category: "Files",
   displayName: "Read",
-  description: "Read a text file from the filesystem.",
+  description: "Read a text file or a PNG/JPEG image from the filesystem.",
   inputSchema: readInputSchema satisfies Schema,
   sideEffects: ["filesystem-read"],
   requiresConfirmation: false,
   visibleToUser: false,
-  run: (input, context) => readText(input, context, { requireAbsolute: true }),
+  run: (input, context) => readFile(input, context, { requireAbsolute: true }),
 });

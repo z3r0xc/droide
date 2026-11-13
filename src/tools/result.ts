@@ -5,6 +5,7 @@
  * notice + tail cut on UTF-8 code-point boundaries) and B13/B27 (an output past
  * 32 MiB is refused, not cut).
  */
+import type { ImageBlock } from "../agent/messages.ts";
 
 /** Default model-facing budget for a tool result (B11). */
 export const MODEL_RESULT_BUDGET_BYTES = 32 * 1024;
@@ -16,6 +17,34 @@ export const MODEL_TEXT_BUDGET_BYTES = 64 * 1024;
 export const MAX_INLINE_OUTPUT_BYTES = 32 * 1024 * 1024;
 
 const NOTICE_SEPARATOR = "\n\n";
+
+/**
+ * A tool result that carries image media beside its text (B17, spec 20 B35).
+ *
+ * A tool's `run` returns it as the dispatch value; the exec runner maps it to a
+ * `ToolResult` with `media` and keeps `content` as the transcript's text.
+ */
+export interface MediaToolOutput {
+  readonly content: string;
+  readonly media: readonly ImageBlock[];
+}
+
+/** Whether a dispatch value is a {@link MediaToolOutput}. */
+export function isMediaToolOutput(value: unknown): value is MediaToolOutput {
+  if (value === null || typeof value !== "object") return false;
+  if (!("content" in value) || typeof value.content !== "string") return false;
+  if (!("media" in value) || !Array.isArray(value.media)) return false;
+  return value.media.every(
+    (block: unknown) =>
+      block !== null &&
+      typeof block === "object" &&
+      "type" in block &&
+      block.type === "image" &&
+      "source" in block &&
+      block.source !== null &&
+      typeof block.source === "object",
+  );
+}
 
 export interface BoundedText {
   readonly text: string;

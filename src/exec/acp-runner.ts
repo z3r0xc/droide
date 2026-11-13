@@ -13,7 +13,11 @@
  * or a tool registry.
  */
 
-import type { AssistantBlock, AssistantMessageEvent } from "./records.ts";
+import type {
+  AssistantBlock,
+  AssistantMessageEvent,
+  ExecUsage,
+} from "./records.ts";
 import type {
   TurnEventSink,
   TurnImage,
@@ -278,6 +282,13 @@ export interface RunAcpTurnOptions {
 
 export interface AcpTurnResult {
   readonly stopReason: AcpStopReason;
+  /**
+   * The turn's token counts, for `usage_update` (B68). Only a completed turn
+   * reports any: a failed, cancelled or permission-rejected turn has no
+   * provider totals, so it carries `null` rather than a row of zeros that
+   * would read as a measured empty window.
+   */
+  readonly usage: ExecUsage | null;
 }
 
 /**
@@ -293,13 +304,13 @@ export async function runAcpTurn(
   const { request, sink } = options;
   const isRefusal = options.isModerationRefusal ?? isContentModerationMessage;
 
-  if (sink.signal.aborted) return { stopReason: "cancelled" };
+  if (sink.signal.aborted) return { stopReason: "cancelled", usage: null };
 
   let outcome: TurnOutcome;
   try {
     outcome = await options.runner.run(request, sink);
   } catch (error) {
-    if (sink.signal.aborted) return { stopReason: "cancelled" };
+    if (sink.signal.aborted) return { stopReason: "cancelled", usage: null };
     throw new AcpProtocolError(
       ACP_ERROR_CODES.internal,
       error instanceof Error ? error.message : String(error),
@@ -308,17 +319,21 @@ export async function runAcpTurn(
   }
 
   if (sink.signal.aborted || outcome.kind === "cancelled") {
-    return { stopReason: "cancelled" };
+    return { stopReason: "cancelled", usage: null };
   }
-  if (outcome.kind === "completed") return { stopReason: "end_turn" };
+  if (outcome.kind === "completed") {
+    return { stopReason: "end_turn", usage: outcome.usage };
+  }
   // A denied Execute or MCP call already reached the client as that call's
   // failed `tool_call_update`, so the turn simply ends: no `Error:` text and no
   // internal error (B66).
-  if (outcome.kind === "permission_rejected") return { stopReason: "end_turn" };
+  if (outcome.kind === "permission_rejected") {
+    return { stopReason: "end_turn", usage: null };
+  }
 
   if (isRefusal(outcome.message)) {
     await sink.update(agentMessageChunk(ACP_CONTENT_MODERATION_MESSAGE));
-    return { stopReason: "refusal" };
+    return { stopReason: "refusal", usage: null };
   }
 
   await sink.update(agentMessageChunk(`Error: ${outcome.message}`));

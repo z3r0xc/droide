@@ -92,6 +92,8 @@ export interface AcpSessionStore {
     readonly cwd?: string | null;
     readonly projectKey?: string;
     readonly firstEventAt?: number | null;
+    /** `cli_acp` for a session this agent creates (B63); absent means none. */
+    readonly originHint?: string | null;
   }): { readonly sessionId: string };
   deleteSession(sessionId: string): boolean;
   /** Rows for `session/list`; absent means only live sessions are listed. */
@@ -101,6 +103,12 @@ export interface AcpSessionStore {
   }): readonly AcpStoredSession[];
   /** A session's transcript; absent or a throw means it cannot be loaded. */
   readSession?(sessionId: string): readonly Readonly<Record<string, unknown>>[];
+  /**
+   * The stored title of a session, or `null` when it has none; absent means
+   * this embedding keeps no titles, so `session_info_update` is never sent
+   * (B68). A throw is treated as "no title".
+   */
+  readTitle?(sessionId: string): string | null;
 }
 
 /** The columns `session/list` reads from a stored session row. */
@@ -109,6 +117,8 @@ export interface AcpStoredSession {
   readonly cwd: string | null;
   readonly title: string | null;
   readonly updatedAt: number | null;
+  /** The row's producer hint, reported as `_meta.droide.originHint` (B63). */
+  readonly originHint?: string | null;
 }
 
 export interface AcpServerOptions {
@@ -138,6 +148,23 @@ export interface AcpServerOptions {
   readonly tools?: readonly string[];
   readonly maxFrameBytes?: number;
   readonly isModerationRefusal?: (message: string) => boolean;
+  /**
+   * The session's slash commands, resolved from the user-invocable skills
+   * (B57), sent as `available_commands_update` (B68). Absent means the client
+   * is offered none and no update is sent.
+   */
+  readonly commands?: (
+    sessionId: string,
+  ) =>
+    | readonly AcpAvailableCommand[]
+    | Promise<readonly AcpAvailableCommand[]>;
+  /**
+   * The context window of a model in tokens, for `usage_update`'s `size`
+   * (B68). Absent or `null` means the size is unknown, and no usage update is
+   * sent: the update says how full the window is, so a guessed denominator
+   * would be a wrong percentage rather than an absent one.
+   */
+  readonly contextLimitFor?: (model: string) => number | null;
 }
 
 export interface AcpServer {
@@ -305,12 +332,20 @@ interface ServerSession {
   readonly sessionId: string;
   readonly cwd: string;
   readonly mcpServers: readonly AcpSessionMcpServer[];
+  /** The row's producer hint, `cli_acp` for a session this agent made (B63). */
+  readonly originHint: string | null;
   /** Per-session settings, changed by `session/set_*` (B70). */
   model: string;
   reasoningEffort: string;
   modeId: AcpModeId;
   readonly createdAt: number;
   turn: ActiveTurn | null;
+  /** The title the client was last told; `undefined` means never reported. */
+  reportedTitle: string | null | undefined;
+  /** The command set last sent, serialised; `null` means none yet. */
+  sentCommands: string | null;
+  /** The usage update last sent, serialised (B68's "no repeats"). */
+  sentUsage: string | null;
 }
 
 interface PendingPermission {

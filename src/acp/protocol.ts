@@ -1157,13 +1157,13 @@ interface AcpContentChunk {
   readonly _meta?: Record<string, unknown>;
 }
 
-/**
- * TODO(spec B68): the union covers every update the clause names, but this
- * slice produces only the two chunks, `plan`, `tool_call`,
- * `tool_call_update`, `current_mode_update` and `config_option_update`;
- * `session_info_update`, `available_commands_update` and `usage_update` have
- * no producer yet.
- */
+/** One slash command a client may offer, from a user-invocable skill (B57). */
+export interface AcpAvailableCommand {
+  readonly name: string;
+  readonly description: string;
+  readonly input?: { readonly hint: string } | null;
+}
+
 export type AcpSessionUpdate =
   | ({ readonly sessionUpdate: "user_message_chunk" } & AcpContentChunk)
   | ({ readonly sessionUpdate: "agent_message_chunk" } & AcpContentChunk)
@@ -1183,11 +1183,7 @@ export type AcpSessionUpdate =
     }
   | {
       readonly sessionUpdate: "available_commands_update";
-      readonly availableCommands: readonly {
-        readonly name: string;
-        readonly description: string;
-        readonly input?: { readonly hint: string } | null;
-      }[];
+      readonly availableCommands: readonly AcpAvailableCommand[];
       readonly _meta?: Record<string, unknown>;
     }
   | {
@@ -1282,6 +1278,47 @@ export function userMessageChunk(
     content: { type: "text", text },
     ...(messageId === undefined ? {} : { messageId }),
   };
+}
+
+/** `session_info_update` for a title that changed (B68). */
+export function sessionInfoUpdate(
+  title: string | null,
+  updatedAt: string,
+): AcpSessionUpdate {
+  return { sessionUpdate: "session_info_update", title, updatedAt };
+}
+
+/**
+ * `available_commands_update` for the session's slash commands (B68). The
+ * caller passes exactly what it resolved; the sort is by name so two equal
+ * sets serialise identically and a no-op is recognisable.
+ */
+export function availableCommandsUpdate(
+  commands: readonly AcpAvailableCommand[],
+): AcpSessionUpdate & { readonly sessionUpdate: "available_commands_update" } {
+  return {
+    sessionUpdate: "available_commands_update",
+    availableCommands: [...commands].sort((left, right) =>
+      left.name.localeCompare(right.name),
+    ),
+  };
+}
+
+/** `usage_update`: tokens the turn put in the context window (B68). */
+export function usageUpdate(used: number, size: number): AcpSessionUpdate {
+  return { sessionUpdate: "usage_update", used, size };
+}
+
+/** `current_mode_update` for a mode the session actually moved to (B68). */
+export function currentModeUpdate(modeId: string): AcpSessionUpdate {
+  return { sessionUpdate: "current_mode_update", currentModeId: modeId };
+}
+
+/** `config_option_update` carrying the full option set (B68). */
+export function configOptionUpdate(
+  options: readonly AcpSessionConfigOption[],
+): AcpSessionUpdate {
+  return { sessionUpdate: "config_option_update", configOptions: options };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1738,6 +1775,13 @@ export interface AcpSessionInfo {
   readonly cwd: string;
   readonly title?: string | null;
   readonly updatedAt?: string | null;
+  /**
+   * ACP's extension point. `_meta.droide.originHint` carries the row's
+   * producer hint (`cli_acp` for a session this agent created): the ACP
+   * schema has no field for it, and a client that does not know the key
+   * ignores it (B63, B71).
+   */
+  readonly _meta?: Record<string, unknown>;
 }
 
 export interface AcpListSessionsResult {
