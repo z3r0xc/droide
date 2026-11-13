@@ -34,6 +34,7 @@ import {
   ManualTimers,
   Peer,
   TEST_API_KEY,
+  TEST_ACCOUNT,
   TEST_IDENTITY,
   TEST_TOKEN,
   nextTick,
@@ -89,7 +90,7 @@ async function authenticate(peer: Peer): Promise<void> {
       { id: AUTH_ID },
     ),
   );
-  assert.deepEqual(resultOf(await peer.next()), TEST_IDENTITY);
+  assert.deepEqual(resultOf(await peer.next()), TEST_ACCOUNT);
   const status = await peer.next();
   assert.equal(status.type, "notification");
   assert.equal(
@@ -293,7 +294,7 @@ test("the gate rejects a non-auth first request with the fixed sentence", async 
         { id: SECOND_ID },
       ),
     );
-    assert.deepEqual(resultOf(await peer.next()), TEST_IDENTITY);
+    assert.deepEqual(resultOf(await peer.next()), TEST_ACCOUNT);
   } finally {
     await peer.close();
     await running.close();
@@ -349,7 +350,7 @@ test("authenticate answers the identity, then the connection status, then the pi
       ),
     );
     assert.deepEqual(resultOf(await peer.next()), {
-      ...TEST_IDENTITY,
+      ...TEST_ACCOUNT,
       pipelined: true,
     });
 
@@ -464,7 +465,7 @@ test("re-authenticate returns the connection identity and logout closes it", asy
         },
       ),
     );
-    assert.deepEqual(resultOf(await peer.next()), TEST_IDENTITY);
+    assert.deepEqual(resultOf(await peer.next()), TEST_ACCOUNT);
 
     peer.send(createRequest("daemon.logout", undefined, { id: AUTH_ID }));
     assert.deepEqual(resultOf(await peer.next()), { accepted: true });

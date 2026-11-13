@@ -23,9 +23,9 @@ import {
   isPipelineMethod,
   parseAuthenticateRequest,
   type AuthenticateRequest,
+  type AuthenticatedAccount,
   type DaemonAuthPolicy,
   type DaemonConnectionStatus,
-  type DaemonIdentity,
   type PipelinedRequest,
 } from "./auth.ts";
 import {
@@ -134,7 +134,7 @@ export type DaemonEndpoint =
 /** What a bound endpoint lets a supervisor report without guessing. */
 export interface DaemonMethodContext {
   readonly connectionId: number;
-  readonly identity: DaemonIdentity | undefined;
+  readonly identity: AuthenticatedAccount | undefined;
   notify(method: string, params?: unknown): void;
 }
 
@@ -497,6 +497,7 @@ class DaemonConnection {
       this.sendSuccess(request.id, {
         userId: existing.userId,
         orgId: existing.orgId,
+        verified: existing.verified,
       });
       return;
     }
@@ -513,9 +514,9 @@ class DaemonConnection {
       throw error;
     }
 
-    let identity: DaemonIdentity;
+    let identity: AuthenticatedAccount;
     try {
-      identity = this.auth.authenticate(params);
+      identity = await this.auth.authenticate(params);
     } catch (error) {
       if (error instanceof DaemonAuthenticationError) {
         this.sendFailure(
@@ -536,6 +537,7 @@ class DaemonConnection {
     this.sendSuccess(request.id, {
       userId: identity.userId,
       orgId: identity.orgId,
+      verified: identity.verified,
       ...(this.encoding === undefined ? {} : { encoding: this.encoding }),
       ...(pipeline.length === 0 ? {} : { pipelined: true }),
     });

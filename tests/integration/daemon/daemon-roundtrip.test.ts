@@ -30,6 +30,7 @@ import {
 } from "../../../src/daemon/protocol.ts";
 import {
   Peer,
+  TEST_ACCOUNT,
   TEST_API_KEY,
   TEST_IDENTITY,
   TEST_TOKEN,
@@ -91,7 +92,7 @@ test("a real client authenticates, requests, receives notifications and closes c
       onNotification: (method) => notifications.push(method),
     });
     try {
-      assert.deepEqual(client.identity, TEST_IDENTITY);
+      assert.deepEqual(client.identity, TEST_ACCOUNT);
       assert.deepEqual(await client.request("daemon.echo", { value: 1 }), {
         value: 1,
       });
@@ -168,7 +169,7 @@ test("deflate-raw is negotiated and the daemon answers in binary frames", async 
       response.type === "response" && "result" in response
         ? response.result
         : undefined,
-      { ...TEST_IDENTITY, encoding: "deflate-raw" },
+      { ...TEST_ACCOUNT, encoding: "deflate-raw" },
     );
     assert.ok(peer.binaryFrames >= 1);
   } finally {
@@ -340,7 +341,7 @@ test("aborting a request over a real socket leaves no pending entry", async () =
       assert.equal(client.pendingCount, 0);
       assert.deepEqual(
         await client.request("daemon.authenticate"),
-        TEST_IDENTITY,
+        TEST_ACCOUNT,
       );
     } finally {
       await client.close();
@@ -384,7 +385,7 @@ test("a stray response frame never disturbs the connection", async () => {
       answer.type === "response" && "result" in answer
         ? answer.result
         : undefined,
-      TEST_IDENTITY,
+      TEST_ACCOUNT,
     );
   } finally {
     await peer.close();

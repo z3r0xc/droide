@@ -34,7 +34,7 @@ export const WHOAMI_PATH = "/api/cli/whoami";
 export const IDENTITY_VERIFICATION_TIMEOUT_MS = 10_000;
 
 /** Stable operation label, so a log line never needs the URL or the secret. */
-export const IDENTITY_OPERATION = "daemon.identity";
+const IDENTITY_OPERATION = "daemon.identity";
 
 /** Statuses that mean "this credential is not a valid account". */
 const REFUSED_STATUSES: Readonly<Record<number, true>> = {
@@ -119,19 +119,8 @@ export async function verifyCredentialWithBackend(
     );
   }
 
-  if (response.status < 200 || response.status >= 300) {
-    const outcome =
-      REFUSED_STATUSES[response.status] === true
-        ? "invalid_credential"
-        : "verification_unavailable";
-    throw new DaemonCredentialVerificationError(
-      outcome,
-      outcome === "invalid_credential"
-        ? INVALID_CREDENTIAL_MESSAGE
-        : VERIFICATION_UNAVAILABLE_MESSAGE,
-    );
-  }
-
+  // A non-2xx never reaches here: the boundary raises `FetchError` with the
+  // status, which the catch above classifies.
   const identity = parseWhoamiBody(response.body);
   if (identity === null) {
     throw new DaemonCredentialVerificationError(

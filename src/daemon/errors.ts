@@ -84,8 +84,7 @@ export class DaemonAuthenticationError extends Error {
  * credential itself.
  */
 export type CredentialVerificationOutcome =
-  | "invalid_credential"
-  | "verification_unavailable";
+  "invalid_credential" | "verification_unavailable";
 
 export class DaemonCredentialVerificationError extends DaemonAuthenticationError {
   readonly outcome: CredentialVerificationOutcome;
