@@ -4,6 +4,20 @@ The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, which a
 unit test keeps equal to the package version; a release bumps both. The recorded
 CLI cases check the version line by shape, not by number. See `docs/release.md`.
 
+## 0.7.1 — 2026-11-13
+
+### Added
+
+- **A startup animation of the block-letter logo.** Before the shell paints, the
+  logo is revealed left to right in twelve-column steps, held, swept by a
+  diagonal shimmer, then faded through `█ → ▓ → ▒ → ░` — 31 frames, about 1.4 s,
+  centred in the terminal both ways. Frames are computed from the logo rows, so
+  there is no asset to drift from the product name. Spec 95 B22.
+- **`general.logoAnimation`** — `once` (default), `always` or `off`. `once`
+  records `<stateDir>/logo-animation-shown`; `always` ignores it; `off` never
+  plays. `DROIDE_NO_ANIMATION=1`, `CI`, a pipe and a terminal narrower than the
+  mini logo all keep the launch still.
+
 ## 0.7.0 — 2026-11-13
 
 ### Added

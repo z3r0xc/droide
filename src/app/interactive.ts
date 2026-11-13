@@ -14,6 +14,8 @@
  * tree and runs the terminal teardown exactly once.
  */
 
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import nodePath from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
 import { createLlmProvider } from "../agent/adapters/llm-provider.ts";
@@ -35,6 +37,12 @@ import {
   type TurnAgent,
   type TurnDriver,
 } from "./interactive-turn.ts";
+import {
+  bootFrames,
+  playBootAnimation,
+  resolveBootAnimation,
+} from "../ui/boot.ts";
+import { LOGO_FULL_ROWS, LOGO_MINI_WIDTH } from "../ui/tokens.ts";
 import { buildStartupPrompt } from "./prompt.ts";
 import type { SessionSeed } from "./session-seed.ts";
 import { createSessionTooling } from "./tooling.ts";
@@ -127,6 +135,15 @@ export interface InteractiveShellOptions {
    * fresh shell, which starts empty.
    */
   readonly seed?: SessionSeed;
+  /**
+   * Plays the startup animation before the shell paints (spec 95 B22). Defaults
+   * to the real terminal writer; a test passes a recorder so the sequence is
+   * asserted without a clock.
+   */
+  readonly boot?: {
+    readonly write: (text: string) => void;
+    readonly sleep: (ms: number) => Promise<void>;
+  };
 }
 
 /** The agent wiring a shell turn runs against; `close` releases MCP clients. */
@@ -297,6 +314,41 @@ export async function runInteractiveShell(
 
   const clock = options.clock ?? (() => Date.now());
   const timers = options.timers ?? systemTimers;
+
+  // Spec 95 B22: the animation plays before the shell mounts, so its frames are
+  // never mixed into the shell's own repaint. A failed marker write leaves the
+  // launch un-animated rather than failing it.
+  const stateDir = options.context.paths.stateDir;
+  const markerPath = nodePath.join(stateDir, "logo-animation-shown");
+  const decision = resolveBootAnimation({
+    setting: options.context.settings.logoAnimation,
+    env: env.env,
+    interactive: capabilities.interactive,
+    columns,
+    miniLogoWidth: LOGO_MINI_WIDTH,
+    markerPresent: existsSync(markerPath),
+  });
+  if (decision.enabled) {
+    const boot = options.boot ?? {
+      write: (text: string) => {
+        options.stdout.write(text);
+      },
+      sleep: (ms: number) =>
+        new Promise<void>((resolve) => {
+          timers.setTimeout(resolve, ms);
+        }),
+    };
+    await playBootAnimation(boot, bootFrames(LOGO_FULL_ROWS, columns, rows));
+    if (decision.markShown) {
+      try {
+        mkdirSync(stateDir, { recursive: true });
+        writeFileSync(markerPath, "", { mode: 0o600, flag: "w" });
+      } catch {
+        // A state directory that cannot be written only costs one more
+        // animation on the next launch; the shell itself is unaffected.
+      }
+    }
+  }
 
   let driver: TurnDriver | undefined;
   let composer = initialComposerState({

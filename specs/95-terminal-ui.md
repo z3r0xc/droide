@@ -452,6 +452,43 @@ All animation reads one shared 125 ms clock tick; spinners derive their frame fr
 (`Dots`, 80 ms): `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏` `[src/utils/tuiSpinner/constants.ts:70-73]`. Fast mode halves every
 interval `[src/components/Spinner.tsx:22-30]`.
 
+### B22 — Startup animation
+
+Before the shell paints, a launch may play a short full-screen animation of the
+block-letter logo (B3's full logo, not the mini). It is our own: the frames are
+generated from the logo rows, never loaded from an asset.
+
+- **Frames.** Three phases, in order: a reveal that uncovers the logo left to
+  right in 8-column steps (a cell is shown only after its column is reached);
+  two hold frames; a shimmer, where a diagonal band of `░` moves one column per
+  frame across the covered logo; then the fade. The fade walks the density
+  ladder `█ → ▓ → ▒ → ░ → space` (and `▐ → # → * → . → space` for a half block)
+  in four steps. Every frame is the logo padded to the logo's own width and
+  centred horizontally in `columns` and vertically in `rows`; a frame never
+  exceeds the terminal.
+- **Timing.** 50 ms per reveal/shimmer frame, 120 ms per fade step, so a 52-column
+  logo plays 14 frames plus four fade steps — about 1.2 s. Timing is read from
+  the shell's injected timer seam; no frame waits on a wall clock, and a test
+  drives the sequence to completion synchronously.
+- **Screen hygiene.** The sequence clears the screen, hides the cursor, writes
+  each frame at the home position, and restores the cursor before the first
+  shell frame. A `teardown` or a signal during the animation restores the cursor
+  exactly once.
+- **When it runs.** Only on an interactive terminal (B18), only when the
+  `logoAnimation` setting allows it (below), and never when
+  `DROIDE_NO_ANIMATION` is `1` or `true`, when `CI` is set, or when the terminal
+  is narrower than the mini logo. A piped CLI writes nothing.
+- **`logoAnimation`.** `general.logoAnimation` is `once` (default), `always` or
+  `off`. `once` plays the animation and records
+  `<stateDir>/logo-animation-shown`; a later launch with that marker present
+  skips it. `always` never reads or writes the marker. `off` never plays. The
+  marker is a zero-byte file created with mode `0600`; a state directory that
+  cannot be written leaves the launch un-animated for `once` rather than failing.
+
+`[derived]` — the reference plays a full-screen frame animation at 20 fps and
+fades it in four density steps before the shell appears; the frame art, the
+phases and the setting names here are ours.
+
 ## Data & config
 
 ### Settings that change the surface
@@ -467,6 +504,7 @@ interval `[src/components/Spinner.tsx:22-30]`.
 | vim mode              | `getVimMode()`                                    | enables NORMAL/INSERT and the vim row                                 | `[src/hooks/useChatKeyboardInput.ts:1990-2000]`                              |
 | status line           | `getStatusLine()` → `{command, padding, maxRows}` | renders the status-line region                                        | `[src/components/StatusLine.tsx:130-160]`                                    |
 | fast mode             | `useIsFastMode()`                                 | halves spinner and shimmer periods                                    | `[src/components/Spinner.tsx:22-30]`                                         |
+| startup animation     | `general.logoAnimation`                           | `once` (default), `always` or `off` (B22)                             | this build — `src/ui/boot.ts`                                                |
 
 ### Environment variables read by the surface
 

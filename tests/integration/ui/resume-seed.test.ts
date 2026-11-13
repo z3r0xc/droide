@@ -104,7 +104,7 @@ function platformOf(): Platform {
 function contextFor(directory: string): AppContext {
   return {
     environment: {
-      env: { TERM: "xterm-256color" },
+      env: { TERM: "xterm-256color", DROIDE_NO_ANIMATION: "1" },
       home: directory,
       platform: platformOf(),
       cwd: join(directory, "project"),
