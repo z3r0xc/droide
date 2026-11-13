@@ -442,3 +442,26 @@ test("a dynamic registration covers the documented port run", () => {
     ["http://127.0.0.1:41234/callback"],
   );
 });
+
+test("a server with no resource document falls back to its own origin as issuer", async (t) => {
+  const server = await withServer(t, { protectedResource: false });
+  const store = await tempStore(t);
+
+  const stored = await authorizeServer(
+    flow(store, remote(server.resource), browser()),
+  );
+
+  // The origin fallback is the resource's origin, without a trailing slash.
+  const origin = new URL(server.resource).origin;
+  assert.equal(stored.issuer, origin);
+  assert.equal(server.registrations.length, 1);
+  // The registered client is public and carries our name.
+  const registration = server.registrations[0];
+  assert.equal(registration?.clientName, "droide");
+  assert.equal(registration?.tokenEndpointAuthMethod, "none");
+  assert.equal(registration?.redirectUris.length, 1);
+  assert.match(
+    registration?.redirectUris[0] ?? "",
+    /^http:\/\/127\.0\.0\.1:\d+\/callback$/u,
+  );
+});

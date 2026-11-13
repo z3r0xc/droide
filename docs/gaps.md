@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **18** markers across **15** clauses.
+Total: **15** markers across **14** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -18,9 +18,6 @@ Total: **18** markers across **15** clauses.
 | `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient DROIDE_API_KEY and reports a local identity. |
 | `src/daemon/server.ts:251` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
 | `src/extensions/mcp/client.ts:579` | `B22` | image blocks are reported by type and size instead of being compressed; the two placeholders themselves are quoted by the clause. |
-| `src/extensions/mcp/oauth/flow.ts:419` | `B26` | B26 says the issuer comes from authorizationServerIssuer "or the server URL's well-known document" but does not pin which document, nor what happens when the server publishes none. This build falls back to the resource origin. |
-| `src/extensions/mcp/oauth/flow.ts:458` | `B26` | B26 pins the published client metadata (B27) and the redirect coverage, but not the registration body's client_name, grant types or auth method for a dynamic client. This build registers a public client with the loopback redirect set. |
-| `src/extensions/mcp/oauth/flow.ts:618` | `B26` | B26 lists tokenEndpointAuthMethod without pinning the accepted values; only public auth and client_secret_basic are implemented (client_secret_post needs a form body this token client does not send). |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
 | `src/tools/fs/read.ts:278` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
 | `src/tools/shell/exec.ts:10` | `90 B15` | Execute keeps a pipe child. The pinned pseudo-terminal surface (B13-B22: login-shell environment, its blocklist and the PTY session lifecycle) belongs to the daemon terminal, which this build does not spawn, so there is no terminal to hand this command to. |

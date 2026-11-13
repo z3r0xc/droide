@@ -296,6 +296,26 @@ client credentials and requires public token-endpoint auth; configured client cr
 `authorizationServerIssuer`; every rejection is a validation issue on `mcp.json` load
 (`evidence/original/windows-x64/packages/sdk-core/src/protocol/settings/schema.ts:96-160`).
 
+Three points B26 leaves open, fixed here (`src/extensions/mcp/oauth/flow.ts`):
+
+- **Issuer discovery.** The issuer is the `authorizationServerIssuer` option when
+  set; otherwise the first `authorization_servers` entry of the server's
+  protected-resource metadata (`/.well-known/oauth-protected-resource`, then the
+  same document under the resource path); otherwise the resource origin itself,
+  normalized without a trailing slash. A server that publishes protected-resource
+  metadata with an empty list takes the origin fallback; a document that does not
+  parse is treated as absent, never as an error.
+- **Dynamic registration body.** A public client for the loopback set:
+  `{client_name: "droide", redirect_uris: <the loopback ports>, grant_types:
+  ["authorization_code", "refresh_token"], response_types: ["code"],
+  token_endpoint_auth_method: "none"}`, posted as `application/json`. A refusal is
+  the `registration` error naming the status.
+- **Accepted `tokenEndpointAuthMethod`.** `none` (default) and
+  `client_secret_basic`. Anything else is the `unsupported-config` refusal
+  quoting the value and naming those two: `client_secret_post` would need a form
+  body this token client does not send, so it is refused rather than silently
+  downgraded to a header.
+
 **B27 — Redirect and client identity.** The loopback callback server starts at port 54621 and tries up to
 100 consecutive ports. The published client metadata is `<apiBase>/mcp/oauth-client`, where `<apiBase>`
 is the managed backend base URL (`DROIDE_API_BASE_URL`), with the loopback redirect set, the hosted

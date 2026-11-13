@@ -18,6 +18,8 @@ import {
 export interface RegistrationRecord {
   readonly redirectUris: readonly string[];
   readonly tokenEndpointAuthMethod: string | undefined;
+  /** The published `client_name`, when the body carried one. */
+  readonly clientName: string | undefined;
 }
 
 export interface AuthorizationRecord {
@@ -151,10 +153,12 @@ export async function startAuthorizationServer(
             )
           : [];
         const method = record["token_endpoint_auth_method"];
+        const clientName = record["client_name"];
         registrations.push({
           redirectUris,
           tokenEndpointAuthMethod:
             typeof method === "string" ? method : undefined,
+          clientName: typeof clientName === "string" ? clientName : undefined,
         });
         sendJson(response, 201, { client_id: registrationClientId });
         return;
