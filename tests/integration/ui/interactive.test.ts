@@ -242,7 +242,7 @@ function silentToolRunner(): ToolRunner {
 
 const context: AppContext = {
   environment: {
-    env: { TERM: "xterm-256color" },
+    env: { TERM: "xterm-256color", DROIDE_NO_ANIMATION: "1" },
     home: "/home/test",
     platform: "linux",
     cwd: "/project",

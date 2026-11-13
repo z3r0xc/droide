@@ -68,6 +68,9 @@ export interface CustomModelSettings {
  */
 export type MarketplaceSourceSetting = JsonObject;
 
+/** Spec 95 B22: how often the startup animation plays. */
+export type LogoAnimationSetting = "once" | "always" | "off";
+
 /** Settings applied at the root of a document, merged key by key. */
 export interface GeneralSettings {
   readonly worktreeDirectory?: string;
@@ -81,6 +84,8 @@ export interface GeneralSettings {
   readonly pluginTokenHosts?: Readonly<Record<string, string>>;
   readonly theme?: string;
   readonly locale?: string;
+  /** `once` (default), `always` or `off` — spec 95 B22. */
+  readonly logoAnimation?: LogoAnimationSetting;
   readonly model?: string;
   readonly llmRequestTimeout?: number;
   readonly compactionTokenLimit?: number;
@@ -159,6 +164,7 @@ const GENERAL_KEYS: AllowedKeys = {
   pluginTokenHosts: true,
   theme: true,
   locale: true,
+  logoAnimation: true,
   model: true,
   llmRequestTimeout: true,
   compactionTokenLimit: true,
