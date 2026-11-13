@@ -1,10 +1,21 @@
 import assert from "node:assert/strict";
-import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 
 import { ToolFailure } from "../../../src/tools/errors.ts";
 import { readTool } from "../../../src/tools/fs/read.ts";
 import { readText } from "../../../src/tools/fs/read.ts";
+import type { SpillFileSystem } from "../../../src/tools/fs/spill.ts";
 import { ToolRegistry } from "../../../src/tools/registry.ts";
 import { makeToolFixture } from "./helpers.ts";
 
@@ -214,13 +225,17 @@ test("an over-budget read carries the middle-cut notice", async () => {
   try {
     const file = fixture.path("wide.txt");
     const line = "x".repeat(99);
-    writeText(file, `${Array.from({ length: 2000 }, () => line).join("\n")}\n`);
+    const content = `${Array.from({ length: 2000 }, () => line).join("\n")}\n`;
+    writeText(file, content);
     const text = await readText({ file_path: file }, fixture.context);
     assert.match(
       text,
       /\[\.\.\. \d+ bytes cut from the middle of \d+; whole output: /,
     );
-    assert.match(text, /\(read it with offset and limit\)\]/);
+    // B12: the notice names the spill file, which holds the whole output.
+    const path = spilledPath(text);
+    assert.match(path, /[0-9a-f]{32}\.txt$/);
+    assert.equal(readFileSync(path, "utf8"), content);
   } finally {
     fixture.cleanup();
   }
@@ -313,6 +328,129 @@ test("an absolute path outside the workspace root is allowed", async () => {
       await readText({ file_path: outside }, fixture.context),
       "outside\n",
     );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+/** A seam whose directory can never be created, as an unwritable home would be. */
+const UNWRITABLE_SEAM: SpillFileSystem = {
+  async makedirs() {
+    throw new Error("EACCES: permission denied");
+  },
+  async exists() {
+    return false;
+  },
+  async write() {
+    throw new Error("EACCES: permission denied");
+  },
+  async rename() {
+    throw new Error("EACCES: permission denied");
+  },
+  async remove() {
+    // Nothing was created, so there is nothing to clean up.
+  },
+};
+
+function spillDirectory(fixture: { readonly home: string }): string {
+  return join(fixture.home, ".droide", "tool-outputs");
+}
+
+function spilledPath(notice: string): string {
+  const match = /whole output: (.*?)\]/.exec(notice);
+  assert.ok(match !== null, "the cut notice names the whole output");
+  const [, path] = match;
+  assert.ok(path !== undefined);
+  return path;
+}
+
+function longText(): string {
+  const lines = Array.from(
+    { length: 40 },
+    (_, index) => `line ${index} ${"x".repeat(40)}`,
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+test("a read within its budget writes no spill file", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("small.txt");
+    writeText(file, "one\ntwo\n");
+    assert.equal(
+      await readText({ file_path: file }, fixture.context),
+      "one\ntwo\n",
+    );
+    assert.equal(existsSync(spillDirectory(fixture)), false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("an over-budget read spills the whole output to a content-addressed file named in the notice", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("large.txt");
+    const content = longText();
+    writeText(file, content);
+    const whole = await readText({ file_path: file }, fixture.context, {
+      budgetBytes: 1_000_000,
+    });
+    assert.equal(whole, content);
+    const cut = await readText({ file_path: file }, fixture.context, {
+      budgetBytes: 512,
+    });
+    assert.ok(cut.length < whole.length);
+    assert.ok(cut.includes("bytes cut from the middle of"));
+    const path = spilledPath(cut);
+    const name = `${createHash("sha256").update(whole, "utf8").digest("hex").slice(0, 32)}.txt`;
+    assert.equal(path, join(spillDirectory(fixture), name));
+    assert.equal(readFileSync(path, "utf8"), whole);
+    if (process.platform !== "win32") {
+      assert.equal(statSync(dirname(path)).mode & 0o777, 0o700);
+      assert.equal(statSync(path).mode & 0o777, 0o600);
+    }
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("a second identical over-budget read reuses the same spill file", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("repeat.txt");
+    writeText(file, longText());
+    const first = await readText({ file_path: file }, fixture.context, {
+      budgetBytes: 512,
+    });
+    const second = await readText({ file_path: file }, fixture.context, {
+      budgetBytes: 512,
+    });
+    const path = spilledPath(first);
+    assert.equal(spilledPath(second), path);
+    assert.deepEqual(readdirSync(dirname(path)), [
+      `${createHash("sha256").update(longText(), "utf8").digest("hex").slice(0, 32)}.txt`,
+    ]);
+    assert.equal(readFileSync(path, "utf8"), longText());
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("an unwritable spill directory falls back to the offset/limit notice", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("fallback.txt");
+    writeText(file, longText());
+    const cut = await readText({ file_path: file }, fixture.context, {
+      budgetBytes: 512,
+      spillFileSystem: UNWRITABLE_SEAM,
+    });
+    assert.ok(
+      cut.includes(`whole output: ${file} (read it with offset and limit)]`),
+      cut,
+    );
+    assert.equal(existsSync(spillDirectory(fixture)), false);
   } finally {
     fixture.cleanup();
   }

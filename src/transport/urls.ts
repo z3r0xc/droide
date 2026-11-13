@@ -110,9 +110,8 @@ const LOCAL_HTTP_HOSTS: Readonly<Record<string, true>> = {
  * query/fragment are refused as well: a base URL is an origin plus a path
  * prefix, and anything else would either leak into every request or make
  * relative-path joining ambiguous.
- *
- * TODO(spec B7): the clause lists empty, scheme and trailing slash only; the
- * credential and query/fragment refusals come from B9's request policy.
+ * B7 quotes the empty/scheme/trailing-slash rules and, in this build, the
+ * credential/query/fragment refusals that follow from B9's request policy.
  */
 export function parseApiBaseUrl(value: string, field: string): URL {
   if (value.length === 0) {

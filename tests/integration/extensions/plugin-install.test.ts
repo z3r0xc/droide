@@ -30,6 +30,7 @@ import {
   commitFile,
   createMarketplaceRepo,
   createTempRoot,
+  gitIn,
   localOnlyRunner,
   writeAt,
 } from "./plugin-repo-fixtures.ts";
@@ -538,6 +539,72 @@ test("an entry is written with a trailing newline and stable keys", async () => 
     assert.ok(raw.endsWith("\n"));
     assert.match(raw, /"schemaVersion": 1/u);
     assert.match(raw, /"demo@team-tools"/u);
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("a Claude-layout plugin is translated into ours on install (B42)", async () => {
+  const root = createTempRoot();
+  try {
+    const repo = join(root.path, "claude-tools");
+    writeAt(
+      repo,
+      ".droide-plugin/marketplace.json",
+      JSON.stringify(
+        {
+          name: "Claude Tools",
+          description: "fixture",
+          plugins: [{ name: "cplugin", source: "plugins/cplugin" }],
+        },
+        null,
+        2,
+      ),
+    );
+    writeAt(repo, "plugins/cplugin/.claude-plugin/plugin.json", "{}\n");
+    writeAt(repo, "plugins/cplugin/agents/reviewer.md", "# reviewer\n");
+    writeAt(
+      repo,
+      "plugins/cplugin/.mcp.json",
+      JSON.stringify({ demo: { command: "node", args: ["server.js"] } }),
+    );
+    gitIn(repo, ["init", "-q", "-b", "main"]);
+    gitIn(repo, ["config", "user.email", "fixture@example.test"]);
+    gitIn(repo, ["config", "user.name", "Fixture"]);
+    gitIn(repo, ["add", "-A"]);
+    gitIn(repo, ["commit", "-qm", "claude layout"]);
+
+    const stateDir = join(root.path, "home", ".droide");
+    const local = localOnlyRunner();
+    await addMarketplace(
+      repo,
+      {},
+      { scopeRoot: stateDir, timeoutMs: 60_000, runGit: local.runner },
+    );
+    const deps: PluginInstallDeps = {
+      scopes: {
+        user: stateDir,
+        project: join(root.path, "project", ".droide"),
+      },
+      timeoutMs: 60_000,
+      runGit: local.runner,
+    };
+    const entry = await installPlugin("cplugin@claude-tools", {}, deps);
+
+    assert.equal(existsSync(join(entry.installPath, ".claude-plugin")), false);
+    assert.equal(existsSync(join(entry.installPath, ".droide-plugin")), true);
+    assert.equal(existsSync(join(entry.installPath, "agents")), false);
+    assert.equal(
+      existsSync(join(entry.installPath, "droids/reviewer.md")),
+      true,
+    );
+    assert.equal(existsSync(join(entry.installPath, ".mcp.json")), false);
+    const mcp = JSON.parse(
+      readFileSync(join(entry.installPath, "mcp.json"), "utf8"),
+    );
+    assert.deepEqual(mcp, {
+      mcpServers: { demo: { command: "node", args: ["server.js"] } },
+    });
   } finally {
     root.cleanup();
   }

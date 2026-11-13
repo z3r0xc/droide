@@ -1553,7 +1553,7 @@ export class HttpMcpTransport implements McpTransport {
         `answered ${method} with HTTP ${response.status}${
           tail === "" ? "" : `: ${tail}`
         }`,
-        { server: this.server, method },
+        { server: this.server, method, status: response.status },
       );
     }
 

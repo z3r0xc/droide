@@ -5,45 +5,25 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **38** markers across **33** clauses.
+Total: **18** markers across **15** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
-| `src/acp/protocol.ts:1123` | `B68` | the union covers every update the clause names, but this slice produces only the two chunks, plan, tool_call, tool_call_update, current_mode_update and config_option_update; session_info_update, available_commands_update and usage_update have no producer yet. |
-| `src/acp/protocol.ts:32` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
+| `src/acp/protocol.ts:1162` | `B68` | the union covers every update the clause names, but this slice produces only the two chunks, plan, tool_call, tool_call_update, current_mode_update and config_option_update; session_info_update, available_commands_update and usage_update have no producer yet. |
+| `src/acp/protocol.ts:33` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
 | `src/acp/server.ts:582` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
-| `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
 | `src/cli/mcp-mutations.ts:321` | `B7` | org MCP policy is remote-only and this build does not resolve it into AppContext, so a server the policy would block is not refused here. |
-| `src/daemon/client.ts:65` | `B19` | the spec pins the four budgets but not the method names that carry them; these daemon.* spellings are this build's map, and callers may replace it through methodTimeouts. |
 | `src/daemon/command.ts:170` | `B1` | --droide-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
 | `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
 | `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient DROIDE_API_KEY and reports a local identity. |
 | `src/daemon/server.ts:251` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
-| `src/exec/acp-runner.ts:310` | `B66` | the shared TurnOutcome has no distinct permission-rejection reason, so a call the user denied reaches this point as failed and answers with an internal error instead of end_turn. |
-| `src/exec/acp-runner.ts:373` | `B69` | the exec tool runner's confirm seam receives no tool-use id, so the permission card names the tool rather than the call ACP wants it to refer to; carrying the id is a change to src/tools/permissions.ts, outside this slice. |
-| `src/exec/acp-runner.ts:48` | `B65` | images are parsed, validated and carried here, but the shared TurnRequest has no image channel, so a plain exec runner drops them. Attaching them needs the agent loop's media port, which this slice does not own. |
-| `src/exec/list-tools.ts:16` | `B53` | the source of defaultAllowed is not pinned by the clause; this build derives it from catalogue membership at autonomy off. |
-| `src/extensions/mcp/client.ts:420` | `B23` | the three structured-output validation markers the SDK reports are not quoted by the spec, so an isError message that mentions them is rendered verbatim instead of being replaced by the remediation sentence. |
-| `src/extensions/mcp/client.ts:431` | `B22` | image blocks are reported by type and size instead of being compressed; the two placeholders themselves are quoted by the clause. |
-| `src/extensions/mcp/client.ts:50` | `B11` | era negotiation is not attempted — no server/discover probe, no 2026-07-28 rescue after a -32022 refusal, no legacy verdict cache; the server's chosen revision is accepted as returned. |
-| `src/extensions/mcp/client.ts:708` | `B13` | the spec does not pin cursor following, so the page ceiling and the repeated-cursor refusal are this build's bounds. |
+| `src/extensions/mcp/client.ts:579` | `B22` | image blocks are reported by type and size instead of being compressed; the two placeholders themselves are quoted by the clause. |
 | `src/extensions/mcp/oauth/flow.ts:419` | `B26` | B26 says the issuer comes from authorizationServerIssuer "or the server URL's well-known document" but does not pin which document, nor what happens when the server publishes none. This build falls back to the resource origin. |
 | `src/extensions/mcp/oauth/flow.ts:458` | `B26` | B26 pins the published client metadata (B27) and the redirect coverage, but not the registration body's client_name, grant types or auth method for a dynamic client. This build registers a public client with the loopback redirect set. |
 | `src/extensions/mcp/oauth/flow.ts:618` | `B26` | B26 lists tokenEndpointAuthMethod without pinning the accepted values; only public auth and client_secret_basic are implemented (client_secret_post needs a form body this token client does not send). |
-| `src/extensions/plugins/install.ts:342` | `B42` | the Claude Code layout translation (.claude-plugin to .droide-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
-| `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
-| `src/tools/fs/read.ts:266` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
-| `src/tools/fs/read.ts:420` | `B12` | the spill file under <state dir>/tool-outputs is not written by this build; the notice names how to ask for the rest instead. |
+| `src/tools/fs/read.ts:278` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
 | `src/tools/shell/exec.ts:10` | `90 B15` | Execute keeps a pipe child. The pinned pseudo-terminal surface (B13-B22: login-shell environment, its blocklist and the PTY session lifecycle) belongs to the daemon terminal, which this build does not spawn, so there is no terminal to hand this command to. |
-| `src/tools/shell/exec.ts:230` | `B28` | the contract keeps detached:false on POSIX. |
-| `src/tools/shell/exec.ts:339` | `B31` | no watchdog and no inner-PID/creation-time report yet; the wrapper PID and the log path are what this build returns. |
-| `src/tools/shell/exec.ts:374` | `B9` | the exact wording is not quoted by the spec. |
-| `src/transport/client.ts:111` | `B41` | the Anthropic -remaining/-reset header pair is not implemented; the spec does not give the header names. |
+| `src/tools/shell/exec.ts:527` | `B28` | the contract keeps detached:false on POSIX. |
+| `src/tools/shell/exec.ts:708` | `B9` | the exact wording is not quoted by the spec. |
 | `src/transport/errors.ts:719` | `B101` | the body markers for quota-vs-payment (non-proxy), content moderation, context limit, request-too-large and thinking-signature/PDF invalidity are not quoted in the spec; only the proxy's two code values and the status bands are implemented. |
-| `src/transport/llm.ts:315` | `B121` | thinking tokens are also estimated from the streamed character count before the provider breakdown arrives; the spec does not give the estimate's ratio, so only the provider field is used here. |
-| `src/transport/llm.ts:369` | `B117` | the spec does not quote the separator used between the two parts. |
-| `src/transport/llm.ts:449` | `B114` | the spec states the handled event order only. |
-| `src/transport/llm.ts:521` | `B120` | the spec names the buckets but not every wire field; both input_tokens_details and prompt_tokens_details spellings are accepted. |
-| `src/transport/llm.ts:627` | `B118` | the derived id's exact spelling is not stated. |
-| `src/transport/urls.ts:114` | `B7` | the clause lists empty, scheme and trailing slash only; the credential and query/fragment refusals come from B9's request policy. |

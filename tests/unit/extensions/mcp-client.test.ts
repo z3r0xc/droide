@@ -11,10 +11,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  DEFAULT_MCP_ERA_VERDICT_TTL_MS,
+  MAX_TOOL_LIST_PAGES,
   McpClient,
+  McpEraVerdictCache,
+  MCP_MODERN_PROTOCOL_VERSION,
   MCP_PROTOCOL_VERSION,
+  mcpEraCacheKey,
+  OUTPUT_SCHEMA_VALIDATION_MARKERS,
+  outputSchemaRemediation,
   parseCallToolResult,
   renderToolCallResult,
+  type McpEraNegotiation,
+  type McpEraVerdicts,
   type McpToolInfo,
 } from "../../../src/extensions/mcp/client.ts";
 import type { McpStdioServerConfig } from "../../../src/extensions/mcp/config.ts";
@@ -147,12 +156,17 @@ async function connectedClient(
     listTimeoutMs?: number;
     callTimeoutMs?: number;
     listingFailureTtlMs?: number;
+    eraNegotiation?: McpEraNegotiation;
+    eraVerdicts?: McpEraVerdicts;
   } = {},
 ): Promise<McpClient> {
   const client = new McpClient({
     server: "unit",
     config: CONFIG,
     transport,
+    // Era negotiation has its own cases; every other case is about the 2025
+    // handshake, so it runs it directly.
+    eraNegotiation: "legacy",
     ...options,
   });
   await client.connect();
@@ -324,6 +338,7 @@ test("cursor pages are requested in order and merged", async () => {
     listing.tools.map((tool) => tool.name),
     ["alpha", "beta", "gamma"],
   );
+  assert.equal(listing.pages, 2, "the chain reports the pages it read");
   assert.deepEqual(
     transport.sent
       .filter((entry) => entry.method === "tools/list")
@@ -400,6 +415,29 @@ test("a repeated cursor is refused instead of looping", async () => {
   await client.close();
 });
 
+test("a cursor chain stops at the page ceiling", async () => {
+  let pages = 0;
+  const transport = connectOnly(new FakeTransport(), async () => {
+    pages += 1;
+    return { tools: [], nextCursor: `p${pages}` };
+  });
+  const client = await connectedClient(transport);
+  await assert.rejects(
+    client.listTools(),
+    (error: unknown) =>
+      error instanceof McpProtocolError &&
+      error.message.includes(
+        `returned more than ${MAX_TOOL_LIST_PAGES} tools/list pages`,
+      ),
+  );
+  assert.equal(
+    pages,
+    MAX_TOOL_LIST_PAGES,
+    "the ceiling counts requests, not one extra probe",
+  );
+  await client.close();
+});
+
 test("a listing failure is negative-cached for sixty seconds", async () => {
   let now = 1_000;
   let attempts = 0;
@@ -467,6 +505,9 @@ test("each phase reports its own timeout identity", async () => {
   const listClient = await connectedClient(listTransport, {
     timers: IMMEDIATE_TIMERS,
     listTimeoutMs: 15_000,
+    // A frozen clock keeps the remaining budget exactly the 15 s it started
+    // with; a real one can shave a millisecond off between the two reads.
+    now: () => 1_000,
   });
   const listError = await listClient.listTools().then(
     () => undefined,
@@ -506,6 +547,7 @@ test("a connect that never answers is a connect timeout that closes the transpor
     config: { ...CONFIG, connectTimeout: 2_000 },
     transport,
     timers: IMMEDIATE_TIMERS,
+    eraNegotiation: "legacy",
   });
   const error = await client.connect().then(
     () => undefined,
@@ -579,6 +621,314 @@ test("a call on a closed client is not_sent and names the client", async () => {
   assert.equal(error.server, "unit");
 });
 
+test("an accepted server/discover probe settles the modern era", async () => {
+  const transport = new FakeTransport();
+  transport.handler = async (method) => {
+    if (method === "server/discover") {
+      return {
+        protocolVersion: MCP_MODERN_PROTOCOL_VERSION,
+        capabilities: { tools: {} },
+        serverInfo: { name: "modern", version: "2.0.0" },
+      };
+    }
+    throw new Error(`sent ${method} to a modern server`);
+  };
+  const client = await connectedClient(transport, {
+    eraNegotiation: "auto",
+    eraVerdicts: new McpEraVerdictCache(),
+  });
+
+  assert.equal(client.protocolVersion, MCP_MODERN_PROTOCOL_VERSION);
+  assert.deepEqual(client.capabilities, { tools: {} });
+  assert.deepEqual(client.serverInfo, { name: "modern", version: "2.0.0" });
+  assert.deepEqual(
+    transport.sent.map((entry) => entry.method),
+    ["server/discover"],
+    "a modern connect sends no initialize and no initialized notification",
+  );
+  assert.deepEqual(transport.notifications, []);
+  await client.close();
+});
+
+test("a -32022 probe refusal falls back to 2025 and caches the verdict", async () => {
+  const verdicts = new McpEraVerdictCache();
+  const refusal = (): never => {
+    throw new McpProtocolError(
+      "rejected server/discover: unsupported protocol version (code -32022)",
+      { server: "unit", method: "server/discover", code: -32022 },
+    );
+  };
+  const probedTransport = connectOnly(new FakeTransport(), async () =>
+    refusal(),
+  );
+  const probed = await connectedClient(probedTransport, {
+    eraNegotiation: "auto",
+    eraVerdicts: verdicts,
+  });
+  assert.deepEqual(
+    probedTransport.sent.map((entry) => entry.method),
+    ["server/discover", "initialize"],
+  );
+  assert.equal(probed.protocolVersion, MCP_PROTOCOL_VERSION);
+  await probed.close();
+
+  // The verdict the fallback recorded is fresh, so the next connect skips the
+  // probe that produced it.
+  const cachedTransport = connectOnly(new FakeTransport(), async (method) => {
+    throw new Error(`probed again with ${method}`);
+  });
+  const cached = await connectedClient(cachedTransport, {
+    eraNegotiation: "auto",
+    eraVerdicts: verdicts,
+  });
+  assert.deepEqual(
+    cachedTransport.sent.map((entry) => entry.method),
+    ["initialize"],
+  );
+  await cached.close();
+});
+
+test("a -32601 probe refusal is the same 2025 answer and falls back", async () => {
+  const transport = connectOnly(new FakeTransport(), async (method) => {
+    throw new McpProtocolError(
+      `rejected ${method}: unknown method (code -32601)`,
+      {
+        server: "unit",
+        method,
+        code: -32601,
+      },
+    );
+  });
+  const client = await connectedClient(transport, {
+    eraNegotiation: "auto",
+    eraVerdicts: new McpEraVerdictCache(),
+  });
+  assert.deepEqual(
+    transport.sent.map((entry) => entry.method),
+    ["server/discover", "initialize"],
+  );
+  await client.close();
+});
+
+test("a probe answered without the modern revision runs the 2025 handshake", async () => {
+  const transport = connectOnly(new FakeTransport(), async () => ({}));
+  const client = await connectedClient(transport, {
+    eraNegotiation: "auto",
+    eraVerdicts: new McpEraVerdictCache(),
+  });
+  assert.deepEqual(
+    transport.sent.map((entry) => entry.method),
+    ["server/discover", "initialize"],
+  );
+  assert.equal(client.protocolVersion, MCP_PROTOCOL_VERSION);
+  await client.close();
+});
+
+test("a probe refusal that is not a revision refusal fails the connect", async () => {
+  const transport = connectOnly(new FakeTransport(), async (method) => {
+    throw new McpProtocolError(
+      `rejected ${method}: internal error (code -32603)`,
+      {
+        server: "unit",
+        method,
+        code: -32603,
+      },
+    );
+  });
+  const client = new McpClient({
+    server: "unit",
+    config: CONFIG,
+    transport,
+    eraNegotiation: "auto",
+    eraVerdicts: new McpEraVerdictCache(),
+  });
+  await assert.rejects(
+    client.connect(),
+    (error: unknown) =>
+      error instanceof McpProtocolError && error.code === -32603,
+  );
+  assert.deepEqual(
+    transport.sent.map((entry) => entry.method),
+    ["server/discover"],
+    "no handshake ran after the probe failed",
+  );
+  assert.equal(transport.closed, true);
+});
+
+test("a pinned probe is not rescued by the 2025 handshake", async () => {
+  const transport = connectOnly(new FakeTransport(), async (method) => {
+    throw new McpProtocolError(
+      `rejected ${method}: unsupported (code -32022)`,
+      {
+        server: "unit",
+        method,
+        code: -32022,
+      },
+    );
+  });
+  const client = new McpClient({
+    server: "unit",
+    config: CONFIG,
+    transport,
+    eraNegotiation: "pinned",
+    eraVerdicts: new McpEraVerdictCache(),
+  });
+  await assert.rejects(client.connect(), McpProtocolError);
+  assert.deepEqual(
+    transport.sent.map((entry) => entry.method),
+    ["server/discover"],
+  );
+  assert.equal(transport.closed, true);
+});
+
+test("an sse transport and a legacy caller never probe", async () => {
+  const sseTransport = connectOnly(new FakeTransport(), async (method) => {
+    throw new Error(`probed with ${method}`);
+  });
+  const sse = new McpClient({
+    server: "unit",
+    config: {
+      type: "sse",
+      url: "http://127.0.0.1:1/sse",
+      headers: {},
+      disabled: false,
+    },
+    transport: sseTransport,
+    eraVerdicts: new McpEraVerdictCache(),
+  });
+  await sse.connect();
+  assert.deepEqual(
+    sseTransport.sent.map((entry) => entry.method),
+    ["initialize"],
+  );
+  await sse.close();
+
+  const legacyTransport = connectOnly(new FakeTransport(), async (method) => {
+    throw new Error(`probed with ${method}`);
+  });
+  const legacy = await connectedClient(legacyTransport);
+  assert.deepEqual(
+    legacyTransport.sent.map((entry) => entry.method),
+    ["initialize"],
+  );
+  await legacy.close();
+});
+
+test("a 2025 handshake refused for the modern revision is rescued once", async () => {
+  const verdicts = new McpEraVerdictCache();
+  verdicts.record(mcpEraCacheKey("unit", CONFIG), 0);
+  const transport = new FakeTransport();
+  transport.handler = async (method) => {
+    if (method === "initialize") {
+      throw new McpProtocolError(
+        `rejected initialize: server needs ${MCP_MODERN_PROTOCOL_VERSION} (code -32022)`,
+        { server: "unit", method: "initialize", code: -32022 },
+      );
+    }
+    if (method === "server/discover") {
+      return {
+        protocolVersion: MCP_MODERN_PROTOCOL_VERSION,
+        capabilities: {},
+        serverInfo: { name: "modern", version: "3.0.0" },
+      };
+    }
+    throw new Error(`sent ${method} after the rescue`);
+  };
+
+  const client = await connectedClient(transport, {
+    eraNegotiation: "auto",
+    eraVerdicts: verdicts,
+    now: () => 0,
+  });
+  assert.equal(client.protocolVersion, MCP_MODERN_PROTOCOL_VERSION);
+  assert.deepEqual(
+    transport.sent.map((entry) => entry.method),
+    ["initialize", "server/discover"],
+    "the stored verdict is the only thing that needed rescuing",
+  );
+  assert.deepEqual(transport.notifications, []);
+  assert.equal(
+    verdicts.hasFresh(mcpEraCacheKey("unit", CONFIG), 0),
+    false,
+    "a modern connect drops the legacy verdict it disproved",
+  );
+  await client.close();
+});
+
+test("a legacy verdict expires after its lifetime and is dropped on failure", async () => {
+  const verdicts = new McpEraVerdictCache();
+  let now = 1_000_000;
+  const refusal = (): never => {
+    throw new McpProtocolError(
+      "rejected server/discover: unsupported (code -32022)",
+      { server: "unit", method: "server/discover", code: -32022 },
+    );
+  };
+
+  const first = await connectedClient(
+    connectOnly(new FakeTransport(), async () => refusal()),
+    { eraNegotiation: "auto", eraVerdicts: verdicts, now: () => now },
+  );
+  await first.close();
+
+  now += DEFAULT_MCP_ERA_VERDICT_TTL_MS - 1;
+  const freshTransport = connectOnly(new FakeTransport(), async (method) => {
+    throw new Error(`probed again with ${method}`);
+  });
+  const fresh = await connectedClient(freshTransport, {
+    eraNegotiation: "auto",
+    eraVerdicts: verdicts,
+    now: () => now,
+  });
+  assert.deepEqual(
+    freshTransport.sent.map((entry) => entry.method),
+    ["initialize"],
+    "a verdict inside its lifetime keeps the probe away",
+  );
+  await fresh.close();
+
+  now += 1;
+  const expiredTransport = connectOnly(new FakeTransport(), async () =>
+    refusal(),
+  );
+  await (
+    await connectedClient(expiredTransport, {
+      eraNegotiation: "auto",
+      eraVerdicts: verdicts,
+      now: () => now,
+    })
+  ).close();
+  assert.deepEqual(
+    expiredTransport.sent.map((entry) => entry.method),
+    ["server/discover", "initialize"],
+    "an expired verdict probes again",
+  );
+
+  // A connect that fails under a cached verdict drops it, so a fixed server is
+  // probed on the next attempt instead of trusting the stale record.
+  const key = mcpEraCacheKey("unit", CONFIG);
+  verdicts.record(key, now);
+  const failing = new McpClient({
+    server: "unit",
+    config: CONFIG,
+    transport: (() => {
+      const broken = new FakeTransport();
+      broken.handler = async (method) => {
+        throw new McpProtocolError(`rejected ${method}: broken`, {
+          server: "unit",
+          method,
+        });
+      };
+      return broken;
+    })(),
+    eraNegotiation: "auto",
+    eraVerdicts: verdicts,
+    now: () => now,
+  });
+  await assert.rejects(failing.connect(), McpProtocolError);
+  assert.equal(verdicts.hasFresh(key, now), false);
+});
+
 test("result blocks render text, JSON, images and placeholders", () => {
   const rendered = renderToolCallResult({
     content: [
@@ -637,6 +987,72 @@ test("empty and error results use the spec's strings", () => {
     }).text,
     "Error: Unknown error occurred",
   );
+});
+
+test("a validation-marker error renders the remediation sentence", () => {
+  for (const marker of OUTPUT_SCHEMA_VALIDATION_MARKERS) {
+    const rendered = renderToolCallResult(
+      {
+        content: [
+          { kind: "text", text: `Output validation failed: ${marker}.` },
+          { kind: "text", text: "ignored" },
+        ],
+        isError: true,
+        structuredContent: undefined,
+      },
+      { server: "unit", tool: "echo" },
+    );
+    assert.equal(
+      rendered.text,
+      "MCP tool unit/echo returned structured output that does not match its output schema. Contact the MCP server owner to fix the schema or response.",
+    );
+    assert.equal(rendered.text.includes(marker), false);
+  }
+  assert.equal(
+    outputSchemaRemediation({}),
+    "MCP tool returned structured output that does not match its output schema. Contact the MCP server owner to fix the schema or response.",
+  );
+});
+
+test("an isError result without a marker is left alone", () => {
+  assert.equal(
+    renderToolCallResult({
+      content: [
+        { kind: "text", text: "Structured output is fine, the tool broke" },
+      ],
+      isError: true,
+      structuredContent: undefined,
+    }).text,
+    "Error: Structured output is fine, the tool broke",
+  );
+});
+
+test("a tool call reporting a schema validation error becomes the sentence", async () => {
+  const transport = connectOnly(new FakeTransport(), async (method) => {
+    if (method === "tools/call") {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Structured content does not match the tool's output schema",
+          },
+        ],
+        isError: true,
+      };
+    }
+    return {};
+  });
+  const client = await connectedClient(transport);
+  const error = await client.callTool("echo").then(
+    () => undefined,
+    (reason: unknown) => reason,
+  );
+  assert.ok(error instanceof McpToolError);
+  assert.equal(
+    error.text,
+    "MCP tool unit/echo returned structured output that does not match its output schema. Contact the MCP server owner to fix the schema or response.",
+  );
+  await client.close();
 });
 
 test("a broken tools/call result is a protocol error, not a tool failure", () => {

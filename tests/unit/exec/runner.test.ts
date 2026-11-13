@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import type { Message } from "../../../src/agent/messages.ts";
+import { toolCallId } from "../../../src/agent/messages.ts";
 import type { LoopClock, Provider } from "../../../src/agent/ports.ts";
 import type { Environment } from "../../../src/config/paths.ts";
 import {
@@ -11,7 +13,10 @@ import {
 } from "../../../src/exec/runner.ts";
 import type { TurnEventSink } from "../../../src/exec/turn.ts";
 import type { ToolContext } from "../../../src/tools/context.ts";
-import { decide } from "../../../src/tools/permissions.ts";
+import {
+  decide,
+  type PermissionRequest,
+} from "../../../src/tools/permissions.ts";
 import { ToolRegistry, defineTool } from "../../../src/tools/registry.ts";
 import { MODEL_RESULT_BUDGET_BYTES } from "../../../src/tools/result.ts";
 
@@ -205,6 +210,51 @@ test("an interactive ask that is declined cancels only that call", async () => {
   assert.equal(result.isError, true);
   assert.equal(result.content, "Error: Tool execution cancelled by user");
   assert.equal(runner.denials.length, 0);
+});
+
+test("the confirm seam receives the call's tool-use id (B69)", async () => {
+  let asked: PermissionRequest | undefined;
+  const runner = makeRunner({
+    permission: {
+      autonomy: "low",
+      interactionMode: "interactive",
+      interactive: true,
+    },
+    confirm: async (request) => {
+      asked = request;
+      return true;
+    },
+  });
+  await runner.execute(
+    "Create",
+    { file_path: "x.txt", content: "hello" },
+    { signal: SIGNAL, toolUseId: "call_denied_1" },
+  );
+
+  assert.equal(asked?.toolUseId, "call_denied_1");
+  assert.equal(asked?.llmId, "Create");
+});
+
+test("a request outside the loop carries no tool-use id", async () => {
+  let asked: PermissionRequest | undefined;
+  const runner = makeRunner({
+    permission: {
+      autonomy: "low",
+      interactionMode: "interactive",
+      interactive: true,
+    },
+    confirm: async (request) => {
+      asked = request;
+      return true;
+    },
+  });
+  await runner.execute(
+    "Create",
+    { file_path: "x.txt", content: "hello" },
+    { signal: SIGNAL },
+  );
+
+  assert.equal(asked?.toolUseId, undefined);
 });
 
 test("invalid input is refused by the registry before the executor runs", async () => {
@@ -409,7 +459,7 @@ test("a tool call produces one result record and a second assistant turn", async
   assert.equal(outcome.numTurns, 2);
 });
 
-test("an immediate denial aborts the loop and ends the turn as failed", async () => {
+test("an immediate denial aborts the loop and ends the turn as permission_rejected", async () => {
   let call = 0;
   const provider: Provider = {
     async *stream() {
@@ -429,6 +479,7 @@ test("an immediate denial aborts the loop and ends the turn as failed", async ()
             toolName: "Execute",
             message: "Exec ended early: no",
             immediate: true,
+            toolUseId: "call_denied_1",
           }
         : undefined,
     execute: async () => {
@@ -457,11 +508,101 @@ test("an immediate denial aborts the loop and ends the turn as failed", async ()
     sink,
   );
 
-  assert.equal(outcome.kind, "failed");
-  if (outcome.kind === "failed") {
+  assert.equal(outcome.kind, "permission_rejected");
+  if (outcome.kind === "permission_rejected") {
     assert.equal(outcome.message, "Exec ended early: no");
+    assert.equal(outcome.toolUseId, "call_denied_1");
   }
   assert.equal(call, 1);
   assert.match(events.join("|"), /assistant:/);
   assert.match(events.join("|"), /Exec ended early: no/);
+});
+
+test("the loop hands the call's tool-use id to the tool runner (B69)", async () => {
+  const provider: Provider = {
+    async *stream() {
+      yield { type: "tool_use_start", name: "Read", slot: 0 };
+      yield {
+        type: "tool_use_input",
+        slot: 0,
+        json: '{"file_path":"a.txt"}',
+      };
+      yield { type: "done" };
+    },
+  };
+  let seen: string | undefined;
+  const tools: ExecToolRunner = {
+    allowed: ["Read"],
+    denials: [],
+    immediateDenial: () => undefined,
+    execute: async (_name, _input, options) => {
+      seen = options.toolUseId;
+      return { content: "", isError: false };
+    },
+  };
+  const { sink } = collectingSink();
+  const runner = createExecTurnRunner({
+    provider,
+    tools,
+    clock: CLOCK,
+    maxTurns: 2,
+    nextMessageId: (role) => `${role}-1`,
+  });
+
+  await runner.run(
+    {
+      prompt: "read a.txt",
+      cwd: "/work",
+      sessionId: "sid",
+      model: "custom:mock",
+      reasoningEffort: "low",
+      tools: ["Read"],
+      messageId: "user-1",
+    },
+    sink,
+  );
+
+  // Derived from the assistant message id and the block slot (spec 20 B9).
+  assert.equal(seen, toolCallId("assistant-1", 0));
+});
+
+test("a prompt's images are attached ahead of its text block (B65)", async () => {
+  let seen: readonly Message[] = [];
+  const provider: Provider = {
+    async *stream(messages) {
+      seen = messages;
+      yield { type: "text", text: "seen" };
+      yield { type: "done" };
+    },
+  };
+  const { sink } = collectingSink();
+  const runner = createExecTurnRunner({
+    provider,
+    tools: idleTools(),
+    clock: CLOCK,
+    maxTurns: 2,
+    nextMessageId: (role) => `${role}-1`,
+  });
+
+  await runner.run(
+    {
+      prompt: "what is this?",
+      cwd: "/work",
+      sessionId: "sid",
+      model: "custom:mock",
+      reasoningEffort: "low",
+      tools: [],
+      images: [{ mediaType: "image/png", data: "aGVsbG8=" }],
+    },
+    sink,
+  );
+
+  const user = seen.find((message) => message.role === "user");
+  assert.deepEqual(user?.content, [
+    {
+      type: "image",
+      source: { type: "base64", mediaType: "image/png", data: "aGVsbG8=" },
+    },
+    { type: "text", text: "what is this?" },
+  ]);
 });

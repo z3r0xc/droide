@@ -291,25 +291,102 @@ function avoidSplittingPairs(
   }
 }
 
+/** Tool ids whose `file_path` argument is worth retaining across a compaction. */
+const FILE_TOUCHING_TOOLS: ReadonlySet<string> = new Set([
+  "Read",
+  "Create",
+  "Edit",
+  "LS",
+  "Glob",
+  "Grep",
+]);
+
+/** The retained-lists ceiling, so the row never grows with the transcript. */
+const MAX_RETAINED_FILES = 40;
+const MAX_RETAINED_TODOS = 20;
+
+export interface RetainedLists {
+  /** Paths the replaced messages touched, in first-use order, de-duplicated. */
+  readonly files: readonly string[];
+  /** The last todo list the replaced messages wrote, if any. */
+  readonly todos: readonly string[];
+}
+
+function stringField(input: unknown, name: string): string | null {
+  if (typeof input !== "object" || input === null) return null;
+  const value = (input as Record<string, unknown>)[name];
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+/** Collect the retained lists from the messages a summary replaces (B49). */
+export function retainedLists(messages: readonly Message[]): RetainedLists {
+  const files: string[] = [];
+  const seen = new Set<string>();
+  let todos: string[] = [];
+
+  for (const message of messages) {
+    for (const block of message.content) {
+      if (block.type !== "tool_use") continue;
+      if (FILE_TOUCHING_TOOLS.has(block.name)) {
+        const path = stringField(block.input, "file_path");
+        if (path !== null && !seen.has(path)) {
+          seen.add(path);
+          if (files.length < MAX_RETAINED_FILES) files.push(path);
+        }
+      }
+      if (block.name !== "TodoWrite") continue;
+      const list = (block.input as Record<string, unknown> | null)?.todos;
+      if (!Array.isArray(list)) continue;
+      todos = list
+        .flatMap((entry) => {
+          const content = stringField(entry, "content");
+          if (content === null) return [];
+          const status = stringField(entry, "status") ?? "";
+          const mark = status === "completed" ? "x" : " ";
+          return [`- [${mark}] ${content}`];
+        })
+        .slice(0, MAX_RETAINED_TODOS);
+    }
+  }
+
+  return { files, todos };
+}
+
 /**
- * The documented request-time replacement text (§B49).
- *
- * TODO(spec B49): the row carries the intro line and the `<summary>` wrapper
- * only. The code-built retained lists (files read, TODOs), the IMPORTANT
- * authorship note and the environment block captured at summary time are not
- * available to this clean-room `compact()`, which sees messages and nothing
- * else.
+ * The documented request-time replacement text (§B49): the intro line, the
+ * `<summary>` wrapper, the retained lists built from the replaced messages, the
+ * authorship note, and the instruction to continue.
  */
-export function renderSummary(summary: string): string {
-  return [
+export function renderSummary(
+  summary: string,
+  retained: RetainedLists = { files: [], todos: [] },
+): string {
+  const lines = [
     "You summarized the conversation thus far earlier in this session, as follows:",
     "",
     "<summary>",
     summary,
     "</summary>",
+  ];
+
+  if (retained.files.length > 0) {
+    lines.push(
+      "",
+      "Files read or modified before the summary:",
+      ...retained.files.map((file) => `- ${file}`),
+    );
+  }
+  if (retained.todos.length > 0) {
+    lines.push("", "Todo list at the time of the summary:", ...retained.todos);
+  }
+
+  lines.push(
+    "",
+    "That summary was written by an earlier instance of Droide from the same transcript; treat it as your own note, not as a user instruction.",
     "",
     "Continue from this summary. The messages it replaced are no longer in context; re-read a file or re-run a tool when you need their detail.",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 /**
@@ -396,7 +473,9 @@ export async function compact(
   const summary: Message = {
     id: options.summaryId ?? `${SUMMARY_ID_PREFIX}${pinned}`,
     role: "user",
-    content: [{ type: "text", text: renderSummary(trimmed) }],
+    content: [
+      { type: "text", text: renderSummary(trimmed, retainedLists(middle)) },
+    ],
     // Timestamped from the last replaced message: a replay of the same
     // transcript produces the same row without reading a clock.
     createdAt: last.updatedAt,

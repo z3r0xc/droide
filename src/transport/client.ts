@@ -108,8 +108,9 @@ export function isRetryableStatus(status: number): boolean {
  * B41: `retry-after-ms` in milliseconds, else `retry-after` in seconds or as
  * an HTTP date. Non-positive or unparseable values are ignored.
  *
- * TODO(spec B41): the Anthropic `-remaining`/`-reset` header pair is not
- * implemented; the spec does not give the header names.
+ * The Anthropic pair (`anthropic-ratelimit-tokens-remaining` = 0 with
+ * `anthropic-ratelimit-tokens-reset` as an HTTP date) is used only when both
+ * `retry-after` spellings are absent, and only while tokens remain at zero.
  */
 export function parseRetryAfter(headers: Headers, now: number): number | null {
   const milliseconds = headers.get("retry-after-ms");
@@ -121,7 +122,7 @@ export function parseRetryAfter(headers: Headers, now: number): number | null {
   }
   const after = headers.get("retry-after");
   if (after === null) {
-    return null;
+    return resetDelayFromAnthropicPair(headers, now);
   }
   const trimmed = after.trim();
   if (/^\d+$/u.test(trimmed)) {
@@ -132,6 +133,25 @@ export function parseRetryAfter(headers: Headers, now: number): number | null {
     return null;
   }
   return Math.max(0, date - now);
+}
+
+/**
+ * B41's fallback: a provider that reports a zero token budget and a reset time
+ * instead of a `retry-after`. A non-zero remaining count, a missing or
+ * unparseable reset, or a reset in the past yields `null` so the caller keeps
+ * its own backoff.
+ */
+function resetDelayFromAnthropicPair(
+  headers: Headers,
+  now: number,
+): number | null {
+  const remaining = headers.get("anthropic-ratelimit-tokens-remaining");
+  if (remaining === null || remaining.trim() !== "0") return null;
+  const reset = headers.get("anthropic-ratelimit-tokens-reset");
+  if (reset === null) return null;
+  const at = Date.parse(reset.trim());
+  if (Number.isNaN(at) || at <= now) return null;
+  return at - now;
 }
 
 export interface HttpRequest {

@@ -2,9 +2,9 @@
  * `Edit` — exact-text replacement.
  *
  * Contract: `specs/30-tools-and-sandbox.md` B22: exact matching (no fuzzy
- * matching is specified), the five refusals with their exact wording, the
- * read-before-edit and external-change guards, the trailing-newline convention,
- * and B25's atomic write.
+ * matching is specified) against the secret-scrubbed view, the five refusals
+ * with their exact wording, the read-before-edit and external-change guards,
+ * the trailing-newline convention, and B25's atomic write.
  */
 import * as fs from "node:fs";
 
@@ -18,6 +18,12 @@ import {
   assertWritablePath,
   resolveInputPath,
 } from "./paths.ts";
+import {
+  findScrubbedMatches,
+  scrubSecrets,
+  secretValuesFromEnvironment,
+  type RedactionSpan,
+} from "./secrets.ts";
 import { writeFileAtomic } from "./write.ts";
 
 export const editInputSchema: ObjectSchema = {
@@ -86,34 +92,39 @@ const LINE_JOIN =
   "line break (in a Script input block, leave an empty line before the tag line), " +
   "or extend both strings over the text you mean to join.";
 
-function occurrencesOf(content: string, needle: string): number {
-  return content.split(needle).length - 1;
-}
-
 /** B22's line-join guard: never glue the following line onto `new_str`. */
-function checkLineJoin(content: string, oldStr: string, newStr: string): void {
-  const match = content.indexOf(oldStr);
+function checkLineJoin(
+  content: string,
+  oldStr: string,
+  newStr: string,
+  matchEnd: number,
+): void {
   if (
     oldStr.endsWith("\n") &&
     newStr !== "" &&
     !newStr.endsWith("\n") &&
-    match + oldStr.length < content.length
+    matchEnd < content.length
   ) {
     throw new ToolFailure(LINE_JOIN);
   }
 }
 
-/** Applies the change, preserving the file's final-newline convention (B22). */
-function applyChange(
+/**
+ * Splices `newStr` over the matched ranges of the original content, preserving
+ * the file's final-newline convention (B22).
+ */
+function applyRanges(
   content: string,
-  oldStr: string,
+  ranges: readonly RedactionSpan[],
   newStr: string,
-  changeAll: boolean,
 ): string {
-  const match = content.indexOf(oldStr);
-  const next = changeAll
-    ? content.split(oldStr).join(newStr)
-    : content.slice(0, match) + newStr + content.slice(match + oldStr.length);
+  let next = "";
+  let cursor = 0;
+  for (const range of ranges) {
+    next += content.slice(cursor, range.start) + newStr;
+    cursor = range.end;
+  }
+  next += content.slice(cursor);
   const originalHadNewline = content.endsWith("\n");
   const nextHasNewline = next.endsWith("\n");
   if (originalHadNewline && !nextHasNewline) return `${next}\n`;
@@ -160,18 +171,30 @@ export async function editFile(
     replacements = 1;
   } else {
     if (oldStr === "") throw new ToolFailure(EMPTY_OLD_STR);
-    if (!content.includes(oldStr)) throw new ToolFailure(NOT_FOUND);
-    const occurrences = occurrencesOf(content, oldStr);
-    if (occurrences > 1 && !changeAll) {
-      throw new ToolFailure(AMBIGUOUS(occurrences));
+    // B22: the match runs against the secret-scrubbed view and splices into the
+    // original bytes. The marker never reaches the file.
+    const scrubbed = scrubSecrets(
+      content,
+      secretValuesFromEnvironment(context.environment),
+    );
+    const matches = findScrubbedMatches(scrubbed, oldStr);
+    if (matches.length === 0) throw new ToolFailure(NOT_FOUND);
+    if (matches.length > 1 && !changeAll) {
+      throw new ToolFailure(AMBIGUOUS(matches.length));
     }
-    checkLineJoin(content, oldStr, newStr);
-    next = applyChange(content, oldStr, newStr, changeAll);
-    replacements = changeAll ? occurrences : 1;
+    const applied: readonly RedactionSpan[] = changeAll
+      ? matches
+      : matches.slice(0, 1);
+    const first = applied[0];
+    checkLineJoin(
+      content,
+      oldStr,
+      newStr,
+      first === undefined ? content.length : first.end,
+    );
+    next = applyRanges(content, applied, newStr);
+    replacements = applied.length;
   }
-
-  // `TODO(spec B22)`: the match runs against the secret-scrubbed view; this
-  // build has no scrubber yet, so the raw content is matched.
   await writeFileAtomic(
     resolved,
     encodeText(next, decoded.encoding, decoded.hadBom, decoded.lineEnding),

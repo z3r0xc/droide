@@ -331,6 +331,66 @@ async function resolveVersion(
   return "local";
 }
 
+/**
+ * B42: translate the other plugin layout into ours. Only a directory that does
+ * not already use our names is touched, so an author who ships both keeps ours.
+ * The MCP document is wrapped in `{ "mcpServers": … }` when it is a bare map,
+ * and the translation is refused if the wrapped document grows past the source
+ * bytes plus the wrapper.
+ */
+const WRAPPER_BYTES = Buffer.byteLength('{"mcpServers":}');
+
+function translateLayout(staging: string, io: PluginIo): void {
+  const claudeRoot = join(staging, ".claude-plugin");
+  const ourRoot = join(staging, ".droide-plugin");
+  if (io.exists(claudeRoot) && !io.exists(ourRoot)) {
+    io.rename(claudeRoot, ourRoot);
+  }
+
+  const agents = join(staging, "agents");
+  const droids = join(staging, "droids");
+  if (io.exists(agents) && !io.exists(droids)) {
+    io.rename(agents, droids);
+  }
+
+  const claudeMcp = join(staging, ".mcp.json");
+  const ourMcp = join(staging, "mcp.json");
+  if (io.exists(ourMcp)) {
+    // An author that ships both keeps `mcp.json`; the other is dropped.
+    if (io.exists(claudeMcp)) io.remove(claudeMcp);
+    return;
+  }
+  const text = io.readFile(claudeMcp);
+  if (text === undefined) return;
+
+  let document: unknown;
+  try {
+    document = JSON.parse(text);
+  } catch (error) {
+    throw new PluginOperationError(
+      "manifest-invalid",
+      `The plugin's .mcp.json is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  const alreadyWrapped =
+    typeof document === "object" &&
+    document !== null &&
+    !Array.isArray(document) &&
+    Object.hasOwn(document, "mcpServers");
+  // The source text is kept byte-for-byte inside the wrapper, so the only
+  // growth is the wrapper itself and a refusal stays a real ceiling.
+  const rendered = alreadyWrapped ? text : `{"mcpServers":${text.trim()}}`;
+  if (Buffer.byteLength(rendered) > Buffer.byteLength(text) + WRAPPER_BYTES) {
+    throw new PluginOperationError(
+      "layout-too-large",
+      "The plugin's .mcp.json grows past its source size when wrapped, so the layout translation was refused.",
+    );
+  }
+  io.writeFile(ourMcp, rendered);
+  io.remove(claudeMcp);
+}
+
 async function copyIntoPlace(
   sourceDirectory: string,
   installPath: string,
@@ -339,10 +399,8 @@ async function copyIntoPlace(
   const staging = `${installPath}.staging-${randomUUID().replace(/-/g, "")}`;
   io.makeDirectory(dirname(installPath));
   try {
-    // TODO(spec B42): the Claude Code layout translation (.claude-plugin to
-    // .droide-plugin, agents to droids, .mcp.json to mcp.json) is not
-    // applied, so the plugin directory is copied verbatim.
     await cp(sourceDirectory, staging, { recursive: true });
+    translateLayout(staging, io);
     adoptDirectory(staging, installPath, io);
   } catch (error) {
     try {

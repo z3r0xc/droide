@@ -524,3 +524,48 @@ test("no compaction config means no compaction event and the same history", asyn
     ["u0", "a0", "u1"],
   );
 });
+
+test("the retained lists name the files and the todo state the summary replaced", async () => {
+  const { retainedLists } = await import("../../../src/agent/compaction.ts");
+  const toolUse = (name: string, input: unknown, id: string): Message => ({
+    id,
+    role: "assistant",
+    content: [{ type: "tool_use", id, name, input }],
+    createdAt: 1,
+    updatedAt: 1,
+  });
+
+  const lists = retainedLists([
+    toolUse("Read", { file_path: "src/a.ts" }, "1"),
+    toolUse("Edit", { file_path: "src/b.ts" }, "2"),
+    toolUse("Read", { file_path: "src/a.ts" }, "3"),
+    toolUse("Grep", { pattern: "x", path: "src" }, "4"),
+    toolUse(
+      "TodoWrite",
+      {
+        todos: [
+          { content: "read the spec", status: "completed" },
+          { content: "write the test", status: "in_progress" },
+        ],
+      },
+      "5",
+    ),
+  ]);
+
+  assert.deepEqual(lists.files, ["src/a.ts", "src/b.ts"]);
+  assert.deepEqual(lists.todos, [
+    "- [x] read the spec",
+    "- [ ] write the test",
+  ]);
+});
+
+test("renderSummary omits an empty list and always carries the authorship note", () => {
+  const empty = renderSummary("x");
+  assert.doesNotMatch(empty, /Files read or modified/);
+  assert.doesNotMatch(empty, /Todo list at the time/);
+  assert.match(empty, /earlier instance of Droide/);
+  assert.match(
+    renderSummary("x", { files: ["src/a.ts"], todos: ["- [ ] t"] }),
+    /Files read or modified before the summary:\n- src\/a\.ts\n\nTodo list at the time of the summary:\n- \[ \] t/,
+  );
+});

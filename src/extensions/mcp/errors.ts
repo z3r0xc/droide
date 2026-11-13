@@ -62,6 +62,8 @@ export class McpConnectError extends McpError {
  */
 export class McpProtocolError extends McpError {
   readonly code: number | undefined;
+  /** The HTTP status a remote transport answered with, when it was not ok. */
+  readonly status: number | undefined;
   /** Why a result was refused, when the spec asks for a separate reason. */
   readonly reason: string | undefined;
 
@@ -69,12 +71,14 @@ export class McpProtocolError extends McpError {
     message: string,
     options: McpErrorOptions & {
       readonly code?: number;
+      readonly status?: number;
       readonly reason?: string;
     },
   ) {
     super(message, options);
     this.name = "McpProtocolError";
     this.code = options.code;
+    this.status = options.status;
     this.reason = options.reason;
   }
 }

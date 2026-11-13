@@ -225,6 +225,14 @@ export function nativeHelperFile(environment: Environment): string {
   );
 }
 
+/**
+ * `<base>/tool-outputs`: whole-output spill files named by the cut notice
+ * (`specs/30-tools-and-sandbox.md` B12).
+ */
+export function toolOutputsDir(environment: Environment): string {
+  return joinPath(environment.platform, stateDir(environment), "tool-outputs");
+}
+
 /** `<base>/temp`: scratch space under the operational root. */
 export function tempDir(environment: Environment): string {
   return joinPath(environment.platform, stateDir(environment), "temp");

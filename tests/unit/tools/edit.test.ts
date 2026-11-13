@@ -181,3 +181,168 @@ test("an edit preserves CRLF line endings", async () => {
     fixture.cleanup();
   }
 });
+
+test("an edit still applies when its match lies outside every secret", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const secret = "sk-live-0123456789abcdefgh";
+    const file = fixture.path("scrubbed-apply.txt");
+    await seed(file, `region = "eu-west-1"\napi_key = "${secret}"\n`);
+    await readText({ file_path: file }, fixture.context);
+    const result = await editFile(
+      { file_path: file, old_str: '"eu-west-1"', new_str: '"us-east-1"' },
+      fixture.context,
+    );
+    assert.equal(result.replacements, 1);
+    const written = readFileSync(file, "utf8");
+    assert.equal(written, `region = "us-east-1"\napi_key = "${secret}"\n`);
+    // The marker lives only in the matching view, never in the file.
+    assert.ok(!written.includes("[redacted]"));
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("an edit whose old_str differs only inside a secret is refused as not found", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const secret = "sk-test-0123456789abcdef";
+    const file = fixture.path("scrubbed-secret.txt");
+    await seed(file, `api_key = "${secret}"\nmodel = "gpt-x"\n`);
+    await readText({ file_path: file }, fixture.context);
+    await assert.rejects(
+      editFile(
+        { file_path: file, old_str: `api_key = "${secret}"`, new_str: "x" },
+        fixture.context,
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /Error: The text to replace was not found/);
+        assert.ok(!error.message.includes(secret));
+        return true;
+      },
+    );
+    assert.equal(
+      readFileSync(file, "utf8"),
+      `api_key = "${secret}"\nmodel = "gpt-x"\n`,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("private-key blocks and bearer tokens are scrubbed from matching", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const body = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ";
+    const token = "abcdefghijklmnopqrstuvwxyz012345";
+    const file = fixture.path("scrubbed-key.txt");
+    await seed(
+      file,
+      [
+        "-----BEGIN OPENSSH PRIVATE KEY-----",
+        body,
+        "-----END OPENSSH PRIVATE KEY-----",
+        `Authorization: Bearer ${token}`,
+        "port = 8080",
+        "",
+      ].join("\n"),
+    );
+    await readText({ file_path: file }, fixture.context);
+    await assert.rejects(
+      editFile(
+        { file_path: file, old_str: body, new_str: "redacted-body" },
+        fixture.context,
+      ),
+      /Error: The text to replace was not found/,
+    );
+    await assert.rejects(
+      editFile(
+        { file_path: file, old_str: token, new_str: "token" },
+        fixture.context,
+      ),
+      /Error: The text to replace was not found/,
+    );
+    const result = await editFile(
+      { file_path: file, old_str: "port = 8080", new_str: "port = 9090" },
+      fixture.context,
+    );
+    assert.equal(result.replacements, 1);
+    assert.equal(
+      readFileSync(file, "utf8"),
+      [
+        "-----BEGIN OPENSSH PRIVATE KEY-----",
+        body,
+        "-----END OPENSSH PRIVATE KEY-----",
+        `Authorization: Bearer ${token}`,
+        "port = 9090",
+        "",
+      ].join("\n"),
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("a DROIDE_API_KEY value from the environment is scrubbed from matching", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const secret = "dsk_env_0123456789";
+    const context = {
+      ...fixture.context,
+      environment: {
+        ...fixture.environment,
+        env: { DROIDE_API_KEY: secret },
+      },
+    };
+    const file = fixture.path("scrubbed-env.txt");
+    await seed(file, `credential = ${secret}\nport = 8080\n`);
+    await readText({ file_path: file }, context);
+    await assert.rejects(
+      editFile(
+        { file_path: file, old_str: `credential = ${secret}`, new_str: "x" },
+        context,
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /Error: The text to replace was not found/);
+        assert.ok(!error.message.includes(secret));
+        return true;
+      },
+    );
+    await editFile(
+      { file_path: file, old_str: "port = 8080", new_str: "port = 9090" },
+      context,
+    );
+    assert.equal(
+      readFileSync(file, "utf8"),
+      `credential = ${secret}\nport = 9090\n`,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("an ambiguity refusal never quotes the file's secrets", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const secret = "sk-ambiguity-0123456789abcdef";
+    const file = fixture.path("scrubbed-ambiguous.txt");
+    await seed(file, `api_key = "${secret}"\nnote alpha\nnote alpha\n`);
+    await readText({ file_path: file }, fixture.context);
+    await assert.rejects(
+      editFile(
+        { file_path: file, old_str: "note alpha", new_str: "note beta" },
+        fixture.context,
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /Error: Found 2 occurrences/);
+        assert.ok(!error.message.includes(secret));
+        return true;
+      },
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});

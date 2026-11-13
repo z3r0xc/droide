@@ -3,18 +3,25 @@
  *
  * Contract: `specs/30-tools-and-sandbox.md` B14 (input), B15 (whole file,
  * outline, range note, budgets), B16 (encodings, the 8 MiB scan path and the
- * two refusals) and B11/B12. Media reads (B17) are refused rather than decoded
- * as text: this build has no image or PDF block layer.
+ * two refusals) and B11/B12 (the cut and its whole-output spill). Media reads
+ * (B17) are refused rather than decoded as text: this build has no image or
+ * PDF block layer.
  */
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
 
+import type { Environment } from "../../config/paths.ts";
 import type { ToolContext } from "../context.ts";
 import { ToolFailure } from "../errors.ts";
 import { defineTool, type ToolDefinition } from "../registry.ts";
 import { MODEL_TEXT_BUDGET_BYTES, boundText } from "../result.ts";
 import type { ObjectSchema, Schema } from "../validate.ts";
 import { decodeText, detectEncoding, normalizeToLF } from "./encoding.ts";
+import {
+  nodeSpillFileSystem,
+  writeToolOutput,
+  type SpillFileSystem,
+} from "./spill.ts";
 import {
   assertReadablePath,
   assertNoSymlinkEscape,
@@ -97,6 +104,11 @@ export interface ReadOptions {
   /** A program read: no outline, no range note, acceptance of a non-finite limit. */
   readonly programmatic?: boolean;
   readonly budgetBytes?: number;
+  /**
+   * The spill seam (B12). Tests inject a fake so an unwritable directory is
+   * provable without touching the host; the default writes under the state dir.
+   */
+  readonly spillFileSystem?: SpillFileSystem;
 }
 
 interface RenderedLines {
@@ -300,6 +312,7 @@ export async function readText(
   const includeLineNumbers = input.line_numbers === true;
   const programmatic = options.programmatic === true;
   const budget = options.budgetBytes ?? MODEL_TEXT_BUDGET_BYTES;
+  const fileSystem = options.spillFileSystem ?? nodeSpillFileSystem;
 
   const stats = await fs.promises.stat(filePath);
   if (!stats.isFile()) {
@@ -379,7 +392,7 @@ export async function readText(
       mtimeMs: stats.mtimeMs,
       size: stats.size,
     });
-    return finish(rendered, filePath, budget);
+    return finish(rendered, filePath, budget, context.environment, fileSystem);
   }
 
   const decoded = decodeText(await fs.promises.readFile(filePath));
@@ -388,7 +401,9 @@ export async function readText(
 
   if (!programmatic && !requestedRange) {
     const outline = outlineLines(text, filePath);
-    if (outline !== null) return finish(outline, filePath, budget);
+    if (outline !== null) {
+      return finish(outline, filePath, budget, context.environment, fileSystem);
+    }
   }
   const totalLines = text.split("\n").length;
   const zeroBasedOffset = offset > 0 ? offset - 1 : offset;
@@ -405,22 +420,35 @@ export async function readText(
     0,
     programmatic,
   );
-  return finish(rendered, filePath, budget);
+  return await finish(
+    rendered,
+    filePath,
+    budget,
+    context.environment,
+    fileSystem,
+  );
 }
 
-function finish(
+/**
+ * The rendered result, or its cut with a notice naming the whole output (B12).
+ * An over-budget result is spilled under `<stateDir>/tool-outputs` first; an
+ * unwritable or oversized spill falls back to the offset/limit remedy.
+ */
+async function finish(
   rendered: RenderedLines,
   filePath: string,
   budget: number,
-): string {
+  environment: Environment,
+  fileSystem: SpillFileSystem,
+): Promise<string> {
   const text =
     rendered.note === undefined
       ? rendered.text
       : `${rendered.text}\n\n${rendered.note}`;
-  // `TODO(spec B12)`: the spill file under `<state dir>/tool-outputs` is not
-  // written by this build; the notice names how to ask for the rest instead.
-  return boundText(text, budget, `${filePath} (read it with offset and limit)`)
-    .text;
+  if (Buffer.byteLength(text, "utf8") <= budget) return text;
+  const spilled = await writeToolOutput(environment, text, fileSystem);
+  const whole = spilled ?? `${filePath} (read it with offset and limit)`;
+  return boundText(text, budget, whole).text;
 }
 
 export const readTool: ToolDefinition = defineTool<ReadInput, ToolContext>({

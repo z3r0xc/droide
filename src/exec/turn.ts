@@ -1,6 +1,8 @@
 /**
  * One-shot exec turn orchestration. Contract:
- * `specs/80-exec-and-streaming.md` B26-B32, B54-B56.
+ * `specs/80-exec-and-streaming.md` B26-B32, B54-B56, plus the two ACP-shared
+ * channels in `specs/60-extensions-mcp-and-skills.md` §B65-B66 (a turn's
+ * images and the `permission_rejected` ending).
  *
  * `TurnRunner` is the seam the agent loop fills; this module owns everything
  * around it: the `system/init` record first, the user echo, the record
@@ -8,7 +10,7 @@
  * on failure, and the exit-code mapping with signal precedence.
  */
 
-import type { Message } from "../agent/messages.ts";
+import type { ImageMediaType, Message } from "../agent/messages.ts";
 import { ExecAbortedError } from "./errors.ts";
 import {
   buildAssistantRecords,
@@ -25,6 +27,17 @@ import {
 } from "./records.ts";
 import type { JsonLineWriter } from "./writer.ts";
 
+/**
+ * One image attached to a turn's prompt (spec 60 §B65, spec 20 §B11-B12).
+ *
+ * Base64, exactly as the transcript's `ImageBlock` carries it; the runner turns
+ * each into an `image` block ahead of the user message's text block.
+ */
+export interface TurnImage {
+  readonly mediaType: ImageMediaType;
+  readonly data: string;
+}
+
 /** What the runner is asked to do for one user message. */
 export interface TurnRequest {
   readonly prompt: string;
@@ -38,6 +51,11 @@ export interface TurnRequest {
    * provider but never echoed on stdout, and this turn appends after them.
    */
   readonly history?: readonly Message[];
+  /**
+   * Images to attach ahead of the prompt text (spec 20 §B12). Absent or empty
+   * leaves the user message as the text block alone.
+   */
+  readonly images?: readonly TurnImage[];
   /** The user message id; absent means the runner asks `nextMessageId`. */
   readonly messageId?: string;
   /** B46: an outer cancellation, e.g. SIGINT during streaming input. */
@@ -62,6 +80,16 @@ export type TurnOutcome =
       readonly finalText: string;
       readonly numTurns: number;
       readonly usage: ExecUsage;
+    }
+  /**
+   * A denied `Execute` or MCP call ended the turn (spec 80 §B14, spec 20 §B38).
+   * `toolUseId` names the call that was refused. Exec renders this as a failure;
+   * ACP settles it as `end_turn` (spec 60 §B66).
+   */
+  | {
+      readonly kind: "permission_rejected";
+      readonly message: string;
+      readonly toolUseId?: string;
     }
   | { readonly kind: "failed"; readonly message: string }
   | { readonly kind: "cancelled"; readonly message: string };
@@ -105,6 +133,7 @@ function requestOf(options: OneShotOptions): TurnRequest {
     tools: options.tools,
     messageId: options.messageId,
     ...(options.history === undefined ? {} : { history: options.history }),
+    ...(options.images === undefined ? {} : { images: options.images }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
   };
 }

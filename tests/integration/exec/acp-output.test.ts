@@ -283,3 +283,97 @@ test(
     );
   },
 );
+
+test(
+  "-o acp carries a prompt's image into the provider request (B65)",
+  { timeout: 60_000 },
+  async () => {
+    await withHarness(
+      DONE_SCRIPT,
+      async ({ directory, settingsPath, server }) => {
+        const child = spawnCli(
+          directory,
+          execArgs(settingsPath, ["-o", "acp", "-m", "custom:mock"]),
+        );
+        const feed = new FrameFeed(child);
+
+        child.write(request(1, "initialize", { protocolVersion: 1 }));
+        assert.ok(isRecord((await feed.response(1)).result));
+        child.write(
+          request(2, "session/new", { cwd: directory, mcpServers: [] }),
+        );
+        const sessionId = sessionIdOf(await feed.response(2));
+
+        child.write(
+          request(3, "session/prompt", {
+            sessionId,
+            prompt: [
+              { type: "image", data: "aGVsbG8=", mimeType: "image/png" },
+              { type: "text", text: "what is this?" },
+            ],
+          }),
+        );
+        const done = await feed.response(3);
+        assert.deepEqual(done.result, { stopReason: "end_turn" });
+
+        // The image reached the wire as a data-URL part, not as dropped input.
+        assert.equal(server.requests.length, 1);
+        const body = server.bodies[0];
+        assert.ok(body !== undefined);
+        const sent = JSON.parse(body) as { messages?: unknown };
+        assert.match(
+          JSON.stringify(sent.messages),
+          /"type":"image_url","image_url":\{"url":"data:image\/png;base64,aGVsbG8="}/,
+        );
+        assert.match(JSON.stringify(sent.messages), /what is this\?/);
+
+        child.end();
+        assert.equal((await child.done).code, 0);
+      },
+    );
+  },
+);
+
+test(
+  "-o acp refuses a prompt image whose type it cannot take (B65)",
+  { timeout: 60_000 },
+  async () => {
+    await withHarness(
+      DONE_SCRIPT,
+      async ({ directory, settingsPath, server }) => {
+        const child = spawnCli(
+          directory,
+          execArgs(settingsPath, ["-o", "acp", "-m", "custom:mock"]),
+        );
+        const feed = new FrameFeed(child);
+
+        child.write(request(1, "initialize", { protocolVersion: 1 }));
+        assert.ok(isRecord((await feed.response(1)).result));
+        child.write(
+          request(2, "session/new", { cwd: directory, mcpServers: [] }),
+        );
+        const sessionId = sessionIdOf(await feed.response(2));
+
+        child.write(
+          request(3, "session/prompt", {
+            sessionId,
+            prompt: [
+              { type: "image", data: "aGVsbG8=", mimeType: "image/tiff" },
+            ],
+          }),
+        );
+        const failed = errorOf(await feed.response(3));
+        assert.equal(failed.code, -32602);
+        assert.equal(
+          failed.message,
+          "Invalid params: Unsupported prompt image type: image/tiff",
+        );
+        assert.equal(server.requests.length, 0);
+
+        child.end();
+        // B55: a prompt that could not be answered is a failed run.
+        assert.equal((await child.done).code, 1);
+      },
+    );
+  },
+);

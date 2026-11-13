@@ -65,7 +65,14 @@ export interface ToolRunner {
   execute(
     name: string,
     input: unknown,
-    options: { readonly signal: AbortSignal },
+    options: {
+      readonly signal: AbortSignal;
+      /**
+       * The assistant `tool_use` block's id for this call, so a permission
+       * card can name the call rather than the tool (spec 60 §B69).
+       */
+      readonly toolUseId?: string;
+    },
   ): Promise<ToolResult>;
 }
 

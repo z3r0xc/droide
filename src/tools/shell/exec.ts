@@ -29,6 +29,16 @@ import type { ObjectSchema } from "../validate.ts";
 const DEFAULT_TIMEOUT_SECONDS = 60;
 const SIGKILL_GRACE_MS = 250;
 
+/** B31: how long a Windows launch waits for the wrapper's pid line. */
+const WINDOWS_LAUNCH_BUDGET_MS = 2_000;
+/** B31: the hard bound on a wrapper that neither answers nor exits. */
+const WINDOWS_LAUNCH_HARD_CAP_MS = 10_000;
+const WINDOWS_LAUNCH_POLL_MS = 50;
+
+/** B31: set to `1`/`true` to keep background children after the CLI exits. */
+export const PRESERVE_BACKGROUND_PROCESSES_ENV =
+  "DROIDE_PRESERVE_BACKGROUND_PROCESSES";
+
 /** B29: the environment that stops interactive prompts launching. */
 const NON_INTERACTIVE_ENV: Readonly<Record<string, string>> = {
   GIT_EDITOR: "true",
@@ -105,12 +115,25 @@ export interface ExecResult {
   readonly pid?: number;
   readonly outputBytes?: number;
   readonly outputFile?: string;
+  /** B31 (Windows): the inner process's creation time as a FILETIME token. */
+  readonly startToken?: string;
 }
+
+/** B31: the CLI's exit hook, injected so a test decides when the CLI ends. */
+export type ExitHook = (handler: () => void) => void;
 
 export interface ExecOptions {
   /** Injected for tests; defaults to the OS temporary directory. */
   readonly tmpDir?: string;
   readonly now?: () => number;
+  /** B31: keep background children alive after the CLI exits. */
+  readonly preserveBackgroundProcesses?: boolean;
+  /** B31: installs the exit hook; defaults to `process.once("exit", …)`. */
+  readonly onExit?: ExitHook;
+  /** B31: the signal the watchdog sends; defaults to `process.kill`. */
+  readonly kill?: (pid: number, signal: NodeJS.Signals) => void;
+  /** B31: the Windows tree stop; defaults to `taskkill /T /F`. */
+  readonly stopTree?: (pid: number) => void;
 }
 
 function executablePath(environment: Environment): string {
@@ -149,17 +172,285 @@ export function childEnvironment(
   };
 }
 
+/**
+ * B31: whether a background child outlives the CLI. The option wins when the
+ * caller passes it; otherwise the environment flag decides.
+ */
+export function backgroundPreserved(
+  options: Pick<ExecOptions, "preserveBackgroundProcesses">,
+  environment: Environment,
+): boolean {
+  if (options.preserveBackgroundProcesses !== undefined) {
+    return options.preserveBackgroundProcesses;
+  }
+  const value =
+    environment.env[PRESERVE_BACKGROUND_PROCESSES_ENV]?.trim().toLowerCase();
+  return value === "1" || value === "true";
+}
+
+/** The Windows tree kill: synchronous, so a dying CLI leaves nothing behind. */
+function stopTreeByPid(pid: number, environment: Environment): void {
+  spawnSync(taskkillPath(environment), ["/PID", String(pid), "/T", "/F"], {
+    stdio: "ignore",
+    windowsHide: true,
+    timeout: 10_000,
+  });
+}
+
+/**
+ * B31: the stop action for one background launch. POSIX signals the process
+ * group the child leads; Windows sweeps the tree, because it has no group
+ * signal. Both are synchronous: the CLI's exit hook cannot await anything.
+ */
+export function backgroundStopper(
+  pid: number,
+  environment: Environment,
+  seams: Pick<ExecOptions, "kill" | "stopTree"> = {},
+): () => boolean {
+  if (environment.platform === "win32") {
+    const stopTree =
+      seams.stopTree ??
+      ((target: number) => stopTreeByPid(target, environment));
+    return () => {
+      stopTree(pid);
+      return true;
+    };
+  }
+  const signal =
+    seams.kill ??
+    ((target: number, name: NodeJS.Signals) => {
+      process.kill(target, name);
+    });
+  return () => {
+    try {
+      signal(-pid, "SIGKILL");
+    } catch {
+      try {
+        signal(pid, "SIGKILL");
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  };
+}
+
+export interface BackgroundWatchdogOptions extends Pick<
+  ExecOptions,
+  "kill" | "stopTree" | "onExit"
+> {
+  readonly environment: Environment;
+  /** The group leader (POSIX) or the inner process (Windows). */
+  readonly pid: number | undefined;
+  readonly preserve: boolean;
+}
+
+/**
+ * B31: install the one exit hook that stops a background launch. Returns the
+ * installed stop, or `undefined` when nothing was registered — because the
+ * launch has no PID, or because background processes are preserved.
+ */
+export function installBackgroundWatchdog(
+  options: BackgroundWatchdogOptions,
+): (() => boolean) | undefined {
+  const pid = options.pid;
+  if (options.preserve || pid === undefined) return undefined;
+  const stop = backgroundStopper(pid, options.environment, options);
+  const onExit =
+    options.onExit ??
+    ((handler: () => void) => {
+      process.once("exit", handler);
+    });
+  onExit(stop);
+  return stop;
+}
+
+/** The inner process a Windows background wrapper started. */
+export interface WindowsBackgroundLaunch {
+  readonly pid: number;
+  /** `$p.StartTime.ToFileTimeUtc()`: the creation time, not the start order. */
+  readonly startToken: string;
+}
+
+/**
+ * B31: parses the one line the Windows background wrapper prints, `<pid>
+ * <filetime>`. Each line must match exactly — a warning or a half-written
+ * number is not a launch — and while the wrapper still runs only a terminated
+ * line counts, so a chunk that split mid-number is rejected until the rest
+ * arrives. Once the wrapper has exited its stdout is complete and callers pass
+ * `false` to accept a final line without a newline.
+ */
+export function parseWindowsBackgroundLaunch(
+  stdout: string,
+  requireLineTerminator: boolean,
+): WindowsBackgroundLaunch | null {
+  const lines = stdout.split(/\r?\n/);
+  // Splitting leaves the unterminated remainder; drop it while it is short.
+  const complete = requireLineTerminator ? lines.slice(0, -1) : lines;
+  for (const line of complete) {
+    const match = /^(\d+)[ \t]+(\d+)$/.exec(line.trim());
+    if (match === null) continue;
+    const pid = Number.parseInt(match[1]!, 10);
+    if (pid > 0) return { pid, startToken: match[2]! };
+  }
+  return null;
+}
+
+/** PowerShell single-quoted literal: the only escaping that applies inside. */
+function powerShellQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+interface WindowsBackgroundStart {
+  readonly child: ChildProcess;
+  readonly launched: Promise<{
+    readonly pid?: number;
+    readonly startToken?: string;
+  }>;
+}
+
+/**
+ * B31: starts a fire-and-forget command through a PowerShell wrapper that
+ * reports the inner process. The user's command is written to a temporary
+ * `.ps1` file, so the wrapper's command line contains only paths this module
+ * produced (each quoted), and the script merges every stream into one UTF-8
+ * log before the wrapper prints `$p.Id` and the creation time.
+ */
+function startWindowsBackground(
+  input: ExecuteInput,
+  context: ToolContext,
+  outputFile: string,
+  tmpDir: string,
+  now: () => number,
+): WindowsBackgroundStart {
+  const environment = context.environment;
+  const powershell = executablePath(environment);
+  const scriptPath = nodePath.join(
+    tmpDir,
+    `droide-bg-${now()}-${randomUUID()}.ps1`,
+  );
+  fs.writeFileSync(
+    scriptPath,
+    `& { ${input.command} } *>&1 | Out-File -FilePath ${powerShellQuote(
+      outputFile,
+    )} -Encoding utf8\n`,
+    "utf8",
+  );
+  // Start-Process joins `-ArgumentList` with spaces without quoting, so the
+  // script path carries its own double quotes.
+  const scriptArgument = `"${scriptPath.replace(/"/g, '""')}"`;
+  const innerArgs = [
+    "-NoLogo",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    scriptArgument,
+  ]
+    .map(powerShellQuote)
+    .join(", ");
+  const wrapper =
+    `$p = Start-Process -FilePath ${powerShellQuote(powershell)} ` +
+    `-ArgumentList @(${innerArgs}) -NoNewWindow -PassThru; ` +
+    'Write-Output "$($p.Id) $($p.StartTime.ToFileTimeUtc())"';
+  const child = spawn(
+    powershell,
+    [
+      "-NoLogo",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      wrapper,
+    ],
+    {
+      cwd: context.root,
+      env: childEnvironment(environment),
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: false,
+      windowsHide: true,
+    },
+  );
+  const { promise, resolve, reject } = Promise.withResolvers<
+    WindowsBackgroundLaunch | undefined
+  >();
+  const startedAt = now();
+  let stdout = "";
+  let settled = false;
+  let exited = false;
+  const fallback = (): WindowsBackgroundLaunch | undefined =>
+    child.pid === undefined ? undefined : { pid: child.pid, startToken: "" };
+  const settle = (launch: WindowsBackgroundLaunch | undefined): void => {
+    if (settled) return;
+    settled = true;
+    clearInterval(poll);
+    // `-NoNewWindow` hands the wrapper's stdout/stderr handles to the inner
+    // process, so the pipes stay open for as long as the background command
+    // runs. The line has been read by now; dropping the streams is what lets
+    // the CLI exit instead of waiting on a child it no longer observes.
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+    resolve(launch);
+  };
+  // The budget is read on the injected clock, so a test never waits for it. A
+  // wrapper that exited is complete, so its line is parsed even when it came
+  // after the budget; a wrapper still starting is our own helper and gets the
+  // hard cap, because settling early would leak a process nobody can stop.
+  const poll = setInterval(() => {
+    if (exited) {
+      settle(parseWindowsBackgroundLaunch(stdout, false) ?? fallback());
+      return;
+    }
+    const elapsed = now() - startedAt;
+    if (elapsed >= WINDOWS_LAUNCH_BUDGET_MS && stdout.trim() !== "") {
+      // The shell answered, but not with a complete launch line: two numbers
+      // is the whole protocol, and a half-written one is not a launch.
+      settle(parseWindowsBackgroundLaunch(stdout, true) ?? fallback());
+      return;
+    }
+    if (elapsed >= WINDOWS_LAUNCH_HARD_CAP_MS) {
+      settle(parseWindowsBackgroundLaunch(stdout, true) ?? fallback());
+    }
+  }, WINDOWS_LAUNCH_POLL_MS);
+  poll.unref();
+  child.stdout?.on("data", (chunk: Buffer) => {
+    stdout += chunk.toString("utf8");
+    const launch = parseWindowsBackgroundLaunch(stdout, !exited);
+    if (launch !== null) settle(launch);
+  });
+  child.stderr?.on("data", () => {
+    // The wrapper's errors are not part of the launch line; a wrapper that
+    // fails exits without one and the fallback reports the wrapper PID.
+  });
+  child.once("error", (error: Error) => {
+    if (settled) return;
+    settled = true;
+    clearInterval(poll);
+    reject(new ToolFailure(`Failed to start command: ${error.message}`));
+  });
+  child.once("exit", () => {
+    // Stdout can still deliver buffered chunks after `exit`, so the poll
+    // parses the complete buffer one tick later instead of here.
+    exited = true;
+  });
+  child.unref();
+  return {
+    child,
+    launched: promise.then((launch) =>
+      launch === undefined
+        ? {}
+        : launch.startToken === ""
+          ? { pid: launch.pid }
+          : { pid: launch.pid, startToken: launch.startToken },
+    ),
+  };
+}
+
 function killTree(child: ChildProcess, environment: Environment): boolean {
   const pid = child.pid;
   if (pid === undefined) return false;
   if (environment.platform === "win32") {
-    // Synchronous so the whole tree is gone before the caller treats the call
-    // as finished; a surviving grandchild would keep the output pipe open.
-    spawnSync(taskkillPath(environment), ["/PID", String(pid), "/T", "/F"], {
-      stdio: "ignore",
-      windowsHide: true,
-      timeout: 10_000,
-    });
+    stopTreeByPid(pid, environment);
     try {
       child.kill("SIGKILL");
     } catch {
@@ -220,7 +511,13 @@ function startChild(
         },
       );
     }
-    return spawn(input.command, [], {
+    const script =
+      outputFile === undefined
+        ? input.command
+        : // B31: `exec` replaces the spawned shell, so the PID this build
+          // tracks and stops is the command's own, and the group is its own.
+          `exec nohup bash -c '${input.command.replace(/'/g, "'\\''")}'`;
+    return spawn(script, [], {
       cwd: context.root,
       env,
       stdio,
@@ -333,15 +630,52 @@ async function runBackground(
     tmpDir,
     `droide-bg-${now()}-${randomUUID()}.out`,
   );
+  const preserve = backgroundPreserved(options, context.environment);
+  const watch = (pid: number | undefined): void => {
+    installBackgroundWatchdog({
+      environment: context.environment,
+      pid,
+      preserve,
+      ...(options.onExit === undefined ? {} : { onExit: options.onExit }),
+      ...(options.kill === undefined ? {} : { kill: options.kill }),
+      ...(options.stopTree === undefined ? {} : { stopTree: options.stopTree }),
+    });
+  };
+  if (context.environment.platform === "win32") {
+    // B31: the inner process is the one to report and to stop; the wrapper
+    // is gone by the time the caller reads the result.
+    const launched = await startWindowsBackground(
+      input,
+      context,
+      outputFile,
+      tmpDir,
+      now,
+    ).launched;
+    if (launched.pid === undefined) {
+      throw new ToolFailure("Failed to start command: no process was created");
+    }
+    watch(launched.pid);
+    return {
+      output: "",
+      exitCode: 0,
+      signal: null,
+      stoppedProcesses: 0,
+      timedOut: false,
+      pid: launched.pid,
+      outputFile,
+      ...(launched.startToken === undefined
+        ? {}
+        : { startToken: launched.startToken }),
+    };
+  }
   const child = startChild(input, context, outputFile);
   child.unref();
   const { promise, resolve, reject } = Promise.withResolvers<ExecResult>();
-  // `TODO(spec B31)`: no watchdog and no inner-PID/creation-time report yet;
-  // the wrapper PID and the log path are what this build returns.
   child.once("error", (error: Error) => {
     reject(new ToolFailure(`Failed to start command: ${error.message}`));
   });
   child.once("spawn", () => {
+    watch(child.pid);
     resolve({
       output: "",
       exitCode: 0,

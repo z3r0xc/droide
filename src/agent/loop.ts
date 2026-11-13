@@ -236,7 +236,10 @@ async function settleCall(
   }
 
   try {
-    const result = await deps.tools.execute(call.name, call.input, { signal });
+    const result = await deps.tools.execute(call.name, call.input, {
+      signal,
+      toolUseId: call.id,
+    });
     return {
       type: "tool_result",
       toolUseId: call.id,

@@ -88,6 +88,7 @@ export type PluginOperationErrorCode =
   | "source-fetch-failed"
   | "checksum-mismatch"
   | "archive-limit"
+  | "layout-too-large"
   | "registry-invalid"
   | "settings-invalid"
   | "settings-not-writable"

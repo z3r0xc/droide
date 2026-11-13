@@ -296,7 +296,11 @@ from clients that the daemon does not know are dropped silently.
 **B19 — Client request lifecycle.** The client generates a UUID v4 id, stores
 the pending request with its timeout, and resolves it on the response with the
 same id (RTT recorded). Default timeout 30 s, overridden per method (e.g.
-session init/resume 120 s, session send 240 s, worktree cleanup 900 s).
+session init/resume 120 s, session send 240 s, worktree cleanup 900 s). The
+method names that carry the four budgets are `daemon.init_session` and
+`daemon.resume_session` (120 s), `daemon.send_message` (240 s) and
+`daemon.cleanup_worktree` (900 s); a caller may replace the map wholesale through
+`methodTimeouts` (`src/daemon/client.ts`, `METHOD_TIMEOUTS`). `[derived]`
 On transport close every pending request rejects with
 `ConnectionClosedError(code, reason)`; on reconnect every still-pending
 request rejects with `ConnectionClosedError(1000, "Connection reopened")`. A

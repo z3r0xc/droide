@@ -128,6 +128,12 @@ cold (`orig/packages/runtime/auth/src/auth/common/cache.ts:617-620,691-703`).
 `MetaError` when the global API config is installed, before any request
 (`orig/packages/utils/src/api/config.ts:7-40`). `[observed]`
 
+A base URL is an origin plus a path prefix, so this build also refuses one that
+carries credentials, a query or a fragment: any of the three would either be
+sent on every request or make relative-path joining ambiguous
+(`src/transport/urls.ts`, `parseApiBaseUrl`; the refusals are tested in
+`tests/unit/transport/urls.test.ts`). `[observed]`
+
 **B8** Relative paths are joined to the base URL resolved for that request
 (`getBaseUrl`), not to a value captured at construction, so a region
 resolution or organization switch that lands between requests changes the
@@ -367,8 +373,12 @@ signed-out (`orig/packages/runtime/auth/src/auth/source.ts:83-95,101-160,466-530
 
 **B41** A throttling failure waits at least 5 s and at most 30 s, plus up to 20 %
 jitter; a server-provided delay is respected as a minimum. `retry-after-ms` is
-read in milliseconds, `retry-after` in seconds or as an HTTP date, and an
-Anthropic `-remaining`/`-reset` pair is used when remaining is zero. Interactive
+read in milliseconds, `retry-after` in seconds or as an HTTP date, and when both
+are absent the Anthropic pair is used: `anthropic-ratelimit-tokens-remaining`
+must be exactly `0` and `anthropic-ratelimit-tokens-reset` an HTTP date in the
+future, whose distance from now is the delay. A non-zero remaining count, a
+missing or unparseable reset, or a reset in the past yields no server delay and
+the caller's own backoff applies (`src/transport/client.ts`, `parseRetryAfter`). Interactive
 turns allow 6 throttling attempts (`orig/packages/core/src/llms/client/retryPolicy/index.ts:16-17,30,74-102,120-140,179-203`).
 `[observed]`
 
@@ -866,6 +876,14 @@ non-payload (`orig/packages/core/src/llms/client/chunk-processing.ts:2150-2155,2
 (`orig/packages/core/src/llms/client/chunk-processing.ts:735-1030`).
 `[observed]`
 
+This build handles exactly that order and nothing else: a `content_block_delta`
+whose `delta.type` is not one of the four is dropped, a `message_delta` supplies
+the stop reason (mapped by B125) without ending the stream, and `message_stop`
+ends it once — a second `message_stop` after `message_delta` adds no delta
+(`src/transport/llm.ts`, `createAnthropicMapper`; regression:
+`tests/unit/transport/llm.test.ts`, "Anthropic message_stop after message_delta
+adds nothing"). `[observed]`
+
 **B115** `message_delta.stop_reason` is terminal: the stream is finalized — tool
 input flushed, usage emitted once, completion signalled — without waiting for
 `message_stop` or transport EOF, so an intermediary holding the body open cannot
@@ -887,12 +905,19 @@ tool-call id derived from the assistant message id and the block index, and
 (`orig/packages/core/src/llms/client/chunk-processing.ts:782-812,914-945`).
 `[observed]`
 
+The derived id's spelling is `<messageId>-<blockIndex>`, and `message` stands in
+for a missing id, so the first block of a message with no id is `message-0`
+(`src/transport/llm.ts`). `[observed]`
+
 **B118** Chat-Completions tool-call deltas: the provider `index` is used when
 present; a delta without an index is grouped by its id; a different non-empty id
 arriving at an already-occupied index is a new call, and the earlier call is
 kept, not concatenated
 (`orig/packages/core/src/llms/client/chunk-processing.ts:2238-2310`).
 `[observed]`
+
+A delta with neither an index nor an id gets the client id `<operation>-<index>`,
+where the index is the next free position (`src/transport/llm.ts`). `[observed]`
 
 **B119** Responses tool calls take the call id from the output item and, when a
 `…arguments.done` payload is non-empty, that payload replaces the buffered
@@ -908,6 +933,13 @@ by subtracting cached and cache-write counts
 (`orig/packages/core/src/llms/client/chunk-processing.ts:1144-1175,2123-2145`).
 `[observed]`
 
+The wire fields this build reads are `input_tokens` or `prompt_tokens`,
+`output_tokens`, `cache_read_input_tokens` or `cache_creation_input_tokens`,
+`thinking_tokens`, and the cache count under either `input_tokens_details` or
+`prompt_tokens_details` (first present wins); when a response carries the
+`fireworks-cached-prompt-tokens` header, its value is used as the cached count
+instead (`src/transport/llm.ts`, `src/transport/client.ts`). `[observed]`
+
 **B121** Anthropic usage arrives twice: `message_start` seeds input and cache
 counts, `message_delta` overwrites them. Thinking tokens are estimated from the
 streamed character count and replaced by the provider's breakdown when present.
@@ -915,6 +947,11 @@ Streaming never commits session totals; the send loop commits one billed attempt
 at a time, and an attempt that was retried, cut, resampled or aborted after
 reporting prompt tokens still counts (`orig/packages/core/src/llms/client/chunk-processing.ts:704-733,742-757,959-1000`;
 `orig/src/services/SessionService.ts:8430-8497`). `[observed]`
+
+The estimate is **not** implemented here: `thinkingTokens` is reported only when
+the provider's breakdown carries it, and it is absent otherwise. A consumer must
+treat the field as optional rather than expect a character-based guess
+(`src/transport/llm.ts`). `[observed]`
 
 **B122** Streaming usage is a live-display snapshot only: `onTokenUsage(usage,
 isStreaming=true)` updates the current-call numbers without accumulating; the

@@ -207,6 +207,41 @@ test("an HTTP-date Retry-After is read against the injected clock", () => {
   );
 });
 
+test("the Anthropic zero-remaining pair supplies the delay when Retry-After is absent", () => {
+  const now = Date.parse("Wed, 21 Oct 2015 07:27:58 GMT");
+  const reset = "Wed, 21 Oct 2015 07:28:00 GMT";
+  const pair = (remaining: string, value?: string) =>
+    new Headers({
+      "anthropic-ratelimit-tokens-remaining": remaining,
+      ...(value === undefined
+        ? {}
+        : { "anthropic-ratelimit-tokens-reset": value }),
+    });
+
+  assert.equal(parseRetryAfter(pair("0", reset), now), 2000);
+  // A non-zero budget means no throttle, whatever the reset says.
+  assert.equal(parseRetryAfter(pair("17", reset), now), null);
+  assert.equal(parseRetryAfter(pair("0"), now), null);
+  assert.equal(parseRetryAfter(pair("0", "not-a-date"), now), null);
+  // A reset already in the past is not a delay.
+  assert.equal(
+    parseRetryAfter(pair("0", "Wed, 21 Oct 2015 07:27:00 GMT"), now),
+    null,
+  );
+  // `retry-after` still wins over the pair.
+  assert.equal(
+    parseRetryAfter(
+      new Headers({
+        "retry-after": "3",
+        "anthropic-ratelimit-tokens-remaining": "0",
+        "anthropic-ratelimit-tokens-reset": reset,
+      }),
+      now,
+    ),
+    3000,
+  );
+});
+
 test("a 401 is never retried, even under a retry policy", async () => {
   const testHarness = harness([
     new Response("unauthorized", { status: 401 }),

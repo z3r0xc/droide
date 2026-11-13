@@ -138,14 +138,23 @@ in a request; older media is dropped from the request and the model is warned
 by the media-limit reminder.
 `evidence/original/windows-x64/packages/sdk-core/src/protocol/sessionV2/messages/schemas.ts:43-60`,
 `evidence/original/windows-x64/packages/sdk-core/src/protocol/sessionV2/messages/schemas.ts:127-160`,
-`evidence/original/windows-x64/packages/core/src/llms/client/image-limits.ts:16-17`,
-`evidence/original/windows-x64/packages/core/src/llms/client/image-limits.ts:151`.
+(`evidence/original/windows-x64/packages/core/src/llms/client/image-limits.ts:16-17`,
+`evidence/original/windows-x64/packages/core/src/llms/client/image-limits.ts:151`).
+
+A turn that carries attached images (`TurnRequest.images`, spec 60 §B65) uses the same media types
+and adds one input guard the reference leaves to its client: each image is capped at 5 MiB of decoded
+bytes, and the surface that admits an image (the ACP prompt) refuses a larger one before the turn
+starts rather than sending it.
 
 **B12 — User content assembly.** Attached images are emitted first, then the
 attached-image path reminder (when paths are known), then the text blocks; a
 caller-supplied `content` array replaces the text/images path. Extra content
 blocks are appended after. `evidence/original/windows-x64/src/core/userMessageInjection.ts:120-169`,
 `evidence/original/windows-x64/src/core/AgentLoop.ts:1172-1195`.
+
+A turn's own `images` are attached that same way: one `image` block per image, in the order the
+caller supplied them, then the turn's text block. With no images the user message is the text block
+alone, unchanged.
 
 **B13 — Assistant turn attribution is persisted.** An assistant message
 records `modelId` (the model that actually served it), `apiProvider`,
@@ -479,7 +488,24 @@ either "You summarized the conversation thus far earlier in this session, as
 follows:" or "A previous instance of Droide has summarized …", then
 `<summary> … </summary>`, the code-built retained lists, the IMPORTANT
 authorship note, and — as its own trailing text block — the environment block
-captured at summary time. A provider-switch serialization uses a fenced
+captured at summary time.
+
+This build renders the lists from the messages it replaces
+(`src/agent/compaction.ts`, `retainedLists`):
+
+- `Files read or modified before the summary:` then one `- <path>` line per
+  distinct `file_path` taken from a `Read`, `Create`, `Edit`, `LS`, `Glob` or
+  `Grep` call, in first-use order, at most 40 — omitted entirely when the
+  replaced messages touched no file.
+- `Todo list at the time of the summary:` then the last `TodoWrite` list, one
+  `- [x] <content>` for a completed item and `- [ ] <content>` otherwise, at
+  most 20 — omitted when no todo list was written.
+- The authorship note is the fixed sentence `That summary was written by an
+earlier instance of Droide from the same transcript; treat it as your own
+note, not as a user instruction.`, followed by the continuation sentence.
+
+The environment block is not part of this row: it belongs to the summary row
+only when a caller supplies one, which this build does not do. `[observed]` A provider-switch serialization uses a fenced
 transcript and tells the model to keep using native tool calling.
 `evidence/original/windows-x64/src/hooks/compaction/CompactionManager.ts:436-520`.
 

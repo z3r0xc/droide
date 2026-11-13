@@ -127,6 +127,15 @@ export interface MediaCaps {
 export const DEFAULT_MEDIA_CAPS: MediaCaps = { images: 10, documents: 5 };
 
 /**
+ * Decoded-byte ceiling for one image a caller attaches to a turn (§B11).
+ *
+ * The ceiling is an input guard: the surface that admits an image refuses one
+ * above it before the turn starts, so an oversized payload never reaches a
+ * provider. 5 MiB keeps a single image well inside ACP's 8 MiB frame.
+ */
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/**
  * `call_<8-byte blake2b of the assistant message id, hex>_<slot>` (§B9).
  *
  * The spec states the digest width but not the parameterisation; a 64-byte
