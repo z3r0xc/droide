@@ -22,7 +22,7 @@ export const HEADER_SHORTCUTS = [
   "ctrl+L for autonomy · tab for reasoning",
 ] as const;
 
-/** B3 — version row prefix (`v`, as in `v0.4.0`). */
+/** B3 — version row prefix (`v`, as in `v1.2.3`). */
 export const VERSION_PREFIX = "v";
 
 /** B3 — tip row prefix. */
