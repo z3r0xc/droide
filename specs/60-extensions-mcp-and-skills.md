@@ -646,6 +646,13 @@ agent: all console output is redirected to stderr, and the protocol is NDJSON ov
 (`evidence/original/windows-x64/src/exec/acpDaemonRunner.ts:14-47`,
 `evidence/original/windows-x64/src/entrypoints/exec/handler.ts:824-831`).
 
+One frame is one line and at most 8 MiB (`ACP_MAX_FRAME_BYTES`, mirroring the
+daemon's `MAX_FRAME_BYTES`): a longer line is answered with a parse error, the
+rest of that line is discarded, and the stream continues on the next newline. The
+limit exists so a broken peer cannot grow the process's memory without bound; it
+is not a message-size contract a client may rely on for larger payloads, which is
+what the `embeddedContext` capability is for. `[derived]`
+
 **B61 — Method surface.** The agent serves `initialize`, `authenticate`, `session/new`, `session/load`,
 `session/resume`, `session/fork`, `session/list`, `session/close`, `session/prompt`,
 `session/set_mode`, `session/set_config_option`, `logout`, plus the legacy `session/set_model`, and

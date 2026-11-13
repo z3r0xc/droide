@@ -30,9 +30,8 @@ export const ACP_PROTOCOL_VERSION = 1;
 /**
  * Ceiling for one NDJSON line.
  *
- * TODO(spec B60): the ACP clause pins no frame ceiling, so this mirrors the
- * daemon's 8 MiB `MAX_FRAME_BYTES`; a client that sends more is answered with
- * a parse error and the rest of the line is discarded.
+ * Spec 60 B60 pins this ceiling: a longer line is a parse error and the rest of
+ * the line is discarded.
  */
 export const ACP_MAX_FRAME_BYTES = 8 * 1024 * 1024;
 
