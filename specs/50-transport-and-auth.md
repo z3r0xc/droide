@@ -100,6 +100,13 @@ endpoint configured` rather than probing a host of ours
 (`orig/src/environmentResolution.ts:90-127,189-197`; `src/transport/urls.ts`,
 `src/exec/command.ts`). `[observed]`
 
+Precedence is: an explicit per-process override supplied by a caller, then the
+environment, then the baked define. The override exists so a test or an
+embedding can pin a loopback endpoint without touching the environment, and it
+can never introduce a URL the validator would reject: every source passes the
+same parse and the same credential/query refusal (`src/transport/urls.ts`,
+`createApiUrlConfig`). `[observed]`
+
 **B4** The region used by B1 is `global` whenever a customer Prem is selected,
 whenever no credential resolves, or when the cached identity has no region;
 otherwise it is the region the identity reports (`Region.global|eu`; vendor

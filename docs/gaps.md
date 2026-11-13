@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **51** markers across **44** clauses.
+Total: **50** markers across **44** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -58,5 +58,4 @@ Total: **51** markers across **44** clauses.
 | `src/transport/llm.ts:449` | `B114` | the spec states the handled event order only. |
 | `src/transport/llm.ts:521` | `B120` | the spec names the buckets but not every wire field; both input_tokens_details and prompt_tokens_details spellings are accepted. |
 | `src/transport/llm.ts:627` | `B118` | the derived id's exact spelling is not stated. |
-| `src/transport/urls.ts:115` | `B7` | the clause lists empty, scheme and trailing slash only; the credential and query/fragment refusals come from B9's request policy. |
-| `src/transport/urls.ts:60` | `B3` | the spec pins environment > baked define; an explicit caller-supplied override is not covered and is placed above both. |
+| `src/transport/urls.ts:114` | `B7` | the clause lists empty, scheme and trailing slash only; the credential and query/fragment refusals come from B9's request policy. |
