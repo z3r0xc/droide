@@ -39,18 +39,18 @@ What runs today, run against this tree:
 
 | Surface                                                                                    | Today                                                                                                                                                                                                                                                                                                                                    |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--version`, `--help`, subcommand help                                                     | works — reports `0.5.0`; 20 recorded CLI cases replay green (snapshots are tracked in `tests/parity/expected/`, see [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md))                                                                                                                                                                                     |
-| `doctor`                                                                                   | works — 16 named checks, twelve of them by default: config, environment, system, binaries, updates, filesystem, git, proxy, certs, connectivity, auth, daemon; `--checks all` adds custom-models, inference, mcp and exec, which start servers or spend money. A check that cannot run reports `skip` with a reason                                        |
+| `--version`, `--help`, subcommand help                                                     | works — reports `0.6.0`; 20 recorded CLI cases replay green (snapshots are tracked in `tests/parity/expected/`, see [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md))                                                                                                                                                       |
+| `doctor`                                                                                   | works — 16 named checks, twelve of them by default: config, environment, system, binaries, updates, filesystem, git, proxy, certs, connectivity, auth, daemon; `--checks all` adds custom-models, inference, mcp and exec, which start servers or spend money. A check that cannot run reports `skip` with a reason                      |
 | `search` / `find`                                                                          | works — served from a local transcript index with a proving fallback to the literal scan; `--reindex` refreshes it                                                                                                                                                                                                                       |
 | `mcp list`, `mcp add`, `mcp remove`, `mcp permissions`                                     | work — merged configuration, surgical JSONC edits that keep comments, atomic writes, permission list/revoke/clear                                                                                                                                                                                                                        |
 | `plugin list`, `plugin marketplace`, `plugin install`, `plugin uninstall`, `plugin update` | work — git-backed marketplaces validated before adoption, atomic registry merges, collision and reference refusals                                                                                                                                                                                                                       |
-| `exec`                                                                                     | works for `text`, `json` and `stream-json` with a prompt, `-f` or stdin, session continuation and streaming input; `--list-tools` prints the tools for the selected model with no credential; `stream-jsonrpc`, ACP and `--mission` refuse                                                                                       |
-| `resume`                                                                                   | works — lists sessions, accepts a UUID or link, continues through the `exec -s` path, forks with `--fork`                                                                                                                                                                |
-| `update`, `update --check`, `update -v <version>`                                          | work — the check reads this repository's release feed; an install streams the archive to staging while hashing it, swaps it atomically and rolls back when the single probe fails                                                                                         |
+| `exec`                                                                                     | works for `text`, `json` and `stream-json` with a prompt, `-f` or stdin, session continuation and streaming input; `--list-tools` prints the tools for the selected model with no credential; `stream-jsonrpc`, ACP and `--mission` refuse                                                                                               |
+| `resume`                                                                                   | works — lists sessions, accepts a UUID or link, continues through the `exec -s` path, forks with `--fork`                                                                                                                                                                                                                                |
+| `update`, `update --check`, `update -v <version>`                                          | work — the check reads this repository's release feed; an install streams the archive to staging while hashing it, swaps it atomically and rolls back when the single probe fails                                                                                                                                                        |
 | `daemon`                                                                                   | works locally — WebSocket transport, JSON-RPC, auth gate, single instance, ordered shutdown; Remote Control and the port proxy are declared, not built                                                                                                                                                                                   |
 | `droide` with no arguments                                                                 | launches the interactive shell on a TTY pair; a typed prompt runs an agent turn with streamed rows, approvals and Esc-cancel                                                                                                                                                                                                             |
 | native helper                                                                              | 15 JSON-line methods (including PTY sessions), typed and validated on the TypeScript side, 69 Rust tests, plus a contract test that spawns a real process through the compiled binary (`npm run test:native`); the tool runtime uses it for discovery when the binary is present and degrades to the TypeScript implementation otherwise |
-| test suite                                                                                 | 1266 tests in 129 files: 1259 pass, 7 skipped, plus 69 Rust tests                                                                                                                                                                                                                                                                        |
+| test suite                                                                                 | 1383 tests in 138 files: 1375 pass, 7 skipped, plus 69 Rust tests                                                                                                                                                                                                                                                                        |
 
 `exec` needs a model credential. Without one it refuses instead of guessing:
 
@@ -61,11 +61,11 @@ Authentication failed. Please log in using /login or set a valid DROIDE_API_KEY 
 
 Declared, in flight:
 
-| Surface                                                          | State                                                                                                                                          |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `computer register\|remove\|ssh\|port-forward`                   | options parse, help prints, every action refuses with exit 64                                                                                  |
-| macOS/Linux credential stores                                    | only Windows DPAPI exists; the store refuses rather than writing plaintext                                                                     |
-| Remote Control, relay and port proxy; the interactive picker     | declared in `specs/70` and `specs/10`; `docs/gaps.md` names every clause                                                                       |
+| Surface                                                      | State                                                                      |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `computer register\|remove\|ssh\|port-forward`               | options parse, help prints, every action refuses with exit 64              |
+| macOS/Linux credential stores                                | only Windows DPAPI exists; the store refuses rather than writing plaintext |
+| Remote Control, relay and port proxy; the interactive picker | declared in `specs/70` and `specs/10`; `docs/gaps.md` names every clause   |
 
 The failure is deliberate, and it is observable — exit 64 for a command that is
 specified but not built, exit 1 for an option that is not:
@@ -91,12 +91,12 @@ Node 24 or newer, and a Rust toolchain for the native layer.
 
 ```sh
 npm ci                          # install once; there is no build step
-node bin/droide.mjs --version   # 0.5.0
+node bin/droide.mjs --version   # 0.6.0
 node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 12 named checks by default (--checks all: 16)
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 1266 tests
+npm test                        # 1383 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 69 tests
