@@ -2,15 +2,15 @@
  * `Execute` — the command runner.
  *
  * Contract: `specs/30-tools-and-sandbox.md` B26 (input, defaults, the
- * `command` refusal), B27 (result shape, the 32 MiB inline cap), B28 (bash on
- * POSIX, PowerShell with its flags on Windows, stdin ignored), B29 (the
- * non-interactive environment), B30 (timeout accounting and tree kill) and B31
- * (fire-and-forget). Spec text that this build cannot honour carries a TODO.
+ * `command` refusal, the `pty` decision), B27 (result shape, the 32 MiB inline
+ * cap, the transport report), B28 (bash on POSIX, PowerShell with its flags on
+ * Windows, stdin ignored), B29 (the non-interactive environment and the PTY
+ * blocklist), B30 (timeout accounting and kill) and B31 (fire-and-forget).
  *
- * `TODO(spec 90 B15)`: `Execute` keeps a pipe child. The pinned pseudo-terminal
- * surface (B13-B22: login-shell environment, its blocklist and the PTY session
- * lifecycle) belongs to the daemon terminal, which this build does not spawn,
- * so there is no terminal to hand this command to.
+ * A call is given a pseudo-terminal exactly when `pty` is `true` and it is not
+ * a background launch (B26). The session is the native helper's `pty.*`
+ * surface behind `./pty.ts`; when the helper is absent or refuses a PTY, the
+ * command runs through the pipe child and B27's `ptyFallbackReason` says why.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
@@ -19,15 +19,29 @@ import * as nodePath from "node:path";
 import { randomUUID } from "node:crypto";
 
 import type { Environment } from "../../config/paths.ts";
-import { isAbsolutePath } from "../../config/paths.ts";
+import { isAbsolutePath, nativeHelperFile } from "../../config/paths.ts";
 import type { ToolContext } from "../context.ts";
 import { OutputLimitError, ToolFailure } from "../errors.ts";
 import { defineTool, type ToolDefinition } from "../registry.ts";
 import { MAX_INLINE_OUTPUT_BYTES } from "../result.ts";
 import type { ObjectSchema } from "../validate.ts";
+import {
+  createNativePtyBackend,
+  withoutBlockedVariables,
+  type PtyBackend,
+  type PtySession,
+} from "./pty.ts";
 
 const DEFAULT_TIMEOUT_SECONDS = 60;
 const SIGKILL_GRACE_MS = 250;
+
+/** B30: how long one PTY observation may block before the budget is checked. */
+const PTY_READ_POLL_MS = 250;
+/** B28: the terminal a PTY call gets. */
+const PTY_COLS = 80;
+const PTY_ROWS = 24;
+/** B26: the helper override `app/tooling.ts` honours for the other methods. */
+const PTY_HELPER_ENV = "DROIDE_NATIVE_BIN";
 
 /** B31: how long a Windows launch waits for the wrapper's pid line. */
 const WINDOWS_LAUNCH_BUDGET_MS = 2_000;
@@ -94,6 +108,14 @@ export const executeInputSchema: ObjectSchema = {
       default: false,
       description: "Start the command in the background and return its PID.",
     },
+    pty: {
+      kind: "boolean",
+      optional: true,
+      default: false,
+      description:
+        "Run under a pseudo-terminal; ignored for fireAndForget. The result " +
+        "reports whether a PTY was granted or the pipe fallback was used.",
+    },
   },
 };
 
@@ -104,7 +126,11 @@ export interface ExecuteInput {
   readonly riskLevelReason?: unknown;
   readonly riskLevel?: unknown;
   readonly fireAndForget?: boolean;
+  readonly pty?: boolean;
 }
+
+/** B27: which transport actually ran the command. */
+export type ExecTransport = "pty" | "pipe";
 
 export interface ExecResult {
   readonly output: string;
@@ -117,6 +143,10 @@ export interface ExecResult {
   readonly outputFile?: string;
   /** B31 (Windows): the inner process's creation time as a FILETIME token. */
   readonly startToken?: string;
+  /** B27: present only when the call asked for a PTY (`pty: true`). */
+  readonly transport?: ExecTransport;
+  /** B27: why a PTY-requested call fell back to the pipe child. */
+  readonly ptyFallbackReason?: string;
 }
 
 /** B31: the CLI's exit hook, injected so a test decides when the CLI ends. */
@@ -130,10 +160,14 @@ export interface ExecOptions {
   readonly preserveBackgroundProcesses?: boolean;
   /** B31: installs the exit hook; defaults to `process.once("exit", …)`. */
   readonly onExit?: ExitHook;
+  /** B26: removes an exit hook a PTY call installed; defaults to `process.off`. */
+  readonly offExit?: ExitHook;
   /** B31: the signal the watchdog sends; defaults to `process.kill`. */
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void;
   /** B31: the Windows tree stop; defaults to `taskkill /T /F`. */
   readonly stopTree?: (pid: number) => void;
+  /** B26: injected PTY backend; defaults to the native helper when installed. */
+  readonly pty?: PtyBackend;
 }
 
 function executablePath(environment: Environment): string {
@@ -186,6 +220,74 @@ export function backgroundPreserved(
   const value =
     environment.env[PRESERVE_BACKGROUND_PROCESSES_ENV]?.trim().toLowerCase();
   return value === "1" || value === "true";
+}
+
+/**
+ * B26: the one condition that grants a PTY — `pty: true` on a call that is not
+ * `fireAndForget`. Nothing else is consulted. Exported so the decision is
+ * proven without spawning a helper.
+ */
+export function usesPty(
+  input: Pick<ExecuteInput, "pty" | "fireAndForget">,
+): boolean {
+  return input.pty === true && input.fireAndForget !== true;
+}
+
+/** The shell invocation a PTY session runs (B28's shell, one layer down). */
+interface PtyShell {
+  readonly program: string;
+  readonly args: readonly string[];
+}
+
+function ptyShell(environment: Environment, command: string): PtyShell {
+  if (environment.platform === "win32") {
+    return {
+      program: executablePath(environment),
+      args: [
+        "-NoLogo",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        command,
+      ],
+    };
+  }
+  return { program: "bash", args: ["-c", command] };
+}
+
+/** The helper path this call would try: `DROIDE_NATIVE_BIN` or the default. */
+function ptyHelperCandidate(environment: Environment): string {
+  const configured = environment.env[PTY_HELPER_ENV]?.trim();
+  return configured === undefined || configured === ""
+    ? nativeHelperFile(environment)
+    : configured;
+}
+
+/** The helper `app/tooling.ts` would use, when the file is there. */
+function ptyHelperPath(environment: Environment): string | undefined {
+  const helperPath = ptyHelperCandidate(environment);
+  return fs.existsSync(helperPath) ? helperPath : undefined;
+}
+
+/** B29: the session environment, with the spec 90 B15 blocklist and a TERM. */
+function ptySessionEnvironment(
+  environment: Environment,
+): Record<string, string> {
+  const env = withoutBlockedVariables(childEnvironment(environment));
+  if (environment.platform !== "win32") env["TERM"] = "xterm-256color";
+  return env;
+}
+
+/** B27: run the pipe child after a PTY request could not be granted. */
+async function fallBackToPipe(
+  input: ExecuteInput,
+  context: ToolContext,
+  timeoutSeconds: number,
+  reason: string,
+): Promise<ExecResult> {
+  const result = await runForeground(input, context, timeoutSeconds);
+  return { ...result, transport: "pipe", ptyFallbackReason: reason };
 }
 
 /** The Windows tree kill: synchronous, so a dying CLI leaves nothing behind. */
@@ -619,6 +721,143 @@ async function runForeground(
   return await promise;
 }
 
+/**
+ * B26-B30: run the command in a helper PTY session. The permission decision has
+ * already gated `run` before this point, and the session spawns the same shell
+ * and command line the pipe path would; a session that cannot be created falls
+ * back to the pipe child with the reason, because only then has nothing
+ * executed yet.
+ */
+async function runPty(
+  input: ExecuteInput,
+  context: ToolContext,
+  timeoutSeconds: number,
+  options: ExecOptions,
+): Promise<ExecResult> {
+  const environment = context.environment;
+  const helperPath = ptyHelperPath(environment);
+  const backend =
+    options.pty ??
+    (helperPath === undefined
+      ? undefined
+      : createNativePtyBackend({
+          helperPath,
+          env: withoutBlockedVariables(childEnvironment(environment)),
+        }));
+  if (backend === undefined) {
+    return await fallBackToPipe(
+      input,
+      context,
+      timeoutSeconds,
+      `the native helper is not installed at ${ptyHelperCandidate(environment)}`,
+    );
+  }
+
+  let session: PtySession;
+  try {
+    session = await backend.spawn({
+      ...ptyShell(environment, input.command),
+      cwd: context.root,
+      env: ptySessionEnvironment(environment),
+      cols: PTY_COLS,
+      rows: PTY_ROWS,
+    });
+  } catch (error) {
+    await backend.close().catch(() => undefined);
+    const detail = error instanceof Error ? error.message : String(error);
+    return await fallBackToPipe(
+      input,
+      context,
+      timeoutSeconds,
+      `the native helper could not open a pseudo-terminal (${detail})`,
+    );
+  }
+
+  const now = options.now ?? Date.now;
+  const deadline = now() + timeoutSeconds * 1000;
+  const onExit: ExitHook =
+    options.onExit ??
+    ((handler) => {
+      process.once("exit", handler);
+    });
+  const offExit: ExitHook =
+    options.offExit ??
+    ((handler) => {
+      process.off("exit", handler);
+    });
+  const chunks: Buffer[] = [];
+  let outputBytes = 0;
+  let exitCode: number | null = null;
+  let timedOut = false;
+  let stoppedProcesses = 0;
+  let released = false;
+  let live = true;
+  const release = async (): Promise<number | null> => {
+    if (released) return null;
+    released = true;
+    try {
+      return await session.stop();
+    } catch {
+      return null;
+    }
+  };
+  // The same exit hook a background launch installs (B31). It cannot await, so
+  // it kills the helper, whose descriptor close hangs up the terminal child.
+  const stopOnExit = (): void => {
+    if (!live) return;
+    live = false;
+    released = true;
+    session.terminate();
+  };
+  onExit(stopOnExit);
+  try {
+    for (;;) {
+      const remaining = deadline - now();
+      if (remaining <= 0) {
+        timedOut = true;
+        break;
+      }
+      const chunk = await session.read(Math.min(remaining, PTY_READ_POLL_MS));
+      if (chunk.data.length > 0) {
+        outputBytes += chunk.data.length;
+        if (outputBytes > MAX_INLINE_OUTPUT_BYTES) {
+          await release();
+          stoppedProcesses += 1;
+          throw new OutputLimitError(outputBytes, MAX_INLINE_OUTPUT_BYTES);
+        }
+        chunks.push(chunk.data);
+      }
+      if (chunk.exited) {
+        exitCode = chunk.exitCode;
+        break;
+      }
+    }
+    if (timedOut) {
+      await release();
+      stoppedProcesses += 1;
+    }
+  } catch (error) {
+    await release();
+    if (error instanceof OutputLimitError) throw error;
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new ToolFailure(`Command failed under a pseudo-terminal: ${detail}`);
+  } finally {
+    live = false;
+    offExit(stopOnExit);
+    await release();
+    await backend.close().catch(() => undefined);
+  }
+
+  return {
+    output: Buffer.concat(chunks).toString("utf8"),
+    exitCode: timedOut ? null : exitCode,
+    signal: timedOut ? "SIGKILL" : null,
+    stoppedProcesses,
+    timedOut,
+    transport: "pty",
+  };
+}
+
 async function runBackground(
   input: ExecuteInput,
   context: ToolContext,
@@ -714,6 +953,19 @@ export async function executeCommand(
   const timeoutSeconds = input.timeout ?? DEFAULT_TIMEOUT_SECONDS;
   if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
     throw new ToolFailure("timeout must be a positive number of seconds");
+  }
+  if (input.pty === true) {
+    if (usesPty(input)) {
+      return await runPty(input, context, timeoutSeconds, options);
+    }
+    // B26/B27: a background launch is never given a PTY; say so rather than
+    // dropping the request silently.
+    const background = await runBackground(input, context, options);
+    return {
+      ...background,
+      transport: "pipe",
+      ptyFallbackReason: "a background launch is never given a pseudo-terminal",
+    };
   }
   return input.fireAndForget === true
     ? await runBackground(input, context, options)

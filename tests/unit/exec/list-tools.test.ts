@@ -136,17 +136,23 @@ test("an MCP tool is grouped under MCP, not Other", async () => {
   const definitions = createMcpToolDefinitions([
     {
       name: "linear",
-      config: { type: "http", url: "https://mcp.example.test" },
+      config: {
+        type: "http",
+        url: "https://mcp.example.test",
+        headers: {},
+        disabled: false,
+      },
       tools: [
         {
           name: "create_issue",
           description: "Create an issue",
           inputSchema: { type: "object" },
+          outputSchema: undefined,
         },
       ],
       callTool: async (tool: string) => {
         called.push(tool);
-        return { text: "ok", isError: false };
+        return { text: "ok", content: [], structuredContent: undefined };
       },
     },
   ]);
