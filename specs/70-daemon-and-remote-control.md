@@ -279,11 +279,36 @@ either `token` (WorkOS JWT) or `apiKey` (`fk-*`); grants
 preconditions, enforced by schema refinements that fail as `PARSE_ERROR`.
 (`packages/daemon-core/src/server/daemon-connection-handler.ts:560-725`;
 `packages/sdk-core/src/protocol/daemon/schemas/connection.ts:45-135`.)
+`[local]` **Verification versus a local identity.** With
+`DROIDE_API_BASE_URL` configured, the daemon **verifies** the presented
+credential against that base instead of comparing it with a locally held
+string: it calls `GET /api/cli/whoami` (50 B32) through the same HTTP
+boundary the transport uses, with the 10 s identity deadline (50 B34), the
+HTTP client's refusal of cross-origin or `http:` redirects, `Authorization:
+Bearer <credential>` and, when the request selected an organization,
+`X-Droide-Org-Id`, plus the extended-answer header (50 B13). The identity the
+daemon reports is the account the backend answers with, never the local
+placeholder. A `401`/`403` is refused as `AUTHENTICATION_ERROR` with
+`error.data.reason:"invalid_credential"`. A configured base that does not
+answer — timeout, network or TLS failure, any other non-2xx status, a body
+that is not `{userId, orgId}` — is `AUTHENTICATION_ERROR` with
+`error.data.reason:"verification_unavailable"` (B31, retryable), never a
+silent local identity. A base that is configured but not a valid absolute
+`http(s)` URL refuses startup, also instead of falling back. Without a
+configured base the daemon reports the local placeholder identity and says so
+with `verified:false` in the answer (B16); a client that needs a real account
+refuses to trust it. The credential is never echoed in an error message and
+never written to the daemon log.
+(`src/daemon/identity.ts`, `src/daemon/auth.ts`.)
 
 **B16 — Authenticate result and post-auth sequence.** Success returns
-`{result:{userId, orgId, encoding?, pipelined?}}`; `encoding:"deflate-raw"`
-is returned only when the client listed it in `acceptEncodings` and the
-connection supports compression. Immediately after the reply the daemon sends
+`{result:{userId, orgId, verified, encoding?, pipelined?}}`; `verified` is
+always present — `true` when the backend confirmed the account (B15's
+verification path), `false` when the daemon only reports its local placeholder
+identity, and a client that needs a real account must refuse `false`.
+`encoding:"deflate-raw"` is returned only when the client listed it in
+`acceptEncodings` and the connection supports compression. Immediately after
+the reply the daemon sends
 the `daemon.connection_status` notification (`supportsRequestCwd`,
 `supportsPullRequestRecords`, `supportsRemoteDesktop`,
 `supportsReadOnlySideChats`, `supportsSharedSessionSideChats`,
@@ -300,7 +325,7 @@ pipeline`", and `pipelined:true` is set in the result.
 
 **B17 — Re-authenticate and logout.** On an authenticated connection,
 `daemon.authenticate` does not re-verify the credential: the daemon replies
-with the connection's `{userId, orgId}`. `daemon.logout` replies
+with the connection's `{userId, orgId, verified}`. `daemon.logout` replies
 `{accepted:true}` and then closes the connection.
 (`packages/daemon-core/src/server/daemon-connection-handler.ts:522-560,750-800`.)
 
@@ -475,7 +500,8 @@ sandbox deny target because atomic writes stage a sibling temp file.
 "localhost means trusted" bypass: every JSON-RPC client authenticates (B15)
 and the daemon is single-user — a valid credential for another user or
 organization is rejected with `AUTHENTICATION_ERROR` and
-`error.data.reason` one of `user_mismatch`, `organization_selection_mismatch`,
+`error.data.reason` one of `invalid_credential` (the backend refused the
+credential itself), `user_mismatch`, `organization_selection_mismatch`,
 `organization_access_denied`, or `verification_unavailable` (backend
 unreachable, retryable). Relay traffic is authenticated by the relay with the
 same WorkOS/API-key credential; the end-to-end channel is a pinned Noise
@@ -746,6 +772,7 @@ SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
 | B13               | `tests/protocol/test_request_response_fixture`      | `fixtures/protocol/authenticate.request.json`, `authenticate.response.json`, `error.method_not_found.json`; parse → normalise → compare                                                                                                                                                                                                                                                                                    |
 | B14               | `tests/protocol/test_handshake_version_negotiation` | 4 envelopes: equal, older, newer, absent version; expected `protocolVersionMismatch` presence and contents                                                                                                                                                                                                                                                                                                                 |
 | B15               | `tests/protocol/test_auth_gate`                     | unauthenticated `list_opened_sessions` and malformed frame; expected exact error envelopes                                                                                                                                                                                                                                                                                                                                 |
+| B15 (verification) | `tests/unit/daemon/auth.test.ts`, `tests/integration/daemon/identity-verification.test.ts` | fake backend on loopback: valid credential → the backend's `userId`/`orgId` with `verified:true`; `401` → `invalid_credential`; base that never answers, 503, and an unparseable answer → `verification_unavailable` (never a local identity); no base → placeholder identity with `verified:false`; credential absent from every error message and log line |
 | B16, B17          | `tests/protocol/test_authenticate_pipeline`         | authenticate with 2 pipelined reads + 1 disallowed method; expected status notification, two results, one `INVALID_REQUEST`, then a second authenticate returns identity, logout closes                                                                                                                                                                                                                                    |
 | B18               | `tests/protocol/test_dispatch_errors`               | unknown method, relay method without capability, handler throw, bad params                                                                                                                                                                                                                                                                                                                                                 |
 | B19               | `tests/protocol/test_request_lifecycle`             | fake transport; close during pending → `ConnectionClosedError`; abort before/after send                                                                                                                                                                                                                                                                                                                                    |

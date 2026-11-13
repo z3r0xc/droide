@@ -119,6 +119,9 @@ export function createMcpToolDefinitions(
           inputSchema: MCP_TOOL_INPUT_SCHEMA,
           sideEffects: ["external-service"],
           requiresConfirmation: true,
+          // B53: a server's tools are grouped under `MCP`, not `Other`, so the
+          // listing says where a call will go.
+          category: "MCP",
           run: async (input) => {
             const args = isJsonObject(input) ? input : {};
             try {

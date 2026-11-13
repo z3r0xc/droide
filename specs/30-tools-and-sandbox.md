@@ -395,9 +395,23 @@ disappeared, or changed since the preview/approval (`@src/agent/file-edit/utils.
 **B26 — `Execute` input.** `summary` (required; Sentence case, 3–8 words,
 `^[A-Z]\S*(?:\s+\S+){2,7}$`), `command` (required), `timeout` (seconds, default
 60), `riskLevelReason` (default `High risk command`), `riskLevel`
-(default `high`), `fireAndForget` (default false)
-(`@packages/core/src/tools/definitions/cli/schema.ts:1033-1077`,
+(default `high`), `fireAndForget` (default false), `pty` (boolean, default
+false) (`@packages/core/src/tools/definitions/cli/schema.ts:1033-1077`,
 `@packages/utils/src/toolCallSummary/constants.ts:3`).
+
+A call is given a pseudo-terminal exactly when `pty` is `true` and the call is
+not `fireAndForget`. `pty` is the whole condition: never inferred from the
+command text, argv0 or the environment, because a terminal changes stdout
+buffering, echo and signal delivery, and only the caller knows it wants those.
+A background launch is never given one — it outlives the call and no reader
+stays attached — so `pty: true` together with `fireAndForget` runs as a pipe
+child and B27's `ptyFallbackReason` says why. The session is the native helper's
+`pty.*` surface (`crates/droide-native`, `src/native/methods.ts`); spec 90
+B13–B22 pins the daemon terminal's surface, which this build does not spawn.
+When the helper is absent, fails its handshake, or refuses a PTY (a platform
+without a backend), the command runs as a pipe child and the result carries the
+reason. The permission decision and the sandbox profile are settled before
+`run`, exactly as for a pipe child; the session is created only after both.
 
 **B27 — `Execute` result.** Success or failure is carried by `exitCode` (null when
 signalled), `signal`, `stoppedProcesses` (count of leftover processes stopped as
@@ -405,6 +419,13 @@ the call returned) and the output. Output within the Script result cap (32 MiB)
 is returned inline as `output`; past it the result carries `outputBytes` and
 `outputFile`, and the file is kept (`@packages/core/src/tools/definitions/cli/schema.ts:113-147`,
 `@src/tools/executors/client/execute-cli.ts:278-305`).
+
+A call that asked for a PTY (`pty: true`, B26) also reports which transport it
+got: `transport` is `"pty"` when the helper granted a session and `"pipe"` when
+it did not, and `ptyFallbackReason` names the fallback — the helper is not
+installed, it failed or refused the platform, or the call was `fireAndForget`.
+The fallback is never silent. Calls that did not ask for a PTY gain neither
+field.
 
 **B28 — Shell per OS.** POSIX: `spawn(script, [], {shell:'bash', detached:false})`
 with stdin ignored, `TERM=dumb`, `PS1=''`, `DEBIAN_FRONTEND=noninteractive`.
