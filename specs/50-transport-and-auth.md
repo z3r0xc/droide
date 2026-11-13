@@ -764,25 +764,25 @@ then unknown. Provider-controlled text never becomes the reason
 fixed too, and it is what a user reads (`src/transport/errors.ts`,
 `LLM_FAILURE_MESSAGES`):
 
-| class | message |
-|---|---|
-| `quota-exhausted` | The model provider quota for this account is exhausted. |
-| `payment-required` | No active subscription found. |
-| `content-moderation` | The model provider rejected the request under its content policy. |
-| `context-limit` | The conversation exceeds the model's context window. |
-| `request-too-large` | The request is too large for the model provider. |
+| class                   | message                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `quota-exhausted`       | The model provider quota for this account is exhausted.                            |
+| `payment-required`      | No active subscription found.                                                      |
+| `content-moderation`    | The model provider rejected the request under its content policy.                  |
+| `context-limit`         | The conversation exceeds the model's context window.                               |
+| `request-too-large`     | The request is too large for the model provider.                                   |
 | `text-fields-too-large` | One or more text fields in the request are larger than the model provider accepts. |
-| `invalid-request` | The model provider rejected the request as invalid. |
-| `authentication` | The model provider rejected the credentials. |
-| `forbidden` | The model provider refused the request. |
-| `gone` | The requested model is no longer available from the provider. |
-| `throttling` | The model provider is throttling requests for this account. |
-| `overloaded` | The model provider is currently overloaded. |
-| `network` | The model provider could not be reached because of network issues. |
-| `host-duration-limit` | The model provider stopped the request at its host duration limit. |
-| `output-degeneration` | The model response degenerated and was stopped. |
-| `internal-error` | The model provider reported an internal error. |
-| `unknown` | The model call failed for an unknown reason. |
+| `invalid-request`       | The model provider rejected the request as invalid.                                |
+| `authentication`        | The model provider rejected the credentials.                                       |
+| `forbidden`             | The model provider refused the request.                                            |
+| `gone`                  | The requested model is no longer available from the provider.                      |
+| `throttling`            | The model provider is throttling requests for this account.                        |
+| `overloaded`            | The model provider is currently overloaded.                                        |
+| `network`               | The model provider could not be reached because of network issues.                 |
+| `host-duration-limit`   | The model provider stopped the request at its host duration limit.                 |
+| `output-degeneration`   | The model response degenerated and was stopped.                                    |
+| `internal-error`        | The model provider reported an internal error.                                     |
+| `unknown`               | The model call failed for an unknown reason.                                       |
 
 The class list is closed: a provider refusal the classifier cannot place is
 `unknown`, never a new class. `[observed]`

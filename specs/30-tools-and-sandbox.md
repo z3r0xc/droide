@@ -499,13 +499,13 @@ sentence when a higher level is administratively impossible
 The sentences are fixed strings, quoted here so a change is a spec change
 (`src/tools/permissions.ts`):
 
-| situation | guidance |
-|---|---|
+| situation                    | guidance                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | organization maximum reached | `This session cannot exceed the organization's maximum autonomy level (<level>). Ask an administrator to raise it.` |
-| autonomy `off` | `Re-run with --auto low, --auto medium or --auto high to allow this tool.` |
-| autonomy `low` | `Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.` |
-| autonomy `medium` | `Re-run with --auto high. For destructive commands, use --skip-permissions-unsafe.` |
-| autonomy `high` | `Re-run with --skip-permissions-unsafe.` |
+| autonomy `off`               | `Re-run with --auto low, --auto medium or --auto high to allow this tool.`                                          |
+| autonomy `low`               | `Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.`                |
+| autonomy `medium`            | `Re-run with --auto high. For destructive commands, use --skip-permissions-unsafe.`                                 |
+| autonomy `high`              | `Re-run with --skip-permissions-unsafe.`                                                                            |
 
 `[observed]`
 

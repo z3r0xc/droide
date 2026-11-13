@@ -8,6 +8,7 @@ import { runExecCommand } from "../../exec/command.ts";
 import { openSessionStore } from "../../session/store.ts";
 import { PROGRAM } from "../brand.ts";
 import { addRuntimeOptions } from "../help.ts";
+import { runSessionPicker } from "../session-picker.ts";
 import { runResumeCommand } from "../resume-commands.ts";
 
 /** Reads stdin to EOF; only the injected exec dependency would ever call it. */
@@ -63,11 +64,7 @@ export function makeResumeCommand(): Command {
           createContext: createAppContext,
           openStore: openSessionStore,
           runExec: runExecCommand,
-          launchInteractive: async (context, streams, resumed) => {
-            // TODO(spec 10 B22): the interactive shell cannot adopt a stored
-            // transcript yet, so the resumed session is named here but the
-            // shell still opens empty.
-            void resumed;
+          launchInteractive: async (context, streams, _resumed, seed) => {
             // A static import would pull React and Ink into `--help`,
             // `--version` and every other subcommand (the same rule the root
             // dispatch follows), so the surface loads only at a terminal.
@@ -77,8 +74,15 @@ export function makeResumeCommand(): Command {
               context,
               stdin: streams.stdin,
               stdout: streams.stdout,
+              seed,
             });
           },
+          pickSession: (labels, streams) =>
+            runSessionPicker(
+              labels,
+              { stdin: streams.stdin, stdout: streams.stdout },
+              { title: "Resume a session:" },
+            ),
           readStdin: readStdinText,
           write: (output) => process.stdout.write(output),
           writeError: (output) => process.stderr.write(output),

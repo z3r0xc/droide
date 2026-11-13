@@ -540,8 +540,7 @@ export class McpClient {
   private readonly callTimeoutMs: number;
   private readonly listingFailureTtlMs: number;
   private readonly onServerNotification:
-    | ((notification: McpServerNotification) => void)
-    | undefined;
+    ((notification: McpServerNotification) => void) | undefined;
   private state: "new" | "connecting" | "open" | "closing" | "closed" = "new";
   private closePromise: Promise<void> | undefined;
   private listingFailure: ListingFailure | undefined;

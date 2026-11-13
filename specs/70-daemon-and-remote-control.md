@@ -478,14 +478,84 @@ a missing host binding says "Reprovision it.".
 
 **B33 — Port proxy.** The WebSocket server answers `GET /health` with
 `200/droide-daemon ok` (unauthenticated, used by the desktop's pre-kill
-probe) and proxies `/port-proxy/<port><path>` to `localhost:<port>` on the
-daemon machine for ports 1024-65535. A proxy request needs the per-process
-32-byte base64url token (`daemon.get_proxy_token`), supplied as the
-`daemonToken` query parameter or the `daemon_proxy` cookie; otherwise
-`401 Unauthorized`. A query token is exchanged for an `HttpOnly;
-SameSite=Strict` cookie scoped to `/port-proxy/<port>` by a 302 that strips
-it from the URL. Paths are normalised and rejected when they escape the
-prefix. Anything else answers `404 Not Found`.
+probe). Every path outside `/port-proxy` answers `404 Not Found`.
+
+_Surface._ `GET /port-proxy/<port><path>` proxies to `http://127.0.0.1:<port>`
+on the daemon machine. `<port>` is decimal and eligible only in 1024-65535;
+`<path>` is the remainder beginning with `/` (absent or `/` means `/`), and
+its query string is forwarded unchanged. The proxy is mounted only when the
+daemon was given a forwardable-port registry; without one the whole prefix is
+`404` with the body `port proxy is not enabled: no forwardable-port registry
+is configured`. Only a loopback peer is served (`127.0.0.0/8`, `::1`, the
+IPv4-mapped form, or a Unix socket), and the `Host` header must name this
+daemon (`127.0.0.1`, `localhost` or `[::1]`, optional port, case-insensitive),
+so a DNS-rebinding request cannot drive the surface with an attacker's name.
+Allowed methods are `GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` and
+`OPTIONS`; the request body is read in full before forwarding and is capped at
+8 MiB; the response status and headers (minus hop-by-hop headers) are streamed
+back; the daemon's own `daemon_proxy` cookie is stripped before forwarding and
+every `daemonToken` parameter is removed from the forwarded query, so the
+upstream never sees the token; an upstream `set-cookie` named `daemon_proxy`
+is dropped so it cannot clobber the proxy's own cookie. The surface is
+rate-limited per peer at 600 requests per 10 s window. A WebSocket upgrade on
+the same path is proxied by piping the raw connection to `127.0.0.1:<port>`
+after the RFC 6455 opening handshake is validated; the upstream's own
+handshake response is passed back with the cookie added.
+
+_Token._ The daemon mints one 32-byte base64url token per process, never
+logged, returned by the authenticated JSON-RPC method
+`daemon.get_proxy_token` as `{token: string}`. A proxy request presents it as
+the `daemonToken` query parameter or as the `daemon_proxy` cookie; the
+comparison is constant-time. A cookie that does not match the current process
+token is discarded and the request is treated as cookie-less.
+
+_Cookie exchange._ A `GET` or `HEAD` carrying a valid query token and no
+valid cookie is not proxied: the daemon answers `302` with
+`Location: <the same path and query with every daemonToken parameter removed>`
+and
+`Set-Cookie: daemon_proxy=<token>; Path=/port-proxy/<port>; HttpOnly; SameSite=Strict`.
+Other methods cannot be redirected without losing their body, and an upgrade
+cannot be redirected at all, so they are proxied (or upgraded) with the same
+`Set-Cookie` attached to their response (the `101` for an upgrade). Once a
+valid cookie is present, a `daemonToken` query parameter is refused with
+`401`, so the token never lingers in an address bar.
+
+_Registry._ `PortProxyRegistry` is the daemon's forwardable-port table; it
+starts empty, rejects ports outside 1024-65535, and holds only ports a local
+service actually listens on. The embedding session manager writes it through
+the authenticated methods `daemon.register_port_forward {port}` and
+`daemon.unregister_port_forward {port}` (both answering `{ports: number[]}`,
+the sorted table) and reads it through `daemon.list_port_forwards`
+(`{ports: number[]}`). A port is registered when its session starts
+listening and unregistered when the session ends.
+
+_Path validation._ The remainder is percent-decoded segment by segment and
+normalised: empty and `.` segments are dropped, a trailing slash is kept, and
+the result always begins with `/`. It is refused with `400` when a segment is
+`..` (raw or encoded), when a backslash or a control/NUL character appears,
+when it begins with `//` (a protocol-relative absolute path), when its first
+segment is a drive-letter absolute path (`C:`), or when a percent-escape does
+not decode. A `<port>` that is not all digits or is outside 1024-65535 is
+also `400`.
+
+_Refusals._ Every refusal is a plain-text body naming the reason.
+
+| Condition                                                     | Status |
+| ------------------------------------------------------------- | ------ |
+| No token, no valid cookie                                     | `401`  |
+| Wrong query token or wrong cookie                             | `401`  |
+| Query token beside a valid cookie                             | `401`  |
+| Non-loopback peer                                             | `403`  |
+| `Host` is not `127.0.0.1`, `localhost` or `[::1]` (rebinding) | `421`  |
+| In-range port absent from the registry                        | `403`  |
+| Daemon has no registry (surface not mounted)                  | `404`  |
+| Path or port fails validation                                 | `400`  |
+| Method not in the allowed set                                 | `405`  |
+| Body above 8 MiB                                              | `413`  |
+| Peer above the rate limit                                     | `429`  |
+| Upstream loopback port refuses the connection                 | `502`  |
+
+Everything else — including any path outside the prefix — is `404`.
 (`packages/daemon-core/src/server/web-socket-server.ts:327-437`;
 `packages/daemon-core/src/server/auth/proxy-token.ts:1-24`.)
 
@@ -631,39 +701,39 @@ SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
 
 ## Acceptance tests
 
-| Clause            | Test id                                             | Fixture                                                                                                                                                                                 |
-| ----------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B1, B11 (surface) | `tests/daemon/test_help_daemon`                     | recorded stdout golden; `$COLUMNS` fixed at 80                                                                                                                                          |
-| B2                | `tests/daemon/test_settings_flag_forwarding`        | temp `HOME`; root `--settings <tmp>`; assert `DROIDE_RUNTIME_SETTINGS_PATH` in the child env                                                                                            |
-| B3                | `tests/daemon/test_transport_selection`             | config table: `{listen,unix,port}` → expected constructor config (ipc-only / unix / tcp / none)                                                                                         |
-| B4                | `tests/daemon/test_no_discovery_file`               | temp `HOME`; start daemon with `--port 0`; assert the state dir gains no port/pid file                                                                                                  |
-| B5                | `tests/daemon/test_readiness_signals`               | fake parent IPC sink + `NOTIFY_SOCKET` temp socket; assert ready message keys and `READY=1` before the banner                                                                           |
-| B6, B7            | `tests/daemon/test_single_instance_two_starts`      | two daemons, same fixed loopback port, in-process harness; second exits 1 with `Startup failed:`; first still answers `/health`                                                         |
-| B7                | `tests/daemon/test_stale_port_retry`                | injected `serve` that throws `EADDRINUSE` 5× then succeeds with fake timers; assert delays `[500,1000,2000,4000,8000]`, success logged on attempt 5; 6 failures rethrow                 |
-| B7 (unix)         | `tests/daemon/test_stale_unix_socket_cleanup`       | (a) socket file with no listener → bind succeeds; (b) socket held by a live listener → exit 1 with bind message. Marked inferred until Open question 3 settles                          |
-| B8                | `tests/daemon/test_graceful_shutdown_order`         | fake services recording stop calls + `SIGTERM`; assert order and exit 0                                                                                                                 |
-| B9                | `tests/daemon/test_crash_policy`                    | injected uncaught errors: agent error → daemon alive; `ENOSPC` → alive; other → `Critical error:` then exit 1                                                                           |
-| B10               | `tests/daemon/test_parent_death_monitors`           | liveness pipe closed / `--parent-pid` of an exited process → shutdown invoked; interval asserted at 2000 ms with fake timers                                                            |
-| B12               | `tests/protocol/test_frame_codec`                   | text frame, binary `0x01`+deflate frame, IPC string frame, relay `client_frame` envelope; byte-for-byte expected                                                                        |
-| B13               | `tests/protocol/test_request_response_fixture`      | `fixtures/protocol/authenticate.request.json`, `authenticate.response.json`, `error.method_not_found.json`; parse → normalise → compare                                                 |
-| B14               | `tests/protocol/test_handshake_version_negotiation` | 4 envelopes: equal, older, newer, absent version; expected `protocolVersionMismatch` presence and contents                                                                              |
-| B15               | `tests/protocol/test_auth_gate`                     | unauthenticated `list_opened_sessions` and malformed frame; expected exact error envelopes                                                                                              |
-| B16, B17          | `tests/protocol/test_authenticate_pipeline`         | authenticate with 2 pipelined reads + 1 disallowed method; expected status notification, two results, one `INVALID_REQUEST`, then a second authenticate returns identity, logout closes |
-| B18               | `tests/protocol/test_dispatch_errors`               | unknown method, relay method without capability, handler throw, bad params                                                                                                              |
-| B19               | `tests/protocol/test_request_lifecycle`             | fake transport; close during pending → `ConnectionClosedError`; abort before/after send                                                                                                 |
-| B20               | `tests/protocol/test_pending_server_requests`       | duplicate id → `CONFLICT`; non-elicitation TTL expiry with fake timers                                                                                                                  |
-| B21               | `tests/protocol/test_cancel_methods`                | interrupt response with `drainedRequestIds` at protocol 1.292.0                                                                                                                         |
-| B22               | `tests/protocol/test_background_processes`          | two-process snapshot notification + `kill_background_process` `{killed:true}`/`{killed:false}`                                                                                          |
-| B23               | `tests/daemon/test_session_inactivity`              | fake timers at 30 min; assert `session_inactivity` payload fields, then teardown; retention callback re-arms                                                                            |
-| B24               | `tests/daemon/test_pending_prompt_restore`          | snapshot file with one fresh and one 25 h old request; restore keeps only the fresh one, before transport start                                                                         |
-| B25, B26          | `tests/computer/test_register_list_remove`          | fake backend; temp `HOME`; assert `host.json`/`computer.json` contents and exit codes                                                                                                   |
-| B27               | `tests/computer/test_reconcile_registration`        | table: missing / hostId absent / hostId conflict / backend error → status and local state                                                                                               |
-| B28, B32          | `tests/daemon/test_remote_control_gating`           | non-TTY without registration → exact message; BYOM disabled → refusal; customer-prem cases → refusals                                                                                   |
-| B29               | `tests/relay/test_relay_auth_frames`                | recorded `relay.authenticate` frame and `auth_ok`/`auth_error` fixtures; disposition table per code                                                                                     |
-| B30               | `tests/computer/test_computer_identity_file`        | generated identity parses; base64 canonical; `keyId` 32 hex; private key absent from logs                                                                                               |
-| B31               | `tests/protocol/test_identity_mismatch`             | credential of another user/org → `AUTHENTICATION_ERROR` with each `reason`                                                                                                              |
-| B33               | `tests/daemon/test_port_proxy_auth`                 | no token → 401; query token → 302 + cookie; bad port → 400; traversal path → 400; unknown path → 404                                                                                    |
-| B34               | `tests/cli/test_daemon_unavailable_messages`        | classified errors → exact fallback strings                                                                                                                                              |
+| Clause            | Test id                                             | Fixture                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1, B11 (surface) | `tests/daemon/test_help_daemon`                     | recorded stdout golden; `$COLUMNS` fixed at 80                                                                                                                                                                                                                                                                                                                                                                             |
+| B2                | `tests/daemon/test_settings_flag_forwarding`        | temp `HOME`; root `--settings <tmp>`; assert `DROIDE_RUNTIME_SETTINGS_PATH` in the child env                                                                                                                                                                                                                                                                                                                               |
+| B3                | `tests/daemon/test_transport_selection`             | config table: `{listen,unix,port}` → expected constructor config (ipc-only / unix / tcp / none)                                                                                                                                                                                                                                                                                                                            |
+| B4                | `tests/daemon/test_no_discovery_file`               | temp `HOME`; start daemon with `--port 0`; assert the state dir gains no port/pid file                                                                                                                                                                                                                                                                                                                                     |
+| B5                | `tests/daemon/test_readiness_signals`               | fake parent IPC sink + `NOTIFY_SOCKET` temp socket; assert ready message keys and `READY=1` before the banner                                                                                                                                                                                                                                                                                                              |
+| B6, B7            | `tests/daemon/test_single_instance_two_starts`      | two daemons, same fixed loopback port, in-process harness; second exits 1 with `Startup failed:`; first still answers `/health`                                                                                                                                                                                                                                                                                            |
+| B7                | `tests/daemon/test_stale_port_retry`                | injected `serve` that throws `EADDRINUSE` 5× then succeeds with fake timers; assert delays `[500,1000,2000,4000,8000]`, success logged on attempt 5; 6 failures rethrow                                                                                                                                                                                                                                                    |
+| B7 (unix)         | `tests/daemon/test_stale_unix_socket_cleanup`       | (a) socket file with no listener → bind succeeds; (b) socket held by a live listener → exit 1 with bind message. Marked inferred until Open question 3 settles                                                                                                                                                                                                                                                             |
+| B8                | `tests/daemon/test_graceful_shutdown_order`         | fake services recording stop calls + `SIGTERM`; assert order and exit 0                                                                                                                                                                                                                                                                                                                                                    |
+| B9                | `tests/daemon/test_crash_policy`                    | injected uncaught errors: agent error → daemon alive; `ENOSPC` → alive; other → `Critical error:` then exit 1                                                                                                                                                                                                                                                                                                              |
+| B10               | `tests/daemon/test_parent_death_monitors`           | liveness pipe closed / `--parent-pid` of an exited process → shutdown invoked; interval asserted at 2000 ms with fake timers                                                                                                                                                                                                                                                                                               |
+| B12               | `tests/protocol/test_frame_codec`                   | text frame, binary `0x01`+deflate frame, IPC string frame, relay `client_frame` envelope; byte-for-byte expected                                                                                                                                                                                                                                                                                                           |
+| B13               | `tests/protocol/test_request_response_fixture`      | `fixtures/protocol/authenticate.request.json`, `authenticate.response.json`, `error.method_not_found.json`; parse → normalise → compare                                                                                                                                                                                                                                                                                    |
+| B14               | `tests/protocol/test_handshake_version_negotiation` | 4 envelopes: equal, older, newer, absent version; expected `protocolVersionMismatch` presence and contents                                                                                                                                                                                                                                                                                                                 |
+| B15               | `tests/protocol/test_auth_gate`                     | unauthenticated `list_opened_sessions` and malformed frame; expected exact error envelopes                                                                                                                                                                                                                                                                                                                                 |
+| B16, B17          | `tests/protocol/test_authenticate_pipeline`         | authenticate with 2 pipelined reads + 1 disallowed method; expected status notification, two results, one `INVALID_REQUEST`, then a second authenticate returns identity, logout closes                                                                                                                                                                                                                                    |
+| B18               | `tests/protocol/test_dispatch_errors`               | unknown method, relay method without capability, handler throw, bad params                                                                                                                                                                                                                                                                                                                                                 |
+| B19               | `tests/protocol/test_request_lifecycle`             | fake transport; close during pending → `ConnectionClosedError`; abort before/after send                                                                                                                                                                                                                                                                                                                                    |
+| B20               | `tests/protocol/test_pending_server_requests`       | duplicate id → `CONFLICT`; non-elicitation TTL expiry with fake timers                                                                                                                                                                                                                                                                                                                                                     |
+| B21               | `tests/protocol/test_cancel_methods`                | interrupt response with `drainedRequestIds` at protocol 1.292.0                                                                                                                                                                                                                                                                                                                                                            |
+| B22               | `tests/protocol/test_background_processes`          | two-process snapshot notification + `kill_background_process` `{killed:true}`/`{killed:false}`                                                                                                                                                                                                                                                                                                                             |
+| B23               | `tests/daemon/test_session_inactivity`              | fake timers at 30 min; assert `session_inactivity` payload fields, then teardown; retention callback re-arms                                                                                                                                                                                                                                                                                                               |
+| B24               | `tests/daemon/test_pending_prompt_restore`          | snapshot file with one fresh and one 25 h old request; restore keeps only the fresh one, before transport start                                                                                                                                                                                                                                                                                                            |
+| B25, B26          | `tests/computer/test_register_list_remove`          | fake backend; temp `HOME`; assert `host.json`/`computer.json` contents and exit codes                                                                                                                                                                                                                                                                                                                                      |
+| B27               | `tests/computer/test_reconcile_registration`        | table: missing / hostId absent / hostId conflict / backend error → status and local state                                                                                                                                                                                                                                                                                                                                  |
+| B28, B32          | `tests/daemon/test_remote_control_gating`           | non-TTY without registration → exact message; BYOM disabled → refusal; customer-prem cases → refusals                                                                                                                                                                                                                                                                                                                      |
+| B29               | `tests/relay/test_relay_auth_frames`                | recorded `relay.authenticate` frame and `auth_ok`/`auth_error` fixtures; disposition table per code                                                                                                                                                                                                                                                                                                                        |
+| B30               | `tests/computer/test_computer_identity_file`        | generated identity parses; base64 canonical; `keyId` 32 hex; private key absent from logs                                                                                                                                                                                                                                                                                                                                  |
+| B31               | `tests/protocol/test_identity_mismatch`             | credential of another user/org → `AUTHENTICATION_ERROR` with each `reason`                                                                                                                                                                                                                                                                                                                                                 |
+| B33               | `tests/daemon/test_port_proxy_auth`                 | `tests/unit/daemon/port-proxy.test.ts`, `tests/integration/daemon/port-proxy.test.ts`: no token → 401; query token → 302 + HttpOnly/SameSite=Strict cookie, then cookie → 200; query token beside the cookie → 401; unregistered port → 403; bad port/traversal/absolute/backslash → 400; method → 405; 8 MiB body → 413; egress rate limit → 429; foreign `Host` → 421; missing registry → 404; upgrade through the proxy |
+| B34               | `tests/cli/test_daemon_unavailable_messages`        | classified errors → exact fallback strings                                                                                                                                                                                                                                                                                                                                                                                 |
 
 Fixtures are synthesised JSON envelopes and in-memory fakes; no fixture is
 copied from the reference build. Tests that bind use loopback only and a

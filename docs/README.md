@@ -46,23 +46,23 @@ Evidence, contract and implementation are kept apart
 
 ## Layout
 
-| Path | Contents |
-|---|---|
-| `docs/` | Project overview, vendored-artefact provenance, ADRs |
-| `specs/` | One specification per subsystem, plus the spec template |
-| `tests/` | Acceptance tests and fixtures, mapped to spec clauses |
-| `tools/` | Deterministic analysers and extractors, each with tests |
-| `evidence/` | The evidence ledger: what was observed, derived, or inferred |
-| `raw/` | Untracked reference artefacts (binaries, upstream source trees) |
+| Path        | Contents                                                        |
+| ----------- | --------------------------------------------------------------- |
+| `docs/`     | Project overview, vendored-artefact provenance, ADRs            |
+| `specs/`    | One specification per subsystem, plus the spec template         |
+| `tests/`    | Acceptance tests and fixtures, mapped to spec clauses           |
+| `tools/`    | Deterministic analysers and extractors, each with tests         |
+| `evidence/` | The evidence ledger: what was observed, derived, or inferred    |
+| `raw/`      | Untracked reference artefacts (binaries, upstream source trees) |
 
 ## Documents
 
-| File | Purpose |
-|---|---|
-| `plan.md` | milestones, gates, definition of done |
-| `status.md` | living dashboard: what works, what is in flight, known gaps |
-| `gaps.md` | every `TODO(spec …)` marker, generated from code (`npm run gaps`) |
-| `release.md` | versioning, release gates, artefacts, rollback |
-| `rust-setup.md` | how the Rust toolchain is configured on this workstation |
-| `adr/` | architecture decisions, one file per decision |
-| `architecture/README.md` | evidence-derived layer map of the reference tree |
+| File                     | Purpose                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| `plan.md`                | milestones, gates, definition of done                             |
+| `status.md`              | living dashboard: what works, what is in flight, known gaps       |
+| `gaps.md`                | every `TODO(spec …)` marker, generated from code (`npm run gaps`) |
+| `release.md`             | versioning, release gates, artefacts, rollback                    |
+| `rust-setup.md`          | how the Rust toolchain is configured on this workstation          |
+| `adr/`                   | architecture decisions, one file per decision                     |
+| `architecture/README.md` | evidence-derived layer map of the reference tree                  |

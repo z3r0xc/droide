@@ -15,6 +15,7 @@ import {
 import { test } from "node:test";
 
 import { MAX_FRAME_BYTES } from "../../../src/daemon/protocol.ts";
+import { PORT_PROXY_DISABLED_REASON } from "../../../src/daemon/port-proxy.ts";
 import {
   FrameReader,
   HEALTH_BODY,
@@ -575,6 +576,10 @@ test("the HTTP server answers /health without authentication and 404 elsewhere",
       body: HEALTH_BODY,
     });
     assert.deepEqual(await fetchText("/port-proxy/1234/x"), {
+      status: 404,
+      body: PORT_PROXY_DISABLED_REASON,
+    });
+    assert.deepEqual(await fetchText("/unknown"), {
       status: 404,
       body: "Not Found",
     });

@@ -16,6 +16,12 @@ import { connect as connectSocket, type Socket } from "node:net";
 import type { Duplex } from "node:stream";
 
 import { MAX_FRAME_BYTES } from "./protocol.ts";
+import {
+  handlePortProxyRequest,
+  isPortProxyUpgrade,
+  isPortProxyUrl,
+  type PortProxyOptions,
+} from "./port-proxy.ts";
 import { systemTimers, type DaemonTimers } from "./timers.ts";
 
 /** The RFC 6455 accept-key salt. */
@@ -421,6 +427,7 @@ export function attachWebSocketServer(
   ) => void,
 ): void {
   server.on("upgrade", (request, socket, head) => {
+    if (isPortProxyUpgrade(request)) return;
     const key = request.headers["sec-websocket-key"];
     const upgrade = request.headers.upgrade;
     const version = request.headers["sec-websocket-version"];
@@ -567,20 +574,30 @@ function handshakeAccepted(head: string, expected: string): boolean {
 /** The body the desktop's pre-kill probe reads (B33). */
 export const HEALTH_BODY = "droide-daemon ok";
 
+/** Options for the daemon's HTTP surface. */
+export interface DaemonHttpServerOptions {
+  /** Absent means the port proxy surface answers `404` with a reason. */
+  readonly portProxy?: PortProxyOptions;
+}
+
 /**
  * Create the HTTP server a daemon binds. `GET /health` answers `200` with
- * {@link HEALTH_BODY} without authenticating; everything else is `404`.
- *
- * TODO(spec B33): the token-gated `/port-proxy/<port>` surface (query token,
- * cookie exchange, traversal refusal) is not implemented, so those requests
- * answer 404 instead of proxying or refusing with 401.
+ * {@link HEALTH_BODY} without authenticating; `/port-proxy` is delegated to
+ * {@link handlePortProxyRequest} (B33), which refuses with `404` when the
+ * daemon has no forwardable-port registry; everything else is `404`.
  */
-export function createDaemonHttpServer(): Server {
+export function createDaemonHttpServer(
+  options: DaemonHttpServerOptions = {},
+): Server {
   return createServer((request, response) => {
     if (request.method === "GET" && request.url === "/health") {
       response.statusCode = 200;
       response.setHeader("Content-Type", "text/plain; charset=utf-8");
       response.end(HEALTH_BODY);
+      return;
+    }
+    if (isPortProxyUrl(request.url)) {
+      handlePortProxyRequest(request, response, options.portProxy);
       return;
     }
     response.statusCode = 404;

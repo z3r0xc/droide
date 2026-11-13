@@ -47,9 +47,45 @@ export interface InstalledPluginsResult {
 export interface LoadInstalledPluginsOptions {
   readonly stateDir: string;
   readonly projectDir: string;
+  /** The merged enablement map: the highest settings level wins per key. */
   readonly enabledPlugins?: Readonly<Record<string, boolean>>;
+  /**
+   * `strictEnabledPlugins` (B36). When set, enablement is resolved against the
+   * unmerged level maps ({@link enabledPluginsByLevel}), so a lower level can
+   * never re-enable a plugin a higher level disabled.
+   */
+  readonly strictEnabledPlugins?: boolean;
+  /**
+   * `enabledPlugins` as each settings level states it, highest priority first
+   * (org, runtime, project, user). Read only when `strictEnabledPlugins` is
+   * true; without it the merged map is the best information available.
+   */
+  readonly enabledPluginsByLevel?: readonly Readonly<Record<string, boolean>>[];
   /** `strictKnownMarketplaces` (B36): what an external source must satisfy. */
   readonly allowedSources?: readonly PluginSource[];
+}
+
+/**
+ * Whether one plugin is enabled (B36). An absent entry means enabled. Under
+ * `strictEnabledPlugins` the first level that names the plugin answers and
+ * later levels are not consulted; otherwise the merged map answers.
+ */
+export function resolvePluginEnablement(
+  id: string,
+  options: Pick<
+    LoadInstalledPluginsOptions,
+    "enabledPlugins" | "strictEnabledPlugins" | "enabledPluginsByLevel"
+  >,
+): boolean {
+  if (options.strictEnabledPlugins === true) {
+    for (const level of options.enabledPluginsByLevel ?? []) {
+      if (Object.hasOwn(level, id)) return level[id] !== false;
+    }
+  }
+  const merged = options.enabledPlugins;
+  if (merged !== undefined && Object.hasOwn(merged, id))
+    return merged[id] !== false;
+  return true;
 }
 
 /**
@@ -237,9 +273,7 @@ function readOneScope(
       ...(version === undefined ? {} : { version }),
       ...(installedAt === undefined ? {} : { installedAt }),
       ...(lastUpdated === undefined ? {} : { lastUpdated }),
-      // TODO(spec B36): strictEnabledPlugins is parsed but not enforced, so an
-      // entry below the policy level still resolves as enabled here.
-      enabled: options.enabledPlugins?.[id] !== false,
+      enabled: resolvePluginEnablement(id, options),
     });
   }
   return records;

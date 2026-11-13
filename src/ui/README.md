@@ -43,8 +43,10 @@ unmounted in `finally`, and the frame tests render twice to prove determinism.
   `isTTY` (`specs/10-cli-surface.md` §B16, `specs/95-terminal-ui.md` §B18).
 - `launchInteractive(context, streams)` is the production launcher;
   `runInteractiveShell(options)` is the session. Size, capabilities, clock,
-  timers, the signal source and the mount are options: the module never reads
-  `process`.
+  timers, the signal source, the mount and the resumed session's `seed` are
+  options: the module never reads `process`. A `seed`
+  (`src/app/session-seed.ts`) becomes the shell's first rows and the next
+  request's history, so a resume renders the transcript without replaying it.
 - `src/cli/commands/root.ts` dispatches through `DefaultCommandRuntime`. The
   production runtime reads `process` exactly once and loads this module with a
   dynamic `import()` only on a terminal launch, so `--help`, `--version`, the

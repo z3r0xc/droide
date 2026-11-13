@@ -26,7 +26,10 @@ import {
   type ShellAgent,
   type TimerApi,
 } from "../../../src/app/interactive.ts";
-import { seedFromRecords, type SessionSeed } from "../../../src/app/session-seed.ts";
+import {
+  seedFromRecords,
+  type SessionSeed,
+} from "../../../src/app/session-seed.ts";
 import type { Platform } from "../../../src/config/paths.ts";
 import { openSessionStore } from "../../../src/session/store.ts";
 import type { SignalSource } from "../../../src/ui/setup.ts";
@@ -166,10 +169,7 @@ function tick(): Promise<void> {
   return promise;
 }
 
-async function waitFor(
-  predicate: () => boolean,
-  label: string,
-): Promise<void> {
+async function waitFor(predicate: () => boolean, label: string): Promise<void> {
   for (let attempt = 0; attempt < 2000; attempt += 1) {
     if (predicate()) return;
     await tick();

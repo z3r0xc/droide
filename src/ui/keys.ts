@@ -172,7 +172,10 @@ const ignore: KeyAction = { kind: "ignore" };
 /** Spec "Key bindings" table, in table order. */
 export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["enter"], action: { kind: "submit", queue: false } },
-  { keys: ["ctrl+enter", "alt+enter"], action: { kind: "submit", queue: true } },
+  {
+    keys: ["ctrl+enter", "alt+enter"],
+    action: { kind: "submit", queue: true },
+  },
   { keys: ["shift+enter"], action: { kind: "newline" } },
   { keys: ["newline"], action: { kind: "newline" } },
   {

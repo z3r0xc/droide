@@ -8,7 +8,11 @@ import { test } from "node:test";
 import { seedFromRecords } from "../../../src/app/session-seed.ts";
 import type { JsonObject, JsonValue } from "../../../src/session/transcript.ts";
 
-function message(role: string, content: readonly JsonValue[], at = 1_000): JsonObject {
+function message(
+  role: string,
+  content: readonly JsonValue[],
+  at = 1_000,
+): JsonObject {
   return {
     type: "message",
     message: { id: `${role}-${at}`, role, content },
@@ -41,10 +45,19 @@ test("stored text turns become the shell's first rows", () => {
 
 test("a tool call and its stored result become one settled tool row", () => {
   const seed = seedFromRecords([
-    message("assistant", [
-      text("checking"),
-      { type: "tool_use", id: "call-1", name: "read", input: { path: "a.ts" } },
-    ], 1_000),
+    message(
+      "assistant",
+      [
+        text("checking"),
+        {
+          type: "tool_use",
+          id: "call-1",
+          name: "read",
+          input: { path: "a.ts" },
+        },
+      ],
+      1_000,
+    ),
     message(
       "tool",
       [{ type: "tool_result", toolUseId: "call-1", content: "file text" }],
@@ -93,9 +106,11 @@ test("a call whose result never landed is shown as an interrupted error", () => 
 
 test("a failed call keeps its error state and rendered result", () => {
   const seed = seedFromRecords([
-    message("assistant", [
-      { type: "tool_use", id: "call-1", name: "shell", input: { cmd: "ls" } },
-    ], 1_000),
+    message(
+      "assistant",
+      [{ type: "tool_use", id: "call-1", name: "shell", input: { cmd: "ls" } }],
+      1_000,
+    ),
     message(
       "tool",
       [

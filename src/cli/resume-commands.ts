@@ -4,11 +4,13 @@
  * Contract: `specs/10-cli-surface.md` §B22–B25 and
  * `specs/40-sessions-and-storage.md` §B17, §B38–B40.
  *
- * Without an id the command is a listing: sessions newest-first, bounded, on
- * stdout — the same bytes whether stdin is a terminal or a pipe. With an id or
- * a session link the named session is validated against the store, then either
- * a prompt runs one non-interactive turn through the same path as
- * `exec --session-id` or the interactive shell takes the session.
+ * Without an id the command chooses: on a terminal it offers the stored
+ * sessions in a picker; on a pipe it prints the bounded newest-first list,
+ * because there is nothing to choose with. With an id or a session link the
+ * named session is validated against the store, then either a prompt runs one
+ * non-interactive turn through the same path as `exec --session-id` or the
+ * interactive shell takes the session, seeded with the stored transcript so the
+ * first screen is the conversation (`src/app/session-seed.ts`).
  *
  * `--fork` copies the transcript into a new id first, with the same rules
  * `exec --fork` applies (a fork of an archived session is refused, and the copy
@@ -19,6 +21,11 @@
 import { ConfigError } from "../config/errors.ts";
 import { openExecSession } from "../exec/session.ts";
 import { isSessionId } from "../session/ids.ts";
+import {
+  TranscriptCorruptError,
+  TranscriptUnavailableError,
+} from "../session/errors.ts";
+import { seedFromRecords, type SessionSeed } from "../app/session-seed.ts";
 import {
   type SessionListItem,
   type SessionRow,
@@ -40,6 +47,18 @@ export const LAST_WITH_ID = "--last cannot be combined with a session id.";
 export const FORK_NEEDS_ID = "--fork needs a session id.";
 export const FORK_WITHOUT_PROMPT =
   "--fork needs a prompt when stdin and stdout are not both terminals.";
+
+/** The picker was dismissed; nothing was resumed, so nothing is an error. */
+export const NO_SESSION_SELECTED = "No session selected.";
+
+/** B22: a transcript the shell cannot read is named, never an empty shell. */
+export function missingTranscript(sessionId: string): string {
+  return `The transcript for session ${sessionId} is missing, so it cannot be resumed.`;
+}
+
+export function corruptTranscript(sessionId: string, line: number): string {
+  return `The transcript for session ${sessionId} is corrupt at line ${line}, so it cannot be resumed.`;
+}
 
 export function invalidSessionId(value: string): string {
   return `Invalid session id: ${value}. Expected a session UUID or a session link.`;
@@ -97,7 +116,16 @@ export interface ResumeDeps {
     context: AppContext,
     streams: ResumeStreams,
     session: ResumedSession,
+    seed: SessionSeed,
   ) => Promise<number>;
+  /**
+   * The terminal picker (B22). Receives the exact rows the list renderer would
+   * show and reports an index, or `null` when the user aborted.
+   */
+  readonly pickSession: (
+    labels: readonly string[],
+    streams: ResumeStreams,
+  ) => Promise<number | null>;
   readonly readStdin: () => Promise<string>;
   readonly write: (text: string) => void;
   readonly writeError: (text: string) => void;
@@ -140,22 +168,32 @@ export function parseSessionArgument(value: string): string | null {
 }
 
 /**
- * Newest first, bounded, and identical on a terminal and a pipe. Ordering is
- * re-applied here with a plain string tie-break so the bytes never depend on
- * the host locale.
+ * Newest first, with a plain string tie-break so the bytes never depend on the
+ * host locale, bounded to what one listing shows. Every surface that shows a
+ * session and then takes an index from the user iterates *this* array, so a
+ * chosen row can never name a different session than the one drawn.
+ */
+export function orderSessions(
+  items: readonly SessionListItem[],
+): readonly SessionListItem[] {
+  return [...items]
+    .sort((left, right) => {
+      const byTime = (right.updatedAt ?? 0) - (left.updatedAt ?? 0);
+      if (byTime !== 0) return byTime;
+      if (left.sessionId === right.sessionId) return 0;
+      return left.sessionId < right.sessionId ? 1 : -1;
+    })
+    .slice(0, RESUME_LIST_LIMIT);
+}
+
+/**
+ * Newest first, bounded, and identical on a terminal and a pipe.
  */
 export function renderSessionList(items: readonly SessionListItem[]): string {
   if (items.length === 0) return "No sessions found.\n";
 
-  const ordered = [...items].sort((left, right) => {
-    const byTime = (right.updatedAt ?? 0) - (left.updatedAt ?? 0);
-    if (byTime !== 0) return byTime;
-    if (left.sessionId === right.sessionId) return 0;
-    return left.sessionId < right.sessionId ? 1 : -1;
-  });
-
   const lines = ["Recent sessions:"];
-  for (const item of ordered.slice(0, RESUME_LIST_LIMIT)) {
+  for (const item of orderSessions(items)) {
     const title =
       item.title === null ? "(untitled)" : cutTitle(cleanTitle(item.title));
     lines.push(
@@ -165,6 +203,27 @@ export function renderSessionList(items: readonly SessionListItem[]): string {
     );
   }
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The picker's rows, in the order given: one line of id, title (or
+ * "(untitled)") and update time per session. The caller passes an array it will
+ * index with the picker's answer (`orderSessions`), so the row drawn and the
+ * session resumed are the same one. The picker draws the pointer itself, so a
+ * row carries no indent or marker.
+ */
+export function renderPickerRows(
+  items: readonly SessionListItem[],
+): readonly string[] {
+  return items.map((item) => {
+    const title =
+      item.title === null ? "(untitled)" : cutTitle(cleanTitle(item.title));
+    const when =
+      item.updatedAt === null
+        ? "unknown"
+        : new Date(item.updatedAt).toISOString();
+    return `${item.sessionId}  ${title} · ${when}`;
+  });
 }
 
 /** The one line every resume path prints before it continues a session. */
@@ -304,6 +363,34 @@ async function continueSession(
     return;
   }
 
+  const launching = prompt === "" && deps.stdinIsTTY && deps.stdoutIsTTY;
+
+  // B22: the shell is seeded from the stored transcript before it mounts, so
+  // the first screen is the conversation and the next request extends it. The
+  // read happens before a fork, because forking copies every record and closes
+  // this store (`openExecSession` owns the handle it was given).
+  let seed: SessionSeed | undefined;
+  if (launching) {
+    try {
+      seed = seedFromRecords(store.readSession(sessionId));
+    } catch (error) {
+      if (error instanceof TranscriptUnavailableError) {
+        fail(deps, missingTranscript(sessionId));
+        return;
+      }
+      if (error instanceof TranscriptCorruptError) {
+        fail(deps, corruptTranscript(sessionId, error.line));
+        return;
+      }
+      const detail = error instanceof Error ? error.message : String(error);
+      fail(
+        deps,
+        `The transcript for session ${sessionId} could not be read: ${detail}`,
+      );
+      return;
+    }
+  }
+
   let session = resumedFrom(row);
   if (options.fork) {
     try {
@@ -318,12 +405,12 @@ async function continueSession(
   deps.write(renderResumedHeader(session, forkedFrom));
 
   if (prompt === "") {
-    if (!(deps.stdinIsTTY && deps.stdoutIsTTY)) {
+    if (seed === undefined) {
       deps.setExitCode(0);
       return;
     }
     deps.setExitCode(
-      await deps.launchInteractive(context, deps.streams, session),
+      await deps.launchInteractive(context, deps.streams, session, seed),
     );
     return;
   }
@@ -416,19 +503,37 @@ export async function runResumeCommand(
       }
       sessionId = chosen.sessionId;
     } else {
-      // TODO(spec 10 B22): the interactive session picker is not implemented,
-      // so a terminal gets the same bounded list as a pipe instead of a
-      // choice; `--last` is the one way to select without a picker.
-      deps.write(
-        renderSessionList(
-          store.listSessions({
-            limit: RESUME_LIST_LIMIT,
-            cwd: context.environment.cwd,
-          }),
-        ),
+      // B22: a terminal chooses; a pipe gets the bounded list and nothing to
+      // choose with, unchanged from what it always printed.
+      const items = orderSessions(
+        store.listSessions({
+          limit: RESUME_LIST_LIMIT,
+          cwd: context.environment.cwd,
+        }),
       );
-      deps.setExitCode(0);
-      return;
+      if (!(deps.stdinIsTTY && deps.stdoutIsTTY)) {
+        deps.write(renderSessionList(items));
+        deps.setExitCode(0);
+        return;
+      }
+      if (items.length === 0) {
+        deps.write("No sessions found.\n");
+        deps.setExitCode(0);
+        return;
+      }
+      // The picker's answer indexes the very array it was drawn from, so the
+      // row the user picked and the session resumed cannot disagree.
+      const chosen = await deps.pickSession(
+        renderPickerRows(items),
+        deps.streams,
+      );
+      const item = chosen === null ? undefined : items[chosen];
+      if (item === undefined) {
+        deps.writeError(`${NO_SESSION_SELECTED}\n`);
+        deps.setExitCode(0);
+        return;
+      }
+      sessionId = item.sessionId;
     }
 
     await continueSession(sessionId, prompt, options, context, store, deps);

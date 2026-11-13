@@ -22,6 +22,7 @@ import {
   type DaemonShutdownStep,
 } from "../../../src/daemon/server.ts";
 import type { LivenessPipeOpener } from "../../../src/daemon/liveness.ts";
+import type { PortProxyRegistry } from "../../../src/daemon/port-proxy.ts";
 import type { DaemonTimers } from "../../../src/daemon/timers.ts";
 import {
   connectWebSocket,
@@ -268,6 +269,7 @@ export interface TestServerOptions {
   readonly isProcessAlive?: (pid: number) => boolean;
   readonly openLiveness?: LivenessPipeOpener;
   readonly pid?: number;
+  readonly portProxy?: PortProxyRegistry;
 }
 
 /** Materialise {@link TestServerOptions} as real server options. */
@@ -334,6 +336,9 @@ export function toServerOptions(
       ? {}
       : { openLiveness: overrides.openLiveness }),
     ...(overrides.pid === undefined ? {} : { pid: overrides.pid }),
+    ...(overrides.portProxy === undefined
+      ? {}
+      : { portProxy: overrides.portProxy }),
   };
 }
 

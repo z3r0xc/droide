@@ -8,6 +8,7 @@ import {
   compareVersions,
   loadInstalledPlugins,
   renderPluginList,
+  resolvePluginEnablement,
 } from "../../../src/extensions/plugins/installed.ts";
 
 async function scope(
@@ -211,4 +212,105 @@ test("versions compare numerically, not lexically", () => {
   assert.equal(compareVersions("2.0.0", "2.0.0"), 0);
   assert.equal(compareVersions(undefined, "1.0.0") < 0, true);
   assert.equal(compareVersions("1.0.0-beta", "1.0.0") < 0, true);
+});
+
+/**
+ * `strictEnabledPlugins` (B36): the levels are consulted highest priority
+ * first and the first one that names a plugin decides. Each iteration makes a
+ * different level the decider and every level below it disagree, so a loader
+ * that let a lower level win would fail the case.
+ */
+const LEVELS = ["org", "runtime", "project", "user"] as const;
+
+function levelsWith(
+  decider: number,
+  decision: boolean,
+): readonly Record<string, boolean>[] {
+  return LEVELS.map((_, index) => {
+    if (index === decider) return { demo: decision };
+    return index > decider ? { demo: !decision } : {};
+  });
+}
+
+test("strict: a lower level cannot re-enable a plugin a higher level disabled", async () => {
+  const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
+  try {
+    const stateDir = await scope(root, "home", {
+      schemaVersion: 1,
+      plugins: { demo: [entry("/p/demo", "1.0.0")] },
+    });
+    await mkdir(join(root, "project"), { recursive: true });
+
+    for (let decider = 0; decider < LEVELS.length; decider += 1) {
+      const result = loadInstalledPlugins({
+        stateDir,
+        projectDir: join(root, "project"),
+        strictEnabledPlugins: true,
+        enabledPluginsByLevel: levelsWith(decider, false),
+      });
+      assert.equal(
+        result.plugins[0]?.enabled,
+        false,
+        `${LEVELS[decider] ?? ""} should decide`,
+      );
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("strict: a level that enables decides over lower levels that disable", async () => {
+  const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
+  try {
+    const stateDir = await scope(root, "home", {
+      schemaVersion: 1,
+      plugins: { demo: [entry("/p/demo", "1.0.0")] },
+    });
+    await mkdir(join(root, "project"), { recursive: true });
+
+    for (let decider = 0; decider < LEVELS.length; decider += 1) {
+      const result = loadInstalledPlugins({
+        stateDir,
+        projectDir: join(root, "project"),
+        strictEnabledPlugins: true,
+        enabledPluginsByLevel: levelsWith(decider, true),
+      });
+      assert.equal(
+        result.plugins[0]?.enabled,
+        true,
+        `${LEVELS[decider] ?? ""} should decide`,
+      );
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("without strict, the merged map is the answer", async () => {
+  const root = await mkdtemp(join(tmpdir(), "droide-plugins-"));
+  try {
+    const stateDir = await scope(root, "home", {
+      schemaVersion: 1,
+      plugins: { demo: [entry("/p/demo", "1.0.0")] },
+    });
+    await mkdir(join(root, "project"), { recursive: true });
+
+    // A policy level says no, a lower level says yes, and the caller's merged
+    // map reflects the lower level: non-strict accepts it.
+    const result = loadInstalledPlugins({
+      stateDir,
+      projectDir: join(root, "project"),
+      enabledPlugins: { demo: true },
+      enabledPluginsByLevel: [{ demo: false }, { demo: true }],
+    });
+    assert.equal(result.plugins[0]?.enabled, true);
+
+    assert.equal(resolvePluginEnablement("demo", { enabledPlugins: {} }), true);
+    assert.equal(
+      resolvePluginEnablement("demo", { enabledPlugins: { demo: false } }),
+      false,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

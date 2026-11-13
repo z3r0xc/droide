@@ -12,7 +12,7 @@ a terminal (`src/components/**`, 340 files, plus `src/repl/**`), and
 set, spacing constants, row budgets, key bindings and the capability matrix for
 16-colour and `TERM=dumb` terminals.
 
-Writing a terminal layout engine by hand would put the *design contract* behind
+Writing a terminal layout engine by hand would put the _design contract_ behind
 hand-written cursor arithmetic, and every spacing rule would be a place to
 drift.
 

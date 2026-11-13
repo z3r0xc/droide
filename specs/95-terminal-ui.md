@@ -907,27 +907,27 @@ File completion: `@` opens a debounced (100 ms) search; results list up to 6 row
 
 Frames are compared as ordered lines with no trailing-space padding. Fixtures are synthetic.
 
-| Clause         | Test id                                                        | Fixture                                                                                    |
-| -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| B1             | `tests/ui/test_screen_sequences`                               | `fixtures/ui/screen-sequences.txt` — asserts the exact byte order of enter/leave sequences |
-| B2, B3         | `tests/ui/test_header_80x24`, `test_header_120x40`             | `fixtures/ui/header-compact.txt`, `fixtures/ui/header-wide.txt`                            |
-| B4             | `tests/ui/test_static_dynamic_split`                           | `fixtures/ui/stream.jsonl`                                                                 |
-| B5, R1–R13     | `tests/ui/test_golden_frame_80x24`, `test_golden_frame_120x40` | `fixtures/ui/transcript.jsonl`                                                             |
-| B6, B7, R4, R5 | `tests/ui/test_tool_row`                                       | `fixtures/ui/tool-read.json`                                                               |
-| B8, R6         | `tests/ui/test_diff_row`                                       | `fixtures/ui/diff-simple.patch`                                                            |
-| B9, R8         | `tests/ui/test_pinned_todo`                                    | `fixtures/ui/todos.json`                                                                   |
-| B10            | `tests/ui/test_composer_layout`                                | `fixtures/ui/composer-cases.json`                                                          |
-| B10 (queue)    | `tests/unit/ui/queued.test.ts`, `tests/unit/app/turn-driver.test.ts`, `tests/integration/ui/interactive.test.ts` | synthetic queue props; a scripted provider held mid-turn |
-| B11            | `tests/ui/test_suggestions`                                    | `fixtures/ui/commands.json`, `fixtures/ui/files.json`                                      |
-| B12            | `tests/ui/test_status_banner`                                  | `fixtures/ui/states.json`                                                                  |
-| B13, B14       | `tests/ui/test_footer_fit`, `test_status_line`                 | `fixtures/ui/footer-widths.json`, `fixtures/ui/statusline.json`                            |
-| B15            | `tests/ui/test_key_sequences`                                  | `fixtures/ui/keys.jsonl`                                                                   |
-| B16            | `tests/ui/test_paste_thresholds`                               | `fixtures/ui/pastes.json`                                                                  |
-| B17            | `tests/ui/test_palette_tokens`                                 | `fixtures/ui/palette.json`                                                                 |
-| B18            | `tests/ui/test_capability_matrix`                              | `fixtures/ui/env-matrix.json`                                                              |
-| B19            | `tests/ui/test_resize_reflow`                                  | `fixtures/ui/resize.jsonl`                                                                 |
-| B20            | `tests/ui/test_sanitization_widths`                            | `fixtures/ui/hostile-text.json`                                                            |
-| B21            | `tests/ui/test_animation_timings`, `test_palette_tokens`       | `fixtures/ui/ticks.json`                                                                   |
+| Clause         | Test id                                                                                                          | Fixture                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| B1             | `tests/ui/test_screen_sequences`                                                                                 | `fixtures/ui/screen-sequences.txt` — asserts the exact byte order of enter/leave sequences |
+| B2, B3         | `tests/ui/test_header_80x24`, `test_header_120x40`                                                               | `fixtures/ui/header-compact.txt`, `fixtures/ui/header-wide.txt`                            |
+| B4             | `tests/ui/test_static_dynamic_split`                                                                             | `fixtures/ui/stream.jsonl`                                                                 |
+| B5, R1–R13     | `tests/ui/test_golden_frame_80x24`, `test_golden_frame_120x40`                                                   | `fixtures/ui/transcript.jsonl`                                                             |
+| B6, B7, R4, R5 | `tests/ui/test_tool_row`                                                                                         | `fixtures/ui/tool-read.json`                                                               |
+| B8, R6         | `tests/ui/test_diff_row`                                                                                         | `fixtures/ui/diff-simple.patch`                                                            |
+| B9, R8         | `tests/ui/test_pinned_todo`                                                                                      | `fixtures/ui/todos.json`                                                                   |
+| B10            | `tests/ui/test_composer_layout`                                                                                  | `fixtures/ui/composer-cases.json`                                                          |
+| B10 (queue)    | `tests/unit/ui/queued.test.ts`, `tests/unit/app/turn-driver.test.ts`, `tests/integration/ui/interactive.test.ts` | synthetic queue props; a scripted provider held mid-turn                                   |
+| B11            | `tests/ui/test_suggestions`                                                                                      | `fixtures/ui/commands.json`, `fixtures/ui/files.json`                                      |
+| B12            | `tests/ui/test_status_banner`                                                                                    | `fixtures/ui/states.json`                                                                  |
+| B13, B14       | `tests/ui/test_footer_fit`, `test_status_line`                                                                   | `fixtures/ui/footer-widths.json`, `fixtures/ui/statusline.json`                            |
+| B15            | `tests/ui/test_key_sequences`                                                                                    | `fixtures/ui/keys.jsonl`                                                                   |
+| B16            | `tests/ui/test_paste_thresholds`                                                                                 | `fixtures/ui/pastes.json`                                                                  |
+| B17            | `tests/ui/test_palette_tokens`                                                                                   | `fixtures/ui/palette.json`                                                                 |
+| B18            | `tests/ui/test_capability_matrix`                                                                                | `fixtures/ui/env-matrix.json`                                                              |
+| B19            | `tests/ui/test_resize_reflow`                                                                                    | `fixtures/ui/resize.jsonl`                                                                 |
+| B20            | `tests/ui/test_sanitization_widths`                                                                              | `fixtures/ui/hostile-text.json`                                                            |
+| B21            | `tests/ui/test_animation_timings`, `test_palette_tokens`                                                         | `fixtures/ui/ticks.json`                                                                   |
 
 **T1 — `test_palette_tokens`.** Input: the resolved `droide-dark` theme. Expected: for each row of
 D1–D8, `COLORS.<slot>` equals the literal hex in this spec; the OSC sequence builder emits

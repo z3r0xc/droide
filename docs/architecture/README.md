@@ -22,19 +22,19 @@ graph TD
 
 ## Package responsibilities (derived from directory contents)
 
-| package | role |
-|---|---|
-| `app:src` | Process entry, command tree, hooks/components (terminal UI), tool implementations, MCP, sandbox, exec/streaming modes, ACP, telemetry |
-| `core` | Agent loop internals, tool registry and `create-tool`, message/context handling |
-| `runtime` | Auth (API key, customer-prem), git, file locking, JSON stores, frontmatter, diagnostics, computer/remote-control support |
-| `common` | Cross-cutting API schemas (backend routes, agent effectiveness, connectors) and settings shape |
-| `sdk-core` | Protocol definitions: `llm`, `tools`, `session`, `sessionV2`, `daemon`, `settings`, `mcp-oauth`, `models`, `host` |
-| `daemon-core` / `daemon-sdk` | Background daemon (sessions, background tasks, transports) and its client SDK |
-| `utils` | Errors (`errors/index.ts` is the graph's top hub, 187 importers), JSON, LLM helpers, settings, session helpers |
-| `logging` | Structured logging, metrics enums, Sentry/tracing wiring |
-| `updater` | Self-update: version check, download, atomic replace |
-| `environment` | Platform/environment detection |
-| `builtin-skills` | Skill markdown shipped inside the binary |
+| package                      | role                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `app:src`                    | Process entry, command tree, hooks/components (terminal UI), tool implementations, MCP, sandbox, exec/streaming modes, ACP, telemetry |
+| `core`                       | Agent loop internals, tool registry and `create-tool`, message/context handling                                                       |
+| `runtime`                    | Auth (API key, customer-prem), git, file locking, JSON stores, frontmatter, diagnostics, computer/remote-control support              |
+| `common`                     | Cross-cutting API schemas (backend routes, agent effectiveness, connectors) and settings shape                                        |
+| `sdk-core`                   | Protocol definitions: `llm`, `tools`, `session`, `sessionV2`, `daemon`, `settings`, `mcp-oauth`, `models`, `host`                     |
+| `daemon-core` / `daemon-sdk` | Background daemon (sessions, background tasks, transports) and its client SDK                                                         |
+| `utils`                      | Errors (`errors/index.ts` is the graph's top hub, 187 importers), JSON, LLM helpers, settings, session helpers                        |
+| `logging`                    | Structured logging, metrics enums, Sentry/tracing wiring                                                                              |
+| `updater`                    | Self-update: version check, download, atomic replace                                                                                  |
+| `environment`                | Platform/environment detection                                                                                                        |
+| `builtin-skills`             | Skill markdown shipped inside the binary                                                                                              |
 
 ## Hot spots
 
@@ -49,12 +49,12 @@ graph TD
 
 ## Entry points
 
-| entry | purpose |
-|---|---|
-| `src/index.ts` | Process entry shim: disk-fault and slow-path test hooks, then the CLI |
+| entry                            | purpose                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| `src/index.ts`                   | Process entry shim: disk-fault and slow-path test hooks, then the CLI                 |
 | `src/entrypoints/**` (131 files) | Interactive, exec, daemon, search, update, doctor, MCP/plugin/computer command groups |
-| `src/commands/**` (108 files) | Command implementations behind the `cac` registrations |
-| `packages/daemon-core/**` | Long-running server started by `droide daemon` |
+| `src/commands/**` (108 files)    | Command implementations behind the `cac` registrations                                |
+| `packages/daemon-core/**`        | Long-running server started by `droide daemon`                                        |
 
 ## Observed gaps
 

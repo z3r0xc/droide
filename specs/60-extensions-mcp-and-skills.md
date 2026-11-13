@@ -345,7 +345,7 @@ refuses rather than reformats: a duplicate target key (`ambiguous-key`), a docum
 or a key path that runs through a non-object (`invalid-document`), a missing file (`not-found`), and a
 read-only file, a path outside the scope directory or a symbolic link (`not-writable`). The edited text
 is parsed back and compared to the requested value before the rename, so a scanner mistake is a
-refusal, never a corrupted file. ADR 0012.
+refusal, never a corrupted file. ADR 0013.
 
 **B37 — Install flow.** `droide plugin install <plugin@marketplace> [-s user|project]` parses the id on
 the first `@` at index ≥ 1, defaults the scope to `user`, looks the plugin up in the registered
@@ -765,7 +765,7 @@ credentials, no wall clock, no dependence on the reference build.
 | B10, B11 | `tests/extensions/test_mcp_connect_budget_and_era_plan`         | `fixtures/mcp/connect/`                                 |
 | B12      | `tests/extensions/test_mcp_era_cache_ttl_and_ignored_files`     | `fixtures/mcp/era-cache/`                               |
 | B13, B14 | `tests/extensions/test_mcp_tool_list_timeout_and_lenient_retry` | `fixtures/mcp/tool-list/`                               |
-| B72      | `tests/integration/extensions/mcp-sse-inbound.test.ts`           | `tests/unit/extensions/mcp-sse-parser.test.ts`          |
+| B72      | `tests/integration/extensions/mcp-sse-inbound.test.ts`          | `tests/unit/extensions/mcp-sse-parser.test.ts`          |
 | B15      | `tests/extensions/test_mcp_tool_filters`                        | `fixtures/mcp/tool-filters/`                            |
 | B16      | `tests/extensions/test_mcp_tool_registration_identity`          | `fixtures/mcp/registration/`                            |
 | B17      | `tests/extensions/test_mcp_tool_name_collision`                 | `fixtures/mcp/name-collision/`                          |
