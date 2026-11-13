@@ -910,9 +910,7 @@ const inference: DoctorCheck = {
         details: [
           "`droide exec` resolves the same target before it opens a connection",
         ],
-        fixes: [
-          "set DROIDE_API_KEY, or point droidCoreModel at a custom model",
-        ],
+        fixes: ["set DROIDE_API_KEY, or point model at a custom model"],
       };
     }
 
@@ -1025,9 +1023,7 @@ const exec: DoctorCheck = {
         details: [
           "the model target is resolved before a provider or a tool runner exists",
         ],
-        fixes: [
-          "set DROIDE_API_KEY, or point droidCoreModel at a custom model",
-        ],
+        fixes: ["set DROIDE_API_KEY, or point model at a custom model"],
         metadata: { stage: "model" },
       };
     }

@@ -324,9 +324,7 @@ export async function runInteractiveShell(
     modeRow: {
       autonomy: MODE_ROW_AUTONOMY_OFF,
       model:
-        options.model ??
-        options.context.settings.droidCoreModel ??
-        DEFAULT_MODEL_ID,
+        options.model ?? options.context.settings.model ?? DEFAULT_MODEL_ID,
     },
     footer: {},
     ...(driver?.statusText === undefined

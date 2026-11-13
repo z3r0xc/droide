@@ -41,7 +41,7 @@ process, timers or network.
    piped stdin. A positional prompt suppresses stdin; `--file` plus a positional
    prompt is refused first. A missing/empty file, empty stdin, `-`, or no source
    at all each produce the recorded message on stderr and exit `1`.
-4. **Model target.** `-m` > `settings.droidCoreModel` > `gpt-6.1-sol`.
+4. **Model target.** `-m` > `settings.model` > `gpt-6.1-sol`.
    - `custom:<id>` finds the `customModels[]` entry by `id` (then by `model`).
      Its `baseUrl` is the endpoint root: `<base>/chat/completions` for `openai`
      and `generic-chat-completion-api`, `<base>/messages` for `anthropic`.

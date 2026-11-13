@@ -44,7 +44,7 @@ async function defaultContext(): Promise<DoctorContext> {
   const app = await createAppContext();
   return {
     // The checks read the same resolved settings a command sees; the model
-    // probes need `customModels` and `droidCoreModel`, not a summary of them.
+    // probes need `customModels` and `model`, not a summary of them.
     settings: { ...app.settings },
     paths: { ...app.paths },
     environment: {

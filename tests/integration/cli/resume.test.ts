@@ -78,7 +78,7 @@ test(
           "the turn wrote nothing into the resumed transcript",
         );
       },
-      () => ({ droidCoreModel: "mock-1" }),
+      () => ({ model: "mock-1" }),
     );
   },
 );
@@ -117,7 +117,7 @@ test(
         assert.ok(forked.length > history.length);
         assert.deepEqual(storedRecords(directory, OLD_SESSION), history);
       },
-      () => ({ droidCoreModel: "mock-1" }),
+      () => ({ model: "mock-1" }),
     );
   },
 );

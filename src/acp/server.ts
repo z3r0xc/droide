@@ -471,7 +471,7 @@ class AcpServerImpl implements AcpServer {
           return;
         }
         case ACP_METHODS.sessionFork: {
-          const result = this.#forkSession(request.params);
+          const result = await this.#forkSession(request.params);
           await this.#writer.write(createAcpSuccess(request.id, result));
           return;
         }
@@ -617,7 +617,7 @@ class AcpServerImpl implements AcpServer {
    * can continue down a second branch (B71). The parent may be live or stored;
    * an id the agent knows nothing about is not found.
    */
-  #forkSession(rawParams: unknown): AcpNewSessionResult {
+  async #forkSession(rawParams: unknown): Promise<AcpNewSessionResult> {
     this.#requireAuth();
     const params = parseSessionHandleParams(rawParams);
     const live = this.#sessions.get(params.sessionId);
@@ -638,7 +638,7 @@ class AcpServerImpl implements AcpServer {
       mcpServers: live?.mcpServers ?? params.mcpServers,
     });
     for (const update of sessionUpdatesFromTranscript(records)) {
-      this.#track(this.#sendUpdate(session, update));
+      await this.#sendUpdate(session, update);
     }
     return { sessionId: session.sessionId };
   }
@@ -705,8 +705,10 @@ class AcpServerImpl implements AcpServer {
       );
     }
     let modeChanged = false;
+    let changed = false;
     switch (params.configId) {
       case ACP_CONFIG_IDS.model:
+        changed = params.value !== session.model;
         session.model = params.value;
         break;
       case ACP_CONFIG_IDS.reasoningEffort: {
@@ -717,12 +719,14 @@ class AcpServerImpl implements AcpServer {
             { value: params.value },
           );
         }
+        changed = params.value !== session.reasoningEffort;
         session.reasoningEffort = params.value;
         break;
       }
       case ACP_CONFIG_IDS.autonomy: {
         const modeId = clampMode(params.value, this.#options.maxAutonomyLevel);
         modeChanged = modeId !== session.modeId;
+        changed = modeChanged;
         session.modeId = modeId;
         break;
       }
@@ -733,7 +737,7 @@ class AcpServerImpl implements AcpServer {
           { configId: params.configId },
         );
     }
-    await this.#announceSettings(session, modeChanged);
+    if (changed) await this.#announceSettings(session, modeChanged);
     return { configOptions: this.#configOptions(session) };
   }
 

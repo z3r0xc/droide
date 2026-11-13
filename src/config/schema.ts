@@ -81,7 +81,7 @@ export interface GeneralSettings {
   readonly pluginTokenHosts?: Readonly<Record<string, string>>;
   readonly theme?: string;
   readonly locale?: string;
-  readonly droidCoreModel?: string;
+  readonly model?: string;
   readonly llmRequestTimeout?: number;
   readonly compactionTokenLimit?: number;
   readonly trustedFolders?: readonly string[];
@@ -159,7 +159,7 @@ const GENERAL_KEYS: AllowedKeys = {
   pluginTokenHosts: true,
   theme: true,
   locale: true,
-  droidCoreModel: true,
+  model: true,
   llmRequestTimeout: true,
   compactionTokenLimit: true,
   trustedFolders: true,
@@ -503,7 +503,7 @@ function parseGeneral(raw: RawObject, path: string): GeneralSettings {
       : expectStringRecord(raw.pluginTokenHosts, path, "pluginTokenHosts");
   const theme = readOptionalString(raw, "theme", path, "");
   const locale = readOptionalString(raw, "locale", path, "");
-  const droidCoreModel = readOptionalString(raw, "droidCoreModel", path, "");
+  const model = readOptionalString(raw, "model", path, "");
   const llmRequestTimeout = readOptionalNumber(
     raw,
     "llmRequestTimeout",
@@ -546,7 +546,7 @@ function parseGeneral(raw: RawObject, path: string): GeneralSettings {
     ...(pluginTokenHosts === undefined ? {} : { pluginTokenHosts }),
     ...(theme === undefined ? {} : { theme }),
     ...(locale === undefined ? {} : { locale }),
-    ...(droidCoreModel === undefined ? {} : { droidCoreModel }),
+    ...(model === undefined ? {} : { model }),
     ...(llmRequestTimeout === undefined ? {} : { llmRequestTimeout }),
     ...(compactionTokenLimit === undefined ? {} : { compactionTokenLimit }),
     ...(trustedFolders === undefined ? {} : { trustedFolders }),

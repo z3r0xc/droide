@@ -90,7 +90,7 @@ import { createJsonLineWriter, isBrokenPipeError } from "./writer.ts";
 
 import type { SessionStore, SessionStoreOptions } from "../session/store.ts";
 
-/** The default model when neither `-m` nor `droidCoreModel` names one. */
+/** The default model when neither `-m` nor `model` names one. */
 export const DEFAULT_MODEL_ID = "gpt-6.1-sol";
 
 /** B23/B56: the managed model's cost ceiling is a provider concern, not ours. */
@@ -443,8 +443,7 @@ function managedModelTarget(
 export function resolveModelTarget(
   input: ResolveModelTargetInput,
 ): ExecModelTarget {
-  const modelId =
-    input.model ?? input.settings.droidCoreModel ?? DEFAULT_MODEL_ID;
+  const modelId = input.model ?? input.settings.model ?? DEFAULT_MODEL_ID;
   if (modelId.startsWith(CUSTOM_MODEL_PREFIX)) {
     const name = modelId.slice(CUSTOM_MODEL_PREFIX.length);
     const models = input.settings.customModels ?? [];
@@ -707,14 +706,6 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
     });
   }
 
-  // B55: a missing model or credential fails here, before any socket exists.
-  const target = resolveModelTarget({
-    model: argv.model,
-    reasoningEffort: argv.reasoningEffort,
-    settings: context.settings,
-    env: context.environment.env,
-  });
-
   // B9/B10: the advertised set follows the autonomy level. When the caller did
   // not inject a registry, this is the real one: core tools plus every MCP
   // server that is configured and reachable (specs/60 §B1–B24).
@@ -735,8 +726,9 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
   });
   const catalogue = createToolCatalogue(registry, allowed);
 
-  // B9: `--list-tools` answers and exits before a prompt, a session or a
-  // provider request exists.
+  // B9: `--list-tools` answers and exits before a prompt, a session, a
+  // credential or a provider request exists: the listing is a property of the
+  // tool registry, not of a resolved model target.
   if (argv.listTools) {
     // B53: `-o json` is a single-line array; every other format is the text
     // listing. The default set is membership at the strictest autonomy.
@@ -745,17 +737,40 @@ async function execute(argv: ExecArgv, deps: ExecCommandDeps): Promise<number> {
       new Set(allowed),
       new Set(selectExecTools(registry, { autonomy: "off" })),
     );
+    // The header names the wire model when one resolves, and the configured id
+    // when it does not — a listing must never fail for want of a credential.
+    const requestedModel =
+      argv.model ?? context.settings.model ?? DEFAULT_MODEL_ID;
+    let label: string;
+    try {
+      label = resolveModelTarget({
+        model: requestedModel,
+        reasoningEffort: argv.reasoningEffort,
+        settings: context.settings,
+        env: context.environment.env,
+      }).wireModel;
+    } catch {
+      label = requestedModel;
+    }
     await writeText(
       deps.stdout,
       outputFormat === "json"
         ? renderToolListJson(rows)
         : renderToolListText(rows, {
-            model: target.wireModel,
+            model: label,
             autonomy: autonomy ?? "off",
           }),
     );
     return 0;
   }
+
+  // B55: a missing model or credential fails here, before any socket exists.
+  const target = resolveModelTarget({
+    model: argv.model,
+    reasoningEffort: argv.reasoningEffort,
+    settings: context.settings,
+    env: context.environment.env,
+  });
 
   const toolRunner = createExecToolRunner({
     registry,

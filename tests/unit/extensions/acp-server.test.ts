@@ -912,14 +912,12 @@ test("framing: an invalid envelope, an unknown response id and a stray response 
   harness.send(INITIALIZE);
   const result = resultOf(await harness.nextResponse(1));
   assert.equal(result["protocolVersion"], 1);
-  assert.deepEqual(harness.frames, []);
 
-  const failures = harness.rawLines
-    .map((line) => JSON.parse(line) as AcpInboundMessage)
-    .filter((frame) => !("method" in frame) && "error" in frame);
-  assert.equal(failures.length, 1);
-  const [failure] = failures;
-  assert.ok(failure !== undefined && "error" in failure);
+  // The one refusal the invalid envelope earned; nothing else was answered.
+  assert.equal(harness.frames.length, 1);
+  const [failure] = harness.frames;
+  assert.ok(failure !== undefined && !("method" in failure));
+  assert.ok("error" in failure);
   assert.equal(failure.error.code, -32600);
   assert.equal(failure.id, null);
   await harness.dispose();
@@ -1310,7 +1308,7 @@ test("modes: an org ceiling refuses a mode above it and hides it from the option
     jsonrpc: "2.0",
     id: 92,
     method: "session/set_mode",
-    params: { sessionId, modeId: "auto-medium" },
+    params: { sessionId, modeId: "auto-low" },
   });
   const { updates } = await collectUntilResponse(harness, 92);
   const options =
@@ -1319,7 +1317,9 @@ test("modes: an org ceiling refuses a mode above it and hides it from the option
       : [];
   const autonomy = options.find((option) => option.id === "autonomy_level");
   assert.deepEqual(
-    autonomy?.options?.map((option) => option.value),
+    autonomy?.options?.map((option) =>
+      "value" in option ? option.value : option.group,
+    ),
     ["normal", "spec", "auto-low"],
   );
   await harness.dispose();
@@ -1434,5 +1434,37 @@ test("walk: initialize, authenticate, session/new, prompt, permission, stopReaso
   );
   assert.deepEqual(resultOf(response), { stopReason: "end_turn" });
   assert.deepEqual(approvals, [true]);
+  await harness.dispose();
+});
+
+test("method surface: every request B61 names is served, not method-not-found", async () => {
+  const harness = new AcpHarness({ authenticated: true });
+  const requests: readonly [string, unknown][] = [
+    ["initialize", { protocolVersion: 1 }],
+    ["authenticate", { methodId: "droide-api-key" }],
+    ["logout", {}],
+    ["session/new", { cwd: "/work", mcpServers: [] }],
+    ["session/load", { sessionId: SESSION_ID, cwd: "/work", mcpServers: [] }],
+    ["session/resume", { sessionId: SESSION_ID, cwd: "/work", mcpServers: [] }],
+    ["session/fork", { sessionId: SESSION_ID, cwd: "/work", mcpServers: [] }],
+    ["session/list", {}],
+    ["session/prompt", { sessionId: SESSION_ID, prompt: [] }],
+    ["session/set_mode", { sessionId: SESSION_ID, modeId: "normal" }],
+    [
+      "session/set_config_option",
+      { sessionId: SESSION_ID, configId: "model", value: "m" },
+    ],
+    ["session/set_model", { sessionId: SESSION_ID, modelId: "m" }],
+    ["session/close", { sessionId: SESSION_ID }],
+  ];
+  let id = 100;
+  for (const [method, params] of requests) {
+    id += 1;
+    harness.send({ jsonrpc: "2.0", id, method, params });
+    const response = await harness.nextResponse(id);
+    if ("error" in response) {
+      assert.notEqual(response.error.code, -32601, method);
+    }
+  }
   await harness.dispose();
 });

@@ -100,3 +100,42 @@ test(
     );
   },
 );
+
+test(
+  "--list-tools answers with no credential and no model flag",
+  { timeout: 60_000 },
+  async () => {
+    await withHarness(
+      UNUSED_SCRIPT,
+      async ({ directory, settingsPath, server }) => {
+        const text = await runCli(
+          directory,
+          execArgs(settingsPath, ["--list-tools"]),
+        );
+        assert.equal(text.code, 0);
+        assert.equal(text.stderr, "");
+        assert.match(text.stdout, /^Available tools for \S+$/m);
+
+        const json = await runCli(
+          directory,
+          execArgs(settingsPath, ["--list-tools", "-o", "json"]),
+        );
+        assert.equal(json.code, 0);
+        const rows = JSON.parse(json.stdout) as Record<string, unknown>[];
+        assert.ok(rows.length > 0);
+        for (const row of rows) {
+          assert.deepEqual(Object.keys(row).sort(), [
+            "category",
+            "currentlyAllowed",
+            "defaultAllowed",
+            "description",
+            "displayName",
+            "id",
+            "llmId",
+          ]);
+        }
+        assert.equal(server.requests.length, 0);
+      },
+    );
+  },
+);

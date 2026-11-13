@@ -487,7 +487,9 @@ test("config options: model, reasoning effort and autonomy level (B70)", () => {
     ],
   );
   assert.deepEqual(
-    options[2]?.options?.map((option) => option.value),
+    options[2]?.options?.map((option) =>
+      "value" in option ? option.value : option.group,
+    ),
     ["normal", "spec", "auto-low", "auto-medium"],
   );
   assert.deepEqual(

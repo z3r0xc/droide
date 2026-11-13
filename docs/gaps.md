@@ -9,7 +9,7 @@ Total: **52** markers across **44** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
-| `src/acp/protocol.ts:1123` | `B68` | the union covers every update the clause names, but this slice's turn path emits only the two chunks, plan, tool_call and tool_call_update; session_info_update, available_commands_update, current_mode_update, config_option_update and usage_update have no producer yet. |
+| `src/acp/protocol.ts:1123` | `B68` | the union covers every update the clause names, but this slice produces only the two chunks, plan, tool_call, tool_call_update, current_mode_update and config_option_update; session_info_update, available_commands_update and usage_update have no producer yet. |
 | `src/acp/protocol.ts:32` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
 | `src/acp/server.ts:568` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
 | `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |

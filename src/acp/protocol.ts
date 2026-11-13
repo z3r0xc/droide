@@ -1121,10 +1121,10 @@ interface AcpContentChunk {
 
 /**
  * TODO(spec B68): the union covers every update the clause names, but this
- * slice's turn path emits only the two chunks, `plan`, `tool_call` and
- * `tool_call_update`; `session_info_update`, `available_commands_update`,
- * `current_mode_update`, `config_option_update` and `usage_update` have no
- * producer yet.
+ * slice produces only the two chunks, `plan`, `tool_call`,
+ * `tool_call_update`, `current_mode_update` and `config_option_update`;
+ * `session_info_update`, `available_commands_update` and `usage_update` have
+ * no producer yet.
  */
 export type AcpSessionUpdate =
   | ({ readonly sessionUpdate: "user_message_chunk" } & AcpContentChunk)
