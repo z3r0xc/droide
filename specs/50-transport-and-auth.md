@@ -769,7 +769,7 @@ network, then the generic 4xx→invalid-request and ≥500→internal-error fall
 then unknown. Provider-controlled text never becomes the reason
 (`orig/packages/core/src/llms/errors/utils.ts:1034-1156`). `[observed]`
 
-The status band is the fallback; a body may only *narrow* it, and only through
+The status band is the fallback; a body may only _narrow_ it, and only through
 the quoted vocabulary below (the data table is `MODEL_FAILURE_MARKERS` in
 `src/transport/errors.ts`). A marker is read from the fields `code`, `type` and
 `status` (codes) and `message` and `detail` (messages), at the top level and
@@ -779,52 +779,52 @@ under `error`, and from nowhere else
 Messages are case-insensitive regexes; they are quoted from the recovered
 classifier, not invented.
 
-| family               | marker                                                                 | class                |
-| -------------------- | ---------------------------------------------------------------------- | -------------------- |
-| quota                | code `insufficient_quota`                                              | `quota-exhausted`    |
-| quota                | code `account_quota_exceeded`                                          | `quota-exhausted`    |
-| quota                | code `billing_error`                                                   | `quota-exhausted`    |
-| quota                | code `billing_hard_limit_reached`                                      | `quota-exhausted`    |
-| quota                | code `billing_not_active`                                              | `quota-exhausted`    |
-| quota                | code `credit_balance_too_low`                                          | `quota-exhausted`    |
-| quota                | message `\b(?:weekly\|monthly\|daily)\s*\/?\s*(?:weekly\|monthly\|daily)?\s*limit\s+exhausted\b` | `quota-exhausted`    |
-| quota                | message `\bquota\s+exhausted\b`                                        | `quota-exhausted`    |
-| quota                | message `check (?:your )?plan and billing`                             | `quota-exhausted`    |
-| quota                | message `\bbilling (?:hard )?limit\s+(?:(?:has been\|was\|is)\s+)?(?:reached\|exceeded\|exhausted)\b` | `quota-exhausted`    |
-| quota                | message `\b(?:reached\|exceeded\|exhausted)\s+(?:your\s+)?billing (?:hard )?limit\b` | `quota-exhausted`    |
-| quota                | message `\b(?:credits?\|balance)\b[^.;]*\b(?:insufficient\|exhausted\|too low)\b` | `quota-exhausted`    |
-| quota                | message `exhausted your available credits`                             | `quota-exhausted`    |
-| moderation           | code `content_filter`                                                  | `content-moderation` |
-| moderation           | code `cyber_policy`                                                    | `content-moderation` |
-| moderation           | code `moderation_blocked`                                              | `content-moderation` |
-| moderation           | message `content moderation`                                           | `content-moderation` |
-| moderation           | message `content_filter`                                               | `content-moderation` |
-| moderation           | message `cyber(?:[_\s-]?policy\|security reasons)`                     | `content-moderation` |
-| moderation           | message `violating our usage policy`                                   | `content-moderation` |
-| moderation           | message `rejected as a result of our safety system`                    | `content-moderation` |
-| context limit        | code `context_length_exceeded`                                         | `context-limit`      |
-| context limit        | message `context length`                                               | `context-limit`      |
-| context limit        | message `context limit`                                                | `context-limit`      |
-| context limit        | message `context size (?:has been )?exceeded`                          | `context-limit`      |
-| context limit        | message `exceed\s.*context\s.*limit`                                   | `context-limit`      |
-| context limit        | message `exceeds?\s+(?:the\s+)?(?:available\s+)?context\s+size`        | `context-limit`      |
-| context limit        | message `exceeds?\s+(?:the\s+)?.*context\s+window`                     | `context-limit`      |
-| context limit        | message `maximum context`                                              | `context-limit`      |
-| context limit        | message `prompt\s+(?:is\s+)?too\s+long`                                | `context-limit`      |
-| context limit        | message `input is too long`                                            | `context-limit`      |
-| context limit        | message `input is too many tokens`                                     | `context-limit`      |
-| context limit        | message `context\s+window\s+(?:is\s+full\|exceeded)`                   | `context-limit`      |
-| context limit        | message `context window exceeds limit`                                 | `context-limit`      |
-| context limit        | message `request size exceed(?:s\|ed)`                                 | `context-limit`      |
-| context limit        | message `request too large for (?:the )?context window`                | `context-limit`      |
-| context limit        | message `required for long context requests`                           | `context-limit`      |
-| request too large    | code `413`                                                             | `request-too-large`  |
-| request too large    | message `request entity too large`                                     | `request-too-large`  |
-| invalid request      | message `invalid.*signature.*thinking`                                 | `invalid-request`    |
-| invalid request      | message `thought[-_ ]?signature.*(?:not \|in)valid`                    | `invalid-request`    |
-| invalid request      | message `(?:invalid\|missing).*thought[-_ ]?signature`                 | `invalid-request`    |
-| invalid request      | message `(?:encrypted[_ ]content.*(?:organization_id\|could not be (?:verified\|decrypted\|parsed))\|could not decrypt.*encrypted[_ ]content\|encrypted[_ ]content\x60? was not issued to this caller)` | `invalid-request`    |
-| invalid request      | message `maximum of \d+ PDF pages`                                     | `invalid-request`    |
+| family            | marker                                                                                                                                                                                                  | class                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| quota             | code `insufficient_quota`                                                                                                                                                                               | `quota-exhausted`    |
+| quota             | code `account_quota_exceeded`                                                                                                                                                                           | `quota-exhausted`    |
+| quota             | code `billing_error`                                                                                                                                                                                    | `quota-exhausted`    |
+| quota             | code `billing_hard_limit_reached`                                                                                                                                                                       | `quota-exhausted`    |
+| quota             | code `billing_not_active`                                                                                                                                                                               | `quota-exhausted`    |
+| quota             | code `credit_balance_too_low`                                                                                                                                                                           | `quota-exhausted`    |
+| quota             | message `\b(?:weekly\|monthly\|daily)\s*\/?\s*(?:weekly\|monthly\|daily)?\s*limit\s+exhausted\b`                                                                                                        | `quota-exhausted`    |
+| quota             | message `\bquota\s+exhausted\b`                                                                                                                                                                         | `quota-exhausted`    |
+| quota             | message `check (?:your )?plan and billing`                                                                                                                                                              | `quota-exhausted`    |
+| quota             | message `\bbilling (?:hard )?limit\s+(?:(?:has been\|was\|is)\s+)?(?:reached\|exceeded\|exhausted)\b`                                                                                                   | `quota-exhausted`    |
+| quota             | message `\b(?:reached\|exceeded\|exhausted)\s+(?:your\s+)?billing (?:hard )?limit\b`                                                                                                                    | `quota-exhausted`    |
+| quota             | message `\b(?:credits?\|balance)\b[^.;]*\b(?:insufficient\|exhausted\|too low)\b`                                                                                                                       | `quota-exhausted`    |
+| quota             | message `exhausted your available credits`                                                                                                                                                              | `quota-exhausted`    |
+| moderation        | code `content_filter`                                                                                                                                                                                   | `content-moderation` |
+| moderation        | code `cyber_policy`                                                                                                                                                                                     | `content-moderation` |
+| moderation        | code `moderation_blocked`                                                                                                                                                                               | `content-moderation` |
+| moderation        | message `content moderation`                                                                                                                                                                            | `content-moderation` |
+| moderation        | message `content_filter`                                                                                                                                                                                | `content-moderation` |
+| moderation        | message `cyber(?:[_\s-]?policy\|security reasons)`                                                                                                                                                      | `content-moderation` |
+| moderation        | message `violating our usage policy`                                                                                                                                                                    | `content-moderation` |
+| moderation        | message `rejected as a result of our safety system`                                                                                                                                                     | `content-moderation` |
+| context limit     | code `context_length_exceeded`                                                                                                                                                                          | `context-limit`      |
+| context limit     | message `context length`                                                                                                                                                                                | `context-limit`      |
+| context limit     | message `context limit`                                                                                                                                                                                 | `context-limit`      |
+| context limit     | message `context size (?:has been )?exceeded`                                                                                                                                                           | `context-limit`      |
+| context limit     | message `exceed\s.*context\s.*limit`                                                                                                                                                                    | `context-limit`      |
+| context limit     | message `exceeds?\s+(?:the\s+)?(?:available\s+)?context\s+size`                                                                                                                                         | `context-limit`      |
+| context limit     | message `exceeds?\s+(?:the\s+)?.*context\s+window`                                                                                                                                                      | `context-limit`      |
+| context limit     | message `maximum context`                                                                                                                                                                               | `context-limit`      |
+| context limit     | message `prompt\s+(?:is\s+)?too\s+long`                                                                                                                                                                 | `context-limit`      |
+| context limit     | message `input is too long`                                                                                                                                                                             | `context-limit`      |
+| context limit     | message `input is too many tokens`                                                                                                                                                                      | `context-limit`      |
+| context limit     | message `context\s+window\s+(?:is\s+full\|exceeded)`                                                                                                                                                    | `context-limit`      |
+| context limit     | message `context window exceeds limit`                                                                                                                                                                  | `context-limit`      |
+| context limit     | message `request size exceed(?:s\|ed)`                                                                                                                                                                  | `context-limit`      |
+| context limit     | message `request too large for (?:the )?context window`                                                                                                                                                 | `context-limit`      |
+| context limit     | message `required for long context requests`                                                                                                                                                            | `context-limit`      |
+| request too large | code `413`                                                                                                                                                                                              | `request-too-large`  |
+| request too large | message `request entity too large`                                                                                                                                                                      | `request-too-large`  |
+| invalid request   | message `invalid.*signature.*thinking`                                                                                                                                                                  | `invalid-request`    |
+| invalid request   | message `thought[-_ ]?signature.*(?:not \|in)valid`                                                                                                                                                     | `invalid-request`    |
+| invalid request   | message `(?:invalid\|missing).*thought[-_ ]?signature`                                                                                                                                                  | `invalid-request`    |
+| invalid request   | message `(?:encrypted[_ ]content.*(?:organization_id\|could not be (?:verified\|decrypted\|parsed))\|could not decrypt.*encrypted[_ ]content\|encrypted[_ ]content\x60? was not issued to this caller)` | `invalid-request`    |
+| invalid request   | message `maximum of \d+ PDF pages`                                                                                                                                                                      | `invalid-request`    |
 
 `\x60` above is one literal backtick, which the source regex spells directly;
 it cannot be shown inside a table's code span.

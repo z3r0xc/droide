@@ -11,6 +11,7 @@ import {
   createAcpServer,
   type AcpServer,
   type AcpServerOptions,
+  type AcpSessionMeta,
   type AcpSessionStore,
   type AcpStoredSession,
 } from "../../../src/acp/server.ts";
@@ -50,6 +51,9 @@ export interface FakeSessionRow {
   readonly sessionId: string;
   readonly cwd: string | null;
   readonly deleted: boolean;
+  /** What `readSessionMeta` reports and `session/list` carries (B63, B68). */
+  readonly title: string | null;
+  readonly originHint: string | null;
 }
 
 export class FakeSessionStore implements AcpSessionStore {
@@ -65,14 +69,30 @@ export class FakeSessionStore implements AcpSessionStore {
     readonly cwd?: string | null;
     readonly projectKey?: string;
     readonly firstEventAt?: number | null;
+    readonly originHint?: string | null;
   }): { readonly sessionId: string } {
     const sessionId = input.sessionId ?? `fake-${this.rows.size + 1}`;
     this.rows.set(sessionId, {
       sessionId,
       cwd: input.cwd ?? null,
       deleted: false,
+      title: null,
+      originHint: input.originHint ?? null,
     });
     return { sessionId };
+  }
+
+  /** Change a stored title the way an embedding's summarizer would (B68). */
+  setTitle(sessionId: string, title: string | null): void {
+    const row = this.rows.get(sessionId);
+    if (row === undefined) throw new Error(`no session ${sessionId}`);
+    this.rows.set(sessionId, { ...row, title });
+  }
+
+  readSessionMeta(sessionId: string): AcpSessionMeta | null {
+    const row = this.rows.get(sessionId);
+    if (row === undefined || row.deleted) return null;
+    return { title: row.title, originHint: row.originHint };
   }
 
   deleteSession(sessionId: string): boolean {
@@ -93,8 +113,9 @@ export class FakeSessionStore implements AcpSessionStore {
       .map((row) => ({
         sessionId: row.sessionId,
         cwd: row.cwd,
-        title: null,
+        title: row.title,
         updatedAt: 1000,
+        originHint: row.originHint,
       }));
   }
 
@@ -130,28 +151,36 @@ interface FrameWaiter {
   readonly resolve: (frame: AcpInboundMessage) => void;
 }
 
-export interface AcpHarnessOptions extends Omit<
+export interface AcpHarnessOptions<
+  S extends AcpSessionStore = FakeSessionStore,
+> extends Omit<
   AcpServerOptions,
   "stdin" | "stdout" | "store" | "turnRunner" | "clock"
 > {
   readonly clock?: () => number;
   readonly runner?: AcpTurnRunner;
-  readonly store?: FakeSessionStore;
+  readonly store?: S;
 }
 
-/** One server, one input stream, one frame queue. */
-export class AcpHarness {
+/**
+ * One server, one input stream, one frame queue. The store type follows
+ * whatever the test passes: the fake by default, or a real store through the
+ * `exec -o acp` seam.
+ */
+export class AcpHarness<S extends AcpSessionStore = FakeSessionStore> {
   readonly input = new PassThrough();
   readonly frames: AcpInboundMessage[] = [];
-  readonly store: FakeSessionStore;
+  readonly store: S;
   readonly server: AcpServer;
   readonly done: Promise<void>;
   readonly #waiters: FrameWaiter[] = [];
   #pendingText = "";
   #rawLines: string[] = [];
 
-  constructor(options: AcpHarnessOptions) {
-    this.store = options.store ?? new FakeSessionStore();
+  constructor(options: AcpHarnessOptions<S>) {
+    // `S` defaults to the fake, so the fallback is that type; a test that names
+    // another store passes it.
+    this.store = options.store ?? (new FakeSessionStore() as unknown as S);
     const { runner, ...serverOptions } = options;
     this.server = createAcpServer({
       ...serverOptions,

@@ -72,6 +72,8 @@ import {
   type AcpTurnRunner,
 } from "./acp-runner.ts";
 import type { AcpSessionStore } from "../acp/server.ts";
+import type { AcpAvailableCommand } from "../acp/protocol.ts";
+import { loadSkills } from "../extensions/skills/load.ts";
 import { TranscriptUnavailableError } from "../session/errors.ts";
 import { runStreamingInput } from "./streaming.ts";
 import {
@@ -655,6 +657,25 @@ function acpModeFor(
 }
 
 /**
+ * The context window an ACP `usage_update` reports as its `size` (60 B68):
+ * a custom model's `maxContextLimit`, or `null` when the model does not state
+ * one. Managed models publish no limit here, and a guessed denominator would
+ * make every percentage wrong.
+ */
+function contextLimitForModel(
+  model: string,
+  settings: Settings,
+): number | null {
+  if (!model.startsWith(CUSTOM_MODEL_PREFIX)) return null;
+  const name = model.slice(CUSTOM_MODEL_PREFIX.length);
+  const custom = (settings.customModels ?? []).find(
+    (entry) => entry.id === name || entry.model === name,
+  );
+  const limit = custom?.maxContextLimit;
+  return limit === undefined || limit <= 0 ? null : limit;
+}
+
+/**
  * `-o acp`: the process becomes an ACP agent on stdin/stdout (B52, B60).
  *
  * The tool registry, the settings and the permission policy are the flags'
@@ -773,6 +794,7 @@ async function runAcpOutput(options: AcpOutputOptions): Promise<number> {
         cwd,
         projectKey: projectKeyFor(cwd, context.environment.platform),
         firstEventAt: input.firstEventAt ?? deps.clock(),
+        originHint: input.originHint ?? null,
       });
       return { sessionId };
     },
@@ -781,7 +803,7 @@ async function runAcpOutput(options: AcpOutputOptions): Promise<number> {
       return store.deleteSession(sessionId);
     },
     listSessions: (listOptions) => store.listSessions(listOptions),
-    readSession: (sessionId) => {
+    readSession(sessionId) {
       try {
         return store.readSession(sessionId);
       } catch (error) {
@@ -789,7 +811,30 @@ async function runAcpOutput(options: AcpOutputOptions): Promise<number> {
         throw error;
       }
     },
+    readSessionMeta(sessionId) {
+      const row = store.getSession(sessionId);
+      return row === null
+        ? null
+        : { title: row.title, originHint: row.originHint };
+    },
   };
+
+  // B57: every valid, enabled, user-invocable skill is a slash command. The
+  // list is resolved per prompt, so enabling a skill reaches an ACP client's
+  // menu at the next turn (B68).
+  const commands = (): readonly AcpAvailableCommand[] =>
+    loadSkills({ environment: context.environment })
+      .filter(
+        (skill) =>
+          skill.status === "active" &&
+          skill.enabled &&
+          skill.userInvocable &&
+          skill.name !== "",
+      )
+      .map((skill) => ({
+        name: skill.name,
+        description: skill.description || "No description provided",
+      }));
 
   try {
     return await runAcpDaemon({
@@ -810,6 +855,8 @@ async function runAcpOutput(options: AcpOutputOptions): Promise<number> {
         : { reasoningEffort: argv.reasoningEffort }),
       mode: acpModeFor(autonomy, argv.skipPermissionsUnsafe),
       tools: allowed,
+      commands,
+      contextLimitFor: (model) => contextLimitForModel(model, context.settings),
       installSignalHandlers: true,
     });
   } finally {

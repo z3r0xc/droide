@@ -135,19 +135,19 @@ set, and (b) if a parent IPC channel is connected, sends the message
 `{ type: "droide.daemon.ready", pid, version }`. It then prints a fixed
 banner to stdout, one line per catalogue message, in this order:
 
-| #   | Key                                    | English text (B5)                                                                         |
-| --- | -------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 1   | `commands:daemon.running`              | `Daemon running`                                                                          |
-| 2   | `commands:daemon.version`              | `Version: {{version}}`                                                                    |
-| 3   | `commands:daemon.pid`                  | `PID: {{pid}}`                                                                            |
-| 4   | `commands:daemon.logs`                 | `Logs: {{path}}` — with `commands:daemon.logsNotConfigured` (`(not configured)`) when none |
-| 5   | endpoint line, exactly one of:         |                                                                                           |
-|     | `commands:daemon.wsEndpoint`           | `WebSocket endpoint: ws://{{host}}:{{port}}`                                              |
-|     | `commands:daemon.unixSocket`           | `Unix socket: {{path}}`                                                                   |
-|     | `commands:daemon.ipcTransport`         | `IPC transport: parent process`                                                           |
-|     | `commands:daemon.noTransport`          | `No inbound transport: the daemon is reachable only through Remote Control`               |
-| 6   | `commands:daemon.remoteControl`        | `Remote Control: enabled` — only when Remote Control is on                                 |
-| 7   | `commands:daemon.pressCtrlCToStop`     | `Press Ctrl+C to stop`                                                                    |
+| #   | Key                                | English text (B5)                                                                          |
+| --- | ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1   | `commands:daemon.running`          | `Daemon running`                                                                           |
+| 2   | `commands:daemon.version`          | `Version: {{version}}`                                                                     |
+| 3   | `commands:daemon.pid`              | `PID: {{pid}}`                                                                             |
+| 4   | `commands:daemon.logs`             | `Logs: {{path}}` — with `commands:daemon.logsNotConfigured` (`(not configured)`) when none |
+| 5   | endpoint line, exactly one of:     |                                                                                            |
+|     | `commands:daemon.wsEndpoint`       | `WebSocket endpoint: ws://{{host}}:{{port}}`                                               |
+|     | `commands:daemon.unixSocket`       | `Unix socket: {{path}}`                                                                    |
+|     | `commands:daemon.ipcTransport`     | `IPC transport: parent process`                                                            |
+|     | `commands:daemon.noTransport`      | `No inbound transport: the daemon is reachable only through Remote Control`                |
+| 6   | `commands:daemon.remoteControl`    | `Remote Control: enabled` — only when Remote Control is on                                 |
+| 7   | `commands:daemon.pressCtrlCToStop` | `Press Ctrl+C to stop`                                                                     |
 
 The reference build names only the keys; its catalogue files
 (`src/i18n/locales/*/commands.json`) are absent, so the English column is this

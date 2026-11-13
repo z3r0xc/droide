@@ -1130,6 +1130,8 @@ test("lifecycle: session/list reports the sessions the store holds (B71)", async
         cwd: "/work",
         title: null,
         updatedAt: new Date(1000).toISOString(),
+        // B63: the row records the producer, and `session/list` reports it.
+        _meta: { droide: { originHint: "cli_acp" } },
       },
     ],
   });

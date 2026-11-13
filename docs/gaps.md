@@ -5,11 +5,10 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **7** markers across **7** clauses.
+Total: **6** markers across **6** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
-| `src/acp/server.ts:617` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
 | `src/cli/mcp-mutations.ts:321` | `B7` | org MCP policy is remote-only and this build does not resolve it into AppContext, so a server the policy would block is not refused here. |
 | `src/daemon/command.ts:170` | `B1` | --droide-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
 | `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |

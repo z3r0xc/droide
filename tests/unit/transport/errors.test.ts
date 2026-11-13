@@ -279,7 +279,9 @@ test("B101 body markers: a quota message, plain text or JSON, is exhaustion", ()
   const json = classifyModelFailure({
     operation: "llm",
     status: 400,
-    bodyJson: { error: { message: "You have reached your billing hard limit." } },
+    bodyJson: {
+      error: { message: "You have reached your billing hard limit." },
+    },
   });
   assert.equal(json.reason, "quota-exhausted");
 
@@ -368,7 +370,9 @@ test("B101 body markers: context limit beats throttling and 413", () => {
     operation: "llm",
     status: 429,
     bodyJson: {
-      error: { message: "This model's maximum context length is 200000 tokens" },
+      error: {
+        message: "This model's maximum context length is 200000 tokens",
+      },
     },
   });
   assert.equal(throttled.reason, "context-limit");
@@ -450,7 +454,9 @@ test("B101 near misses stay unclassified: a rate, a bare quota phrase, a length"
     },
     {
       status: 400,
-      bodyJson: { error: { message: "This value is over the maximum length." } },
+      bodyJson: {
+        error: { message: "This value is over the maximum length." },
+      },
       expected: "invalid-request",
     },
   ];

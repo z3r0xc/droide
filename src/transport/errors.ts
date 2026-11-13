@@ -796,7 +796,9 @@ export const MODEL_FAILURE_MARKERS: {
 };
 
 const QUOTA_CODE_SET = new Set<string>(MODEL_FAILURE_MARKERS.quotaCodes);
-const MODERATION_CODE_SET = new Set<string>(MODEL_FAILURE_MARKERS.moderationCodes);
+const MODERATION_CODE_SET = new Set<string>(
+  MODEL_FAILURE_MARKERS.moderationCodes,
+);
 const CONTEXT_LIMIT_CODE_SET = new Set<string>(
   MODEL_FAILURE_MARKERS.contextLimitCodes,
 );
@@ -919,7 +921,10 @@ function readBodyFields(
   return { codes, messages };
 }
 
-function hasQuotedCode(fields: BodyFields, quoted: ReadonlySet<string>): boolean {
+function hasQuotedCode(
+  fields: BodyFields,
+  quoted: ReadonlySet<string>,
+): boolean {
   return fields.codes.some((code) => quoted.has(code));
 }
 

@@ -470,14 +470,31 @@ human output is the grouped-by-kind rendering (`run.ts:143-149`,
 stderr and sets exit status 1; an abort (Ctrl-C) sets 130; any other failure
 prints the search-failed message and sets 1 (`run.ts:160-173`). `[observed]`
 
+### Session producer hint
+
+**B57.** A session row records which producer created it, in
+`sessions.origin_hint TEXT` (migration 11, `0011_session_origin_hint.sql`). The
+column is **additive**: `ALTER TABLE sessions ADD COLUMN` with no backfill, so a
+file that already holds rows keeps every column it had, reads NULL for the hint,
+and is never rebuilt or copied on the way. `cli_acp` is the value an ACP
+`session/new` writes (spec 60 §B63); NULL means the producer named none.
+
+`registerSession` takes `originHint`, `getSession` returns it as `originHint`, and
+every `listSessions` row carries it, so the value reads back from the same places
+the rest of the row does. Nothing rewrites it: `session/load` and `session/resume`
+read it back rather than restating it, and a fork writes its own row with the
+forking agent as the producer. `[derived]`
+
 ## Data & config
 
-### Our head: version 10 (a local design, labelled)
+### Our head: version 11 (a local design, labelled)
 
-The reference build's cache head is version 9. This build adds one migration of its own,
-`0010_transcript_index`, because the retrieval shape we need is a _literal
-transcript index_ rather than the reference build's `session_term_filters` planner.
-The difference is deliberate and recorded here, not hidden:
+The reference build's cache head is version 9. This build adds two migrations of its own.
+`0010_transcript_index` exists because the retrieval shape we need is a _literal
+transcript index_ rather than the reference build's `session_term_filters` planner;
+`0011_session_origin_hint` exists because a reload must be able to tell an ACP
+session from any other (spec 60 §B63). Both differences are deliberate and
+recorded here, not hidden:
 
 | object                   | purpose                                                                                                                                                                                                     |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -485,6 +502,7 @@ The difference is deliberate and recorded here, not hidden:
 | `transcript_index_value` | one row per indexed line (`path`, `line`, `ordinal` PK): `kind`, `tool`, `role`, `summary`, lowercased `value`, FK-cascaded from `transcript_index`                                                         |
 | 3 indexes                | by session, by project key, and by lowercased value for the prefilter                                                                                                                                       |
 | 3 triggers               | a changed fingerprint clears cached values; an insert seeds the settings copy; a `sessions` update keeps it synced                                                                                          |
+| `sessions.origin_hint`   | `TEXT`, nullable, no backfill: the producer that created the row (B57)                                                                                                                                      |
 
 **Invariant that keeps this honest.** The index only _prefilters_: a session is
 skipped only when its fingerprint still matches its file **and** no cached value
@@ -530,7 +548,8 @@ and version 8 the transcript source (`src/migrations.ts:28-38`).
 `refresh_lease_until`, `vector_epoch` (seeded `'0'`
 by `0009_vector_bookkeeping*.sql:22`).
 
-`sessions` (`0001_baseline*.sql:28-123` plus `0004_daemon_session_fields*.sql:22-25`):
+`sessions` (`0001_baseline*.sql:28-123` plus `0004_daemon_session_fields*.sql:22-25`,
+and `origin_hint` from this build's `0011_session_origin_hint*.sql`):
 
 | column                      | type    | nullability / default          | meaning                                                       |
 | --------------------------- | ------- | ------------------------------ | ------------------------------------------------------------- |
@@ -554,6 +573,7 @@ by `0009_vector_bookkeeping*.sql:22`).
 | `worktree`                  | TEXT    |                                | JSON from the settings file                                   |
 | `artifacts`                 | TEXT    |                                | JSON from the settings file                                   |
 | `settings_write_seq`        | INTEGER |                                | NULL means the settings-derived columns need re-reading       |
+| `origin_hint`               | TEXT    |                                | producer that created the row (B57); NULL when it named none  |
 
 Indexes: `sessions_parent`, `sessions_caller`, `sessions_mission`
 (`0001_baseline*.sql:124-126`), expression index
