@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **11** markers across **11** clauses.
+Total: **8** markers across **8** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -15,8 +15,5 @@ Total: **11** markers across **11** clauses.
 | `src/daemon/command.ts:170` | `B1` | --droide-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
 | `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
 | `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient DROIDE_API_KEY and reports a local identity. |
-| `src/daemon/server.ts:251` | `B5` | the i18n catalogues are absent, so the banner uses literal English with the documented line order instead of commands:daemon.* keys. |
 | `src/extensions/mcp/client.ts:579` | `B22` | image blocks are reported by type and size instead of being compressed; the two placeholders themselves are quoted by the clause. |
-| `src/tools/fs/read.ts:278` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
 | `src/tools/shell/exec.ts:10` | `90 B15` | Execute keeps a pipe child. The pinned pseudo-terminal surface (B13-B22: login-shell environment, its blocklist and the PTY session lifecycle) belongs to the daemon terminal, which this build does not spawn, so there is no terminal to hand this command to. |
-| `src/transport/errors.ts:719` | `B101` | the body markers for quota-vs-payment (non-proxy), content moderation, context limit, request-too-large and thinking-signature/PDF invalidity are not quoted in the spec; only the proxy's two code values and the status bands are implemented. |

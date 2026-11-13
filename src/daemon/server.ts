@@ -62,6 +62,12 @@ import {
   type LivenessPipeOpener,
   type LivenessWatcher,
 } from "./liveness.ts";
+import {
+  DAEMON_MESSAGES,
+  daemonMessage,
+  type DaemonMessageCatalogue,
+  type DaemonMessageKey,
+} from "./strings.ts";
 import { systemTimers, type DaemonTimers } from "./timers.ts";
 import {
   GET_PROXY_TOKEN_METHOD,
@@ -241,44 +247,55 @@ export interface ReadinessBannerOptions {
   readonly pid: number;
   readonly logsPath?: string;
   readonly remoteControl: boolean;
+  /** The English catalogue (B5); another locale replaces the whole record. */
+  readonly catalogue?: DaemonMessageCatalogue;
 }
 
 /**
- * The fixed readiness banner (B5). The message catalogues are absent from the
- * recovered tree, so the copy is literal English; the line order and the
- * endpoint/relay keys are pinned.
- *
- * TODO(spec B5): the i18n catalogues are absent, so the banner uses literal
- * English with the documented line order instead of `commands:daemon.*` keys.
+ * The fixed readiness banner (B5): one catalogue line per message, in the
+ * pinned order. Nothing here spells a sentence out — every line and label is a
+ * `commands:daemon.*` value, so the spec's text and the banner cannot drift.
  */
 export function formatReadinessBanner(
   endpoint: DaemonEndpoint,
   options: ReadinessBannerOptions,
 ): readonly string[] {
+  const catalogue = options.catalogue ?? DAEMON_MESSAGES;
+  const say = (
+    key: DaemonMessageKey,
+    params?: Readonly<Record<string, string | number>>,
+  ): string => daemonMessage(catalogue, key, params);
   const lines = [
-    "Daemon running",
-    `Version: ${options.version}`,
-    `PID: ${options.pid}`,
-    `Logs: ${options.logsPath ?? "(not configured)"}`,
+    say("commands:daemon.running"),
+    say("commands:daemon.version", { version: options.version }),
+    say("commands:daemon.pid", { pid: options.pid }),
+    say("commands:daemon.logs", {
+      path: options.logsPath ?? say("commands:daemon.logsNotConfigured"),
+    }),
   ];
   switch (endpoint.kind) {
     case "tcp":
-      lines.push(`WebSocket endpoint: ws://${endpoint.host}:${endpoint.port}`);
-      break;
-    case "unix":
-      lines.push(`Unix socket: ${endpoint.unixPath}`);
-      break;
-    case "ipc":
-      lines.push("IPC transport: parent process");
-      break;
-    case "none":
       lines.push(
-        "No inbound transport: the daemon is reachable only through Remote Control",
+        say("commands:daemon.wsEndpoint", {
+          host: endpoint.host,
+          port: endpoint.port,
+        }),
       );
       break;
+    case "unix":
+      lines.push(
+        say("commands:daemon.unixSocket", { path: endpoint.unixPath }),
+      );
+      break;
+    case "ipc":
+      lines.push(say("commands:daemon.ipcTransport"));
+      break;
+    case "none":
+      lines.push(say("commands:daemon.noTransport"));
+      break;
   }
-  if (options.remoteControl) lines.push("Remote Control: enabled");
-  lines.push("Press Ctrl+C to stop");
+  if (options.remoteControl) lines.push(say("commands:daemon.remoteControl"));
+  lines.push(say("commands:daemon.pressCtrlCToStop"));
   return lines;
 }
 
