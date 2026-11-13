@@ -212,20 +212,18 @@ test("an available release prints the version and the page", async () => {
 
 test("a rate-limited feed says so and, when the header is there, when to retry", async () => {
   const reset = Math.floor(Date.now() / 1000) + 120;
-  const limited = await checkForUpdate({
-    fetch: async () =>
+  const limited = await check(
+    async () =>
       new Response("{}", {
         status: 403,
         headers: { "x-ratelimit-reset": String(reset) },
       }),
-  });
+  );
   assert.equal(limited.kind, "unavailable");
   assert.match(limited.reason ?? "", /rate-limited \(HTTP 403\)/u);
   assert.match(limited.reason ?? "", /try again in 2 minute\(s\)/u);
 
-  const bare = await checkForUpdate({
-    fetch: async () => new Response("{}", { status: 429 }),
-  });
+  const bare = await check(async () => new Response("{}", { status: 429 }));
   assert.equal(bare.kind, "unavailable");
   assert.match(bare.reason ?? "", /try again later/u);
 });
