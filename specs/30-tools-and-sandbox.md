@@ -278,6 +278,15 @@ newline-joined list (`@packages/core/src/tools/definitions/cli/globSearchCli.ts:
 pattern containing a newline, and in content mode limits per-file matches
 (`--max-count`) to `head_limit`, or 500 when none was given, or 1 for a
 non-positive limit. No match yields `No matching files found` / `No matches found`.
+The `type` filter accepts these names, each mapping to the listed extensions:
+`js` (`.js .mjs .cjs .jsx`), `ts` (`.ts .mts .cts .tsx`), `py` (`.py .pyi`),
+`rust` (`.rs`), `go` (`.go`), `java` (`.java`), `cpp`
+(`.cpp .cc .cxx .hpp .hh .hxx`), `c` (`.c .h`), `csharp` (`.cs`), `ruby`
+(`.rb`), `php` (`.php`), `shell` (`.sh .bash .zsh`), `html` (`.html .htm`),
+`css` (`.css .scss .sass`), `json` (`.json .jsonc`), `yaml` (`.yaml .yml`),
+`toml` (`.toml`), `md` (`.md .mdx`). Any other name is refused as an unknown
+type; the table is deliberately a subset of a general-purpose search tool's, and
+adding to it is a spec change (`src/tools/fs/grep.ts`). `[observed]`
 A program call whose result exceeds the 20 MB ripgrep buffer is refused with a
 narrowing remedy (`@packages/core/src/tools/definitions/cli/schema.ts:896-980`,
 `@src/tools/executors/client/grep-search-cli.ts:287-381`, `@src/utils/constants.ts:27-30`).
@@ -486,6 +495,19 @@ high` at low, `--auto high` at medium, `--skip-permissions-unsafe` at high, the
 `--auto low|medium|high` sentence for spec/default, and the organization-maximum
 sentence when a higher level is administratively impossible
 (`@src/core/ToolExecutor.ts:829-878`, `:1052-1132`).
+
+The sentences are fixed strings, quoted here so a change is a spec change
+(`src/tools/permissions.ts`):
+
+| situation | guidance |
+|---|---|
+| organization maximum reached | `This session cannot exceed the organization's maximum autonomy level (<level>). Ask an administrator to raise it.` |
+| autonomy `off` | `Re-run with --auto low, --auto medium or --auto high to allow this tool.` |
+| autonomy `low` | `Re-run with --auto medium or --auto high. For destructive commands, use --skip-permissions-unsafe.` |
+| autonomy `medium` | `Re-run with --auto high. For destructive commands, use --skip-permissions-unsafe.` |
+| autonomy `high` | `Re-run with --skip-permissions-unsafe.` |
+
+`[observed]`
 
 **B47 — Tool-level allowlists.** An exec session's `--only-tools` set is enforced at
 dispatch: a call to a filtered-out tool returns

@@ -25,7 +25,7 @@ const MAX_CONTENT_MATCHES_PER_FILE = 500;
 const MAX_GREP_RESULT_BYTES = 20 * 1024 * 1024;
 const BINARY_SAMPLE_BYTES = 8192;
 
-/** A subset of ripgrep's `--type` table; `TODO(spec B20)` for the full list. */
+/** The `type` table spec 30 B20 lists; adding a name is a spec change. */
 const TYPE_EXTENSIONS: Readonly<Record<string, readonly string[]>> = {
   js: [".js", ".mjs", ".cjs", ".jsx"],
   ts: [".ts", ".mts", ".cts", ".tsx"],

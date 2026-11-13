@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **50** markers across **44** clauses.
+Total: **48** markers across **42** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -40,11 +40,9 @@ Total: **50** markers across **44** clauses.
 | `src/extensions/plugins/install.ts:647` | `B37` | the flow stops at the registry write. The clause also says the install writes the enablement map, but this build has no settings writer (src/config reads settings.json and never rewrites it), so general.enabledPlugins is left alone and the plugin resolves as enabled by absence. A settings-write surface has to exist before this can land. |
 | `src/extensions/plugins/installed.ts:240` | `B36` | strictEnabledPlugins is parsed but not enforced, so an entry below the policy level still resolves as enabled here. |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view; this build has no scrubber yet, so the raw content is matched. |
-| `src/tools/fs/grep.ts:28` | `B20` | for the full list. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
 | `src/tools/fs/read.ts:266` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
 | `src/tools/fs/read.ts:420` | `B12` | the spill file under <state dir>/tool-outputs is not written by this build; the notice names how to ask for the rest instead. |
-| `src/tools/permissions.ts:174` | `B46` | for the exact sentences. |
 | `src/tools/shell/exec.ts:10` | `90 B15` | Execute keeps a pipe child. The pinned pseudo-terminal surface (B13-B22: login-shell environment, its blocklist and the PTY session lifecycle) belongs to the daemon terminal, which this build does not spawn, so there is no terminal to hand this command to. |
 | `src/tools/shell/exec.ts:230` | `B28` | the contract keeps detached:false on POSIX. |
 | `src/tools/shell/exec.ts:339` | `B31` | no watchdog and no inner-PID/creation-time report yet; the wrapper PID and the log path are what this build returns. |
