@@ -39,7 +39,7 @@ What runs today, run against this tree:
 
 | Surface                                                                                    | Today                                                                                                                                                                                                                                                                                                                                    |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--version`, `--help`, subcommand help                                                     | works — reports `0.4.0`; 20 recorded CLI cases replay green (snapshots are local, see [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md))                                                                                                                                                                                     |
+| `--version`, `--help`, subcommand help                                                     | works — reports `0.5.0`; 20 recorded CLI cases replay green (snapshots are tracked in `tests/parity/expected/`, see [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md))                                                                                                                                                                                     |
 | `doctor`                                                                                   | works — 16 named checks, twelve of them by default: config, environment, system, binaries, updates, filesystem, git, proxy, certs, connectivity, auth, daemon; `--checks all` adds custom-models, inference, mcp and exec, which start servers or spend money. A check that cannot run reports `skip` with a reason                                        |
 | `search` / `find`                                                                          | works — served from a local transcript index with a proving fallback to the literal scan; `--reindex` refreshes it                                                                                                                                                                                                                       |
 | `mcp list`, `mcp add`, `mcp remove`, `mcp permissions`                                     | work — merged configuration, surgical JSONC edits that keep comments, atomic writes, permission list/revoke/clear                                                                                                                                                                                                                        |
@@ -91,7 +91,7 @@ Node 24 or newer, and a Rust toolchain for the native layer.
 
 ```sh
 npm ci                          # install once; there is no build step
-node bin/droide.mjs --version   # 0.4.0
+node bin/droide.mjs --version   # 0.5.0
 node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 12 named checks by default (--checks all: 16)
 node bin/droide.mjs mcp list
