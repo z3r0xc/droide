@@ -170,6 +170,41 @@ test(
 );
 
 test(
+  "-o json renders a denied Execute as subtype failure, not an internal error (B14, B22)",
+  { timeout: 60_000 },
+  async () => {
+    await withHarness(
+      DENIED_SCRIPT,
+      async ({ directory, settingsPath, server }) => {
+        const result = await runCli(
+          directory,
+          execArgs(settingsPath, [
+            "-o",
+            "json",
+            "--auto",
+            "low",
+            "-m",
+            "custom:mock",
+            "delete it",
+          ]),
+        );
+        assert.equal(result.code, 1);
+        assert.equal(result.stderr, "");
+        const record = recordOf(JSON.parse(result.stdout));
+        assert.equal(record["type"], "result");
+        assert.equal(record["subtype"], "failure");
+        assert.equal(record["is_error"], true);
+        assert.match(
+          String(record["result"]),
+          /^Exec ended early: insufficient permission to proceed\./,
+        );
+        assert.equal(server.requests.length, 1);
+      },
+    );
+  },
+);
+
+test(
   "-o stream-json emits init, echo, tool records, the answer and one completion",
   { timeout: 60_000 },
   async () => {

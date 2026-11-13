@@ -141,7 +141,10 @@ export function parseRetryAfter(headers: Headers, now: number): number | null {
  * unparseable reset, or a reset in the past yields `null` so the caller keeps
  * its own backoff.
  */
-function resetDelayFromAnthropicPair(headers: Headers, now: number): number | null {
+function resetDelayFromAnthropicPair(
+  headers: Headers,
+  now: number,
+): number | null {
   const remaining = headers.get("anthropic-ratelimit-tokens-remaining");
   if (remaining === null || remaining.trim() !== "0") return null;
   const reset = headers.get("anthropic-ratelimit-tokens-reset");

@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { PRODUCT_VERSION } from "../../../src/cli/brand.ts";
+import { MAX_IMAGE_BYTES } from "../../../src/agent/messages.ts";
 
 import {
   ACP_ERROR_CODES,
@@ -333,6 +334,74 @@ test("prompt: text, links, embedded context and images are parsed (B65)", () => 
       parsePromptParams({ sessionId: "s", prompt: [{ type: "nope" }] }),
     ).code,
     ACP_ERROR_CODES.invalidParams,
+  );
+});
+
+test("prompt: an unsupported declared image type is refused (B65)", () => {
+  const error = protocolError(() =>
+    extractImagesFromPrompt([
+      { type: "image", data: "aGVsbG8=", mimeType: "image/bmp" },
+    ]),
+  );
+  assert.equal(error.code, ACP_ERROR_CODES.invalidParams);
+  assert.equal(
+    error.message,
+    "Invalid params: Unsupported prompt image type: image/bmp",
+  );
+
+  // An image blob is held to the same rule; a non-image blob is context.
+  const blobError = protocolError(() =>
+    extractImagesFromPrompt([
+      {
+        type: "resource",
+        resource: {
+          uri: "file:///work/scan.bmp",
+          mimeType: "image/bmp",
+          blob: "aGVsbG8=",
+        },
+      },
+    ]),
+  );
+  assert.equal(
+    blobError.message,
+    "Invalid params: Unsupported prompt image type: image/bmp",
+  );
+  assert.deepEqual(
+    extractImagesFromPrompt([
+      {
+        type: "resource",
+        resource: {
+          uri: "file:///work/notes.pdf",
+          mimeType: "application/pdf",
+          blob: "aGVsbG8=",
+        },
+      },
+    ]),
+    [],
+  );
+});
+
+test("prompt: an image over the 5 MiB ceiling is refused with its size (B65)", () => {
+  // Four base64 characters carry three bytes; no padding here.
+  const decoded = MAX_IMAGE_BYTES + 3;
+  const data = "A".repeat(Math.ceil(decoded / 3) * 4);
+  const error = protocolError(() =>
+    extractImagesFromPrompt([{ type: "image", data, mimeType: "image/png" }]),
+  );
+  assert.equal(error.code, ACP_ERROR_CODES.invalidParams);
+  assert.equal(
+    error.message,
+    `Invalid params: Prompt image is ${Math.ceil(decoded / 3) * 3} bytes; ` +
+      `the limit is 5 MiB`,
+  );
+
+  // Exactly at the ceiling is accepted.
+  const atCeiling = "A".repeat((MAX_IMAGE_BYTES / 3) * 4);
+  assert.equal(
+    extractImagesFromPrompt([
+      { type: "image", data: atCeiling, mimeType: "image/png" },
+    ]).length,
+    1,
   );
 });
 

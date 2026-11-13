@@ -594,9 +594,14 @@ test("a Claude-layout plugin is translated into ours on install (B42)", async ()
     assert.equal(existsSync(join(entry.installPath, ".claude-plugin")), false);
     assert.equal(existsSync(join(entry.installPath, ".droide-plugin")), true);
     assert.equal(existsSync(join(entry.installPath, "agents")), false);
-    assert.equal(existsSync(join(entry.installPath, "droids/reviewer.md")), true);
+    assert.equal(
+      existsSync(join(entry.installPath, "droids/reviewer.md")),
+      true,
+    );
     assert.equal(existsSync(join(entry.installPath, ".mcp.json")), false);
-    const mcp = JSON.parse(readFileSync(join(entry.installPath, "mcp.json"), "utf8"));
+    const mcp = JSON.parse(
+      readFileSync(join(entry.installPath, "mcp.json"), "utf8"),
+    );
     assert.deepEqual(mcp, {
       mcpServers: { demo: { command: "node", args: ["server.js"] } },
     });

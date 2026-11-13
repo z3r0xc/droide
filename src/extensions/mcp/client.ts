@@ -1,18 +1,23 @@
 /**
  * MCP client: the protocol lifecycle of one server. Contract:
- * `specs/60-extensions-mcp-and-skills.md` B10 (connect budgets), B13 (listing
- * deadline, lenient tolerance and the 60 s negative cache), B14 (per-tool
+ * `specs/60-extensions-mcp-and-skills.md` B10 (connect budgets), B11 (era
+ * negotiation and its legacy verdict cache), B13 (listing deadline, cursor
+ * bounds, lenient tolerance and the 60 s negative cache), B14 (per-tool
  * tolerance), B20 (call budget), B21 (cancellation and its `not_sent` /
- * `in_flight` classification) and B22 (result marshalling).
+ * `in_flight` classification), B22 (result marshalling) and B23 (rewritten
+ * output-schema validation errors).
  *
- * Lifecycle: `initialize` request -> `notifications/initialized` -> `tools/list`
- * (following `nextCursor` pages inside one budget) -> `tools/call`. Neither
- * `resources/*` nor prompts are called: no clause of the spec requires them.
+ * Lifecycle: `server/discover` when negotiating the modern era, else
+ * `initialize` -> `notifications/initialized` -> `tools/list` (following
+ * `nextCursor` pages inside one budget) -> `tools/call`. Neither `resources/*`
+ * nor prompts are called: no clause of the spec requires them.
  *
  * Every budget is measured with an injected timer, every call takes an
  * `AbortSignal`, and a cancelled request reports whether it had already left
  * this process. Nothing a server sends is used before it is parsed.
  */
+
+import { createHash } from "node:crypto";
 
 import {
   DEFAULT_MCP_CALL_TIMEOUT_MS,
@@ -46,12 +51,132 @@ import { boundText, MODEL_RESULT_BUDGET_BYTES } from "../../tools/result.ts";
 
 /**
  * The revision this build speaks in the 2025 `initialize` handshake.
- *
- * TODO(spec B11): era negotiation is not attempted — no `server/discover`
- * probe, no 2026-07-28 rescue after a `-32022` refusal, no legacy verdict
- * cache; the server's chosen revision is accepted as returned.
  */
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
+
+/** The revision a modern server is probed for (B11). */
+export const MCP_MODERN_PROTOCOL_VERSION = "2026-07-28";
+
+/** The probe that settles a server's era without `initialize` (B11). */
+export const MCP_DISCOVER_METHOD = "server/discover";
+
+/** JSON-RPC `UnsupportedProtocolVersion`: the probed revision is refused. */
+export const MCP_UNSUPPORTED_PROTOCOL_VERSION_CODE = -32022;
+
+/** JSON-RPC `MethodNotFound`: a 2025 server has no `server/discover` (B11). */
+export const MCP_METHOD_NOT_FOUND_CODE = -32601;
+
+/** HTTP answers a 2025 server gives an unknown method (B11). */
+const MCP_PROBE_HTTP_REFUSALS: ReadonlySet<number> = new Set([400, 404, 405]);
+
+/** How long a legacy verdict keeps the probe away (B11, B12). */
+export const DEFAULT_MCP_ERA_VERDICT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** How one connect settles the protocol era (B11). */
+export type McpEraNegotiation = "auto" | "legacy" | "pinned";
+
+/**
+ * Fresh legacy verdicts, keyed by {@link mcpEraCacheKey} (B11). Injected so a
+ * test can drive the clock; a fresh verdict runs the 2025 handshake without
+ * probing, and the record is never refreshed by the success it caused.
+ */
+export interface McpEraVerdicts {
+  hasFresh(key: string, now: number): boolean;
+  record(key: string, now: number): void;
+  forget(key: string): void;
+}
+
+/** The in-memory verdict cache; the on-disk record is B12's. */
+export class McpEraVerdictCache implements McpEraVerdicts {
+  private readonly checkedAt = new Map<string, number>();
+  private readonly ttlMs: number;
+
+  constructor(ttlMs: number = DEFAULT_MCP_ERA_VERDICT_TTL_MS) {
+    this.ttlMs = ttlMs;
+  }
+
+  /** Whether `key` holds a verdict younger than the lifetime. */
+  hasFresh(key: string, now: number): boolean {
+    const at = this.checkedAt.get(key);
+    if (at === undefined) return false;
+    const age = now - at;
+    // A verdict dated in the future is distrusted rather than trusted, and an
+    // expired one is dropped: either way the next connect probes (B12).
+    if (age < 0 || age >= this.ttlMs) {
+      this.checkedAt.delete(key);
+      return false;
+    }
+    return true;
+  }
+
+  record(key: string, now: number): void {
+    this.checkedAt.set(key, now);
+  }
+
+  forget(key: string): void {
+    this.checkedAt.delete(key);
+  }
+}
+
+/** The cache one process shares when a caller injects none. */
+const processMcpEraVerdicts = new McpEraVerdictCache();
+
+/**
+ * The cache key for one server's era (B11): the canonical name plus the
+ * transport's identity, so changing a server's command or URL probes again.
+ */
+export function mcpEraCacheKey(
+  server: string,
+  config: McpServerConfig,
+): string {
+  const identity =
+    config.type === "stdio"
+      ? ["protocol-era", server, config.type, config.command, ...config.args]
+      : ["protocol-era", server, config.type, config.url];
+  return createHash("sha256").update(JSON.stringify(identity)).digest("hex");
+}
+
+/** The revision a `server/discover` answer offers, when it offers one (B11). */
+function discoveredRevision(result: unknown): string | undefined {
+  if (!isJsonObject(result)) return undefined;
+  if (result["protocolVersion"] === MCP_MODERN_PROTOCOL_VERSION) {
+    return MCP_MODERN_PROTOCOL_VERSION;
+  }
+  const supported = result["supportedVersions"];
+  if (
+    Array.isArray(supported) &&
+    supported.includes(MCP_MODERN_PROTOCOL_VERSION)
+  ) {
+    return MCP_MODERN_PROTOCOL_VERSION;
+  }
+  return undefined;
+}
+
+/**
+ * Whether a probe failure is a server saying it does not speak the revision
+ * (B11) rather than a connect that never got an answer.
+ */
+function isEraRefusal(error: unknown): boolean {
+  if (!(error instanceof McpProtocolError)) return false;
+  if (
+    error.code === MCP_UNSUPPORTED_PROTOCOL_VERSION_CODE ||
+    error.code === MCP_METHOD_NOT_FOUND_CODE
+  ) {
+    return true;
+  }
+  return (
+    error.status !== undefined && MCP_PROBE_HTTP_REFUSALS.has(error.status)
+  );
+}
+
+/** Whether a refused 2025 handshake asks for the modern revision (B11). */
+function isModernRescue(error: unknown): boolean {
+  return (
+    error instanceof McpProtocolError &&
+    error.code === MCP_UNSUPPORTED_PROTOCOL_VERSION_CODE &&
+    error.message.includes(MCP_MODERN_PROTOCOL_VERSION)
+  );
+}
 
 /** Client identity sent in `initialize`; a caller may replace it. */
 export interface McpClientInfo {
@@ -116,6 +241,15 @@ export interface McpSkippedTool {
 export interface McpToolList {
   readonly tools: readonly McpToolInfo[];
   readonly skipped: readonly McpSkippedTool[];
+  /** How many `tools/list` pages the listing read (B13). */
+  readonly pages: number;
+}
+
+/** One validated `tools/list` page, before the chain merges it (B13). */
+export interface McpToolListPage {
+  readonly tools: readonly McpToolInfo[];
+  readonly skipped: readonly McpSkippedTool[];
+  readonly nextCursor: string | undefined;
 }
 
 /** One validated result content block. */
@@ -208,7 +342,7 @@ const INVALID_TOOLS_LIST =
 export function parseToolsListResult(
   result: unknown,
   server: string,
-): McpToolList & { readonly nextCursor: string | undefined } {
+): McpToolListPage {
   if (!isJsonObject(result)) {
     throw new McpProtocolError(INVALID_TOOLS_LIST, {
       server,
@@ -416,23 +550,38 @@ function renderBlock(block: McpContentBlock): string {
   }
 }
 
-/**
- * TODO(spec B23): the three structured-output validation markers the SDK
- * reports are not quoted by the spec, so an `isError` message that mentions
- * them is rendered verbatim instead of being replaced by the remediation
- * sentence.
- */
+/** The SDK's three structured-output validation markers (B23). */
+export const OUTPUT_SCHEMA_VALIDATION_MARKERS = [
+  "Structured content does not match the tool's output schema",
+  "Failed to validate structured content",
+  "has an output schema but did not return structured content",
+] as const;
+
+/** The sentence B23 puts in place of a validation error. */
+export function outputSchemaRemediation(label: {
+  readonly server?: string;
+  readonly tool?: string;
+}): string {
+  const target =
+    label.server !== undefined && label.tool !== undefined
+      ? `MCP tool ${label.server}/${label.tool}`
+      : "MCP tool";
+  return `${target} returned structured output that does not match its output schema. Contact the MCP server owner to fix the schema or response.`;
+}
 
 /**
  * Render a validated result for the model (B22): text blocks are re-indented
  * JSON, an empty successful result renders `structuredContent` or
- * `[No content returned]`, and an `isError` result renders `Error: ...`.
+ * `[No content returned]`, and an `isError` result renders `Error: ...`. An
+ * error text naming one of the three structured-output validation markers is
+ * replaced by the remediation sentence instead (B23).
  *
  * TODO(spec B22): image blocks are reported by type and size instead of being
  * compressed; the two placeholders themselves are quoted by the clause.
  */
 export function renderToolCallResult(
   result: McpCallToolResult,
+  label: { readonly server?: string; readonly tool?: string } = {},
 ): McpToolCallResult {
   const bounded = (text: string): string =>
     boundText(text, MODEL_RESULT_BUDGET_BYTES, "the MCP server response").text;
@@ -440,6 +589,17 @@ export function renderToolCallResult(
   if (result.isError) {
     const firstText = result.content.find((block) => block.kind === "text");
     if (firstText !== undefined && firstText.kind === "text") {
+      if (
+        OUTPUT_SCHEMA_VALIDATION_MARKERS.some((marker) =>
+          firstText.text.includes(marker),
+        )
+      ) {
+        return {
+          text: bounded(outputSchemaRemediation(label)),
+          content: result.content,
+          structuredContent: result.structuredContent,
+        };
+      }
       return {
         text: bounded(`Error: ${firstText.text}`),
         content: result.content,
@@ -505,6 +665,10 @@ export interface McpClientOptions {
   readonly listingFailureTtlMs?: number;
   /** Injected clock for the listing deadline and the cache. */
   readonly now?: () => number;
+  /** How this connect settles the era (B11); `auto` by default. */
+  readonly eraNegotiation?: McpEraNegotiation;
+  /** Replaces the process-wide legacy verdict cache (B11). */
+  readonly eraVerdicts?: McpEraVerdicts;
   /** A prepared transport; the client owns it and closes it. */
   readonly transport?: McpTransport;
   /**
@@ -539,6 +703,8 @@ export class McpClient {
   private readonly listTimeoutMs: number;
   private readonly callTimeoutMs: number;
   private readonly listingFailureTtlMs: number;
+  private readonly eraNegotiation: McpEraNegotiation;
+  private readonly eraVerdicts: McpEraVerdicts;
   private readonly onServerNotification:
     ((notification: McpServerNotification) => void) | undefined;
   private state: "new" | "connecting" | "open" | "closing" | "closed" = "new";
@@ -564,6 +730,8 @@ export class McpClient {
       DEFAULT_MCP_CALL_TIMEOUT_MS;
     this.listingFailureTtlMs =
       options.listingFailureTtlMs ?? DEFAULT_MCP_LISTING_FAILURE_TTL_MS;
+    this.eraNegotiation = options.eraNegotiation ?? "auto";
+    this.eraVerdicts = options.eraVerdicts ?? processMcpEraVerdicts;
     this.onServerNotification = options.onServerNotification;
     this.connectTimeoutMs =
       options.connectTimeoutMs ??
@@ -613,9 +781,9 @@ export class McpClient {
   }
 
   /**
-   * `initialize` then `notifications/initialized`, inside the connect budget
-   * (B10). A failure closes the transport, so a rejected connect leaves no
-   * process behind.
+   * Settle the era, then complete the handshake, inside the connect budget
+   * (B10, B11). A failure closes the transport, so a rejected connect leaves
+   * no process behind.
    */
   async connect(): Promise<void> {
     if (this.state === "open") return;
@@ -627,41 +795,28 @@ export class McpClient {
     }
     this.state = "connecting";
 
-    try {
-      const result = await this.withinBudget(
-        (signal) =>
-          this.transport.request(
-            "initialize",
-            {
-              protocolVersion: MCP_PROTOCOL_VERSION,
-              capabilities: {},
-              clientInfo: this.clientInfo,
-            },
-            { signal },
-          ),
-        this.connectTimeoutMs,
-        "connect",
-        "initialize",
-        undefined,
-        undefined,
-      );
-      const initialized = parseInitializeResult(result, this.server);
-      this.protocolVersionValue = initialized.protocolVersion;
-      this.capabilitiesValue = initialized.capabilities;
-      this.serverInfoValue = initialized.serverInfo;
+    const key = mcpEraCacheKey(this.server, this.config);
+    // An `sse` transport predates the modern revision, and a caller that pins
+    // `legacy` wants the 2025 client exactly: neither probes nor remembers.
+    const negotiating =
+      this.config.type !== "sse" && this.eraNegotiation !== "legacy";
+    const cached = negotiating && this.eraVerdicts.hasFresh(key, this.now());
+    let verdictFromProbe = false;
+    let modern = false;
 
-      await this.withinBudget(
-        (signal) =>
-          this.transport.notify("notifications/initialized", undefined, {
-            signal,
-          }),
-        this.connectTimeoutMs,
-        "connect",
-        "notifications/initialized",
-        undefined,
-        undefined,
-      );
+    try {
+      if (negotiating && !cached) {
+        const revision = await this.probeEra();
+        modern = revision !== undefined;
+        verdictFromProbe = !modern;
+      }
+      if (!modern) {
+        // A cached verdict is the one path that can still be wrong when the
+        // handshake is refused as a 2025 client, so only it rescues (B11).
+        modern = await this.runLegacyHandshake(cached);
+      }
     } catch (error) {
+      if (cached) this.eraVerdicts.forget(key);
       await this.transport.close();
       this.state = "closed";
       if (
@@ -683,6 +838,12 @@ export class McpClient {
       );
     }
 
+    // A modern server costs the same one probe whether or not it is known, so
+    // its verdict is not stored; a legacy one came from a probe, and that is
+    // the only verdict worth keeping — a cached one never refreshes itself.
+    if (modern) this.eraVerdicts.forget(key);
+    else if (verdictFromProbe) this.eraVerdicts.record(key, this.now());
+
     this.state = "open";
     this.transport.setNotificationHandler?.((notification) => {
       // B13/B72: a listing-changed notification invalidates both caches, so the
@@ -695,6 +856,118 @@ export class McpClient {
     });
   }
 
+  /**
+   * Ask a server which era it speaks (B11). Returns the modern revision when
+   * the probe is accepted and `undefined` when this connect must run the 2025
+   * handshake; an answer without the revision is a 2025-era server under
+   * `auto` and a protocol error under `pinned`, while any failure other than
+   * a refusal propagates.
+   */
+  private async probeEra(): Promise<string | undefined> {
+    let result: unknown;
+    try {
+      result = await this.connectRequest(MCP_DISCOVER_METHOD, {});
+    } catch (error) {
+      if (this.eraNegotiation !== "pinned" && isEraRefusal(error)) {
+        return undefined;
+      }
+      throw error;
+    }
+    const revision = discoveredRevision(result);
+    if (revision !== undefined) {
+      this.applyModernEra(result);
+      return revision;
+    }
+    if (this.eraNegotiation === "pinned") {
+      throw new McpProtocolError(
+        `answered ${MCP_DISCOVER_METHOD} without the ${MCP_MODERN_PROTOCOL_VERSION} revision`,
+        { server: this.server, method: MCP_DISCOVER_METHOD },
+      );
+    }
+    return undefined;
+  }
+
+  /**
+   * The 2025 `initialize` handshake; `true` when a refusal carrying `-32022`
+   * that names the modern revision was rescued by a probe. With `rescue`, that
+   * refusal is answered once by that probe rather than surfaced, and a rescue
+   * that is not accepted surfaces the refusal (B11).
+   */
+  private async runLegacyHandshake(rescue: boolean): Promise<boolean> {
+    try {
+      const result = await this.connectRequest("initialize", {
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        capabilities: {},
+        clientInfo: this.clientInfo,
+      });
+      const initialized = parseInitializeResult(result, this.server);
+      this.protocolVersionValue = initialized.protocolVersion;
+      this.capabilitiesValue = initialized.capabilities;
+      this.serverInfoValue = initialized.serverInfo;
+
+      await this.withinBudget(
+        (signal) =>
+          this.transport.notify("notifications/initialized", undefined, {
+            signal,
+          }),
+        this.connectTimeoutMs,
+        "connect",
+        "notifications/initialized",
+        undefined,
+        undefined,
+      );
+      return false;
+    } catch (error) {
+      if (!rescue || this.eraNegotiation !== "auto" || !isModernRescue(error)) {
+        throw error;
+      }
+      let revision: string | undefined;
+      try {
+        revision = await this.probeEra();
+      } catch {
+        revision = undefined;
+      }
+      if (revision === undefined) throw error;
+      return true;
+    }
+  }
+
+  /** One connect-phase request, inside the connect budget (B10). */
+  private async connectRequest(
+    method: string,
+    params: unknown,
+  ): Promise<unknown> {
+    return await this.withinBudget(
+      (signal) => this.transport.request(method, params, { signal }),
+      this.connectTimeoutMs,
+      "connect",
+      method,
+      undefined,
+      undefined,
+    );
+  }
+
+  /**
+   * Read what a `server/discover` answer offers. The revision is what the
+   * connect adopts; an unreadable `serverInfo` is simply not reported.
+   */
+  private applyModernEra(result: unknown): void {
+    this.protocolVersionValue = MCP_MODERN_PROTOCOL_VERSION;
+    if (!isJsonObject(result)) {
+      this.capabilitiesValue = {};
+      return;
+    }
+    const capabilities = result["capabilities"];
+    this.capabilitiesValue = isJsonObject(capabilities) ? capabilities : {};
+    const info = result["serverInfo"];
+    this.serverInfoValue =
+      isJsonObject(info) &&
+      typeof info["name"] === "string" &&
+      typeof info["version"] === "string"
+        ? { name: info["name"], version: info["version"] }
+        : undefined;
+  }
+
   /** Forget the cached listing and the negative-cached failure (B13, B72). */
   clearListingFailure(): void {
     this.listingFailure = undefined;
@@ -702,11 +975,11 @@ export class McpClient {
   }
 
   /**
-   * `tools/list`, following `nextCursor` inside one budget (B13). A distinct
-   * failure is remembered for `listingFailureTtlMs`; `refresh` clears it first.
-   *
-   * TODO(spec B13): the spec does not pin cursor following, so the page ceiling
-   * and the repeated-cursor refusal are this build's bounds.
+   * `tools/list`, following `nextCursor` inside one budget (B13). At most
+   * `MAX_TOOL_LIST_PAGES` pages are read and a cursor the chain has already
+   * seen is refused, so a server cannot make the listing loop; the result
+   * reports how many pages it read. A distinct failure is remembered for
+   * `listingFailureTtlMs`; `refresh` clears it first.
    */
   async listTools(
     options: {
@@ -736,6 +1009,7 @@ export class McpClient {
     const skipped: McpSkippedTool[] = [];
     const names = new Set<string>();
     const cursors = new Set<string>();
+    let pages = 0;
 
     try {
       let cursor: string | undefined;
@@ -767,6 +1041,7 @@ export class McpClient {
           options.signal,
         );
         const parsed = parseToolsListResult(result, this.server);
+        pages += 1;
         skipped.push(...parsed.skipped);
         for (const tool of parsed.tools) {
           if (names.has(tool.name)) {
@@ -795,7 +1070,7 @@ export class McpClient {
     }
 
     this.listingFailure = undefined;
-    const listing: McpToolList = { tools, skipped };
+    const listing: McpToolList = { tools, skipped, pages };
     this.listing = listing;
     return listing;
   }
@@ -829,7 +1104,10 @@ export class McpClient {
       options.signal,
     );
     const parsed = parseCallToolResult(result, this.server, tool);
-    const rendered = renderToolCallResult(parsed);
+    const rendered = renderToolCallResult(parsed, {
+      server: this.server,
+      tool,
+    });
     if (parsed.isError) {
       throw new McpToolError(rendered.text, {
         server: this.server,

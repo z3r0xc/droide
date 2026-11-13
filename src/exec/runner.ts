@@ -21,7 +21,12 @@
  * do; no clock is read for timestamps the sink owns.
  */
 import type { Environment } from "../config/paths.ts";
-import type { Message, Role, ToolResultBlock } from "../agent/messages.ts";
+import type {
+  ImageBlock,
+  Message,
+  Role,
+  ToolResultBlock,
+} from "../agent/messages.ts";
 import { runTurn, type TurnOutcome as LoopTurnOutcome } from "../agent/loop.ts";
 import type {
   LoopClock,
@@ -184,6 +189,8 @@ export interface ToolDenial {
   readonly message: string;
   /** B14: a denied `Execute` or MCP call takes the immediate exit. */
   readonly immediate: boolean;
+  /** The refused call's `tool_use` id, when the caller had one (B69). */
+  readonly toolUseId?: string;
 }
 
 export interface ExecToolRunner extends LoopToolRunner {
@@ -236,12 +243,14 @@ function permissionRequestOf(
   definition: ToolDefinition,
   input: unknown,
   toolClass: ToolClass,
+  toolUseId: string | undefined,
 ): PermissionRequest {
   const riskLevel = riskLevelOf(input);
   return {
     toolId: definition.id,
     llmId: definition.llmId,
     toolClass,
+    ...(toolUseId === undefined ? {} : { toolUseId }),
     ...(riskLevel === undefined ? {} : { riskLevel }),
   };
 }
@@ -317,7 +326,10 @@ export function createExecToolRunner(
     async execute(
       name: string,
       input: unknown,
-      executeOptions: { readonly signal: AbortSignal },
+      executeOptions: {
+        readonly signal: AbortSignal;
+        readonly toolUseId?: string;
+      },
     ): Promise<LoopToolResult> {
       const definition = options.registry.byLlmId(name)[0];
       if (definition === undefined || !allowedSet.has(definition.llmId)) {
@@ -330,7 +342,12 @@ export function createExecToolRunner(
       if (executeOptions.signal.aborted) throw abortError();
 
       const toolClass = toolClassOf(definition);
-      const request = permissionRequestOf(definition, input, toolClass);
+      const request = permissionRequestOf(
+        definition,
+        input,
+        toolClass,
+        executeOptions.toolUseId,
+      );
       const decision = decide(request, options.permission);
 
       if (decision === "deny") {
@@ -347,6 +364,9 @@ export function createExecToolRunner(
             toolName: name,
             message,
             immediate: toolClass === "execute" || toolClass === "mcp",
+            ...(executeOptions.toolUseId === undefined
+              ? {}
+              : { toolUseId: executeOptions.toolUseId }),
           };
           denials.push(denial);
           options.onDenial?.(denial);
@@ -666,7 +686,17 @@ export function createExecTurnRunner(
       const userMessage: Message = {
         id: request.messageId ?? options.nextMessageId("user"),
         role: "user",
-        content: [{ type: "text", text: request.prompt }],
+        content: [
+          ...(request.images ?? []).map((image): ImageBlock => ({
+            type: "image",
+            source: {
+              type: "base64",
+              mediaType: image.mediaType,
+              data: image.data,
+            },
+          })),
+          { type: "text", text: request.prompt },
+        ],
         createdAt: at,
         updatedAt: at,
       };
@@ -700,7 +730,15 @@ export function createExecTurnRunner(
         options.transcript?.assistantMessage(endedEarly);
         await sink.assistant(toAssistantMessageEvent(endedEarly));
         options.transcript?.turnFailed(immediate.message);
-        return { kind: "failed", message: immediate.message };
+        // B14: the ending has its own name, so ACP settles it as `end_turn`
+        // instead of surfacing a denied call as an internal error (B66).
+        return {
+          kind: "permission_rejected",
+          message: immediate.message,
+          ...(immediate.toolUseId === undefined
+            ? {}
+            : { toolUseId: immediate.toolUseId }),
+        };
       }
 
       switch (outcome.reason) {

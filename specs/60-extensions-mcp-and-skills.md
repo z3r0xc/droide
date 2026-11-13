@@ -135,6 +135,30 @@ legacy only (SSE transports and when modern negotiation is off); may be pinned; 
 "rescue" after a 2025 handshake is refused with error code `-32022` naming `2026-07-28`
 (`evidence/original/windows-x64/src/mcp/enums.ts:103-153`, `evidence/original/windows-x64/src/mcp/constants.ts:104-124`).
 
+The ladder this build runs is fixed (`src/extensions/mcp/client.ts`, `probeEra` and
+`runLegacyHandshake`). With negotiation on — every `stdio` and `http` server unless the caller selects
+`legacy` — a connect first sends `server/discover` with empty params inside the connect budget, and
+adopts `2026-07-28` only when the answer names that revision, as its `protocolVersion` or among its
+`supportedVersions`; a modern connect then sends neither `initialize` nor
+`notifications/initialized`. A probe the server _answers_ without the revision is a fallback: the
+JSON-RPC codes `-32022` (unsupported protocol version) and `-32601` (method not found), and the HTTP
+statuses `400`, `404` and `405`, are the answers a server that does not speak the revision gives, and
+each runs the 2025 handshake on the same transport. Any other probe failure — a timeout, a
+cancellation, `401`/`403`, a `5xx`, a malformed frame, any other JSON-RPC code — fails the connect
+without a handshake, and a `pinned` probe never falls back. An `sse` transport and a caller that turns
+negotiation off run the 2025 handshake only, and neither consult nor update the verdict cache. A 2025
+handshake refused with `-32022` whose message names `2026-07-28` is rescued by one probe, but only
+when this connect had not already probed (the cached-verdict path proved wrong); an unaccepted rescue
+surfaces the refusal.
+
+The legacy verdict is cached in memory for 24 h under
+`sha256(JSON.stringify(["protocol-era", server, <identity>]))`, where the identity is `type`,
+`command`, `args` for `stdio` and `type`, `url` for `http`; the on-disk record of the same key is
+B12's. A fresh verdict runs the 2025 handshake without probing and is never refreshed by the success
+it caused, so it cannot keep itself alive; a failure under a cached verdict drops it, a modern connect
+drops it, and a verdict dated in the future is distrusted and dropped. A verdict is recorded only when
+this connect's own probe produced it. `[observed]`
+
 **B12 — Legacy verdict cache.** A legacy verdict is cached per server for 24 h at
 `cache/mcp/protocol-eras/v1/<sha256 key>.json` holding `{version: 1, checkedAt}`; a record over 1 KiB,
 a non-regular file, unparseable JSON or an unrecognized shape is ignored; a verdict dated in the future
@@ -146,6 +170,12 @@ is distrusted. Modern verdicts are never stored
 the two attempts cannot stack. Distinct failures are negative-cached for 60 s, and manual recovery
 (retry, reconnect, `tools/list_changed`, config change) clears the entry immediately
 (`evidence/original/windows-x64/src/mcp/constants.ts:23-33`, `evidence/original/windows-x64/src/mcp/McpToolList.ts:29-62`).
+
+The cursor chain is bounded (`src/extensions/mcp/client.ts`, `listTools`): at most 100 `tools/list`
+requests are read inside the one budget, a `nextCursor` the chain has already seen is refused with a
+protocol error instead of being re-requested, and the merged listing reports how many pages it read
+(`pages`). A duplicate tool name inside one listing is skipped and reported rather than replacing the
+tool already read. `[observed]`
 
 **B72 — Inbound event stream for `sse`.** An `sse` server's server-initiated channel is one `GET` to the
 configured URL, carrying the configured headers and `Accept: text/event-stream`, opened when the client
@@ -232,6 +262,15 @@ content block: <blockType>]` for anything else. `[observed]`
 structured-output validation markers, the result text becomes
 `MCP tool <server>/<tool> returned structured output that does not match its output schema. Contact the MCP server owner to fix the schema or response.`
 (`evidence/original/windows-x64/src/tools/executors/client/mcp/formatMcpResult.ts:23-47`).
+
+The three markers are literal (`src/extensions/mcp/client.ts`,
+`OUTPUT_SCHEMA_VALIDATION_MARKERS`): `Structured content does not match the tool's output schema`,
+`Failed to validate structured content`, and `has an output schema but did not return structured
+content`. When the first text block of an `isError` result contains any one of them, that text is
+replaced by the remediation sentence above — not prefixed with `Error:` — with `<server>` and
+`<tool>` filled in by the `tools/call` that produced it; without both names the renderer falls back to
+the unqualified `MCP tool` label. An `isError` text that contains none of the markers is rendered
+verbatim as `Error: <text>`. `[observed]`
 
 **B24 — Persistent permissions.** `persistentPermissions` is `{ servers?: {name: entry},
 tools?: {server: {tool: entry}} }` with `entry = { approvedAt, impactLevel, serverIdentity? }`. A
@@ -620,11 +659,31 @@ the literal `Process request` when empty, images are attached, and all pending s
 flushed before the response is returned
 (`evidence/original/windows-x64/src/acp/AcpAgent.ts:2130-2200`).
 
+The images travel on the shared turn contract, not on the ACP request alone: `TurnRequest.images` is
+an ordered list of base64 images `{mediaType, data}` whose media types are `image/jpeg`, `image/png`,
+`image/gif` and `image/webp`, each capped at 5 MiB of decoded bytes, and the runner emits them as
+`image` blocks **before** the user message's text block (spec 20 §B12). The prompt surface refuses an
+image before the turn starts: a declared type outside those four fails `session/prompt` with
+invalid-params `Invalid params: Unsupported prompt image type: <mimeType>`, and one over the ceiling
+fails with `Invalid params: Prompt image is <n> bytes; the limit is 5 MiB`. Neither reaches a
+provider, and nothing is silently dropped. There is no client-side model capability gate: a model
+that cannot take image input fails the turn with the provider's own error message, so the failure is
+visible rather than the image disappearing.
+
 **B66 — Stop reasons.** A cancelled turn or a turn that ended cancelled returns
 `{stopReason: 'cancelled'}`; a successful turn returns `end_turn`; a recognized moderation refusal sends
 the content-moderation message as agent text and returns `refusal`; any other ending sends
 `Error: <message>` as agent text and fails the request with an internal error
 (`evidence/original/windows-x64/src/acp/AcpAgent.ts:2202-2233`).
+
+The fourth ending of the shared `TurnOutcome` is `permission_rejected`
+(`{message, toolUseId?}`): it is what a denied `Execute` or MCP call settles as (spec 80 §B14, spec
+20 §B38). It is not an internal error — ACP answers it with `{stopReason: 'end_turn'}` and sends no
+`Error: <message>` agent text, because the refusal already reached the client as that call's failed
+`tool_call_update`. Exec's own renderers keep treating it as a failure: text mode writes
+`Error during droide execution: <message>` to stderr and exits 1, `-o json` writes
+`subtype: "failure"`, and `-o stream-json` writes exactly one `error` record (spec 80 §B20, §B22,
+§B32).
 
 **B67 — Cancellation.** `session/cancel` is a no-op when the session has no turn; otherwise it marks the
 turn cancelled, aborts the turn controller, and asks the daemon to interrupt the session. A `$/cancel_request`
@@ -648,6 +707,13 @@ proceed-edit → `allow_once`; proceed-always, always-tools, always-server and t
 `Allow & auto-run (low risk)`)
 (`evidence/original/windows-x64/src/acp/tools/mapOutcomeToKind.ts:8-33`,
 `evidence/original/windows-x64/src/acp/tools/permissionMappers.ts:1-60`).
+
+The request names the call it approves, not just the tool: `PermissionRequest.toolUseId` is the
+assistant `tool_use` block's id for the call being decided, which the loop hands to the tool runner
+and the tool runner hands to its confirm callback. The ACP card sends it as
+`toolCall.toolCallId`, the same id the `tool_call`/`tool_call_update` notifications (B68) carry, so a
+client attaches the card to the call it already holds; a request with no id (a call made outside the
+loop) falls back to `permission-<toolId>`.
 
 **B70 — Modes and config options.** Mode ids are the autonomy modes `normal`, `spec`, `auto-low`,
 `auto-medium`, `auto-high`, filtered/clamped by the org `maxAutonomyLevel`. Config option ids are

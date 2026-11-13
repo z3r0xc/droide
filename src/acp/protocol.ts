@@ -15,6 +15,7 @@
 
 import { isUtf8 } from "node:buffer";
 
+import { MAX_IMAGE_BYTES } from "../agent/messages.ts";
 import { isRecord } from "../transport/schema.ts";
 
 /* -------------------------------------------------------------------------- */
@@ -965,29 +966,67 @@ function isImageMediaType(value: string): value is AcpImageMediaType {
   return Object.hasOwn(IMAGE_MEDIA_TYPES, value);
 }
 
-function asImage(
-  data: string,
-  mimeType: string | undefined,
-): AcpPromptImage | undefined {
-  if (mimeType === undefined || !isImageMediaType(mimeType)) {
-    return undefined;
+/**
+ * Decoded size of a base64 payload without allocating the bytes: every four
+ * characters carry three bytes, less one per `=` pad.
+ */
+function decodedBase64Bytes(data: string): number {
+  let length = data.length;
+  while (length > 0 && data.charCodeAt(length - 1) === 61) length -= 1;
+  return Math.floor((length * 3) / 4);
+}
+
+/**
+ * B65: the declared image type decides — a supported one within the ceiling,
+ * or a refusal. The declared type is validated before the size so a client
+ * hears which of the two rules it broke.
+ */
+function imageOf(data: string, mimeType: string | undefined): AcpPromptImage {
+  if (mimeType === undefined) {
+    throw invalidParams("Prompt image type is missing");
+  }
+  if (!isImageMediaType(mimeType)) {
+    throw invalidParams(`Unsupported prompt image type: ${mimeType}`);
+  }
+  const bytes = decodedBase64Bytes(data);
+  if (bytes > MAX_IMAGE_BYTES) {
+    throw invalidParams(
+      `Prompt image is ${bytes} bytes; the limit is ${
+        MAX_IMAGE_BYTES / (1024 * 1024)
+      } MiB`,
+    );
   }
   return { data, mimeType };
 }
 
-/** Images from `image` blocks and image blobs, in prompt order (B65). */
+/**
+ * Images from `image` blocks and image blobs, in prompt order (B65).
+ *
+ * A declared image is validated here rather than dropped: an unsupported media
+ * type or one over {@link MAX_IMAGE_BYTES} fails the prompt with invalid
+ * params, so the client hears about it instead of the image disappearing. A
+ * blob whose declared type is not an image is context, not an image, and is
+ * skipped.
+ */
 export function extractImagesFromPrompt(
   prompt: readonly AcpContentBlock[],
 ): readonly AcpPromptImage[] {
   const images: AcpPromptImage[] = [];
   for (const block of prompt) {
-    const image =
-      block.type === "image"
-        ? asImage(block.data, block.mimeType)
-        : block.type === "resource" && block.resource.blob !== undefined
-          ? asImage(block.resource.blob, block.resource.mimeType)
-          : undefined;
-    if (image !== undefined) images.push(image);
+    if (block.type === "image") {
+      images.push(imageOf(block.data, block.mimeType));
+      continue;
+    }
+    if (block.type !== "resource") continue;
+    const { blob, mimeType } = block.resource;
+    if (
+      blob === undefined ||
+      mimeType === undefined ||
+      !mimeType.toLowerCase().startsWith("image/")
+    ) {
+      continue;
+    }
+    images.push(imageOf(blob, mimeType));
   }
   return images;
 }

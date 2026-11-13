@@ -380,9 +380,7 @@ function translateLayout(staging: string, io: PluginIo): void {
     Object.hasOwn(document, "mcpServers");
   // The source text is kept byte-for-byte inside the wrapper, so the only
   // growth is the wrapper itself and a refusal stays a real ceiling.
-  const rendered = alreadyWrapped
-    ? text
-    : `{"mcpServers":${text.trim()}}`;
+  const rendered = alreadyWrapped ? text : `{"mcpServers":${text.trim()}}`;
   if (Buffer.byteLength(rendered) > Buffer.byteLength(text) + WRAPPER_BYTES) {
     throw new PluginOperationError(
       "layout-too-large",

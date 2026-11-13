@@ -54,22 +54,31 @@ transport and closes it on every failure path.
    channel; `http`/`sse` post to `url` with the configured `headers`. The child
    is a process-group leader on POSIX and is killed with `taskkill /T` on
    Windows, so `close()` always reaps descendants.
-2. **`initialize`.** Sends `{protocolVersion, capabilities: {}, clientInfo}`;
+2. **Era.** With negotiation on (`auto`, the default) and neither an `sse`
+   transport nor a fresh legacy verdict, `server/discover` is sent first. An
+   answer naming `2026-07-28` settles the modern era and the connect ends
+   there — no `initialize` follows. A `-32022`, `-32601` or HTTP `400`/`404`/
+   `405` refusal runs the 2025 handshake instead and records a verdict for
+   24 h; any other failure fails the connect. `legacy` never probes, `pinned`
+   never falls back, and a refused 2025 handshake naming `2026-07-28` is
+   rescued by one probe.
+3. **`initialize`.** Sends `{protocolVersion, capabilities: {}, clientInfo}`;
    validates `protocolVersion`, `capabilities` and `serverInfo` from the reply.
    Budget: `connectTimeout`, else 10 s (30 s for stdio).
-3. **`notifications/initialized`.** Sent inside the same connect budget. A
+4. **`notifications/initialized`.** Sent inside the same connect budget. A
    failure here is a connect failure: the transport is closed and the promise
    rejects.
-4. **`tools/list`.** Follows `nextCursor` until a page has none, all inside one
+5. **`tools/list`.** Follows `nextCursor` until a page has none, all inside one
    15 s budget (`DROIDE_MCP_LIST_TOOLS_TIMEOUT_MS`). A page is
    parsed strictly first; if any tool fails, the same payload is parsed per tool
    and the refusals are returned as `skipped` instead of discarding the listing.
-   Pages are capped at 100 and a repeated cursor is refused.
-5. **`tools/call`.** Sends `{name, arguments}` inside `config.timeout`, else
+   Pages are capped at 100, a repeated cursor is refused, and the listing
+   reports the `pages` it read.
+6. **`tools/call`.** Sends `{name, arguments}` inside `config.timeout`, else
    180 s. Content blocks become text (JSON re-indented), image and unknown
    blocks become markers; `structuredContent` renders when the content array is
    empty; an empty result is `[No content returned]`.
-6. **`close()`.** Idempotent: settles every pending request with
+7. **`close()`.** Idempotent: settles every pending request with
    `client_closed`, ends stdin, waits the close grace, then kills the process
    tree.
 
@@ -84,6 +93,8 @@ requires none.
 | command cannot start                                             | `McpConnectError`                                 | `MCP server "<s>" could not be started: <cause>`                                                                        | connect fails, no process left                                                 |
 | process dies before the handshake                                | `McpConnectError`                                 | `MCP server "<s>" could not complete the initialize handshake: <cause>`                                                 | connect fails, transport closed                                                |
 | server did not answer `initialize`                               | `McpTimeoutError` (`phase: connect`)              | `MCP server connection timed out after <n> seconds`                                                                     | connect fails, transport closed                                                |
+| server did not answer the `server/discover` probe                | `McpTimeoutError` (`phase: connect`)              | `MCP server connection timed out after <n> seconds`                                                                     | connect fails, no handshake ran                                                |
+| `server/discover` refused beyond the fallback set                | `McpProtocolError`                                | `rejected server/discover: <msg> (code <n>)`                                                                            | connect fails, transport closed                                                |
 | bad frame, wrong id, unattributable error, JSON-RPC error        | `McpProtocolError`                                | `sent a frame that is not JSON`, `answered request id <n>, which is not pending`, `rejected <method>: <msg> (code <n>)` | the stream is untrustworthy: every pending request settles, the boundary fails |
 | `tools/list` result is not an object, or `tools` is not an array | `McpProtocolError`                                | `The MCP server returned an invalid tools/list result: <reason>`                                                        | listing fails, cached 60 s                                                     |
 | listing budget exhausted                                         | `McpTimeoutError` (`phase: list`)                 | `MCP server "<s>" did not answer tools/list within <n> seconds`                                                         | listing fails, cached 60 s                                                     |

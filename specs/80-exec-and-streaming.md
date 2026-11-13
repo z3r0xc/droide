@@ -168,7 +168,9 @@ process exits `1` (`core/ToolExecutor.ts:840-861`, `core/AgentLoop.ts:7667-7700`
 (`Re-run with --auto medium or --auto high. For destructive commands, use
 --skip-permissions-unsafe.`); any other level gets `guidanceDefault`; and when
 the required level exceeds the organization maximum the guidance instead names
-that ceiling (`guidanceMaxAutonomy`).
+that ceiling (`guidanceMaxAutonomy`). The shared outcome that carries this ending
+is `TurnOutcome.permission_rejected` (`{message, toolUseId?}`, spec 60 §B66),
+not `failed`: exec renders it as a failure, and ACP settles it as `end_turn`.
 
 **B15.** A denied call of any other confirmation type (e.g. file edit) yields a
 per-tool error result and the turn continues; no immediate exit is taken

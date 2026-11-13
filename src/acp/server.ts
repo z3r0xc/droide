@@ -889,6 +889,12 @@ class AcpServerImpl implements AcpServer {
     rawParams: unknown,
   ): Promise<{ readonly stopReason: AcpStopReason }> {
     const params: AcpPromptParams = parsePromptParams(rawParams);
+    // B65: images are validated (type, ceiling) before the session is marked
+    // busy, so a refused prompt leaves no half-started turn behind.
+    const images = extractImagesFromPrompt(params.prompt).map((image) => ({
+      mediaType: image.mimeType,
+      data: image.data,
+    }));
     const session = this.#session(params.sessionId);
     if (session.turn !== null) {
       throw new AcpProtocolError(
@@ -912,7 +918,7 @@ class AcpServerImpl implements AcpServer {
       reasoningEffort: session.reasoningEffort,
       tools: this.#options.tools ?? [],
       messageId: (this.#options.nextMessageId ?? (() => randomUUID()))(),
-      images: extractImagesFromPrompt(params.prompt),
+      images,
       mode: session.modeId,
       signal: controller.signal,
     };

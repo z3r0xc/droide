@@ -14,7 +14,12 @@
  */
 
 import type { AssistantBlock, AssistantMessageEvent } from "./records.ts";
-import type { TurnEventSink, TurnOutcome, TurnRequest } from "./turn.ts";
+import type {
+  TurnEventSink,
+  TurnImage,
+  TurnOutcome,
+  TurnRequest,
+} from "./turn.ts";
 import {
   ACP_ERROR_CODES,
   AcpProtocolError,
@@ -29,7 +34,6 @@ import {
   type AcpPermissionOutcome,
   type AcpPermissionOption,
   type AcpPlanEntry,
-  type AcpPromptImage,
   type AcpRequestPermissionParams,
   type AcpSessionUpdate,
   type AcpStopReason,
@@ -45,12 +49,11 @@ import type { PermissionRequest } from "../tools/permissions.ts";
 /** One prompt as the ACP surface resolved it (B65). */
 export interface AcpTurnRequest extends TurnRequest {
   /**
-   * TODO(spec B65): images are parsed, validated and carried here, but the
-   * shared `TurnRequest` has no image channel, so a plain exec runner drops
-   * them. Attaching them needs the agent loop's media port, which this
-   * slice does not own.
+   * The prompt's images, already parsed, validated and capped by the ACP
+   * surface (B65): the runner attaches them ahead of the prompt text (spec 20
+   * §B12). Empty when the prompt carried none.
    */
-  readonly images: readonly AcpPromptImage[];
+  readonly images: readonly TurnImage[];
   /**
    * The session's autonomy mode, as `session/set_mode` last set it (B70). The
    * runner decides what a mode permits; this seam only carries the value.
@@ -279,10 +282,10 @@ export interface AcpTurnResult {
 
 /**
  * Runs one prompt through the shared turn path and settles it as B66 says:
- * a cancelled turn returns `cancelled`, a completed one `end_turn`, a
- * moderation block sends the moderation text and returns `refusal`, and any
- * other ending sends `Error: <message>` and fails the request with an
- * internal error.
+ * a cancelled turn returns `cancelled`, a completed one `end_turn`, a denied
+ * `Execute`/MCP call `end_turn` with no extra agent text, a moderation block
+ * sends the moderation text and returns `refusal`, and any other ending sends
+ * `Error: <message>` and fails the request with an internal error.
  */
 export async function runAcpTurn(
   options: RunAcpTurnOptions,
@@ -307,10 +310,11 @@ export async function runAcpTurn(
   if (sink.signal.aborted || outcome.kind === "cancelled") {
     return { stopReason: "cancelled" };
   }
-  // TODO(spec B66): the shared `TurnOutcome` has no distinct
-  // permission-rejection reason, so a call the user denied reaches this point
-  // as `failed` and answers with an internal error instead of `end_turn`.
   if (outcome.kind === "completed") return { stopReason: "end_turn" };
+  // A denied Execute or MCP call already reached the client as that call's
+  // failed `tool_call_update`, so the turn simply ends: no `Error:` text and no
+  // internal error (B66).
+  if (outcome.kind === "permission_rejected") return { stopReason: "end_turn" };
 
   if (isRefusal(outcome.message)) {
     await sink.update(agentMessageChunk(ACP_CONTENT_MODERATION_MESSAGE));
@@ -368,12 +372,11 @@ export interface CreateAcpConfirmOptions {
  * The tool runner's `confirm` callback over an ACP permission round-trip.
  *
  * B69: a selected `allow_*` kind approves the call; a cancelled or rejected
- * answer (and any malformed answer) refuses it.
- *
- * TODO(spec B69): the exec tool runner's `confirm` seam receives no tool-use
- * id, so the permission card names the tool rather than the call ACP wants it
- * to refer to; carrying the id is a change to `src/tools/permissions.ts`,
- * outside this slice.
+ * answer (and any malformed answer) refuses it. The card names the call, not
+ * the tool: `request.toolUseId` (the assistant `tool_use` id) becomes
+ * `toolCall.toolCallId`, the same id the `tool_call` update carried, so the
+ * client attaches the card to that call. A request with no id (a call made
+ * outside the loop) falls back to `permission-<toolId>`.
  */
 export function createAcpConfirm(
   options: CreateAcpConfirmOptions,
@@ -385,7 +388,7 @@ export function createAcpConfirm(
       response = await options.ask({
         sessionId: options.sessionId,
         toolCall: {
-          toolCallId: `permission-${request.toolId}`,
+          toolCallId: request.toolUseId ?? `permission-${request.toolId}`,
           title: request.llmId ?? request.toolId,
         },
         options: acpOptions,

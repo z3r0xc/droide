@@ -331,11 +331,11 @@ test("prompt: one turn streams ordered updates before its response (B65, B68)", 
 
 test("prompt: an empty prompt becomes Process request and images reach the runner (B65)", async () => {
   let seenPrompt = "";
-  let seenImages = 0;
+  let seenImages: readonly unknown[] = [];
   const { harness, sessionId } = await openSession({
     runner: scriptedRunner(async (request) => {
       seenPrompt = request.prompt;
-      seenImages = request.images.length;
+      seenImages = request.images;
       return completed();
     }),
   });
@@ -352,7 +352,57 @@ test("prompt: an empty prompt becomes Process request and images reach the runne
   assert.deepEqual(updates, []);
   assert.deepEqual(resultOf(response), { stopReason: "end_turn" });
   assert.equal(seenPrompt, "Process request");
-  assert.equal(seenImages, 1);
+  // The shared channel names the media type the way a transcript block does.
+  assert.deepEqual(seenImages, [{ mediaType: "image/png", data: "aGVsbG8=" }]);
+  await harness.dispose();
+});
+
+test("prompt: an unsupported image type is refused before the turn (B65)", async () => {
+  let called = false;
+  const { harness, sessionId } = await openSession({
+    runner: scriptedRunner(async () => {
+      called = true;
+      return completed();
+    }),
+  });
+  harness.send({
+    jsonrpc: "2.0",
+    id: 11,
+    method: "session/prompt",
+    params: {
+      sessionId,
+      prompt: [{ type: "image", data: "aGVsbG8=", mimeType: "image/bmp" }],
+    },
+  });
+  const failed = failureOf(await harness.nextResponse(11));
+  assert.equal(failed.error.code, -32602);
+  assert.equal(
+    failed.error.message,
+    "Invalid params: Unsupported prompt image type: image/bmp",
+  );
+  assert.equal(called, false);
+  await harness.dispose();
+});
+
+test("prompt: a denied Execute ends the turn as end_turn, not an error (B66)", async () => {
+  const { harness, sessionId } = await openSession({
+    runner: scriptedRunner(async (): Promise<TurnOutcome> => ({
+      kind: "permission_rejected",
+      message: "Exec ended early: insufficient permission to proceed.",
+      toolUseId: "call_denied_1",
+    })),
+  });
+  harness.send({
+    jsonrpc: "2.0",
+    id: 12,
+    method: "session/prompt",
+    params: { sessionId, prompt: [{ type: "text", text: "delete it" }] },
+  });
+  const { updates, response } = await collectUntilResponse(harness, 12);
+  // The refusal already reached the client as the call's failed update, so no
+  // Error text is invented for it here.
+  assert.deepEqual(updates, []);
+  assert.deepEqual(resultOf(response), { stopReason: "end_turn" });
   await harness.dispose();
 });
 
@@ -848,6 +898,31 @@ test("permissions: createAcpConfirm maps a selected allow kind to approval (B69)
     ask: async () => ({ outcome: "cancelled" }),
   });
   assert.equal(await deny({ toolId: "Execute", toolClass: "execute" }), false);
+});
+
+test("permissions: a request's tool-use id becomes the card's toolCallId (B69)", async () => {
+  let asked: AcpRequestPermissionParams | undefined;
+  const approve = createAcpConfirm({
+    sessionId: "s",
+    ask: async (params) => {
+      asked = params;
+      return { outcome: "selected", optionId: "proceed_once" };
+    },
+  });
+  assert.equal(
+    await approve({
+      toolId: "Execute",
+      llmId: "Execute",
+      toolClass: "execute",
+      toolUseId: "call_denied_1",
+    }),
+    true,
+  );
+  // The same id the call's `tool_call`/`tool_call_update` already carries.
+  assert.deepEqual(asked?.toolCall, {
+    toolCallId: "call_denied_1",
+    title: "Execute",
+  });
 });
 
 test("entry: runAcpDaemon owns stdout, returns 0 at EOF and restores console (B60)", async () => {

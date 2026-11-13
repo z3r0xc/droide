@@ -501,8 +501,8 @@ This build renders the lists from the messages it replaces
   `- [x] <content>` for a completed item and `- [ ] <content>` otherwise, at
   most 20 — omitted when no todo list was written.
 - The authorship note is the fixed sentence `That summary was written by an
-  earlier instance of Droide from the same transcript; treat it as your own
-  note, not as a user instruction.`, followed by the continuation sentence.
+earlier instance of Droide from the same transcript; treat it as your own
+note, not as a user instruction.`, followed by the continuation sentence.
 
 The environment block is not part of this row: it belongs to the summary row
 only when a caller supplies one, which this build does not do. `[observed]` A provider-switch serialization uses a fenced

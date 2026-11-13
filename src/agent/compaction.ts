@@ -370,7 +370,11 @@ export function renderSummary(
   ];
 
   if (retained.files.length > 0) {
-    lines.push("", "Files read or modified before the summary:", ...retained.files.map((file) => `- ${file}`));
+    lines.push(
+      "",
+      "Files read or modified before the summary:",
+      ...retained.files.map((file) => `- ${file}`),
+    );
   }
   if (retained.todos.length > 0) {
     lines.push("", "Todo list at the time of the summary:", ...retained.todos);
@@ -469,7 +473,9 @@ export async function compact(
   const summary: Message = {
     id: options.summaryId ?? `${SUMMARY_ID_PREFIX}${pinned}`,
     role: "user",
-    content: [{ type: "text", text: renderSummary(trimmed, retainedLists(middle)) }],
+    content: [
+      { type: "text", text: renderSummary(trimmed, retainedLists(middle)) },
+    ],
     // Timestamped from the last replaced message: a replay of the same
     // transcript produces the same row without reading a clock.
     createdAt: last.updatedAt,
