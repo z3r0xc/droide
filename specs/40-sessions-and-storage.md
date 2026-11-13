@@ -755,7 +755,7 @@ Three tests carry the load and must be exact:
 | `ev_session_paths` | B17, Data & config | Reading `session-paths/src/index.ts:36-160`, `280-381` [observed] |
 | `ev_state_home` | Terms, layout | Reading `cli/src/home/index.ts:13-29`, `environment/src/constants/index.ts:6-9` [derived: `getDirName` is an accessor over `getBaseEnv()`] |
 | `ev_schema_version` | B32–B33 | Reading `ingest.ts:212-325`, `record.ts:833-868` [observed] |
-| `ev_daemon_search` | B49, B54 | Reading `daemon-search.ts:30-130`, `283-400`; protocol schema `sdk-core/.../droid.ts:893-963` [observed] |
+| `ev_daemon_search` | B49, B54 | Reading `daemon-search.ts:30-130`, `283-400`; protocol schema `sdk-core/.../agent.ts:893-963` [observed] |
 
 Inferred only: the human strings behind the i18n keys (message catalogs are
 absent from the recovered tree), and the annotations database path.

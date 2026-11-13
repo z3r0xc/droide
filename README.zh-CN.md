@@ -38,16 +38,17 @@
 | 功能面                                                                                     | 当前                                                                                                                                                                              |
 | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--version`、`--help`、子命令帮助                                                          | 可用——报告 `0.4.0`；20 条录制的 CLI 用例回放通过（快照在本地，见 [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md)）                                                  |
-| `doctor`                                                                                   | 可用——16 项具名检查；其中十一项是真实探测（config, environment, system, binaries, updates, filesystem, git, proxy, certs, auth, mcp），其余报告 `skip` 并给出原因                 |
+| `doctor`                                                                                   | 可用——16 项具名检查，默认运行其中十二项：config, environment, system, binaries, updates, filesystem, git, proxy, certs, connectivity, auth, daemon；`--checks all` 会加上 custom-models、inference、mcp 与 exec，它们会启动服务器或花钱。无法运行的检查报告 `skip` 并给出原因 |
 | `search` / `find`                                                                          | 可用——由本地转录索引提供，并可回退到字面扫描作为佐证；`--reindex` 会刷新它                                                                                                        |
 | `mcp list`、`mcp add`、`mcp remove`、`mcp permissions`                                     | 可用——合并配置，保留注释的定点 JSONC 编辑，原子写入，权限的列出、撤销与清空                                                                                                       |
 | `plugin list`、`plugin marketplace`、`plugin install`、`plugin uninstall`、`plugin update` | 可用——基于 git 的 marketplace 在采纳前先校验，原子注册表合并，冲突与悬空引用会被拒绝                                                                                              |
-| `exec`                                                                                     | 对 `text`、`json`、`stream-json` 输出可用，输入可来自提示词参数、`-f` 或 stdin，支持会话续接与流式输入；`stream-jsonrpc`、ACP、`--mission` 与 `--list-tools` 会拒绝               |
+| `exec`                                                                                     | 对 `text`、`json`、`stream-json` 输出可用，输入可来自提示词参数、`-f` 或 stdin，支持会话续接与流式输入；`--list-tools` 无需凭据即可打印所选模型的工具；`stream-jsonrpc`、ACP 与 `--mission` 会拒绝 |
 | `resume`                                                                                   | 可用——列出会话，接受 UUID 或链接，通过 `exec -s` 路径继续，用 `--fork` 分叉                                                                                                       |
+| `update`、`update --check`、`update -v <version>`                                          | 可用——检查读取本仓库的发布源；安装会边流式写入 staging 边计算摘要，原子替换，并在唯一一次探测失败时回滚                                                     |
 | `daemon`                                                                                   | 本地可用——WebSocket 传输、JSON-RPC、鉴权闸门、单实例、有序关闭；Remote Control 与端口代理已声明，尚未构建                                                                         |
 | 无参数的 `droide`                                                                          | 在 TTY 对上启动交互式 shell；输入提示词会执行一个 agent 回合，带流式行、审批与 Esc 取消                                                                                           |
 | 原生 helper                                                                                | 15 个 JSON-line 方法（包括 PTY 会话），在 TypeScript 侧有类型并有校验，69 个 Rust 测试，另有契约测试会通过已编译二进制启动真实进程（`npm run test:native`）——**尚未接入工具执行** |
-| 测试套件                                                                                   | 128 个文件中的 1237 个测试：1230 通过，7 跳过，另有 69 个 Rust 测试                                                                                                               |
+| 测试套件                                                                                   | 128 个文件中的 1261 个测试：1254 通过，7 跳过，另有 69 个 Rust 测试                                                                                                               |
 
 `exec` 需要模型凭据。没有凭据时它会拒绝，而不是靠猜：
 
@@ -58,28 +59,26 @@ Authentication failed. Please log in using /login or set a valid DROIDE_API_KEY 
 
 已声明、推进中：
 
-| 功能面                                                                     | 状态                                                                                |
-| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `mcp auth`                                                                 | PKCE、loopback 回调、令牌交换与密封凭据存储已实现并测试；把它们接起来的命令尚未实现 |
-| `computer register\|remove\|ssh\|port-forward`、不带 `--check` 的 `update` | 选项可解析，帮助可打印，每个动作都会以退出码 1 或 2 拒绝                            |
-| macOS/Linux 凭据存储                                                       | 只有 Windows DPAPI 存在；存储会拒绝，而不是以明文写入                               |
-| Remote Control、relay 与端口代理；交互式会话选择器                         | 已在 `specs/70` 与 `specs/10` 中声明；`docs/gaps.md` 列出了每一条款                 |
-| 工具运行时内部的 native 层                                                 | helper 已端到端测试，但工具目前仍通过 fake 访问它                                   |
+| 功能面                                                       | 状态                                                                  |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| `computer register\|remove\|ssh\|port-forward`               | 选项可解析，帮助可打印，每个动作都会以退出码 64 拒绝                  |
+| macOS/Linux 凭据存储                                         | 只有 Windows DPAPI 存在；存储会拒绝，而不是以明文写入                 |
+| Remote Control、relay 与端口代理；交互式会话选择器           | 已在 `specs/70` 与 `specs/10` 中声明；`docs/gaps.md` 列出了每一条款   |
 
 这些失败是刻意为之，而且可观测——已写进规格但未构建的
 命令退出码为 64，不存在的选项退出码为 1：
 
 ```console
-$ node bin/droide.mjs update
-droide: the "update" command is specified but not implemented in this build.
+$ node bin/droide.mjs computer register
+droide: the "computer register" command is specified but not implemented in this build.
 
-$ node bin/droide.mjs exec --list-tools
---list-tools is not implemented in this build.
+$ node bin/droide.mjs exec --mission "build it"
+--mission is not implemented in this build.
 ```
 
 当前代码树的形态：11 份编号规格文档——共享上下文加十份子系统规格，
-`specs/` 下共 9,409 行——`src/` 下 147 个 TypeScript 文件（51,294 行），
-`crates/droide-native/src/` 下 9 个 Rust 文件，9 份 ADR，1237 个 TypeScript
+`specs/` 下共 9,414 行——`src/` 下 147 个 TypeScript 文件（52,048 行），
+`crates/droide-native/src/` 下 9 个 Rust 文件，9 份 ADR，1261 个 TypeScript
 测试与 69 个 Rust 测试。凡是实现窄于其所引用条款之处，代码中都标有
 `TODO(spec …)`，并计入 [`docs/gaps.md`](./docs/gaps.md)，该文件由
 `npm run gaps` 重新生成。
@@ -92,10 +91,10 @@ $ node bin/droide.mjs exec --list-tools
 npm ci                          # install once; there is no build step
 node bin/droide.mjs --version   # 0.4.0
 node bin/droide.mjs --help
-node bin/droide.mjs doctor      # 16 named checks (11 个真实探测), text or --json
+node bin/droide.mjs doctor      # 默认 12 项具名检查（--checks all：16）
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 1237 tests
+npm test                        # 1261 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 69 tests
@@ -186,7 +185,8 @@ node bin/droide.mjs exec -f prompt.txt --auto low
 4. `npm run test:parity`（需要 `.work/parity` 下的本地快照）
 5. `cargo test --workspace`
 6. `npm run gaps:check`
-7. 它所实现的规格条款已在提交信息或 PR 描述中引用
+7. `npm run brand:check`
+8. 它所实现的规格条款已在提交信息或 PR 描述中引用
 
 两条规则维持方法的完整性：未写进规格的东西不实现，
 任何行为都不靠猜测抹平。当实现窄于其条款时，标记

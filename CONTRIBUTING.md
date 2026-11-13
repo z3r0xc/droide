@@ -2,8 +2,10 @@
 
 ## The gate
 
-`npm run verify` runs every TypeScript-side gate below in order; `npm run verify:rust`
-runs the Rust side, including the contract test against the compiled helper.
+`npm run verify` runs the TypeScript gates in order, plus the parity snapshots;
+`npm run verify:rust` runs the Rust side, including the contract test against the
+compiled helper. `npm run brand:check` is a separate step, which CI runs on its
+own line.
 
 Every change must pass, in this order:
 
@@ -13,6 +15,7 @@ npm run format:check   # prettier over src/tests/json
 npm test               # unit + integration (node --test)
 npm run test:parity    # CLI snapshots recorded from this build (local only)
 npm run gaps:check     # docs/gaps.md matches the TODO(spec …) markers in src/
+npm run brand:check    # no other product's name, release number or vendor host
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace

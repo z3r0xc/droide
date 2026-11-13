@@ -5,7 +5,8 @@ duplicate it inside spec files.
 
 ## Repo
 
-`C:/Users/handona/Documents/AI/Harnesses/droid-re` (GitHub `z3r0xc/droide`), branch `feat/production-wave-5`.
+The checkout this tree was read in (GitHub `z3r0xc/droide`), on branch
+`feat/production-wave-5`.
 **Never run git commands** — the orchestrator commits.
 
 ## The reference build
@@ -46,7 +47,7 @@ rests on.
 | `docs/architecture/README.md` | layer map, package roles, hubs, entry points |
 | `evidence/arch/graph.json` | per-file internal imports, external deps, package edges |
 | `evidence/cli/help.txt` | captured `--help` |
-| `tests/parity/cases/`, `tests/parity/expected/` | recorded CLI cases (help texts, exit codes, error strings) |
+| `tests/parity/cases/`, `.work/parity/expected/` | recorded CLI cases (help texts, exit codes, error strings) |
 | `evidence/extracted/windows-x64/` | the raw bundle: 783 JS chunks plus assets (`SKILL*.md`, `*.sql` migrations, native blobs) |
 | `specs/template.md`, `specs/README.md` | the required spec structure |
 

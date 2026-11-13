@@ -39,7 +39,7 @@ where it changes the parent loop's outcome.
   the tool batch and the resulting tool-result message.
 - **Transcript** — the persisted, ordered `AgentMessage` list (vendor prefix elided).
 - **Reminder** — CLI-authored text wrapped in `<system-reminder>` …
-  `</system-reminder>` (`evidence/original/windows-x64/packages/sdk-core/src/protocol/droid/constants.ts:24-25`),
+  `</system-reminder>` (`evidence/original/windows-x64/packages/sdk-core/src/protocol/agent/constants.ts:24-25`),
   delivered either as a `user`-role message with `visibility: "llm_only"` or
   appended to the user's own message.
 - **Context row** — the per-prompt LLM-only message carrying environment,
@@ -92,7 +92,7 @@ the rows already appended. `evidence/original/windows-x64/src/core/AgentLoop.ts:
 **B5 — A turn ends with one reason.** Completion is reported as one
 `AgentTurnCompletionReason` (`completed`, `cancelled`, `permission_rejected`,
 `error`, `model_authentication_failed`, …),
-`evidence/original/windows-x64/packages/sdk-core/src/protocol/droid/enums.ts:264-292`. A stop request
+`evidence/original/windows-x64/packages/sdk-core/src/protocol/agent/enums.ts:264-292`. A stop request
 also ends the turn as `cancelled` (`evidence/original/windows-x64/src/core/AgentLoop.ts:2062-2082`).
 
 ### Message model
@@ -330,7 +330,7 @@ grants. `proceed_auto_run_*` set the interaction mode. New-session outcomes
 approve all and end the turn with a spec handoff. `proceed_edit` approves all
 and leaves spec mode for editing.
 `evidence/original/windows-x64/src/agent/tool-confirmation.ts:609-700`,
-`evidence/original/windows-x64/packages/sdk-core/src/protocol/droid/enums.ts:2-24`.
+`evidence/original/windows-x64/packages/sdk-core/src/protocol/agent/enums.ts:2-24`.
 
 **B34 — Execution concurrency.** Each batch is segmented: `Create`, `Edit`,
 `ApplyPatch` are sequential barriers, and `Execute` is a barrier unless it is
@@ -558,7 +558,7 @@ jitter within [50 %, 100 %] of the backoff. Every wait is capped below the
 emits `llm-retry-scheduled` with `{sessionId, attempt, reason}` where reason is
 `overloaded | rate_limited | timeout | network | empty_response | unknown`;
 aborts do not emit. `evidence/original/windows-x64/src/services/llmStreamingPlatform.ts:60-112`,
-`evidence/original/windows-x64/packages/sdk-core/src/protocol/droid/enums.ts:252-259`.
+`evidence/original/windows-x64/packages/sdk-core/src/protocol/agent/enums.ts:252-259`.
 
 **B58 — Per-request timeout.** Each provider request carries an explicit
 timeout of `general.llmRequestTimeout` ms, default 600 000; the SDK's own

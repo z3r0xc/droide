@@ -27,8 +27,8 @@ CLI cases check the version line by shape, not by number. See `docs/release.md`.
 - `doctor --checks updates` compares the running version with the release feed.
 - A command-tree smoke net: every command group must answer `--help`, unknown
   words are refused as prompts, and a declared-but-unbuilt mode fails loudly.
-- CI is live (the repository is public): five jobs — typescript, rust,
-  rust-windows, supply-chain, parity.
+- CI is live (the repository is public): six jobs — typescript,
+  typescript-windows, rust, rust-windows, supply-chain, parity.
 
 ### Changed
 

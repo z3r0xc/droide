@@ -58,7 +58,7 @@ citation means `orig/src/…`.
 ### Root program surface
 
 **B1** `droide --help` (also `-h`, and `droide help`) writes the root help page to
-stdout and exits 0. It is byte-exact in `tests/parity/expected/help.json`. The
+stdout and exits 0. It is byte-exact in `.work/parity/expected/help.json`. The
 first line is `Usage: droide [options] [command] [prompt...]`, produced from the
 program name, its options, its subcommands and its `[prompt...]` argument
 (`orig/src/cli.ts:428-431`). `[observed]`
@@ -70,13 +70,13 @@ program name, its options, its subcommands and its `[prompt...]` argument
 **B3** `-v` / `--version` prints the version and exits 0. The value is the
 build's version constant (`PRODUCT_VERSION` in `src/cli/brand.ts`, equal to
 `package.json`); this build reports `0.4.0` (`orig/src/cli.ts:429`;
-`tests/parity/expected/version.json`). `[observed]`
+`.work/parity/expected/version.json`). `[observed]`
 
 **B4** The help page ends with an `Examples:` block of six lines followed by the
 line `For more details, see: https://github.com/z3r0xc/droide#readme`
 and a final newline; the block is attached with `addHelpText('after', …)` and
 contains no other trailing text (`orig/src/cli.ts:432-446`;
-`tests/parity/expected/help.json`). `[observed]`
+`.work/parity/expected/help.json`). `[observed]`
 
 **B5** The root `Options:` section lists, in this order: `-v, --version`;
 `--settings <path>`; `--append-system-prompt <text>`;
@@ -92,7 +92,7 @@ None of the twelve startup options declares a default, so all are absent
 registration order — `resume`, `exec`, `daemon`, `search|find`, `update`, `mcp`,
 `plugin`, `computer`, `doctor` — followed by commander's built-in
 `help [command]`. No hidden command appears (`orig/src/cli.ts:453-476`;
-`tests/parity/expected/help.json`). `[observed]`
+`.work/parity/expected/help.json`). `[observed]`
 
 **B7** The root usage line advertises `[prompt...]`, so a bare operand is part of
 the documented grammar even though no command word is involved
@@ -114,8 +114,8 @@ and `.allowExcessArguments(true)`, so option-shaped tokens are operands too
 **B10** Because of B9, `droide definitely-not-a-command` and
 `droide --definitely-not-a-flag` both reach the same refusal path with the token
 in the prompt word, and the recorded goldens differ only in that word
-(`tests/parity/expected/unknown-command.json`,
-`tests/parity/expected/unknown-flag.json`). `[observed]`
+(`.work/parity/expected/unknown-command.json`,
+`.work/parity/expected/unknown-flag.json`). `[observed]`
 
 **B11** The root program sets `enablePositionalOptions()`, so root options are
 read only before the first operand; from the command word (or prompt) onward the
@@ -184,12 +184,18 @@ the session picker when no id is given, and sends any remaining operands as the
 prompt. Usage line:
 `droide resume [options] [sessionId] [prompt...]`
 (`orig/src/entrypoints/tui/command.ts:184-190`;
-`tests/parity/expected/help-resume.json`). `[observed]`
+`.work/parity/expected/help-resume.json`). `[observed]`
+
+The id is a lowercase UUIDv4 (B17 of `40-sessions-and-storage.md`), either bare
+or as the last path segment of an absolute link — `/sessions/<id>` pages and the
+`droide://sessions/<id>` deep link both parse to the id; any other operand is
+refused rather than guessed (`src/cli/resume-commands.ts`, `src/session/ids.ts`).
+`[observed]`
 
 **B23** Its option list is the two contextual flags `--fork` (boolean) and
 `--last`, then the whole startup set minus `--resume`, `--fork` and `--last`,
 in registration order (`orig/src/entrypoints/tui/command.ts:191-208`;
-`tests/parity/expected/help-resume.json`). `[observed]`
+`.work/parity/expected/help-resume.json`). `[observed]`
 
 **B24** `resume <id> --fork` is exactly `droide --fork <id>`: the id is moved into
 the root `fork` slot and the TUI runs (`orig/src/entrypoints/tui/command.ts:228-234`). `[observed]`
@@ -214,7 +220,7 @@ through the message catalogue
 `orig/src/entrypoints/exec/help.ts:81-183`). `[observed]`
 
 **B27** The curated help prints exactly the option lines in
-`tests/parity/expected/help-exec.json` and, below them, the sections
+`.work/parity/expected/help-exec.json` and, below them, the sections
 `Stream JSON-RPC Mode:`, `Autonomy Levels:`, `Mission Mode:`, `Session Flags:`,
 `Tool Controls:`, `Available Models:`, `Model details:`, `Pinning the Latest
 Model:`, `Authentication:` and `Examples:`
@@ -262,7 +268,7 @@ with `--fork`; `--fork` with `--worktree`; `--worktree` with `--cwd`;
 validated but have no effect, and a warning naming the ones that are set goes to
 stderr (`orig/src/entrypoints/exec/constants.ts:11-53`;
 `orig/src/entrypoints/exec/handler.ts:319-330`). The list is printed in the
-curated help (`tests/parity/expected/help-exec.json`). `[observed]`
+curated help (`.work/parity/expected/help-exec.json`). `[observed]`
 
 ### `daemon`
 
@@ -273,7 +279,7 @@ curated help (`tests/parity/expected/help-exec.json`). `[observed]`
 `--liveness-fd <fd>`, `--parent-pid <pid>`, `--remote-control`,
 `--remote-access` (default `false`) and `--settings <path>`
 (`orig/src/entrypoints/daemon/command.ts:20-83`;
-`tests/parity/expected/help-daemon.json`). `[observed]`
+`.work/parity/expected/help-daemon.json`). `[observed]`
 
 **B36** `--port`, `--liveness-fd` and `--parent-pid` are parsed with
 `parseInt`; `--listen` is restricted to the two declared choices, so any other
@@ -294,7 +300,7 @@ children it spawns (`orig/src/entrypoints/daemon/command.ts:85-95`). `[observed]
 **B39** `droide search|find [options] <query>` requires the `query` argument; the
 help's usage line renders the alias as `search|find`
 (`orig/src/entrypoints/search/command.ts:9-13`;
-`tests/parity/expected/help-search.json`). `[observed]`
+`.work/parity/expected/help-search.json`). `[observed]`
 
 **B40** Defaults: `--kind all`, `--limit-sessions 20`, `--limit-hits 3`,
 `--context-chars 80`; `--limit-sessions`/`--limit-hits` accept integers ≥ 1 and
@@ -306,7 +312,7 @@ help's usage line renders the alias as `search|find`
 ### `update`
 
 **B41** `droide update [options]` takes `-c, --check` and
-`-v, --version <version>` (`tests/parity/expected/help-update.json`;
+`-v, --version <version>` (`.work/parity/expected/help-update.json`;
 `orig/src/entrypoints/update/command.ts:4-13`). The `-v` here shadows the root
 `-v` version flag inside that command. `[observed]`
 
@@ -318,7 +324,7 @@ leading `v` (`orig/src/entrypoints/update/run.ts:148-166`). `[observed]`
 
 **B43** `droide mcp` groups `add`, `remove`, `list`, `auth` and `permissions`
 (`orig/src/entrypoints/mcp/command.ts:8-113`;
-`tests/parity/expected/help-mcp.json`). `[observed]`
+`.work/parity/expected/help-mcp.json`). `[observed]`
 
 **B44** `mcp add <name> <urlOrCommand...>` takes `--type <type>`, repeatable
 `--env <KEY=VALUE>`, repeatable `--header <KEY: VALUE>` and `--no-oauth`;
@@ -334,7 +340,7 @@ was given (`orig/src/entrypoints/mcp/command.ts:18-47`). `[observed]`
 `list`, `update [name]`), `install|i <plugin>`, `uninstall|remove <plugin>`,
 `update [plugin]` and `list`; every install/uninstall/update/list accepts
 `-s, --scope <user|project>` (`orig/src/entrypoints/plugin/command.ts:13-119`;
-`tests/parity/expected/help-plugin.json`). `[observed]`
+`.work/parity/expected/help-plugin.json`). `[observed]`
 
 ### `computer`
 
@@ -343,7 +349,7 @@ was given (`orig/src/entrypoints/mcp/command.ts:18-47`). `[observed]`
 (`--debug`, `--proxy`, `--port <port>` default `22`) and
 `port-forward <computer-name> <mappings...>` (`--address <addr>` default
 `127.0.0.1`, `--debug`) (`orig/src/entrypoints/computer/command.ts:12-93`;
-`tests/parity/expected/help-computer.json`). `[observed]`
+`.work/parity/expected/help-computer.json`). `[observed]`
 
 **B48** `computer` also registers a hidden `trust-repos <dirs...>` subcommand
 used by managed-computer provisioning; it bootstraps with `skipAuth`
@@ -354,7 +360,7 @@ used by managed-computer provisioning; it bootstraps with `skipAuth`
 **B49** `droide doctor [options]` takes `--json`, `--verbose`,
 `--timeout <ms>` and `--checks <names>`, and appends a four-line trailer after
 its option list (`orig/src/entrypoints/doctor/command.ts:49-72`;
-`tests/parity/expected/help-doctor.json`). `[observed]`
+`.work/parity/expected/help-doctor.json`). `[observed]`
 
 **B50** `--timeout` must be a safe integer in `1…2147483647`; `--checks` accepts
 a comma-separated subset of `config, environment, system, binaries, updates,
@@ -479,7 +485,7 @@ after the move (`orig/src/environment.ts:484-521`;
 ### Exit codes
 
 **B69** Help and version: exit 0, output on stdout, stderr empty
-(`tests/parity/expected/help*.json`, `version.json`). `[observed]`
+(`.work/parity/expected/help*.json`, `version.json`). `[observed]`
 
 **B70** The non-TTY refusal (B16) and every commander usage error — unknown
 option, invalid option-argument, missing required argument, missing required
@@ -649,30 +655,30 @@ the parity harness invariants (`tests/parity/README.md`).
 
 | Clause | Test id | Fixture |
 |---|---|---|
-| B1, B4, B5, B6 | `tests/cli/test_root_help_exact` | `tests/parity/expected/help.json` |
+| B1, B4, B5, B6 | `tests/cli/test_root_help_exact` | `.work/parity/expected/help.json` |
 | B2, B7 | `tests/cli/test_root_usage_line` | — |
-| B3 | `tests/cli/test_version_flag` | `tests/parity/expected/version.json` |
+| B3 | `tests/cli/test_version_flag` | `.work/parity/expected/version.json` |
 | B8 | `tests/cli/test_alias_dispatch` | `fixtures/session-corpus` |
-| B9, B10 | `tests/cli/test_bare_words_become_prompt` | `tests/parity/expected/unknown-*.json` |
+| B9, B10 | `tests/cli/test_bare_words_become_prompt` | `.work/parity/expected/unknown-*.json` |
 | B11 | `tests/cli/test_positional_options` | — |
 | B12 | `tests/cli/test_hook_words_shortcircuit` | — |
 | B13 | `tests/cli/test_deployment_prerouter` | — |
 | B14, B63 | `tests/cli/test_gated_help_fails_closed` | `fixtures/flags-off` |
 | B15–B20 | `tests/cli/test_non_tty_refusal_matrix` | `fixtures/no-tty` |
 | B21 | `tests/cli/test_refusal_locale` | `fixtures/settings-ja` |
-| B22–B25, B82 | `tests/cli/test_resume_command`, `tests/cli/test_tui_flag_conflicts` | `tests/parity/expected/help-resume.json` |
-| B26–B29 | `tests/cli/test_exec_help_exact` | `tests/parity/expected/help-exec.json` |
+| B22–B25, B82 | `tests/cli/test_resume_command`, `tests/cli/test_tui_flag_conflicts` | `.work/parity/expected/help-resume.json` |
+| B26–B29 | `tests/cli/test_exec_help_exact` | `.work/parity/expected/help-exec.json` |
 | B30 | `tests/cli/test_exec_undocumented_options` | — |
 | B31 | `tests/cli/test_exec_prompt_sources` | `fixtures/prompts` |
 | B32, B34 | `tests/cli/test_exec_streaming_modes` | `fixtures/stream-jsonrpc` |
 | B33 | `tests/cli/test_exec_flag_conflicts` | — |
-| B35–B38 | `tests/cli/test_daemon_options` | `tests/parity/expected/help-daemon.json` |
-| B39, B40 | `tests/cli/test_search_options` | `tests/parity/expected/help-search.json` |
-| B41, B42, B75 | `tests/cli/test_update_options` | `tests/parity/expected/help-update.json` |
-| B43–B45 | `tests/cli/test_mcp_tree` | `tests/parity/expected/help-mcp.json` |
-| B46 | `tests/cli/test_plugin_tree` | `tests/parity/expected/help-plugin.json` |
-| B47, B48 | `tests/cli/test_computer_tree` | `tests/parity/expected/help-computer.json` |
-| B49–B51, B74 | `tests/cli/test_doctor_options` | `tests/parity/expected/help-doctor.json` |
+| B35–B38 | `tests/cli/test_daemon_options` | `.work/parity/expected/help-daemon.json` |
+| B39, B40 | `tests/cli/test_search_options` | `.work/parity/expected/help-search.json` |
+| B41, B42, B75 | `tests/cli/test_update_options` | `.work/parity/expected/help-update.json` |
+| B43–B45 | `tests/cli/test_mcp_tree` | `.work/parity/expected/help-mcp.json` |
+| B46 | `tests/cli/test_plugin_tree` | `.work/parity/expected/help-plugin.json` |
+| B47, B48 | `tests/cli/test_computer_tree` | `.work/parity/expected/help-computer.json` |
+| B49–B51, B74 | `tests/cli/test_doctor_options` | `.work/parity/expected/help-doctor.json` |
 | B52–B62 | `tests/cli/test_hidden_commands_absent` | `fixtures/flags-on` |
 | B64 | `tests/cli/test_dispatch_token_provenance` | — |
 | B65–B68 | `tests/cli/test_launch_path_anchoring` | `fixtures/nested-dirs` |
@@ -713,7 +719,7 @@ column says so.
 | `["definitely-not-a-command"]` | `tui` | `["definitely-not-a-command"]` | — | 1, E1 |
 | `["--definitely-not-a-flag"]` | `tui` | `["--definitely-not-a-flag"]` | — | 1, E1 |
 | `["git-ai-checkpoint-hook"]` | none | — | — | 0, no output |
-| `["deployment","set","--factory"]` | `deployment` | — | `factory=true` | 0/1 |
+| `["deployment","set","--managed"]` | `deployment` | — | `managed=true` | 0/1 |
 | `["space","list"]` (flag off) | — | — | — | 1, E7 |
 
 ### Non-TTY refusal permutations
@@ -735,7 +741,7 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
 
 ### Help-text invariants
 
-1. `droide --help` stdout is byte-identical to `tests/parity/expected/help.json`,
+1. `droide --help` stdout is byte-identical to `.work/parity/expected/help.json`,
    exit 0, stderr empty.
 2. Its last line is
    `For more details, see: https://github.com/z3r0xc/droide#readme`
@@ -761,7 +767,7 @@ stdin is a pipe in every row; `word` is `promptParts[0]`.
 
 | Evidence | Supports | Method |
 |---|---|---|
-| `ev_cli_1` | B1–B7, B69 | `orig/src/cli.ts:427-480`, `orig/src/entrypoints/tui/options.ts:10-53`; `tests/parity/expected/help.json` |
+| `ev_cli_1` | B1–B7, B69 | `orig/src/cli.ts:427-480`, `orig/src/entrypoints/tui/options.ts:10-53`; `.work/parity/expected/help.json` |
 | `ev_cli_2` | B8–B11, B64 | `orig/src/entrypoints/tui/command.ts:159-166`, `orig/src/cli.ts:258-289`; goldens `unknown-command`, `unknown-flag` |
 | `ev_cli_3` | B12–B14, B76 | `orig/src/cli.ts:492-506`, `orig/src/index.ts:119-126`, `orig/src/entrypoints/bootstrap/gatedCommand.ts:16-40` |
 | `ev_cli_4` | B15–B21 | `orig/src/entrypoints/tui/command.ts:33-49,167-170,215-217`; English catalogue `chunk-j2hk0tf4.js` |

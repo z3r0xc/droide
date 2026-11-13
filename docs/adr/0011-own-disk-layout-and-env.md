@@ -61,5 +61,5 @@ two applications fighting over one state directory.
 - **Support both, preferring ours**: doubles the surface, and the "fallback"
   quietly reads another product's data — rejected on the same ground as point 4.
 - **Neutral name (`~/.config/droide`)**: XDG-correct on Linux but splits the
-  layout per platform; the subject's shape is a single home directory and keeping
-  the shape minimises the diff.
+  layout per platform; the reference layout is a single home directory and keeping
+  that shape minimises the diff.

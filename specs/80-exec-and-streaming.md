@@ -465,8 +465,13 @@ daemon before session fetch, and `--disable-builtin-skills` is refused in both
 ### `--list-tools`
 
 **B53.** `--list-tools` resolves tool selection, prints the catalogue and exits
-`0` without creating a session or consuming a prompt
-(`entrypoints/exec/handler.ts:800-814`). With `-o json` the catalogue is a
+`0` without creating a session or consuming a prompt, and without requiring a
+credential: it answers before a model target, session, socket or API key is
+resolved, so it works with no login. The header line names the wire model when
+one resolves and the configured model id when it does not
+(`entrypoints/exec/handler.ts:800-814`; regression:
+`tests/integration/exec/list-tools.test.ts`, "answers with no credential and no
+model flag"). With `-o json` the catalogue is a
 single-line JSON **array** whose entries are
 `{id, llmId, displayName, description, category, defaultAllowed,
 currentlyAllowed}` (`entrypoints/exec/handler.ts:458-461`,
@@ -711,7 +716,7 @@ deprecation warning (B41).
 | Evidence | Supports | Method |
 |---|---|---|
 | `ev_exec_cmd_1` | B1, B10, B11, B35–B38, option table | read `entrypoints/exec/command.ts:47-230` |
-| `ev_exec_help_1` | B1, B9, B35, B53 | read `entrypoints/exec/help.ts:100-303` and `tests/parity/expected/help-exec.json` |
+| `ev_exec_help_1` | B1, B9, B35, B53 | read `entrypoints/exec/help.ts:100-303` and `.work/parity/expected/help-exec.json` |
 | `ev_exec_prompt_1` | B2–B6 | read `entrypoints/exec/handler.ts:177-244`, `:325-384` |
 | `ev_exec_validate_1` | B7, B10, B37, B38, B41, B48, B51, B52 | read `entrypoints/exec/assertValidOptions.ts:71-315`, `:354-367` |
 | `ev_exec_validate_2` | B7, B55 | read `entrypoints/exec/run.ts:575-590` |
@@ -748,7 +753,7 @@ deprecation warning (B41).
    emitted by `JsonRpcStreamingExecRunner` is not specified here (B48–B51 cover
    only the boundary). Settled by a dedicated `jsonrpc-streaming.md` reading
    `exec/streamingJsonRpcExecRunner.ts` and
-   `packages/sdk-core/src/protocol/droid`. Blocks implementation of the
+   `packages/sdk-core/src/protocol/agent`. Blocks implementation of the
    JSON-RPC payloads, not of exec.
 3. **ACP exit codes and lifetime.** `runAcpDaemon` owns exit status after B52;
    the codes are unknown at this slice. Settled by an `acp-server.md`.

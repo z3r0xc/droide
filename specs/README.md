@@ -16,7 +16,7 @@ before it is specified.**
 3. **Every clause is labelled and cited.** `[observed]` (read directly),
    `[derived]` (computed from several observations) or `[inferred]` (judgement),
    with a location (`evidence/original/windows-x64/<path>:<line>`) or a recorded
-   case (`tests/parity/expected/<case>.json`). A clause without a citation is an
+   case (`.work/parity/expected/<case>.json`). A clause without a citation is an
    open question, not a clause.
 4. **Every clause has a test.** Acceptance tests name at least one deterministic
    test per behavioural clause. Determinism: no network, no credentials, no wall
@@ -43,16 +43,16 @@ before it is specified.**
 
 | Spec | Status | Covers |
 |---|---|---|
-| `10-cli-surface.md` | review | Router, root options, visible and hidden commands, argument classification, precedence chain, exit codes, error strings |
+| `10-cli-surface.md` | draft | Router, root options, visible and hidden commands, argument classification, precedence chain, exit codes, error strings |
 | `40-sessions-and-storage.md` | review | SQLite schema and migrations, transcript records, ordering, on-disk layout, search |
-| `80-exec-and-streaming.md` | review | Non-interactive mode, stream formats, exit codes |
-| `90-native-layer.md` | review | Native helpers (pty, search, secrets, sqlite, browser), framing and contracts |
-| `95-terminal-ui.md` | review | Design tokens, layout, transcript renderers, keys, capability handling |
-| `20-agent-loop.md` | review | Provider message model, tool-call cycle, context assembly, model catalogue |
-| `30-tools-and-sandbox.md` | review | Tool registry, permission matrix, filesystem and shell models, sandbox |
-| `50-transport-and-auth.md` | review | Backend routes, auth flows, error taxonomy, LLM transport |
+| `80-exec-and-streaming.md` | draft | Non-interactive mode, stream formats, exit codes |
+| `90-native-layer.md` | draft | Native helpers (pty, search, secrets, sqlite, browser), framing and contracts |
+| `95-terminal-ui.md` | draft | Design tokens, layout, transcript renderers, keys, capability handling |
+| `20-agent-loop.md` | draft | Provider message model, tool-call cycle, context assembly, model catalogue |
+| `30-tools-and-sandbox.md` | draft | Tool registry, permission matrix, filesystem and shell models, sandbox |
+| `50-transport-and-auth.md` | draft | Backend routes, auth flows, error taxonomy, LLM transport |
 | `60-extensions-mcp-and-skills.md` | draft | MCP, plugins, skills, ACP |
-| `70-daemon-and-remote-control.md` | review | Daemon lifecycle, client protocol, remote control |
+| `70-daemon-and-remote-control.md` | draft | Daemon lifecycle, client protocol, remote control |
 
 `pending` means the spec file does not exist yet; the subsystem must not be
 implemented until it does.

@@ -342,12 +342,12 @@ clock. A load/initialize result carries the same snapshot as
 session has no worker or nothing matched, and the daemon forwards the kill to
 the worker otherwise. `outputFile` and `pid` refer to the session host, not
 the client.
-(`packages/sdk-core/src/protocol/droid/schemas/cli.ts:536-566`;
-`packages/sdk-core/src/protocol/droid/schemas/client.ts:1354-1360,688-692`;
+(`packages/sdk-core/src/protocol/agent/schemas/cli.ts:536-566`;
+`packages/sdk-core/src/protocol/agent/schemas/client.ts:1354-1360,688-692`;
 `packages/daemon-core/src/server/handlers/request-handler.ts:18688-18704`.)
 
 **B23 — Session retention.** A Local or Computer daemon reaps an idle session
-after 30 minutes (`OVERRIDE_DROID_SESSION_TIMEOUT_MS` overrides; an Ephemeral
+after 30 minutes (`DROIDE_SESSION_TIMEOUT_MS` overrides; an Ephemeral
 daemon uses 5 minutes). Before teardown it broadcasts a
 `daemon.session_notification` whose notification is
 `{type:"session_inactivity", message:"Session cleaned up after inactivity",
@@ -356,7 +356,7 @@ subagents still working, a completion still owed) and the timer re-arms one
 bounded window at a time. After teardown an empty draft session is deleted.
 A session with `disableInactivityTimeout` is never reaped, and a session that
 is loading or being initialized is not reaped before it settles.
-(`packages/daemon-core/src/droid/droid-registry.ts:116,252-267,1975-2100`.)
+(`packages/daemon-core/src/agent/agent-registry.ts:116,252-267,1975-2100`.)
 
 **B24 — Prompt retention across restart.** Pending `ask_user`,
 `pick_options` and `request_permission` requests are snapshotted to
@@ -533,7 +533,7 @@ runs.
 |---|---|---|
 | `DROIDE_RUNTIME_SETTINGS_PATH` | set by `--settings` | Runtime settings overlay for the daemon process only. |
 | `NOTIFY_SOCKET`, `WATCHDOG_*`, `LISTEN_*`, `INVOCATION_ID` | read at boot, then stripped from `process.env` | systemd notification; stripped so children cannot signal systemd. |
-| `OVERRIDE_DROID_SESSION_TIMEOUT_MS` | daemon config | Positive integer; replaces the 30-minute inactivity timeout. |
+| `DROIDE_SESSION_TIMEOUT_MS` | daemon config | Positive integer; replaces the 30-minute inactivity timeout. |
 | `DROIDE_DAEMON_HEARTBEAT_INTERVAL_MS` | daemon config | Positive integer; heartbeat interval override. |
 | `DROIDE_DAEMON_CGROUP_ISOLATION`, `DROIDE_DAEMON_CGROUP_RESERVE_BYTES`, `DROIDE_DAEMON_CGROUP_STATUS`, `DROIDE_DAEMON_CGROUP_REASON` | Computer only | Managed cgroup admission and report. |
 | `SHELL_ENV_FROM_PARENT_ENV_VAR` marker | daemon | `1` means the parent already loaded the login shell environment. |
@@ -548,7 +548,7 @@ runs.
 |---|---|---|
 | `JSONRPC_VERSION` | `2.0` | `protocol/shared/constants.ts:7` |
 | `LEGACY_DROIDE_API_VERSION` | `1.0.0` (frozen) | `protocol/shared/constants.ts:5` |
-| `DROIDE_PROTOCOL_VERSION` | `1.321.0` | `protocol/droid/schemas/constants.ts:6` |
+| `DROIDE_PROTOCOL_VERSION` | `1.321.0` | `protocol/agent/schemas/constants.ts:6` |
 | `COMPRESSED_PAYLOAD_TAG` | `0x01` | `protocol/daemon/constants.ts:95` |
 | `DEFLATE_RAW_ENCODING` | `deflate-raw` | `protocol/daemon/constants.ts:88` |
 | `CLIENT_FRAME_TARGET_BYTES` | 8 MiB | `daemon-core/.../constants/constants.ts:13` |
@@ -558,7 +558,7 @@ runs.
 | WebSocket ping interval | 30 s | `web-socket-server.ts:81` |
 | Pending daemon request TTL | 300 s | `server/constants/constants.ts:3` |
 | Pending resend attempts | 5 | `server/constants/constants.ts:5` |
-| Session inactivity (Local/Computer) | 1 800 000 ms | `droid-registry.ts:116` |
+| Session inactivity (Local/Computer) | 1 800 000 ms | `agent-registry.ts:116` |
 | Relay ping interval / pong timeout | 1000 / 5000 ms | `common/relay/constants.ts:100-118` |
 | Relay reconnect grace | 15 000 ms | `common/relay/constants.ts:25` |
 | Secure channel | v2, `Noise_NK_25519_ChaChaPoly_SHA256` | `crypto/secure-channel/constants.ts:1-5` |
@@ -673,7 +673,7 @@ fixed free port; timer tests use fake timers.
 
 | Evidence | Supports | Method |
 |---|---|---|
-| `ev_daemon_cli_1` | B1 | read of `src/entrypoints/daemon/command.ts:20-83`; captured golden `tests/parity/expected/help-daemon.json` (now absent from the tree) |
+| `ev_daemon_cli_1` | B1 | read of `src/entrypoints/daemon/command.ts:20-83`; captured golden `.work/parity/expected/help-daemon.json` (now absent from the tree) |
 | `ev_daemon_cli_2` | B2, B3 | `command.ts:85-104`; `handler.ts:533-535,925`; `daemon-server.ts:312-315` |
 | `ev_daemon_lifecycle_1` | B5, B6, B8, B9, B10 | `handler.ts:700-960`; `daemon-server.ts:256-660`; `run.ts:196-253`; `DaemonCore.ts:326-420` |
 | `ev_daemon_discovery_1` | B4 | negative search across `src/entrypoints/daemon/**`, `packages/daemon-core/src/server/**` for port/pid/state files; only `/health` exists |
@@ -682,8 +682,8 @@ fixed free port; timer tests use fake timers.
 | `ev_protocol_envelope_1` | B13, B14 | `protocol/shared/schemas.ts:290-410`; `default-helpers.ts:413-434`; `envelope-helpers.ts:160-245` |
 | `ev_protocol_auth_1` | B15, B16, B17, B18 | `daemon-connection-handler.ts:522-1040,1208-1265`; `request-dispatcher.ts:140-395` |
 | `ev_protocol_client_1` | B19, B20, B21 | `RequestEngine.ts:182-215,466-560,863-980`; `DaemonClient.ts:365-395,543-612`; `pending-daemon-request-store.ts:263-330` |
-| `ev_protocol_background_1` | B22 | `protocol/droid/schemas/cli.ts:536-566`; `schemas/client.ts:688-692,1354-1360`; `request-handler.ts:18688-18704` |
-| `ev_daemon_retention_1` | B23, B24 | `droid-registry.ts:116,252-267,1975-2100`; `pendingElicitationPersistence.ts:22-40` |
+| `ev_protocol_background_1` | B22 | `protocol/agent/schemas/cli.ts:536-566`; `schemas/client.ts:688-692,1354-1360`; `request-handler.ts:18688-18704` |
+| `ev_daemon_retention_1` | B23, B24 | `agent-registry.ts:116,252-267,1975-2100`; `pendingElicitationPersistence.ts:22-40` |
 | `ev_remote_cli_1` | B25, B26, B27 | `computer/command.ts:12-105`; `computer/run.ts:145-300`; `registration.ts:27-125`; `HostConfigStore.ts:13-95` |
 | `ev_remote_daemon_1` | B28, B29 | `remoteAccess.ts:78-371`; `daemon-server.ts:662-780`; `WebSocketRelayTransport.ts:300-400` |
 | `ev_remote_identity_1` | B30, B31 | `runtime/host/src/constants/index.ts:1-8`; `runtime/host/src/schemas.ts:11-30`; `auth/utils.ts:390-480`; `crypto/secure-channel/constants.ts:1-5` |

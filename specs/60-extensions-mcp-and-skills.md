@@ -223,7 +223,7 @@ org `maxAutonomyLevel` ceiling. The fingerprint covers only `type + command + ar
 **B25 — CLI surface.** `droide mcp` exposes `add`, `remove`, `list`, `auth`, and
 `permissions {list, revoke <server> [tool], clear --confirm}`; `remove` without a name offers the
 removable servers, and `clear` requires `--confirm`
-(`tests/parity/expected/help-mcp.json`,
+(`.work/parity/expected/help-mcp.json`,
 `evidence/original/windows-x64/src/entrypoints/mcp/command.ts:49-112`).
 
 ### MCP OAuth
@@ -550,9 +550,8 @@ next prompt (`evidence/original/windows-x64/src/exec/acpDaemonRunner.ts:49-92`).
 `{list, resume, close, fork}`, `promptCapabilities {image, embeddedContext}`,
 `mcpCapabilities {http, sse}`, `auth {logout}`, and the unstable `_meta['terminal-auth']` extension.
 `agentInfo` is `{name: package name, title: 'Droide', version}`. Auth methods are
-`customer-prem` for customer-prem deployments, else `device-pairing` ("Login") and
-`factory-api-key` — TODO(spec 60): the method id becomes `droide-api-key` when the ACP
-implementation is renamed; the two land together
+`customer-prem` for a customer-prem deployment, else `device-pairing` ("Login")
+and `droide-api-key`
 (`evidence/original/windows-x64/src/acp/AcpAgent.ts:1450-1517`).
 
 **B63 — Session creation.** `session/new` requires authentication, mints a UUID session id, marks the
@@ -835,7 +834,7 @@ Every `path:line` below is relative to `evidence/original/windows-x64/`, e.g.
 | `ev_acp_perm_1` (`src/acp/tools/mapOutcomeToKind.ts:8-33`, `src/acp/tools/permissionMappers.ts:1-60`) | B69 | reading |
 | `ev_acp_modes_1` (`src/acp/session/constants.ts:4-6`, `src/acp/session/modes.ts:14-38`) | B70 | reading |
 | `ev_acp_lifecycle_1` (`src/acp/AcpAgent.ts:1554-1780`, `:2097-2130`) | B71 | reading |
-| `ev_cli_goldens_1` (repo-relative `tests/parity/expected/help-mcp.json`, `help-plugin.json`, `help-exec.json`) | B25, B40, B58 | recorded goldens |
+| `ev_cli_goldens_1` (repo-relative `.work/parity/expected/help-mcp.json`, `help-plugin.json`, `help-exec.json`) | B25, B40, B58 | recorded goldens |
 
 Labelling. Two claims are `[derived]` rather than read directly: B17's collision-stability guarantee
 (the code comments assert it and the hashing is of the raw name, but no executed collision case was

@@ -64,7 +64,7 @@ Citations are abbreviated: `orig/…` = `evidence/original/windows-x64/…`.
 | **hosted route** | A route served by the hosted control plane, e.g. `/api/sessions/v2`. |
 | **managed Prem** | A hosted Prem placement advertised per organization as `premBaseHostV2`; it is *not* an authentication authority (`orig/packages/common/src/api/backend/schemas.ts:45-47`). |
 | **customer Prem** | A self-hosted deployment selected by `auth-deployment.json`; it *is* the authentication authority (`orig/packages/runtime/auth/src/auth/prem/config.ts:101-107`). |
-| **deployment selection** | The persisted choice `factory` or `customer-prem`+origin. Independent of whether credentials are saved. |
+| **deployment selection** | The persisted choice `managed` or `customer-prem`+origin. Independent of whether credentials are saved. |
 | **credential source** | One of `workos` (stored WorkOS session or brokered provider), `api-key` (`DROIDE_API_KEY`), `prem` (customer credential record). Spelled `TokenSourceType` in code. |
 | **credential snapshot** | One consistent read of token + active organization (+ Prem identity) plus the user it names. |
 | **base URL** | The origin (and any path prefix) a relative backend path is appended to. |
@@ -86,15 +86,19 @@ configured; else `apiBaseUrl`
 
 **B2** The deployment selection is resolved once per process, before services
 load. A `customer-prem` selection sets the runtime `apiBaseUrl` to the origin
-and leaves `apiBaseUrlEu` unset, so B1's EU branch cannot win. A `factory`
+and leaves `apiBaseUrlEu` unset, so B1's EU branch cannot win. A `managed`
 selection keeps the environment-resolved URLs
 (`orig/src/environment.ts:300-317`). `[observed]`
 
-**B3** For a `factory` selection, `apiBaseUrl` comes from
-`DROIDE_API_BASE_URL` and `apiBaseUrlEu` from `DROIDE_API_BASE_URL_EU`; the
-environment variable beats the baked build define. A test runtime substitutes
-the test defaults only when neither is set
-(`orig/src/environmentResolution.ts:90-127,189-197`). `[observed]`
+**B3** For a `managed` selection, `apiBaseUrl` comes from
+`DROIDE_API_BASE_URL` and `apiBaseUrlEu` from `DROIDE_API_BASE_URL_EU`. This
+build bakes **no** endpoint: the baked define is empty, so the environment is
+the only source. With neither variable set, `droide exec` exits 1 with `no API
+endpoint configured: set DROIDE_API_BASE_URL (or choose a custom model in
+settings)`, and `doctor`'s `connectivity` check reports `skip` with `no API
+endpoint configured` rather than probing a host of ours
+(`orig/src/environmentResolution.ts:90-127,189-197`; `src/transport/urls.ts`,
+`src/exec/command.ts`). `[observed]`
 
 **B4** The region used by B1 is `global` whenever a customer Prem is selected,
 whenever no credential resolves, or when the cached identity has no region;
@@ -132,28 +136,28 @@ are resolved or bytes are sent (`orig/packages/utils/src/api/fetch.ts:11-29`;
 
 **B10** Headers built from a credential are, in order: `Authorization: Bearer
 <token>` when a token exists, the client headers (B11), and
-`X-Factory-Org-Id: <organization>` when an organization is known
+`X-Droide-Org-Id: <organization>` when an organization is known
 (`orig/src/api/config.ts:233-242`). `[observed]`
 
 **B11** Client headers are the caller-attribution projection plus the installed
-version: `X-Factory-Client` (always present on an operational request, defaulting
-to `cli`), `X-Factory-Sdk` (SDK callers only), `X-Factory-Request-Surface`,
-`X-Factory-Exec-Output-Format`, `X-Factory-Exec-Input-Format`, and
+version: `X-Droide-Client` (always present on an operational request, defaulting
+to `cli`), `X-Droide-Sdk` (SDK callers only), `X-Droide-Request-Surface`,
+`X-Droide-Exec-Output-Format`, `X-Droide-Exec-Input-Format`, and
 `X-Client-Version` (sent only when `CLI_VERSION` is set)
 (`orig/src/api/config.ts:149-186,209-228`;
 `orig/packages/sdk-core/src/protocol/schemas/constants.ts:7-19`).
 `[observed]`
 
-**B12** `headerPurpose: 'usage'` omits the operational `X-Factory-Client`
+**B12** `headerPurpose: 'usage'` omits the operational `X-Droide-Client`
 default and sends only a *known* caller's attribution. On a usage route the
 final transport strips attribution headers supplied by the caller, so a retained
 SDK tuple cannot be relabelled onto proxy traffic
 (`orig/src/api/config.ts:191-228`;
 `orig/src/api/BackendClient.ts:807-886`). `[observed]`
 
-**B13** The identity request always carries `X-Factory-Whoami-Extended: true`
-and an optional `X-Factory-Session-Attribution` claim; the credential itself is
-presented as `Authorization: Bearer` plus `X-Factory-Org-Id` only when an active
+**B13** The identity request always carries `X-Droide-Whoami-Extended: true`
+and an optional `X-Droide-Session-Attribution` claim; the credential itself is
+presented as `Authorization: Bearer` plus `X-Droide-Org-Id` only when an active
 organization is set (`orig/packages/runtime/auth/src/auth/common/whoami.ts:19-56`;
 `orig/packages/sdk-core/src/protocol/schemas/constants.ts:21-36`).
 `[observed]`
@@ -203,7 +207,7 @@ a precondition error (`orig/packages/daemon-core/src/services/ApiClient.ts:129-1
 `orig/packages/utils/src/api/constants.ts:6-9`). `[observed]`
 
 **B22** Customer-Prem authentication requests carry `Authorization: Bearer
-<accessToken>` and `X-Factory-Org-Id: <activeOrganizationId>` when an
+<accessToken>` and `X-Droide-Org-Id: <activeOrganizationId>` when an
 organization is selected, plus `Content-Type: application/json` when a body is
 present (`orig/packages/runtime/auth/src/auth/prem/client.ts:107-140`).
 `[observed]`
@@ -229,7 +233,7 @@ managed transport (`http`/`websocket`), an optional header purpose, and one of
 | `archive-session` | POST | `/api/sessions/{id}/archive` | same path under Prem prefix |
 | `unarchive-session` | POST | `/api/sessions/{id}/unarchive` | same path under Prem prefix |
 | `list-session-messages` | GET | `/api/v0/sessions/{id}/messages` | none |
-| `update-droid-status` | POST | `/api/sessions/{id}/droid-status` | Prem prefix |
+| `update-agent-status` | POST | `/api/sessions/{id}/agent-status` | Prem prefix |
 | `update-title` | POST | `/api/sessions/{id}/update-title` | Prem prefix |
 | `update-settings` | POST | `/api/sessions/{id}/update-settings` | Prem prefix |
 | `update-mission-metadata` | POST | `/api/sessions/{id}/mission/metadata` | Prem prefix |
@@ -376,7 +380,7 @@ models use the configured request timeout instead
 `[observed]`
 
 **B44** A managed stream's server-side deadline is advertised as
-`x-factory-stream-deadline-ms`; when absent, clients assume 600 000 ms
+`x-droide-stream-deadline-ms`; when absent, clients assume 600 000 ms
 (`orig/packages/common/src/api/llm-proxy/constants.ts:59-70`). `[observed]`
 
 ### E. Credential storage and lookup
@@ -533,12 +537,12 @@ is refreshed scoped to it (`orig/packages/runtime/auth/src/auth/resolve-org.ts:1
 
 **B70** The deployment selection is the file `auth-deployment.json` in the
 credential base directory with shape `{version: 1, revision: <uuid>, deployment:
-{kind:'factory'} | {kind:'customer-prem', origin: <url>}}`
+{kind:'managed'} | {kind:'customer-prem', origin: <url>}}`
 (`orig/packages/runtime/auth/src/deployment/index.ts:25-95`;
 `orig/packages/runtime/auth/src/deployment/schemas.ts:4-25`;
 `orig/packages/runtime/auth/src/deployment/constants.ts:1`). `[observed]`
 
-**B71** A missing selection file means the `factory` deployment. A malformed or
+**B71** A missing selection file means the `managed` deployment. A malformed or
 unreadable file is not a sign-out: it throws `AuthDeploymentSelectionError`
 naming the file, and the process writes the message to stderr and exits 1
 before dispatch (`orig/packages/runtime/auth/src/deployment/index.ts:51-68`;
@@ -552,13 +556,13 @@ userinfo and fragments are refused; `http` is allowed only for `localhost`,
 (`orig/packages/runtime/auth/src/auth/prem/config.ts:11-77`). `[observed]`
 
 **B73** `droide deployment set` requires exactly one of `--private-origin` or
-`--factory`, refuses to run in airgap or inside a sandbox, saves the selection,
+`--managed`, refuses to run in airgap or inside a sandbox, saves the selection,
 and prints `Deployment saved. Restart Droide, desktop, daemons, and workers to
 use it. Saved credentials are unchanged.` It exits 0 on success and 1 on any
 failure (`orig/src/entrypoints/deployment/command.ts:30-112`). `[observed]`
 
 **B74** When the computer is pinned to an expected Prem origin and the saved
-selection differs (including a missing file, which reads as the `factory`
+selection differs (including a missing file, which reads as the `managed`
 deployment), startup throws `ExpectedPremDeploymentError` asking for
 `droide deployment set --private-origin` (`orig/src/environment.ts:285-298`;
 `orig/packages/runtime/auth/src/deployment/errors.ts:20-36`). `[observed]`
@@ -604,7 +608,7 @@ record is cleared anyway (`orig/packages/runtime/auth/src/auth/prem/client.ts:46
 `[observed]`
 
 **B81** `getCustomerPremAuthHeaders` returns `Authorization: Bearer <token>` and
-`X-Factory-Org-Id`, using the verified API key when one is configured and the
+`X-Droide-Org-Id`, using the verified API key when one is configured and the
 stored human credential otherwise; with no credential it throws
 `Sign in to this customer deployment.`, and with no selected organization
 `Choose an organization for this customer deployment.`
@@ -755,7 +759,7 @@ large, text-fields-too-large and output degeneration are not
 **B104** The inference proxy's gate failures have stable identities: 403 with
 code `content_policy_rejected` (or legacy `{"detail":"Forbidden"}`), 402 with
 code `no_active_subscription`, and any provider error it forwards is marked by
-`x-factory-upstream-error`. Gate detection excludes firewall block pages and
+`x-droide-upstream-error`. Gate detection excludes firewall block pages and
 upstream-marked errors (`orig/packages/common/src/api/llm-proxy/constants.ts:24-58`;
 `orig/packages/core/src/llms/errors/utils.ts:1185-1213`). `[observed]`
 
@@ -936,8 +940,8 @@ and exits non-zero when any selected check fails
 
 | Name | Type / domain | Default | Absent / malformed | Clause |
 |---|---|---|---|---|
-| `DROIDE_API_BASE_URL` | absolute http(s) URL, no trailing `/` | baked build define | a release build fails config validation | B3, B7 |
-| `DROIDE_API_BASE_URL_EU` | absolute http(s) URL, no trailing `/` | baked build define | EU region falls back to `DROIDE_API_BASE_URL` | B1, B3 |
+| `DROIDE_API_BASE_URL` | absolute http(s) URL, no trailing `/` | none — the baked define is empty | `exec` exits 1 with `no API endpoint configured`; `doctor` `connectivity` reports `skip` | B3, B7 |
+| `DROIDE_API_BASE_URL_EU` | absolute http(s) URL, no trailing `/` | none | EU region falls back to `DROIDE_API_BASE_URL` | B1, B3 |
 | `DROIDE_API_KEY` | opaque key, prefix `fk-` | none | falls through to WorkOS/Prem | B52, B53 |
 | `DROIDE_WORKOS_BASE_URL` | URL | `https://api.workos.com/user_management` | default used | B59 |
 | `DROIDE_ENV` | `development` \| `production` | `development` | invalid value throws | B60 |
@@ -965,14 +969,14 @@ and exits non-zero when any selected check fails
 
 ### Header names (literal)
 
-`Authorization`, `X-Factory-Org-Id`, `X-Factory-Client`, `X-Factory-Sdk`,
-`X-Factory-Request-Surface`, `X-Factory-Exec-Output-Format`,
-`X-Factory-Exec-Input-Format`, `X-Client-Version`,
-`X-Factory-Whoami-Extended`, `X-Factory-Session-Attribution`,
+`Authorization`, `X-Droide-Org-Id`, `X-Droide-Client`, `X-Droide-Sdk`,
+`X-Droide-Request-Surface`, `X-Droide-Exec-Output-Format`,
+`X-Droide-Exec-Input-Format`, `X-Client-Version`,
+`X-Droide-Whoami-Extended`, `X-Droide-Session-Attribution`,
 `x-session-id`, `x-assistant-message-id`, `x-api-provider`,
 `x-message-call-type`, `traceparent`, `Content-Type`,
-`x-factory-upstream-error`, `x-factory-stream-deadline-ms`,
-`x-factory-computer-delete-support`, `fireworks-cached-prompt-tokens`,
+`x-droide-upstream-error`, `x-droide-stream-deadline-ms`,
+`x-droide-computer-delete-support`, `fireworks-cached-prompt-tokens`,
 `x-api-key`, `proxy-authorization`, `cookie`.
 
 ## Errors
@@ -1034,9 +1038,9 @@ status of their own.
 ### Test specifications
 
 **`test_base_url_matrix`** — table-driven over `resolveCliApiBaseUrl(config,
-region)`. Rows: (deployment `factory`, region global, base
+region)`. Rows: (deployment `managed`, region global, base
 `https://api.example`, eu `https://eu.example`) → `https://api.example`;
-(`factory`, eu, both) → `https://eu.example`; (`factory`, eu, eu absent) →
+(`managed`, eu, both) → `https://eu.example`; (`managed`, eu, eu absent) →
 `https://api.example`; (customer-prem `https://prem.example`, eu, both) →
 `https://prem.example`. Also asserts `getRegion` returns `global` with no
 credential and with a customer deployment, and that `getPremBaseHost` returns
@@ -1046,17 +1050,17 @@ array of cases; no network.
 
 **`test_header_construction`** — given a fake snapshot `{token: 't', org: 'o',
 purpose: 'operational'}` the produced header record equals
-`{Authorization: 'Bearer t', 'X-Factory-Org-Id': 'o', 'X-Factory-Client':
+`{Authorization: 'Bearer t', 'X-Droide-Org-Id': 'o', 'X-Droide-Client':
 'cli', 'X-Client-Version': <fixture version>}`; with no token the
 `Authorization` key is absent; with `purpose: 'usage'` the default
-`X-Factory-Client` is absent; SDK attribution adds `X-Factory-Sdk`; a caller
+`X-Droide-Client` is absent; SDK attribution adds `X-Droide-Sdk`; a caller
 header whose name differs only in case is never duplicated. Daemon builder adds
 `Content-Type: application/json` and lets a caller override win.
 
 **`test_request_policy`** — a policy `{origin: 'https://prem.example',
 allows: path === '/api/apps/x'}` accepts exactly that origin+path and rejects
 (a) another origin, (b) userinfo, (c) a fragment, (d) another path, (e) a
-`Host` header naming another authority, (f) an `Authorization`/`X-Factory-Org-Id`
+`Host` header naming another authority, (f) an `Authorization`/`X-Droide-Org-Id`
 that differs from the expected value, (g) `x-api-key`/`proxy-authorization`/
 `cookie`. Expected refusal is `MetaError` before the injected fetch is called
 (assert call count 0).
@@ -1100,7 +1104,7 @@ organization switch clears the org until identity; switch superseded error;
 org membership lookup returns the first `workosOrgIds` entry and triggers a
 scoped refresh.
 
-**`test_deployment_selection`** — missing file → `{kind:'factory'}`; malformed
+**`test_deployment_selection`** — missing file → `{kind:'managed'}`; malformed
 JSON → `AuthDeploymentSelectionError`; load of a customer deployment
 canonicalizes the origin; save preserves unknown metadata, bumps `revision`;
 `droide deployment set` with both flags → 400 message; in airgap → 403; expected
@@ -1225,7 +1229,7 @@ check ids and exits non-zero when one is forced to `fail`.
    root help plus a grep of command registrations; a fully hidden command
    registered under a different name would be invisible to both. Settle by
    running the reference build's completion/command catalogue.
-9. **Exact `X-Factory-Client` values.** B11 names the header and the `cli`
+9. **Exact `X-Droide-Client` values.** B11 names the header and the `cli`
    default; the full `ClientType` value set (daemon, SDK, desktop, …) is in a
    module not read. Settle from the protocol enum.
 
@@ -1236,7 +1240,7 @@ check ids and exits non-zero when one is forced to `fail`.
 - The base-URL precedence: customer origin, then EU base on EU region, then
   global base; per-request resolution through the same precedence.
 - Deployment selection as a separate, restart-scoped file that can only be
-  changed through `droide deployment set`, with missing = `factory` deployment
+  changed through `droide deployment set`, with missing = `managed` deployment
   and malformed = hard startup failure.
 - The literal credential file names, their base directory, the `0600` mode,
   secure-then-keyfile load order, `DROIDE_DISABLE_KEYRING` behaviour, key
