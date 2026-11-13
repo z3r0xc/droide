@@ -114,7 +114,7 @@ test("framing: a frame split across chunks is reassembled and answered", async (
   const result = resultOf(response);
   assert.deepEqual(result["agentInfo"], {
     name: "droide",
-    title: "Factory Droid",
+    title: "Droide",
     version: "0.4.0",
   });
   assert.equal(result["protocolVersion"], 1);
@@ -215,7 +215,7 @@ test("session/new: authentication, MCP conversion and a stored session (B63, B64
     jsonrpc: "2.0",
     id: 4,
     method: "authenticate",
-    params: { methodId: "factory-api-key" },
+    params: { methodId: "droide-api-key" },
   });
   assert.deepEqual(resultOf(await harness.nextResponse(4)), {});
 
@@ -623,7 +623,7 @@ test("prompt: a second prompt while one runs is an invalid request (B65)", async
   await harness.dispose();
 });
 
-test("refusals: unknown sessions, bad params and unimplemented methods", async () => {
+test("refusals: unknown sessions, bad params and unstored sessions", async () => {
   const harness = new AcpHarness({ authenticated: true });
   harness.send({
     jsonrpc: "2.0",
@@ -649,7 +649,9 @@ test("refusals: unknown sessions, bad params and unimplemented methods", async (
     method: "session/load",
     params: { sessionId: SESSION_ID, cwd: "/work", mcpServers: [] },
   });
-  assert.equal(failureOf(await harness.nextResponse(19)).error.code, -32601);
+  const notStored = failureOf(await harness.nextResponse(19));
+  assert.equal(notStored.error.code, -32002);
+  assert.match(notStored.error.message, /is not stored/);
 
   harness.send({
     jsonrpc: "2.0",
@@ -875,7 +877,7 @@ test("entry: runAcpDaemon owns stdout, returns 0 at EOF and restores console (B6
   assert.equal(result["protocolVersion"], 1);
   assert.deepEqual(result["agentInfo"], {
     name: "droide",
-    title: "Factory Droid",
+    title: "Droide",
     version: "0.4.0",
   });
   assert.ok(isRecord(result["agentCapabilities"]));
@@ -895,4 +897,542 @@ test("console: redirectConsoleOutput sends every level to its sink and restores"
   restore();
   fake.debug("after restore");
   assert.deepEqual(writes, ['hello {"a":1} 2\n', "careful\n"]);
+});
+
+test("framing: an invalid envelope, an unknown response id and a stray response keep the stream alive", async () => {
+  const harness = new AcpHarness({ authenticated: true });
+  // A message with neither method nor id is not a response.
+  harness.sendRaw('{"jsonrpc":"2.0"}\n');
+  // A well-formed response nobody asked for is dropped silently.
+  harness.send({
+    jsonrpc: "2.0",
+    id: 999,
+    result: { outcome: { outcome: "cancelled" } },
+  });
+  harness.send(INITIALIZE);
+  const result = resultOf(await harness.nextResponse(1));
+  assert.equal(result["protocolVersion"], 1);
+  assert.deepEqual(harness.frames, []);
+
+  const failures = harness.rawLines
+    .map((line) => JSON.parse(line) as AcpInboundMessage)
+    .filter((frame) => !("method" in frame) && "error" in frame);
+  assert.equal(failures.length, 1);
+  const [failure] = failures;
+  assert.ok(failure !== undefined && "error" in failure);
+  assert.equal(failure.error.code, -32600);
+  assert.equal(failure.id, null);
+  await harness.dispose();
+});
+
+test("notifications: unknown notifications and malformed cancel params are ignored", async () => {
+  const harness = new AcpHarness({ authenticated: true });
+  harness.send({ jsonrpc: "2.0", method: "session/not_a_method", params: {} });
+  harness.send({ jsonrpc: "2.0", method: "session/cancel", params: {} });
+  harness.send({
+    jsonrpc: "2.0",
+    method: "$/cancel_request",
+    params: { nope: 1 },
+  });
+  harness.send(INITIALIZE);
+  assert.equal(resultOf(await harness.nextResponse(1))["protocolVersion"], 1);
+  assert.deepEqual(harness.frames, []);
+  assert.equal(harness.rawLines.length, 1);
+  await harness.dispose();
+});
+
+test("cancel: session/cancel without a turn and a stale request id are no-ops (B67)", async () => {
+  const { harness, sessionId } = await openSession({
+    runner: scriptedRunner(async () => completed("still ran")),
+  });
+  harness.send({
+    jsonrpc: "2.0",
+    method: "session/cancel",
+    params: { sessionId },
+  });
+  harness.send({
+    jsonrpc: "2.0",
+    method: "$/cancel_request",
+    params: { requestId: 4242 },
+  });
+  harness.send({
+    jsonrpc: "2.0",
+    id: 70,
+    method: "session/prompt",
+    params: { sessionId, prompt: [{ type: "text", text: "go" }] },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(70)), {
+    stopReason: "end_turn",
+  });
+  await harness.dispose();
+});
+
+test("permissions: an error response settles the request as cancelled (B69)", async () => {
+  const answers: AcpPermissionResponse[] = [];
+  const { harness, sessionId } = await openSession({
+    runner: scriptedRunner(async (request, sink) => {
+      answers.push(
+        await sink.requestPermission({
+          sessionId: request.sessionId,
+          toolCall: { toolCallId: "t1", title: "Execute" },
+          options: [
+            { optionId: "proceed_once", name: "Allow", kind: "allow_once" },
+          ],
+        }),
+      );
+      return completed();
+    }),
+  });
+  harness.send({
+    jsonrpc: "2.0",
+    id: 71,
+    method: "session/prompt",
+    params: { sessionId, prompt: [{ type: "text", text: "run" }] },
+  });
+  const request = await harness.next(
+    (frame) =>
+      "method" in frame && frame.method === "session/request_permission",
+  );
+  assert.ok("id" in request);
+  harness.send({
+    jsonrpc: "2.0",
+    id: request.id,
+    error: { code: -32603, message: "no" },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(71)), {
+    stopReason: "end_turn",
+  });
+  assert.deepEqual(answers, [{ outcome: "cancelled" }]);
+  await harness.dispose();
+});
+
+test("shutdown: EOF settles a pending permission and answers the turn (B60, B67)", async () => {
+  const answers: AcpPermissionResponse[] = [];
+  const { harness, sessionId } = await openSession({
+    runner: scriptedRunner(async (request, sink) => {
+      answers.push(
+        await sink.requestPermission({
+          sessionId: request.sessionId,
+          toolCall: { toolCallId: "t1", title: "Execute" },
+          options: [
+            { optionId: "proceed_once", name: "Allow", kind: "allow_once" },
+          ],
+        }),
+      );
+      return sink.signal.aborted ? cancelledOutcome() : completed();
+    }),
+  });
+  harness.send({
+    jsonrpc: "2.0",
+    id: 72,
+    method: "session/prompt",
+    params: { sessionId, prompt: [{ type: "text", text: "run" }] },
+  });
+  await harness.next(
+    (frame) =>
+      "method" in frame && frame.method === "session/request_permission",
+  );
+  await harness.dispose();
+  assert.deepEqual(resultOf(await harness.nextResponse(72)), {
+    stopReason: "cancelled",
+  });
+  assert.deepEqual(answers, [{ outcome: "cancelled" }]);
+});
+
+test("lifecycle: session/list reports the sessions the store holds (B71)", async () => {
+  const store = new FakeSessionStore();
+  const { harness, sessionId } = await openSession({ store });
+  harness.send({
+    jsonrpc: "2.0",
+    id: 73,
+    method: "session/list",
+    params: { cwd: "/work" },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(73)), {
+    sessions: [
+      {
+        sessionId,
+        cwd: "/work",
+        title: null,
+        updatedAt: new Date(1000).toISOString(),
+      },
+    ],
+  });
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 74,
+    method: "session/list",
+    params: { cwd: "/elsewhere" },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(74)), { sessions: [] });
+  await harness.dispose();
+});
+
+test("lifecycle: session/load replays a stored transcript before its response (B71)", async () => {
+  const store = new FakeSessionStore();
+  store.registerSession({ sessionId: "stored-1", cwd: "/work" });
+  store.transcripts.set("stored-1", [
+    { type: "message", role: "user", id: "u1", text: "earlier question" },
+    { type: "message", role: "assistant", id: "a1", text: "earlier answer" },
+  ]);
+  const harness = new AcpHarness({ authenticated: true, store });
+  harness.send({
+    jsonrpc: "2.0",
+    id: 75,
+    method: "session/load",
+    params: { sessionId: "stored-1", cwd: "/work", mcpServers: [] },
+  });
+  const { updates, response } = await collectUntilResponse(harness, 75);
+  assert.deepEqual(
+    updates.map((update) => update.sessionUpdate),
+    ["user_message_chunk", "agent_message_chunk"],
+  );
+  assert.deepEqual(resultOf(response), {});
+
+  // A prompt on the loaded session proves it is live and its cwd survived.
+  harness.send({
+    jsonrpc: "2.0",
+    id: 76,
+    method: "session/prompt",
+    params: {
+      sessionId: "stored-1",
+      prompt: [{ type: "text", text: "go on" }],
+    },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(76)), {
+    stopReason: "end_turn",
+  });
+  assert.equal(harness.store.rows.get("stored-1")?.cwd, "/work");
+  await harness.dispose();
+});
+
+test("lifecycle: session/resume re-attaches without replay and fork replays (B71)", async () => {
+  const store = new FakeSessionStore();
+  store.registerSession({ sessionId: "stored-2", cwd: "/work" });
+  store.transcripts.set("stored-2", [
+    { type: "message", role: "user", id: "u1", text: "parent turn" },
+  ]);
+  const harness = new AcpHarness({
+    authenticated: true,
+    store,
+    nextSessionId: () => SESSION_ID,
+  });
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 77,
+    method: "session/resume",
+    params: { sessionId: "stored-2", cwd: "/work", mcpServers: [] },
+  });
+  const resumed = await collectUntilResponse(harness, 77);
+  assert.deepEqual(resumed.updates, []);
+  assert.deepEqual(resultOf(resumed.response), {});
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 78,
+    method: "session/fork",
+    params: { sessionId: "stored-2", cwd: "/fork", mcpServers: [] },
+  });
+  const forked = await collectUntilResponse(harness, 78);
+  assert.deepEqual(
+    forked.updates.map((update) => update.sessionUpdate),
+    ["user_message_chunk"],
+  );
+  assert.deepEqual(resultOf(forked.response), { sessionId: SESSION_ID });
+  assert.equal(store.rows.get(SESSION_ID)?.cwd, "/fork");
+  await harness.dispose();
+});
+
+test("lifecycle: a closed session cannot be loaded or resumed (B71)", async () => {
+  const { harness, sessionId } = await openSession({});
+  harness.send({
+    jsonrpc: "2.0",
+    id: 79,
+    method: "session/close",
+    params: { sessionId },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(79)), {});
+  for (const [id, method] of [
+    [80, "session/load"],
+    [81, "session/resume"],
+  ] as const) {
+    harness.send({
+      jsonrpc: "2.0",
+      id,
+      method,
+      params: { sessionId, cwd: "/work", mcpServers: [] },
+    });
+    const failure = failureOf(await harness.nextResponse(id));
+    assert.equal(failure.error.code, -32002, method);
+  }
+  await harness.dispose();
+});
+
+test("modes: session/set_mode announces the mode and the option set (B70)", async () => {
+  const { harness, sessionId } = await openSession({});
+  harness.send({
+    jsonrpc: "2.0",
+    id: 82,
+    method: "session/set_mode",
+    params: { sessionId, modeId: "spec" },
+  });
+  const { updates, response } = await collectUntilResponse(harness, 82);
+  assert.deepEqual(resultOf(response), {});
+  assert.deepEqual(
+    updates.map((update) => update.sessionUpdate),
+    ["current_mode_update", "config_option_update"],
+  );
+  assert.deepEqual(updates[0], {
+    sessionUpdate: "current_mode_update",
+    currentModeId: "spec",
+  });
+  const options =
+    updates[1]?.sessionUpdate === "config_option_update"
+      ? updates[1].configOptions
+      : [];
+  assert.deepEqual(
+    options.map((option) => [option.id, option.currentValue]),
+    [
+      ["model", ""],
+      ["reasoning_effort", "medium"],
+      ["autonomy_level", "spec"],
+    ],
+  );
+
+  // Re-selecting the current mode is silent.
+  harness.send({
+    jsonrpc: "2.0",
+    id: 83,
+    method: "session/set_mode",
+    params: { sessionId, modeId: "spec" },
+  });
+  const second = await harness.nextResponse(83);
+  assert.deepEqual(resultOf(second), {});
+  assert.deepEqual(harness.frames, []);
+  await harness.dispose();
+});
+
+test("config: set_config_option and set_model change the next turn's settings (B70)", async () => {
+  const seen: { model: string; effort: string; mode: string }[] = [];
+  const { harness, sessionId } = await openSession({
+    model: "m0",
+    runner: scriptedRunner(async (request) => {
+      seen.push({
+        model: request.model,
+        effort: request.reasoningEffort,
+        mode: request.mode,
+      });
+      return completed();
+    }),
+  });
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 84,
+    method: "session/set_config_option",
+    params: { sessionId, configId: "model", value: "m1" },
+  });
+  const first = await harness.nextResponse(84);
+  assert.deepEqual(
+    (resultOf(first)["configOptions"] as { currentValue?: unknown }[]).map(
+      (option) => option.currentValue,
+    ),
+    ["m1", "medium", "normal"],
+  );
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 85,
+    method: "session/set_config_option",
+    params: { sessionId, configId: "reasoning_effort", value: "high" },
+  });
+  assert.ok("result" in (await harness.nextResponse(85)));
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 86,
+    method: "session/set_config_option",
+    params: { sessionId, configId: "autonomy_level", value: "auto-low" },
+  });
+  assert.ok("result" in (await harness.nextResponse(86)));
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 87,
+    method: "session/set_model",
+    params: { sessionId, modelId: "m2" },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(87)), {});
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 88,
+    method: "session/prompt",
+    params: { sessionId, prompt: [{ type: "text", text: "go" }] },
+  });
+  await harness.nextResponse(88);
+  assert.deepEqual(seen, [{ model: "m2", effort: "high", mode: "auto-low" }]);
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 89,
+    method: "session/set_config_option",
+    params: { sessionId, configId: "nope", value: "x" },
+  });
+  assert.equal(failureOf(await harness.nextResponse(89)).error.code, -32602);
+  harness.send({
+    jsonrpc: "2.0",
+    id: 90,
+    method: "session/set_config_option",
+    params: { sessionId, configId: "reasoning_effort", value: "extreme" },
+  });
+  assert.equal(failureOf(await harness.nextResponse(90)).error.code, -32602);
+  await harness.dispose();
+});
+
+test("modes: an org ceiling refuses a mode above it and hides it from the options (B70)", async () => {
+  const { harness, sessionId } = await openSession({
+    maxAutonomyLevel: "auto-low",
+  });
+  harness.send({
+    jsonrpc: "2.0",
+    id: 91,
+    method: "session/set_mode",
+    params: { sessionId, modeId: "auto-high" },
+  });
+  const failure = failureOf(await harness.nextResponse(91));
+  assert.equal(failure.error.code, -32602);
+  assert.match(failure.error.message, /autonomy level/);
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 92,
+    method: "session/set_mode",
+    params: { sessionId, modeId: "auto-medium" },
+  });
+  const { updates } = await collectUntilResponse(harness, 92);
+  const options =
+    updates[1]?.sessionUpdate === "config_option_update"
+      ? updates[1].configOptions
+      : [];
+  const autonomy = options.find((option) => option.id === "autonomy_level");
+  assert.deepEqual(
+    autonomy?.options?.map((option) => option.value),
+    ["normal", "spec", "auto-low"],
+  );
+  await harness.dispose();
+});
+
+test("walk: initialize, authenticate, session/new, prompt, permission, stopReason (B60-B69)", async () => {
+  const approvals: boolean[] = [];
+  const harness = new AcpHarness({
+    nextSessionId: () => SESSION_ID,
+    runner: scriptedRunner(async (request, sink) => {
+      const approve = createAcpConfirm({
+        sessionId: request.sessionId,
+        ask: (params) => sink.requestPermission(params),
+      });
+      const allowed = await approve({
+        toolId: "Execute",
+        llmId: "Execute",
+        toolClass: "execute",
+      });
+      approvals.push(allowed);
+      await sink.assistant({
+        id: "m1",
+        blocks: [
+          {
+            kind: "tool_use",
+            toolUseId: "t1",
+            name: "Execute",
+            input: { command: "ls" },
+          },
+        ],
+      });
+      await sink.toolResult({
+        toolUseId: "t1",
+        messageId: "m1",
+        isError: !allowed,
+        text: allowed ? "a.ts" : "denied",
+      });
+      await sink.assistant({
+        id: "m1",
+        blocks: [{ kind: "text", text: allowed ? "listed" : "refused" }],
+      });
+      return completed("listed");
+    }),
+  });
+
+  harness.send(INITIALIZE);
+  const handshake = resultOf(await harness.nextResponse(1));
+  assert.equal(handshake["protocolVersion"], 1);
+  assert.deepEqual(
+    (handshake["authMethods"] as { id: string }[]).map((method) => method.id),
+    ["device-pairing", "droide-api-key"],
+  );
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "authenticate",
+    params: { methodId: "droide-api-key" },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(2)), {});
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 3,
+    method: "session/new",
+    params: { cwd: "/work", mcpServers: [] },
+  });
+  assert.deepEqual(resultOf(await harness.nextResponse(3)), {
+    sessionId: SESSION_ID,
+  });
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: 4,
+    method: "session/prompt",
+    params: {
+      sessionId: SESSION_ID,
+      prompt: [{ type: "text", text: "list the files" }],
+    },
+  });
+  const request = await harness.next(
+    (frame) =>
+      "method" in frame && frame.method === "session/request_permission",
+  );
+  assert.ok("id" in request);
+  const params = "params" in request ? request.params : undefined;
+  assert.ok(isRecord(params));
+  assert.deepEqual(params["toolCall"], {
+    toolCallId: "permission-Execute",
+    title: "Execute",
+  });
+  assert.deepEqual(
+    (params["options"] as { optionId: string; kind: string }[]).map(
+      (option) => [option.optionId, option.kind],
+    ),
+    [
+      ["proceed_once", "allow_once"],
+      ["proceed_always", "allow_always"],
+      ["cancel", "reject_once"],
+    ],
+  );
+
+  harness.send({
+    jsonrpc: "2.0",
+    id: request.id,
+    result: { outcome: { outcome: "selected", optionId: "proceed_once" } },
+  });
+  const { updates, response } = await collectUntilResponse(harness, 4);
+  assert.deepEqual(
+    updates.map((update) => update.sessionUpdate),
+    ["tool_call", "tool_call_update", "agent_message_chunk"],
+  );
+  assert.deepEqual(resultOf(response), { stopReason: "end_turn" });
+  assert.deepEqual(approvals, [true]);
+  await harness.dispose();
 });

@@ -29,13 +29,16 @@ interface ProbeContextOptions {
 function probeContext(options: ProbeContextOptions = {}): DoctorContext {
   return {
     settings: options.settings ?? {},
-    paths: { stateDir: options.stateDir ?? "/tmp/factory" },
+    paths: { stateDir: options.stateDir ?? "/tmp/droide" },
     environment: {
       platform: "linux",
       nodeVersion: "24.0.0",
       cwd: options.cwd ?? "/work",
       home: "/home/u",
-      env: options.env ?? {},
+      env: {
+        DROIDE_API_BASE_URL: "https://api.example.test",
+        ...options.env,
+      },
     },
     timeoutMs: 5_000,
     withTimeout: async (_label, run) => run(new AbortController().signal),
@@ -101,11 +104,11 @@ test("connectivity reports DNS, TLS and HTTP separately", async () => {
   assert.equal(result.status, "ok");
   assert.deepEqual(
     recorder.calls.map((call) => call.url),
-    ["https://api.droide.ai/"],
+    ["https://api.example.test/"],
   );
   assert.equal(recorder.calls[0]?.init.method, "HEAD");
   assert.deepEqual(result.details, [
-    "base: https://api.droide.ai/",
+    "base: https://api.example.test/",
     "DNS: 203.0.113.10",
     "TLS: handshake ok",
     "HTTP: 204",
@@ -121,7 +124,7 @@ test("connectivity: a DNS failure is a warn with the reason, never a fail", asyn
   const result = await check("connectivity").run(
     probeContext({
       resolveHost: async () => {
-        throw codeError("getaddrinfo ENOTFOUND api.droide.ai", "ENOTFOUND");
+        throw codeError("getaddrinfo ENOTFOUND api.example.test", "ENOTFOUND");
       },
       fetch: recorder.fetch,
     }),
@@ -164,11 +167,21 @@ test("connectivity: a TLS failure is a warn naming the TLS stage", async () => {
 
 test("connectivity: a malformed base URL fails naming the variable", async () => {
   const result = await check("connectivity").run(
-    probeContext({ env: { DROIDE_API_BASE_URL: "https://api.droide.ai/" } }),
+    probeContext({ env: { DROIDE_API_BASE_URL: "https://api.example.test/" } }),
   );
 
   assert.equal(result.status, "fail");
   assert.match(result.summary, /must not end with \//);
+  assert.match(result.fixes?.[0] ?? "", /DROIDE_API_BASE_URL/);
+});
+
+test("connectivity: no configured endpoint is a skip, not a failure", async () => {
+  const result = await check("connectivity").run(
+    probeContext({ env: { DROIDE_API_BASE_URL: undefined } }),
+  );
+
+  assert.equal(result.status, "skip");
+  assert.match(result.summary, /no API endpoint configured/);
   assert.match(result.fixes?.[0] ?? "", /DROIDE_API_BASE_URL/);
 });
 
@@ -344,7 +357,7 @@ test("inference: a selected check sends one tiny completion", async () => {
   const call = recorder.calls[0];
   assert.equal(
     call?.url,
-    "https://api.droide.ai/api/llm/o/v1/chat/completions",
+    "https://api.example.test/api/llm/o/v1/chat/completions",
   );
   assert.equal(call?.init.method, "POST");
   const body: unknown = JSON.parse(String(call?.init.body));
@@ -410,7 +423,7 @@ test("exec: resolvable settings, model and tools are ok", async () => {
     result.details?.some(
       (line) =>
         line ===
-        "endpoint: https://api.droide.ai/api/llm/o/v1/chat/completions",
+        "endpoint: https://api.example.test/api/llm/o/v1/chat/completions",
     ),
     true,
   );
@@ -423,7 +436,7 @@ test("exec: an unresolved settings path fails before the model", async () => {
   );
 
   assert.equal(result.status, "fail");
-  assert.match(result.summary, /factory directory is not resolved/);
+  assert.match(result.summary, /state directory is not resolved/);
   assert.equal(result.metadata?.["stage"], "settings");
 });
 
@@ -469,7 +482,7 @@ test("--checks all consults only the injected HTTP client", async () => {
 
     assert.equal(globalCalls, 0);
     assert.deepEqual(recorder.calls.map((call) => call.url).sort(), [
-      "https://api.droide.ai/",
+      "https://api.example.test/",
       "https://api.github.com/repos/z3r0xc/droide/releases/latest",
     ]);
     assert.deepEqual(

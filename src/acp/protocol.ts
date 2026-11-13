@@ -1561,7 +1561,9 @@ export function clampMode(modeId: string, maxAutonomy?: string): AcpModeId {
   if (!isAcpModeId(modeId)) {
     throw invalidParams(`modeId "${modeId}" is not a mode`, { modeId });
   }
-  const allowed = sessionModesFor(maxAutonomy).some((mode) => mode.id === modeId);
+  const allowed = sessionModesFor(maxAutonomy).some(
+    (mode) => mode.id === modeId,
+  );
   if (!allowed) {
     throw invalidParams(
       `modeId "${modeId}" is above this organization's autonomy level`,
@@ -1583,10 +1585,14 @@ export const ACP_CONFIG_IDS = {
   autonomy: "autonomy_level",
 } as const;
 
-export type AcpConfigId =
-  (typeof ACP_CONFIG_IDS)[keyof typeof ACP_CONFIG_IDS];
+export type AcpConfigId = (typeof ACP_CONFIG_IDS)[keyof typeof ACP_CONFIG_IDS];
 
-const REASONING_EFFORTS: readonly string[] = ["low", "medium", "high"];
+/** The reasoning-effort values the `reasoning_effort` option offers (B70). */
+export const ACP_REASONING_EFFORTS: readonly string[] = [
+  "low",
+  "medium",
+  "high",
+];
 
 /**
  * The full config option set (B70): `model`, `reasoning_effort` and
@@ -1614,7 +1620,7 @@ export function configOptionsFor(
       type: "select",
       category: "thought_level",
       currentValue: settings.reasoningEffort,
-      options: REASONING_EFFORTS.map((value) => ({ value, name: value })),
+      options: ACP_REASONING_EFFORTS.map((value) => ({ value, name: value })),
     },
     {
       id: ACP_CONFIG_IDS.autonomy,

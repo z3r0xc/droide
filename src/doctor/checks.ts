@@ -47,11 +47,11 @@ import type { CheckResult, DoctorCheck, DoctorContext } from "./types.ts";
 const UPDATE_REPOSITORY = "z3r0xc/droide";
 
 /**
- * The baked managed base URL (50 B3); `DROIDE_API_BASE_URL` overrides it.
- * `exec` keeps its own copy for the same reason: the constant is a build
- * define, not a shared module's state.
+ * This build bakes no endpoint (50 B3): the product has no hosted backend, so
+ * `DROIDE_API_BASE_URL` is the only source and its absence is a skip, never a
+ * failure.
  */
-const DEFAULT_API_BASE_URL = "https://api.droide.ai";
+const DEFAULT_API_BASE_URL = "";
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -161,7 +161,7 @@ const filesystem: DoctorCheck = {
   async run(context) {
     const stateDir = context.paths["stateDir"];
     if (stateDir === undefined)
-      return { status: "fail", summary: "factory directory is unknown" };
+      return { status: "fail", summary: "state directory is unknown" };
     const probe = join(stateDir, `.doctor-${randomUUID()}`);
     try {
       // The app creates its home lazily, so a missing directory is not a
@@ -172,13 +172,13 @@ const filesystem: DoctorCheck = {
       await rm(probe, { force: true });
       return {
         status: "ok",
-        summary: "factory directory is writable",
+        summary: "state directory is writable",
         details: [`stateDir: ${stateDir}`, `cwd: ${context.environment.cwd}`],
       };
     } catch (error) {
       return {
         status: "fail",
-        summary: "factory directory is not writable",
+        summary: "state directory is not writable",
         details: [
           stateDir,
           error instanceof Error ? error.message : String(error),
@@ -516,10 +516,12 @@ function stageOf(error: unknown): "dns" | "tls" | "http" {
   return "http";
 }
 
-/** The backend base URL this process routes to (50 B1/B3). */
-function backendBase(context: DoctorContext): URL {
+/** The backend base URL this process routes to, or `null` when none is configured (50 B1/B3). */
+function backendBase(context: DoctorContext): URL | null {
+  const configured = context.environment.env[API_BASE_URL_ENV]?.trim();
+  if (configured === undefined || configured === "") return null;
   const config = createApiUrlConfig({
-    deployment: { kind: "factory" },
+    deployment: { kind: "managed" },
     environment: { env: context.environment.env },
     baked: { apiBaseUrl: DEFAULT_API_BASE_URL, apiBaseUrlEu: null },
     // The probe is global-only, so an EU override cannot make it fail.
@@ -532,9 +534,9 @@ const connectivity: DoctorCheck = {
   name: "connectivity",
   title: "Connectivity",
   async run(context) {
-    let base: URL;
+    let resolved: URL | null;
     try {
-      base = backendBase(context);
+      resolved = backendBase(context);
     } catch (error) {
       return {
         status: "fail",
@@ -545,6 +547,20 @@ const connectivity: DoctorCheck = {
         fixes: [`fix ${API_BASE_URL_ENV} or unset it`],
       };
     }
+
+    if (resolved === null) {
+      return {
+        status: "skip",
+        summary: "no API endpoint configured",
+        details: [
+          `${API_BASE_URL_ENV}: (unset)`,
+          "this build ships no hosted endpoint",
+        ],
+        fixes: [`set ${API_BASE_URL_ENV} to the endpoint to use`],
+      };
+    }
+
+    const base: URL = resolved;
 
     const baseUrl = redactUrl(base) ?? base.href;
     const host = base.hostname;
@@ -981,7 +997,7 @@ const exec: DoctorCheck = {
     if ((context.paths["stateDir"] ?? "") === "") {
       return {
         status: "fail",
-        summary: "exec cannot start: the factory directory is not resolved",
+        summary: "exec cannot start: the state directory is not resolved",
         fixes: ["check HOME/USERPROFILE, then re-run --checks exec"],
         metadata: { stage: "settings" },
       };

@@ -84,7 +84,7 @@ export type PluginHookDeclaration =
     }
   | { readonly kind: "hook-files"; readonly paths: readonly string[] };
 
-export type PluginLayout = "factory" | "claude";
+export type PluginLayout = "managed" | "claude";
 
 export interface PluginManifest {
   readonly path: string;
@@ -95,7 +95,7 @@ export interface PluginManifest {
 }
 
 function layoutForPath(path: string): PluginLayout {
-  return path.includes(".claude-plugin") ? "claude" : "factory";
+  return path.includes(".claude-plugin") ? "claude" : "managed";
 }
 
 function readHooks(

@@ -12,6 +12,7 @@ import {
   type AcpServer,
   type AcpServerOptions,
   type AcpSessionStore,
+  type AcpStoredSession,
 } from "../../../src/acp/server.ts";
 import type {
   AcpTurnRequest,
@@ -53,6 +54,11 @@ export interface FakeSessionRow {
 
 export class FakeSessionStore implements AcpSessionStore {
   readonly rows = new Map<string, FakeSessionRow>();
+  /** Transcripts by session id, as `readSession` would return them. */
+  readonly transcripts = new Map<
+    string,
+    readonly Readonly<Record<string, unknown>>[]
+  >();
 
   registerSession(input: {
     readonly sessionId?: string;
@@ -73,7 +79,31 @@ export class FakeSessionStore implements AcpSessionStore {
     const row = this.rows.get(sessionId);
     if (row === undefined) return false;
     this.rows.set(sessionId, { ...row, deleted: true });
+    this.transcripts.delete(sessionId);
     return true;
+  }
+
+  listSessions(options?: {
+    readonly cwd?: string | null;
+    readonly limit?: number;
+  }): readonly AcpStoredSession[] {
+    return [...this.rows.values()]
+      .filter((row) => !row.deleted)
+      .filter((row) => options?.cwd === undefined || row.cwd === options.cwd)
+      .map((row) => ({
+        sessionId: row.sessionId,
+        cwd: row.cwd,
+        title: null,
+        updatedAt: 1000,
+      }));
+  }
+
+  readSession(sessionId: string): readonly Readonly<Record<string, unknown>>[] {
+    const row = this.rows.get(sessionId);
+    if (row === undefined || row.deleted) {
+      throw new Error(`no session ${sessionId}`);
+    }
+    return this.transcripts.get(sessionId) ?? [];
   }
 }
 

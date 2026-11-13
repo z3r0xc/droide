@@ -84,7 +84,7 @@ test("test_plugin_manifest_validation: the factory manifest is JSONC and only ho
     const loaded = loadPluginManifest(temp.path);
     assert.equal(loaded.kind, "present");
     if (loaded.kind !== "present") return;
-    assert.equal(loaded.manifest.layout, "factory");
+    assert.equal(loaded.manifest.layout, "managed");
     assert.equal(loaded.manifest.agentPlugins, true);
     assert.equal(loaded.manifest.hooks?.kind, "event-map");
   } finally {

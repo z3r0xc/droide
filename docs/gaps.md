@@ -5,15 +5,13 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **53** markers across **45** clauses.
+Total: **52** markers across **44** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
 | `src/acp/protocol.ts:1123` | `B68` | the union covers every update the clause names, but this slice's turn path emits only the two chunks, plan, tool_call and tool_call_update; session_info_update, available_commands_update, current_mode_update, config_option_update and usage_update have no producer yet. |
 | `src/acp/protocol.ts:32` | `B60` | the ACP clause pins no frame ceiling, so this mirrors the daemon's 8 MiB MAX_FRAME_BYTES; a client that sends more is answered with a parse error and the rest of the line is discarded. |
-| `src/acp/server.ts:425` | `B70` | session/set_mode, session/set_config_option and the legacy session/set_model are not served, and no current_mode_update or config_option_update is ever emitted. |
-| `src/acp/server.ts:472` | `B61` | session/load, session/resume, session/fork and session/list are advertised by initialize but this slice does not serve them. They answer method-not-found rather than pretending to succeed. |
-| `src/acp/server.ts:539` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
+| `src/acp/server.ts:568` | `B63` | the session is registered with its cwd and converted MCP servers, but this store has no loading state and no sessionOriginHint column; a reload therefore cannot distinguish a cli_acp session from any other, and the filesystem MCP config the session would merge those servers with is resolved by the caller. |
 | `src/agent/compaction.ts:297` | `B49` | the row carries the intro line and the <summary> wrapper only. The code-built retained lists (files read, TODOs), the IMPORTANT authorship note and the environment block captured at summary time are not available to this clean-room compact(), which sees messages and nothing else. |
 | `src/app/interactive-turn.ts:558` | `95 B10` | steering and the queued-message list are not implemented, so a second submit is refused with a notice instead of being queued or delivered to the running turn. |
 | `src/cli/commands/resume.ts:67` | `10 B22` | the interactive shell cannot adopt a stored transcript yet, so the resumed session is named here but the shell still opens empty. |
@@ -40,6 +38,7 @@ Total: **53** markers across **45** clauses.
 | `src/extensions/mcp/tools.ts:36` | `30 B7` | arguments are not validated against the server's JSON Schema before the call. |
 | `src/extensions/mcp/transport.ts:871` | `B3` | an sse server's server-initiated event stream (a GET that stays open) is not opened, so it never delivers tools/list_changed; the POST response path is supported. |
 | `src/extensions/plugins/install.ts:335` | `B42` | the Claude Code layout translation (.claude-plugin to .droide-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
+| `src/extensions/plugins/install.ts:647` | `B37` | the flow stops at the registry write. The clause also says the install writes the enablement map, but this build has no settings writer (src/config reads settings.json and never rewrites it), so general.enabledPlugins is left alone and the plugin resolves as enabled by absence. A settings-write surface has to exist before this can land. |
 | `src/extensions/plugins/installed.ts:240` | `B36` | strictEnabledPlugins is parsed but not enforced, so an entry below the policy level still resolves as enabled here. |
 | `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/grep.ts:28` | `B20` | for the full list. |
@@ -60,5 +59,5 @@ Total: **53** markers across **45** clauses.
 | `src/transport/llm.ts:449` | `B114` | the spec states the handled event order only. |
 | `src/transport/llm.ts:521` | `B120` | the spec names the buckets but not every wire field; both input_tokens_details and prompt_tokens_details spellings are accepted. |
 | `src/transport/llm.ts:627` | `B118` | the derived id's exact spelling is not stated. |
-| `src/transport/urls.ts:108` | `B7` | the clause lists empty, scheme and trailing slash only; the credential and query/fragment refusals come from B9's request policy. |
-| `src/transport/urls.ts:53` | `B3` | the spec pins environment > baked define; an explicit caller-supplied override is not covered and is placed above both. |
+| `src/transport/urls.ts:115` | `B7` | the clause lists empty, scheme and trailing slash only; the credential and query/fragment refusals come from B9's request policy. |
+| `src/transport/urls.ts:60` | `B3` | the spec pins environment > baked define; an explicit caller-supplied override is not covered and is placed above both. |

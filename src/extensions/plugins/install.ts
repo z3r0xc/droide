@@ -643,6 +643,12 @@ export async function installPlugin(
       io.remove(previousPath);
     }
   }
+
+  // TODO(spec B37): the flow stops at the registry write. The clause also says
+  // the install writes the enablement map, but this build has no settings
+  // writer (src/config reads `settings.json` and never rewrites it), so
+  // `general.enabledPlugins` is left alone and the plugin resolves as enabled
+  // by absence. A settings-write surface has to exist before this can land.
   return entry;
 }
 

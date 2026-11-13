@@ -49,8 +49,8 @@ process, timers or network.
      `anthropic-version` for Anthropic); `extraHeaders` is merged. An unknown
      id, a missing `baseUrl` and `bedrock-converse` are refused.
    - Anything else is managed: `DROIDE_API_KEY` (missing → the recorded
-     authentication message) and `DROIDE_API_BASE_URL` (default
-     `https://api.droide.ai`) at `/api/llm/o/v1/chat/completions`.
+     authentication message) and `DROIDE_API_BASE_URL`, which is required —
+     this build bakes no endpoint — at `/api/llm/o/v1/chat/completions`.
    - A missing model or credential fails **here**, before a provider object
      exists; no socket is opened.
 5. **Tools.** Without `--auto`/`--skip-permissions-unsafe` only read-only and
@@ -82,13 +82,13 @@ record, and exit `1`.
 
 ### Output modes
 
-| `-o`                                  | Behaviour                                                                                         |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `-o`                                  | Behaviour                                                                                          |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `text` (default)                      | final answer + `\n` on stdout; failures write `Error during droide execution: <message>` on stderr |
-| `json`                                | one `result` object (`runOneShotSummary`)                                                         |
-| `stream-json`, `debug`                | one record per line (`runOneShot`)                                                                |
-| `stream-jsonrpc`, `acp`, `acp-daemon` | refused before any work: not implemented in this build                                            |
-| `--input-format …`                    | refused before any work: not implemented in this build                                            |
+| `json`                                | one `result` object (`runOneShotSummary`)                                                          |
+| `stream-json`, `debug`                | one record per line (`runOneShot`)                                                                 |
+| `stream-jsonrpc`, `acp`, `acp-daemon` | refused before any work: not implemented in this build                                             |
+| `--input-format …`                    | refused before any work: not implemented in this build                                             |
 
 ## Record kinds (`-o stream-json`)
 

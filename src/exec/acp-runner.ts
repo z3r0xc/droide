@@ -22,8 +22,10 @@ import {
   agentThoughtChunk,
   isAllowKind,
   mapOptionsToAcp,
+  toolKindFor,
   permissionResponseToOutcome,
   type AcpConfirmationOption,
+  type AcpModeId,
   type AcpPermissionOutcome,
   type AcpPermissionOption,
   type AcpPlanEntry,
@@ -32,7 +34,6 @@ import {
   type AcpSessionUpdate,
   type AcpStopReason,
   type AcpToolCallStatus,
-  type AcpToolKind,
   type AcpToolConfirmationOutcome,
 } from "../acp/protocol.ts";
 import type { Writable } from "node:stream";
@@ -50,6 +51,11 @@ export interface AcpTurnRequest extends TurnRequest {
    * slice does not own.
    */
   readonly images: readonly AcpPromptImage[];
+  /**
+   * The session's autonomy mode, as `session/set_mode` last set it (B70). The
+   * runner decides what a mode permits; this seam only carries the value.
+   */
+  readonly mode: AcpModeId;
 }
 
 /** A permission answer as the client sent it. */
@@ -84,19 +90,6 @@ export interface CreateAcpTurnSinkOptions {
   ) => Promise<AcpPermissionResponse>;
   readonly signal: AbortSignal;
 }
-
-const TOOL_KINDS: Readonly<Record<string, AcpToolKind>> = {
-  Read: "read",
-  LS: "read",
-  Glob: "search",
-  Grep: "search",
-  Edit: "edit",
-  Create: "edit",
-  Execute: "execute",
-  WebFetch: "fetch",
-  WebSearch: "fetch",
-  TodoWrite: "think",
-};
 
 const TODO_LINE = /^\s*\d+\.\s*\[(pending|in_progress|completed)\]\s*(.+?)\s*$/;
 const TODO_PRIORITY: Readonly<Record<string, AcpPlanEntry["priority"]>> = {
@@ -174,7 +167,7 @@ function toolCallUpdate(
     toolCallId: block.toolUseId,
     title: block.name,
     name: block.name,
-    kind: TOOL_KINDS[block.name] ?? "other",
+    kind: toolKindFor(block.name),
     status: "pending",
     rawInput: block.input,
     content: [],

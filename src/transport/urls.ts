@@ -24,7 +24,7 @@ export const API_BASE_URL_ENV = "DROIDE_API_BASE_URL";
 export const API_BASE_URL_EU_ENV = "DROIDE_API_BASE_URL_EU";
 
 /** B4's region domain. */
-export type FactoryRegion = "global" | "eu";
+export type ManagedRegion = "global" | "eu";
 
 /**
  * The per-process deployment choice (B2/B70). Only the routing shape lives
@@ -32,7 +32,7 @@ export type FactoryRegion = "global" | "eu";
  * job.
  */
 export type DeploymentSelection =
-  | { readonly kind: "factory" }
+  | { readonly kind: "managed" }
   | { readonly kind: "customer-prem"; readonly origin: string };
 
 /** The environment slice this layer reads; `config` supplies the rest. */
@@ -40,7 +40,14 @@ export interface TransportEnvironment {
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
-/** Values compiled into a release build; the environment overrides them (B3). */
+/**
+ * Values compiled into a release build; the environment overrides them (B3).
+ *
+ * `apiBaseUrl: ""` means the build ships no endpoint: this product has no
+ * hosted backend of its own, so a base must be configured (environment or
+ * settings) before a request can be routed. Empty is not "invalid", it is
+ * "unconfigured", and the two are reported differently.
+ */
 export interface BakedApiUrls {
   readonly apiBaseUrl: string;
   readonly apiBaseUrlEu: string | null;
@@ -244,6 +251,13 @@ export function createApiUrlConfig(input: ApiUrlConfigInput): ApiUrlConfig {
       : (environmentValue(environment, API_BASE_URL_EU_ENV) ??
         baked.apiBaseUrlEu);
 
+  if (baseValue === "" || baseValue === undefined) {
+    throw new InvalidBaseUrlError(
+      API_BASE_URL_ENV,
+      `is not configured; set ${API_BASE_URL_ENV} to the endpoint to use`,
+    );
+  }
+
   return {
     deployment,
     apiBaseUrl: parseApiBaseUrl(baseValue, API_BASE_URL_ENV),
@@ -261,7 +275,7 @@ export function createApiUrlConfig(input: ApiUrlConfigInput): ApiUrlConfig {
  */
 export function resolveCliApiBaseUrl(
   config: ApiUrlConfig,
-  region: FactoryRegion,
+  region: ManagedRegion,
 ): URL {
   if (config.deployment.kind === "customer-prem") {
     return config.apiBaseUrl;
@@ -277,11 +291,11 @@ export interface RegionInputs {
   /** Whether any credential resolved; no credential pins `global` (B4). */
   readonly hasCredential: boolean;
   /** The cached identity's region, or `null` when it has none. */
-  readonly identityRegion: FactoryRegion | null;
+  readonly identityRegion: ManagedRegion | null;
 }
 
 /** B4: a customer deployment, no credential, or no identity region is global. */
-export function resolveRegion(input: RegionInputs): FactoryRegion {
+export function resolveRegion(input: RegionInputs): ManagedRegion {
   if (input.deployment.kind === "customer-prem") {
     return "global";
   }
@@ -337,7 +351,7 @@ export function joinApiPath(base: URL, path: string): URL {
 /** B8: resolve one request's absolute URL from this process's config. */
 export function resolveApiRequestUrl(
   config: ApiUrlConfig,
-  region: FactoryRegion,
+  region: ManagedRegion,
   path: string,
 ): URL {
   return joinApiPath(resolveCliApiBaseUrl(config, region), path);

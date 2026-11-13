@@ -33,8 +33,18 @@ import {
   parseNewSessionParams,
   parsePermissionResponse,
   parsePromptParams,
+  parseSessionHandleParams,
+  parseListSessionsParams,
+  parseSetConfigOptionParams,
+  parseSetModeParams,
+  parseSetModelParams,
   permissionResponseToOutcome,
+  configOptionsFor,
+  clampMode,
+  sessionModesFor,
+  sessionUpdatesFromTranscript,
   serializeAcpMessage,
+  toolKindFor,
   type AcpContentBlock,
 } from "../../../src/acp/protocol.ts";
 
@@ -145,13 +155,13 @@ test("initialize: params are validated and the result carries B62's surface", ()
   const result = buildInitializeResult({
     name: "droide",
     version: "0.4.0",
-    title: "Factory Droid",
+    title: "Droide",
   });
   assert.equal(result.protocolVersion, ACP_PROTOCOL_VERSION);
   assert.deepEqual(result.agentInfo, {
     name: "droide",
     version: "0.4.0",
-    title: "Factory Droid",
+    title: "Droide",
   });
   assert.deepEqual(result.agentCapabilities.sessionCapabilities, {
     list: {},
@@ -173,7 +183,7 @@ test("initialize: params are validated and the result carries B62's surface", ()
   });
   assert.deepEqual(
     result.authMethods.map((method) => method.id),
-    ["device-pairing", "factory-api-key"],
+    ["device-pairing", "droide-api-key"],
   );
   assert.deepEqual(
     authMethodsFor("customer-prem").map((method) => method.id),
@@ -433,4 +443,161 @@ test("session updates: one notification carries one typed update (B68)", () => {
       },
     },
   });
+});
+
+test("modes: the org ceiling filters what session/set_mode accepts (B70)", () => {
+  assert.deepEqual(
+    sessionModesFor().map((mode) => mode.id),
+    ["normal", "spec", "auto-low", "auto-medium", "auto-high"],
+  );
+  assert.deepEqual(
+    sessionModesFor("auto-low").map((mode) => mode.id),
+    ["normal", "spec", "auto-low"],
+  );
+  assert.deepEqual(
+    sessionModesFor("normal").map((mode) => mode.id),
+    ["normal", "spec"],
+  );
+  assert.equal(clampMode("auto-high"), "auto-high");
+  assert.equal(clampMode("auto-medium", "auto-high"), "auto-medium");
+  const aboveCeiling = protocolError(() => clampMode("auto-high", "auto-low"));
+  assert.equal(aboveCeiling.code, ACP_ERROR_CODES.invalidParams);
+  assert.match(aboveCeiling.message, /autonomy level/);
+  assert.equal(
+    protocolError(() => clampMode("turbo")).code,
+    ACP_ERROR_CODES.invalidParams,
+  );
+  assert.deepEqual(parseSetModeParams({ sessionId: "s", modeId: "spec" }), {
+    sessionId: "s",
+    modeId: "spec",
+  });
+});
+
+test("config options: model, reasoning effort and autonomy level (B70)", () => {
+  const options = configOptionsFor(
+    { model: "m1", reasoningEffort: "medium", modeId: "spec" },
+    "auto-medium",
+  );
+  assert.deepEqual(
+    options.map((option) => [option.id, option.currentValue]),
+    [
+      ["model", "m1"],
+      ["reasoning_effort", "medium"],
+      ["autonomy_level", "spec"],
+    ],
+  );
+  assert.deepEqual(
+    options[2]?.options?.map((option) => option.value),
+    ["normal", "spec", "auto-low", "auto-medium"],
+  );
+  assert.deepEqual(
+    parseSetConfigOptionParams({
+      sessionId: "s",
+      configId: "model",
+      value: "m2",
+    }),
+    { sessionId: "s", configId: "model", value: "m2" },
+  );
+  assert.equal(
+    protocolError(() =>
+      parseSetConfigOptionParams({
+        sessionId: "s",
+        configId: "model",
+        value: 1,
+      }),
+    ).code,
+    ACP_ERROR_CODES.invalidParams,
+  );
+  assert.deepEqual(parseSetModelParams({ sessionId: "s", modelId: "m3" }), {
+    sessionId: "s",
+    modelId: "m3",
+  });
+});
+
+test("session handles: load, resume and fork share one param shape (B71)", () => {
+  assert.deepEqual(
+    parseSessionHandleParams({
+      sessionId: "s1",
+      cwd: "/work",
+      mcpServers: [{ name: "shell", command: "node" }],
+    }),
+    {
+      sessionId: "s1",
+      cwd: "/work",
+      mcpServers: [
+        { type: "stdio", name: "shell", command: "node", args: [], env: {} },
+      ],
+    },
+  );
+  assert.equal(
+    protocolError(() =>
+      parseSessionHandleParams({ cwd: "/work", mcpServers: [] }),
+    ).code,
+    ACP_ERROR_CODES.invalidParams,
+  );
+  assert.deepEqual(parseListSessionsParams(undefined), {});
+  assert.deepEqual(parseListSessionsParams({ cwd: "/work" }), {
+    cwd: "/work",
+  });
+});
+
+test("session replay: transcript records become the updates a load emits (B71)", () => {
+  const updates = sessionUpdatesFromTranscript([
+    { type: "system", subtype: "init", session_id: "s1" },
+    { type: "message", role: "user", id: "u1", text: "hi" },
+    { type: "reasoning", id: "r1", text: "thinking" },
+    { type: "message", role: "assistant", id: "a1", text: "hello" },
+    {
+      type: "tool_call",
+      id: "t1",
+      toolName: "Execute",
+      parameters: { command: "ls" },
+    },
+    { type: "tool_result", id: "t1", isError: false, value: "a.ts" },
+    { type: "tool_result", id: "t2", isError: true, value: "" },
+    { type: "completion", finalText: "done" },
+  ]);
+  assert.deepEqual(updates, [
+    {
+      sessionUpdate: "user_message_chunk",
+      content: { type: "text", text: "hi" },
+      messageId: "u1",
+    },
+    {
+      sessionUpdate: "agent_thought_chunk",
+      content: { type: "text", text: "thinking" },
+      messageId: "r1",
+    },
+    {
+      sessionUpdate: "agent_message_chunk",
+      content: { type: "text", text: "hello" },
+      messageId: "a1",
+    },
+    {
+      sessionUpdate: "tool_call",
+      toolCallId: "t1",
+      title: "Execute",
+      name: "Execute",
+      kind: "execute",
+      status: "pending",
+      rawInput: { command: "ls" },
+      content: [],
+    },
+    {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "t1",
+      status: "completed",
+      rawOutput: "a.ts",
+      content: [{ type: "content", content: { type: "text", text: "a.ts" } }],
+    },
+    {
+      sessionUpdate: "tool_call_update",
+      toolCallId: "t2",
+      status: "failed",
+      rawOutput: "",
+      content: [],
+    },
+  ]);
+  assert.equal(toolKindFor("Grep"), "search");
+  assert.equal(toolKindFor("SomethingNew"), "other");
 });

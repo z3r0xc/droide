@@ -102,8 +102,8 @@ export const AUTHENTICATION_REQUIRED =
 
 const CUSTOM_MODEL_PREFIX = "custom:";
 
-/** The baked managed base URL; `DROIDE_API_BASE_URL` overrides it (50 B3). */
-const DEFAULT_API_BASE_URL = "https://api.droide.ai";
+/** This build bakes no endpoint; `DROIDE_API_BASE_URL` is the only source (50 B3). */
+const DEFAULT_API_BASE_URL = "";
 
 /** B20: the one failure prefix for a turn, in `text` mode. */
 export const EXEC_FAILURE_PREFIX = "Error during droide execution: ";
@@ -408,10 +408,12 @@ function managedModelTarget(
     throw new ExecCommandError(AUTHENTICATION_REQUIRED);
   }
   const configured = env["DROIDE_API_BASE_URL"]?.trim();
-  const baseValue =
-    configured === undefined || configured === ""
-      ? DEFAULT_API_BASE_URL
-      : configured;
+  if (configured === undefined || configured === "") {
+    throw new ExecCommandError(
+      `no API endpoint configured: set DROIDE_API_BASE_URL (or choose a custom model in settings)`,
+    );
+  }
+  const baseValue = configured;
   let base: URL;
   try {
     base = parseApiBaseUrl(baseValue, "DROIDE_API_BASE_URL");

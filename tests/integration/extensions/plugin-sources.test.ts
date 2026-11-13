@@ -10,7 +10,7 @@
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -40,6 +40,7 @@ import {
 import type { Settings } from "../../../src/config/schema.ts";
 import {
   buildTarball,
+  buildTarballEntries,
   buildZip,
   createBareRepo,
   createMarketplaceRepo,
@@ -402,6 +403,147 @@ test("a malformed archive digest is refused before any download", async () => {
         error.code === "source-invalid",
     );
     assert.deepEqual(fetch.urls, []);
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("an archive entry with an absolute path is refused and nothing is written", async () => {
+  const root = createTempRoot();
+  try {
+    const url = "https://files.example.test/absolute.zip";
+    const archive = buildZip([
+      { name: "/etc/skills/demo/SKILL.md", data: "# demo\n" },
+    ]);
+    await assert.rejects(
+      materializeSource(
+        { source: "archive", url },
+        {
+          target: join(root.path, "out"),
+          deps: { fetch: fakeFetch({ [url]: { body: archive } }).fetch },
+        },
+      ),
+      (error: unknown) =>
+        error instanceof PluginOperationError &&
+        error.code === "source-invalid" &&
+        /unsafe file path/u.test(error.message),
+    );
+    // The staging directory was removed and nothing landed beside it.
+    assert.deepEqual(readdirSync(root.path), []);
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("an archive entry that climbs out with dot-dot is refused and nothing is written", async () => {
+  const root = createTempRoot();
+  try {
+    const url = "https://files.example.test/dotdot.zip";
+    const archive = buildZip([
+      { name: "skills/demo/SKILL.md", data: "# demo\n" },
+      { name: "../escape.txt", data: "escaped\n" },
+    ]);
+    await assert.rejects(
+      materializeSource(
+        { source: "archive", url },
+        {
+          target: join(root.path, "out"),
+          deps: { fetch: fakeFetch({ [url]: { body: archive } }).fetch },
+        },
+      ),
+      (error: unknown) =>
+        error instanceof PluginOperationError &&
+        error.code === "source-invalid" &&
+        /unsafe file path/u.test(error.message),
+    );
+    assert.equal(existsSync(join(root.path, "escape.txt")), false);
+    assert.deepEqual(readdirSync(root.path), []);
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("an archive symlink entry is refused in both zip and npm archives", async () => {
+  const root = createTempRoot();
+  try {
+    const zipUrl = "https://files.example.test/symlink.zip";
+    const zip = buildZip([
+      { name: "skills/demo/SKILL.md", data: "# demo\n" },
+      // 0o120777 is a Unix symbolic link; the payload is its target.
+      { name: "skills/demo/link.md", data: "../../etc/passwd", mode: 0o120777 },
+    ]);
+    const refusal = (error: unknown) =>
+      error instanceof PluginOperationError &&
+      error.code === "source-invalid" &&
+      /symbolic link.*Droide does not install/u.test(error.message);
+    await assert.rejects(
+      materializeSource(
+        { source: "archive", url: zipUrl },
+        {
+          target: join(root.path, "out-zip"),
+          deps: { fetch: fakeFetch({ [zipUrl]: { body: zip } }).fetch },
+        },
+      ),
+      refusal,
+    );
+
+    const tarball = buildTarballEntries([
+      { name: "skills/demo/SKILL.md", data: "# demo\n" },
+      { name: "skills/demo/link.md", data: "../../etc/passwd", type: "2" },
+    ]);
+    const integrity = `sha512-${createHash("sha512").update(tarball).digest("base64")}`;
+    const tarballUrl =
+      "https://registry.example.test/demo-plugin/-/demo-plugin-1.0.0.tgz";
+    const metadata = {
+      "dist-tags": { latest: "1.0.0" },
+      versions: {
+        "1.0.0": { version: "1.0.0", dist: { tarball: tarballUrl, integrity } },
+      },
+    };
+    const fetch = fakeFetch({
+      "https://registry.example.test/demo-plugin": {
+        body: new TextEncoder().encode(JSON.stringify(metadata)),
+      },
+      [tarballUrl]: { body: tarball },
+    });
+    await assert.rejects(
+      materializeSource(
+        {
+          source: "npm",
+          package: "demo-plugin",
+          registry: "https://registry.example.test",
+        },
+        { target: join(root.path, "out-npm"), deps: { fetch: fetch.fetch } },
+      ),
+      refusal,
+    );
+    assert.deepEqual(readdirSync(root.path), []);
+  } finally {
+    root.cleanup();
+  }
+});
+
+test("an archive entry with an over-long name is refused and nothing is written", async () => {
+  const root = createTempRoot();
+  try {
+    const url = "https://files.example.test/long.zip";
+    const archive = buildZip([
+      { name: `skills/${"a".repeat(300)}/SKILL.md`, data: "# demo\n" },
+    ]);
+    await assert.rejects(
+      materializeSource(
+        { source: "archive", url },
+        {
+          target: join(root.path, "out"),
+          deps: { fetch: fakeFetch({ [url]: { body: archive } }).fetch },
+        },
+      ),
+      (error: unknown) =>
+        error instanceof PluginOperationError &&
+        error.code === "source-invalid" &&
+        /path that is too long/u.test(error.message),
+    );
+    assert.deepEqual(readdirSync(root.path), []);
   } finally {
     root.cleanup();
   }

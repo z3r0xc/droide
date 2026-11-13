@@ -14,7 +14,7 @@
 import { randomUUID } from "node:crypto";
 import type { Writable } from "node:stream";
 
-import { PRODUCT_VERSION, PROGRAM } from "../cli/brand.ts";
+import { DISPLAY, PRODUCT_VERSION, PROGRAM } from "../cli/brand.ts";
 import {
   createAcpTurnSink,
   runAcpTurn,
@@ -25,12 +25,16 @@ import {
 } from "../exec/acp-runner.ts";
 import { isBrokenPipeError } from "../exec/writer.ts";
 import {
+  ACP_CONFIG_IDS,
   ACP_ERROR_CODES,
   ACP_MAX_FRAME_BYTES,
   ACP_METHODS,
+  ACP_REASONING_EFFORTS,
   AcpProtocolError,
   authMethodsFor,
   buildInitializeResult,
+  clampMode,
+  configOptionsFor,
   createAcpFailure,
   createAcpRequest,
   createAcpSuccess,
@@ -42,20 +46,31 @@ import {
   parseCancelParams,
   parseCancelRequestParams,
   parseInitializeParams,
+  parseListSessionsParams,
   parseNewSessionParams,
   parsePermissionResponse,
   parsePromptParams,
+  parseSessionHandleParams,
   parseSessionIdParams,
+  parseSetConfigOptionParams,
+  parseSetModeParams,
+  parseSetModelParams,
   serializeAcpMessage,
+  sessionUpdatesFromTranscript,
   type AcpDeployment,
   type AcpInboundMessage,
+  type AcpListSessionsResult,
+  type AcpModeId,
   type AcpNewSessionResult,
   type AcpPromptParams,
   type AcpRequestId,
   type AcpRequestMessage,
   type AcpRequestPermissionParams,
   type AcpResponseMessage,
+  type AcpSessionInfo,
+  type AcpSessionConfigOption,
   type AcpSessionMcpServer,
+  type AcpSessionSettings,
   type AcpSessionUpdate,
   type AcpStopReason,
 } from "./protocol.ts";
@@ -65,8 +80,11 @@ import {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The slice of the session store an ACP session needs: create one and remove
- * it. `SessionStore` satisfies this structurally.
+ * The slice of the session store an ACP session needs: create one, remove it,
+ * and — when the embedding keeps transcripts — list and read them so
+ * `session/list`, `session/load` and `session/fork` can reach a session the
+ * agent did not create in this process (B71). `SessionStore` satisfies this
+ * structurally.
  */
 export interface AcpSessionStore {
   registerSession(input: {
@@ -76,6 +94,21 @@ export interface AcpSessionStore {
     readonly firstEventAt?: number | null;
   }): { readonly sessionId: string };
   deleteSession(sessionId: string): boolean;
+  /** Rows for `session/list`; absent means only live sessions are listed. */
+  listSessions?(options?: {
+    readonly cwd?: string | null;
+    readonly limit?: number;
+  }): readonly AcpStoredSession[];
+  /** A session's transcript; absent or a throw means it cannot be loaded. */
+  readSession?(sessionId: string): readonly Readonly<Record<string, unknown>>[];
+}
+
+/** The columns `session/list` reads from a stored session row. */
+export interface AcpStoredSession {
+  readonly sessionId: string;
+  readonly cwd: string | null;
+  readonly title: string | null;
+  readonly updatedAt: number | null;
 }
 
 export interface AcpServerOptions {
@@ -98,6 +131,10 @@ export interface AcpServerOptions {
   readonly nextRequestId?: () => AcpRequestId;
   readonly model?: string;
   readonly reasoningEffort?: string;
+  /** The session's starting autonomy mode; defaults to `normal` (B70). */
+  readonly mode?: string;
+  /** The org's autonomy ceiling; modes above it are not offered (B70). */
+  readonly maxAutonomyLevel?: string;
   readonly tools?: readonly string[];
   readonly maxFrameBytes?: number;
   readonly isModerationRefusal?: (message: string) => boolean;
@@ -111,6 +148,9 @@ export interface AcpServer {
 }
 
 const DEFAULT_REASONING_EFFORT = "medium";
+
+/** Ceiling for one `session/list` page; matches the store's list limit. */
+const MAX_LISTED_SESSIONS = 1000;
 
 /* -------------------------------------------------------------------------- */
 /* NDJSON framing                                                             */
@@ -259,6 +299,11 @@ interface ServerSession {
   readonly sessionId: string;
   readonly cwd: string;
   readonly mcpServers: readonly AcpSessionMcpServer[];
+  /** Per-session settings, changed by `session/set_*` (B70). */
+  model: string;
+  reasoningEffort: string;
+  modeId: AcpModeId;
+  readonly createdAt: number;
   turn: ActiveTurn | null;
 }
 
@@ -382,9 +427,6 @@ class AcpServerImpl implements AcpServer {
   /* ----------------------------- requests ------------------------------- */
 
   async #handleRequest(request: AcpRequestMessage): Promise<void> {
-    // TODO(spec B70): session/set_mode, session/set_config_option and the
-    // legacy session/set_model are not served, and no current_mode_update or
-    // config_option_update is ever emitted.
     try {
       switch (request.method) {
         case ACP_METHODS.initialize: {
@@ -395,7 +437,7 @@ class AcpServerImpl implements AcpServer {
               buildInitializeResult({
                 name: this.#options.name ?? PROGRAM,
                 version: this.#options.version ?? PRODUCT_VERSION,
-                title: this.#options.title ?? "Factory Droid",
+                title: this.#options.title ?? DISPLAY,
                 ...(this.#options.deployment === undefined
                   ? {}
                   : { deployment: this.#options.deployment }),
@@ -418,9 +460,45 @@ class AcpServerImpl implements AcpServer {
           await this.#writer.write(createAcpSuccess(request.id, result));
           return;
         }
+        case ACP_METHODS.sessionLoad: {
+          await this.#loadSession(request.params);
+          await this.#writer.write(createAcpSuccess(request.id, {}));
+          return;
+        }
+        case ACP_METHODS.sessionResume: {
+          await this.#resumeSession(request.params);
+          await this.#writer.write(createAcpSuccess(request.id, {}));
+          return;
+        }
+        case ACP_METHODS.sessionFork: {
+          const result = this.#forkSession(request.params);
+          await this.#writer.write(createAcpSuccess(request.id, result));
+          return;
+        }
+        case ACP_METHODS.sessionList: {
+          await this.#writer.write(
+            createAcpSuccess(request.id, this.#listSessions(request.params)),
+          );
+          return;
+        }
         case ACP_METHODS.sessionPrompt: {
           const result = await this.#prompt(request.id, request.params);
           await this.#writer.write(createAcpSuccess(request.id, result));
+          return;
+        }
+        case ACP_METHODS.sessionSetMode: {
+          await this.#setMode(request.params);
+          await this.#writer.write(createAcpSuccess(request.id, {}));
+          return;
+        }
+        case ACP_METHODS.sessionSetConfigOption: {
+          const result = await this.#setConfigOption(request.params);
+          await this.#writer.write(createAcpSuccess(request.id, result));
+          return;
+        }
+        case ACP_METHODS.sessionSetModel: {
+          await this.#setModel(request.params);
+          await this.#writer.write(createAcpSuccess(request.id, {}));
           return;
         }
         case ACP_METHODS.sessionClose: {
@@ -429,10 +507,6 @@ class AcpServerImpl implements AcpServer {
           return;
         }
         default:
-          // TODO(spec B61): session/load, session/resume, session/fork and
-          // session/list are advertised by initialize but this slice does not
-          // serve them. They answer method-not-found rather than pretending
-          // to succeed.
           await this.#writer.write(
             createAcpFailure(
               request.id,
@@ -467,7 +541,7 @@ class AcpServerImpl implements AcpServer {
     const known = authMethodsFor(this.#options.deployment ?? "cloud").map(
       (method) => method.id,
     );
-    if (!known.includes(params.methodId) && params.methodId !== "api-key") {
+    if (!known.includes(params.methodId)) {
       throw new AcpProtocolError(
         ACP_ERROR_CODES.invalidParams,
         `Invalid params: Unsupported authentication method: ${params.methodId}`,
@@ -488,12 +562,7 @@ class AcpServerImpl implements AcpServer {
   }
 
   async #newSession(params: unknown): Promise<AcpNewSessionResult> {
-    if (!this.#authenticated) {
-      throw new AcpProtocolError(
-        ACP_ERROR_CODES.authRequired,
-        "Authentication required",
-      );
-    }
+    this.#requireAuth();
     const parsed = parseNewSessionParams(params);
     const sessionId = (this.#options.nextSessionId ?? (() => randomUUID()))();
     // TODO(spec B63): the session is registered with its cwd and converted
@@ -507,25 +576,213 @@ class AcpServerImpl implements AcpServer {
       projectKey: "",
       firstEventAt: this.#options.clock(),
     });
-    const session: ServerSession = {
+    const session = this.#adopt({
       sessionId: row.sessionId,
       cwd: parsed.cwd,
       mcpServers: parsed.mcpServers,
-      turn: null,
-    };
-    this.#sessions.set(session.sessionId, session);
+    });
     return { sessionId: session.sessionId };
   }
 
-  #closeSession(sessionId: string): void {
-    const session = this.#sessions.get(sessionId);
-    if (session === undefined) {
+  /**
+   * Re-open a stored session and replay its transcript as `session/update`
+   * notifications before the response (B71). A session this process already
+   * holds is re-attached without a second replay, so a client that reloads
+   * twice does not see its history twice.
+   */
+  async #loadSession(rawParams: unknown): Promise<void> {
+    this.#requireAuth();
+    const params = parseSessionHandleParams(rawParams);
+    if (this.#sessions.has(params.sessionId)) return;
+    const { known, records } = this.#readTranscript(params.sessionId);
+    if (!known) throw this.#unknownStoredSession(params.sessionId);
+    const session = this.#adopt(params);
+    for (const update of sessionUpdatesFromTranscript(records)) {
+      await this.#sendUpdate(session, update);
+    }
+  }
+
+  /** Re-attach a stored session without replaying its history (B71). */
+  async #resumeSession(rawParams: unknown): Promise<void> {
+    this.#requireAuth();
+    const params = parseSessionHandleParams(rawParams);
+    if (this.#sessions.has(params.sessionId)) return;
+    const { known } = this.#readTranscript(params.sessionId);
+    if (!known) throw this.#unknownStoredSession(params.sessionId);
+    this.#adopt(params);
+  }
+
+  /**
+   * Fork a session: a new id with the parent's history replayed, so the client
+   * can continue down a second branch (B71). The parent may be live or stored;
+   * an id the agent knows nothing about is not found.
+   */
+  #forkSession(rawParams: unknown): AcpNewSessionResult {
+    this.#requireAuth();
+    const params = parseSessionHandleParams(rawParams);
+    const live = this.#sessions.get(params.sessionId);
+    const { known, records } = this.#readTranscript(params.sessionId);
+    if (live === undefined && !known) {
+      throw this.#unknownStoredSession(params.sessionId);
+    }
+    const sessionId = (this.#options.nextSessionId ?? (() => randomUUID()))();
+    const row = this.#options.store.registerSession({
+      sessionId,
+      cwd: params.cwd,
+      projectKey: "",
+      firstEventAt: this.#options.clock(),
+    });
+    const session = this.#adopt({
+      sessionId: row.sessionId,
+      cwd: params.cwd,
+      mcpServers: live?.mcpServers ?? params.mcpServers,
+    });
+    for (const update of sessionUpdatesFromTranscript(records)) {
+      this.#track(this.#sendUpdate(session, update));
+    }
+    return { sessionId: session.sessionId };
+  }
+
+  /**
+   * `SessionInfo` rows for the client's session picker (B71). The store is the
+   * source when it can list; otherwise only the sessions this process holds
+   * are listable. A row with no `cwd` cannot be re-opened (`session/load`
+   * requires one), so it is not offered.
+   */
+  #listSessions(rawParams: unknown): AcpListSessionsResult {
+    const params = parseListSessionsParams(rawParams);
+    const listSessions = this.#options.store.listSessions;
+    const rows =
+      listSessions === undefined
+        ? [...this.#sessions.values()].map((session) => ({
+            sessionId: session.sessionId,
+            cwd: session.cwd,
+            title: null,
+            updatedAt: session.createdAt,
+          }))
+        : listSessions.call(this.#options.store, {
+            limit: MAX_LISTED_SESSIONS,
+            ...(params.cwd === undefined ? {} : { cwd: params.cwd }),
+          });
+    const sessions: AcpSessionInfo[] = [];
+    for (const row of rows) {
+      if (row.cwd === null || row.cwd === "") continue;
+      sessions.push({
+        sessionId: row.sessionId,
+        cwd: row.cwd,
+        title: row.title,
+        updatedAt:
+          row.updatedAt === null ? null : new Date(row.updatedAt).toISOString(),
+      });
+    }
+    return { sessions };
+  }
+
+  /** `session/set_mode` (B70): clamp, store and announce the new mode. */
+  async #setMode(rawParams: unknown): Promise<void> {
+    const params = parseSetModeParams(rawParams);
+    const session = this.#session(params.sessionId);
+    const modeId = clampMode(params.modeId, this.#options.maxAutonomyLevel);
+    if (modeId === session.modeId) return;
+    session.modeId = modeId;
+    await this.#announceSettings(session, true);
+  }
+
+  /**
+   * `session/set_config_option` (B70). The response carries the full option
+   * set, so a client that lost the previous one is back in sync.
+   */
+  async #setConfigOption(
+    rawParams: unknown,
+  ): Promise<{ readonly configOptions: readonly AcpSessionConfigOption[] }> {
+    const params = parseSetConfigOptionParams(rawParams);
+    const session = this.#session(params.sessionId);
+    if (typeof params.value !== "string") {
       throw new AcpProtocolError(
         ACP_ERROR_CODES.invalidParams,
-        "Invalid params: Unknown session identifier",
-        { sessionId },
+        `Invalid params: ${params.configId} takes a string value`,
+        { configId: params.configId },
       );
     }
+    let modeChanged = false;
+    switch (params.configId) {
+      case ACP_CONFIG_IDS.model:
+        session.model = params.value;
+        break;
+      case ACP_CONFIG_IDS.reasoningEffort: {
+        if (!ACP_REASONING_EFFORTS.includes(params.value)) {
+          throw new AcpProtocolError(
+            ACP_ERROR_CODES.invalidParams,
+            "Invalid params: reasoning_effort must be low, medium or high",
+            { value: params.value },
+          );
+        }
+        session.reasoningEffort = params.value;
+        break;
+      }
+      case ACP_CONFIG_IDS.autonomy: {
+        const modeId = clampMode(params.value, this.#options.maxAutonomyLevel);
+        modeChanged = modeId !== session.modeId;
+        session.modeId = modeId;
+        break;
+      }
+      default:
+        throw new AcpProtocolError(
+          ACP_ERROR_CODES.invalidParams,
+          `Invalid params: ${params.configId} is not a config option`,
+          { configId: params.configId },
+        );
+    }
+    await this.#announceSettings(session, modeChanged);
+    return { configOptions: this.#configOptions(session) };
+  }
+
+  /** The legacy `session/set_model`, routed through the settings path (B70). */
+  async #setModel(rawParams: unknown): Promise<void> {
+    const params = parseSetModelParams(rawParams);
+    const session = this.#session(params.sessionId);
+    if (params.modelId === session.model) return;
+    session.model = params.modelId;
+    await this.#announceSettings(session, false);
+  }
+
+  /**
+   * B70: a mode change is `current_mode_update`, and any change to mode, model
+   * or effort is the full `config_option_update`.
+   */
+  async #announceSettings(
+    session: ServerSession,
+    modeChanged: boolean,
+  ): Promise<void> {
+    if (modeChanged) {
+      await this.#sendUpdate(session, {
+        sessionUpdate: "current_mode_update",
+        currentModeId: session.modeId,
+      });
+    }
+    await this.#sendUpdate(session, {
+      sessionUpdate: "config_option_update",
+      configOptions: this.#configOptions(session),
+    });
+  }
+
+  #configOptions(session: ServerSession): readonly AcpSessionConfigOption[] {
+    return configOptionsFor(
+      this.#settingsOf(session),
+      this.#options.maxAutonomyLevel,
+    );
+  }
+
+  #settingsOf(session: ServerSession): AcpSessionSettings {
+    return {
+      model: session.model,
+      reasoningEffort: session.reasoningEffort,
+      modeId: session.modeId,
+    };
+  }
+
+  #closeSession(sessionId: string): void {
+    const session = this.#session(sessionId);
     this.#sessions.delete(sessionId);
     const turn = session.turn;
     if (turn !== null) {
@@ -536,19 +793,85 @@ class AcpServerImpl implements AcpServer {
     this.#options.store.deleteSession(sessionId);
   }
 
+  #requireAuth(): void {
+    if (this.#authenticated) return;
+    throw new AcpProtocolError(
+      ACP_ERROR_CODES.authRequired,
+      "Authentication required",
+    );
+  }
+
+  #session(sessionId: string): ServerSession {
+    const session = this.#sessions.get(sessionId);
+    if (session === undefined) {
+      throw new AcpProtocolError(
+        ACP_ERROR_CODES.invalidParams,
+        "Invalid params: Unknown session identifier",
+        { sessionId },
+      );
+    }
+    return session;
+  }
+
+  #unknownStoredSession(sessionId: string): AcpProtocolError {
+    return new AcpProtocolError(
+      ACP_ERROR_CODES.resourceNotFound,
+      `Session ${sessionId} is not stored`,
+      { sessionId },
+    );
+  }
+
+  /**
+   * A session's transcript through the store. `known` is false when the
+   * embedding keeps no transcripts or does not have this one, which is what
+   * separates "cannot load" from "loads nothing".
+   */
+  #readTranscript(sessionId: string): {
+    readonly known: boolean;
+    readonly records: readonly Readonly<Record<string, unknown>>[];
+  } {
+    const readSession = this.#options.store.readSession;
+    if (readSession === undefined) return { known: false, records: [] };
+    try {
+      return {
+        known: true,
+        records: readSession.call(this.#options.store, sessionId),
+      };
+    } catch {
+      return { known: false, records: [] };
+    }
+  }
+
+  /** Create the live session record for an id that already has a store row. */
+  #adopt(input: {
+    readonly sessionId: string;
+    readonly cwd: string;
+    readonly mcpServers: readonly AcpSessionMcpServer[];
+  }): ServerSession {
+    const session: ServerSession = {
+      sessionId: input.sessionId,
+      cwd: input.cwd,
+      mcpServers: input.mcpServers,
+      model: this.#options.model ?? "",
+      reasoningEffort:
+        this.#options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+      modeId: clampMode(
+        this.#options.mode ?? "normal",
+        this.#options.maxAutonomyLevel,
+      ),
+      createdAt: this.#options.clock(),
+      turn: null,
+    };
+    this.#sessions.set(session.sessionId, session);
+    return session;
+  }
+
   async #prompt(
     requestId: AcpRequestId,
     rawParams: unknown,
   ): Promise<{ readonly stopReason: AcpStopReason }> {
     const params: AcpPromptParams = parsePromptParams(rawParams);
-    const session = this.#sessions.get(params.sessionId);
-    if (session === undefined) {
-      throw new AcpProtocolError(
-        ACP_ERROR_CODES.invalidParams,
-        "Invalid params: Unknown session identifier",
-        { sessionId: params.sessionId },
-      );
-    }
+    const session = this.#session(params.sessionId);
     if (session.turn !== null) {
       throw new AcpProtocolError(
         ACP_ERROR_CODES.invalidRequest,
@@ -567,12 +890,12 @@ class AcpServerImpl implements AcpServer {
       prompt,
       cwd: session.cwd,
       sessionId: session.sessionId,
-      model: this.#options.model ?? "",
-      reasoningEffort:
-        this.#options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
+      model: session.model,
+      reasoningEffort: session.reasoningEffort,
       tools: this.#options.tools ?? [],
       messageId: (this.#options.nextMessageId ?? (() => randomUUID()))(),
       images: extractImagesFromPrompt(params.prompt),
+      mode: session.modeId,
       signal: controller.signal,
     };
     const sink: AcpTurnSink = createAcpTurnSink({
