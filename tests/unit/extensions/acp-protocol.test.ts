@@ -6,6 +6,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { PRODUCT_VERSION } from "../../../src/cli/brand.ts";
+
 import {
   ACP_ERROR_CODES,
   ACP_MAX_FRAME_BYTES,
@@ -154,13 +156,13 @@ test("initialize: params are validated and the result carries B62's surface", ()
 
   const result = buildInitializeResult({
     name: "droide",
-    version: "0.4.0",
+    version: PRODUCT_VERSION,
     title: "Droide",
   });
   assert.equal(result.protocolVersion, ACP_PROTOCOL_VERSION);
   assert.deepEqual(result.agentInfo, {
     name: "droide",
-    version: "0.4.0",
+    version: PRODUCT_VERSION,
     title: "Droide",
   });
   assert.deepEqual(result.agentCapabilities.sessionCapabilities, {

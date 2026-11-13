@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { test } from "node:test";
 
+import { PRODUCT_VERSION } from "../../../src/cli/brand.ts";
+
 import type {
   AcpFailureMessage,
   AcpInboundMessage,
@@ -115,7 +117,7 @@ test("framing: a frame split across chunks is reassembled and answered", async (
   assert.deepEqual(result["agentInfo"], {
     name: "droide",
     title: "Droide",
-    version: "0.4.0",
+    version: PRODUCT_VERSION,
   });
   assert.equal(result["protocolVersion"], 1);
   await harness.dispose();
@@ -878,7 +880,7 @@ test("entry: runAcpDaemon owns stdout, returns 0 at EOF and restores console (B6
   assert.deepEqual(result["agentInfo"], {
     name: "droide",
     title: "Droide",
-    version: "0.4.0",
+    version: PRODUCT_VERSION,
   });
   assert.ok(isRecord(result["agentCapabilities"]));
 });
