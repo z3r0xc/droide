@@ -144,6 +144,22 @@ async function fetchRelease(
           : `no release tagged ${version} is published`;
       continue;
     }
+    if (response.status === 403 || response.status === 429) {
+      // Same cause as the check path: an address that has spent its anonymous
+      // budget. Say so, because the bare status reads like a broken feed.
+      const reset = response.headers.get("x-ratelimit-reset");
+      const wait =
+        reset === null
+          ? null
+          : Math.max(0, Number.parseInt(reset, 10) * 1000 - Date.now());
+      return {
+        kind: "unavailable",
+        reason:
+          wait === null || !Number.isFinite(wait)
+            ? `the release feed is rate-limited (HTTP ${response.status}); try again later`
+            : `the release feed is rate-limited (HTTP ${response.status}); try again in ${Math.max(1, Math.ceil(wait / 60_000))} minute(s)`,
+      };
+    }
     if (!response.ok) {
       return {
         kind: "unavailable",
