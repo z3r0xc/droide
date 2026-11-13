@@ -367,8 +367,12 @@ signed-out (`orig/packages/runtime/auth/src/auth/source.ts:83-95,101-160,466-530
 
 **B41** A throttling failure waits at least 5 s and at most 30 s, plus up to 20 %
 jitter; a server-provided delay is respected as a minimum. `retry-after-ms` is
-read in milliseconds, `retry-after` in seconds or as an HTTP date, and an
-Anthropic `-remaining`/`-reset` pair is used when remaining is zero. Interactive
+read in milliseconds, `retry-after` in seconds or as an HTTP date, and when both
+are absent the Anthropic pair is used: `anthropic-ratelimit-tokens-remaining`
+must be exactly `0` and `anthropic-ratelimit-tokens-reset` an HTTP date in the
+future, whose distance from now is the delay. A non-zero remaining count, a
+missing or unparseable reset, or a reset in the past yields no server delay and
+the caller's own backoff applies (`src/transport/client.ts`, `parseRetryAfter`). Interactive
 turns allow 6 throttling attempts (`orig/packages/core/src/llms/client/retryPolicy/index.ts:16-17,30,74-102,120-140,179-203`).
 `[observed]`
 

@@ -5,7 +5,7 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **33** markers across **28** clauses.
+Total: **29** markers across **25** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
@@ -31,14 +31,10 @@ Total: **33** markers across **28** clauses.
 | `src/extensions/mcp/oauth/flow.ts:458` | `B26` | B26 pins the published client metadata (B27) and the redirect coverage, but not the registration body's client_name, grant types or auth method for a dynamic client. This build registers a public client with the loopback redirect set. |
 | `src/extensions/mcp/oauth/flow.ts:618` | `B26` | B26 lists tokenEndpointAuthMethod without pinning the accepted values; only public auth and client_secret_basic are implemented (client_secret_post needs a form body this token client does not send). |
 | `src/extensions/plugins/install.ts:342` | `B42` | the Claude Code layout translation (.claude-plugin to .droide-plugin, agents to droids, .mcp.json to mcp.json) is not applied, so the plugin directory is copied verbatim. |
-| `src/tools/fs/edit.ts:173` | `B22` | the match runs against the secret-scrubbed view; this build has no scrubber yet, so the raw content is matched. |
 | `src/tools/fs/paths.ts:191` | `B24` | the artifacts directory, mission system files, automation state, features.json and shared-space guards are not added because this spec does not pin their locations. |
-| `src/tools/fs/read.ts:266` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
-| `src/tools/fs/read.ts:420` | `B12` | the spill file under <state dir>/tool-outputs is not written by this build; the notice names how to ask for the rest instead. |
+| `src/tools/fs/read.ts:276` | `B17` | image and PDF reads are not implemented; refusing beats decoding binary bytes as text. |
 | `src/tools/shell/exec.ts:10` | `90 B15` | Execute keeps a pipe child. The pinned pseudo-terminal surface (B13-B22: login-shell environment, its blocklist and the PTY session lifecycle) belongs to the daemon terminal, which this build does not spawn, so there is no terminal to hand this command to. |
-| `src/tools/shell/exec.ts:230` | `B28` | the contract keeps detached:false on POSIX. |
-| `src/tools/shell/exec.ts:339` | `B31` | no watchdog and no inner-PID/creation-time report yet; the wrapper PID and the log path are what this build returns. |
-| `src/tools/shell/exec.ts:374` | `B9` | the exact wording is not quoted by the spec. |
-| `src/transport/client.ts:111` | `B41` | the Anthropic -remaining/-reset header pair is not implemented; the spec does not give the header names. |
+| `src/tools/shell/exec.ts:499` | `B28` | the contract keeps detached:false on POSIX. |
+| `src/tools/shell/exec.ts:680` | `B9` | the exact wording is not quoted by the spec. |
 | `src/transport/errors.ts:719` | `B101` | the body markers for quota-vs-payment (non-proxy), content moderation, context limit, request-too-large and thinking-signature/PDF invalidity are not quoted in the spec; only the proxy's two code values and the status bands are implemented. |
 | `src/transport/urls.ts:114` | `B7` | the clause lists empty, scheme and trailing slash only; the credential and query/fragment refusals come from B9's request policy. |
