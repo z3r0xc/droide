@@ -208,11 +208,30 @@ call proceeds and a once-per-tool warning is logged
 model asked for by name (Read, Task, TaskOutput, FetchUrl, Skill, `text()`) gets
 64 KiB (`MODEL_TEXT_BUDGET_BYTES`) (`@packages/core/src/tools/utils/constants.ts:32-40`).
 
-**B12 — Cut shape.** An over-budget result keeps its head and tail around one
-notice, cut on UTF-8 code-point boundaries; the notice is
-`[... <N> bytes cut from the middle of <M>; whole output: <where>]`. The notice
-counts against the budget; if it cannot fit, only the notice is returned
+**B12 — Cut shape and the whole-output spill.** An over-budget result keeps its
+head and tail around one notice, cut on UTF-8 code-point boundaries; the notice
+is `[... <N> bytes cut from the middle of <M>; whole output: <where>]`. The
+notice counts against the budget; if it cannot fit, only the notice is returned
 (`@packages/core/src/tools/utils/large-output.ts:60-100`).
+
+`Read` spills its whole result at the same threshold as the cut: a rendered
+result — the selected lines plus any range/outline note — that fits the read
+budget (B11's 64 KiB, or the budget the caller injects) is returned whole and
+nothing is written. A result that would be cut is first written to
+`<stateDir>/tool-outputs/<name>`, and `<where>` is that absolute path; the file
+holds the exact UTF-8 bytes the cut counts describe (the whole result, not the
+whole file). The name is content-addressed —
+`<first 32 lowercase hex digits of the SHA-256 of the output>.txt` — so two
+reads of the same output reuse one file and a notice stays valid across runs;
+no session id and no timestamp in the name. The directory is created on first
+use with mode `0700`; the file is written through a temp file and a rename with
+mode `0600`, so nothing world-readable appears, and a concurrent identical read
+finds the existing file and reuses it. The spill is capped at 32 MiB of UTF-8
+(`MAX_INLINE_OUTPUT_BYTES`, B13). Nothing else is written and no older spill is
+deleted. When the output exceeds the cap, the directory cannot be created or
+written, or the rename fails, the call still succeeds with the cut and
+`<where>` falls back to `<file_path> (read it with offset and limit)`
+(`@src/tools/fs/spill.ts:1-111`, `:86-108`).
 
 **B13 — Oversized program results are refused, not cut.** Inside `Script`, a nested
 result over 32 MiB of text, or 32 MiB of JSON when it is many small records, is
@@ -302,13 +321,31 @@ auto-registered (`@packages/core/src/tools/definitions/cli/schema.ts:1145-1150`,
 
 **B22 — `Edit`.** `file_path`, `old_str`, `new_str` required; `change_all` default
 false. The match runs against the secret-scrubbed view and splices into the
-original bytes. Refusals: empty `old_str` in a non-empty file; text not found;
-more than one occurrence without `change_all`; `old_str` ending in a newline while
-`new_str` does not when the match is not at EOF (line-join guard). A file must have
-been read (or created) in the session, and a file changed externally since that
-read is refused. Trailing-newline convention is preserved
-(`@packages/core/src/tools/utils/file-tools-utils.ts:29-84`,
-`@src/agent/file-edit/edit.ts:48-90`, `@src/agent/file-edit/utils.ts:302-353`).
+original bytes. The view replaces each credential-shaped span with the fixed
+marker `[redacted]`: a `-----BEGIN … PRIVATE KEY-----` … `-----END … PRIVATE
+KEY-----` block; an auth-scheme credential (`Bearer`, `Basic` or `Token` and an
+opaque value of 16+ token characters); a provider-shaped key (`sk-…` and
+`sk-ant-…` of 16+ key characters, `github_pat_…` of 20+, `ghp_`/`gho_`/`ghu_`/
+`ghs_`/`ghr_` of 20+, `AKIA` and 16 uppercase-or-digit characters, `xox…-…`
+of 10+, `AIza…` of 30+); a JWT (`eyJ` and three `.`-separated base64url
+segments of 8+ each); the value of a `password`,
+`passwd`, `pwd`, `secret`, `token`, `api_key`/`api-key`, `access_key`,
+`client_secret` or `auth_token` assignment — quoted at 6+ characters, else an
+unquoted opaque value of 12+; and every occurrence of the injected
+environment's `DROIDE_API_KEY` value when it is 8+ characters. A match that
+overlaps a marker is not a match, so an `old_str` that reproduces a secret (or
+the part of a line inside one) is refused as text not found, and an `old_str`
+outside every secret matches exactly as before. The marker exists only in the
+matching view: the file is rewritten from the original bytes, and no refusal
+message quotes file content — the not-found, ambiguous and line-join texts name
+counts and the path, never the text. Refusals: empty `old_str` in a non-empty
+file; text not found; more than one occurrence without `change_all`; `old_str`
+ending in a newline while `new_str` does not when the match is not at EOF
+(line-join guard). A file must have been read (or created) in the session, and
+a file changed externally since that read is refused. Trailing-newline
+convention is preserved (`@packages/core/src/tools/utils/file-tools-utils.ts:29-84`,
+`@src/agent/file-edit/edit.ts:48-90`, `@src/agent/file-edit/utils.ts:302-353`,
+`@src/tools/fs/secrets.ts:1-251`).
 
 **B23 — `ApplyPatch`.** Input is one `input` string in the patch grammar:
 `*** Begin Patch` … `*** End Patch`, with `*** Update File: `, `*** Add File: `,
@@ -386,6 +423,39 @@ watchdog that kills the group when the CLI dies (unless
 reporting the inner PID + creation time within 2 s
 (`@src/tools/executors/client/execute-cli.ts:1196-1240`,
 `@src/tools/executors/client/shell/shell-executor.ts:89-135`, `:297-362`, `:560-700`).
+
+The watchdog is what makes "kills the group when the CLI dies" true for a CLI
+that never runs shutdown cleanup: the background child leads its own process
+group, and on a successful launch the CLI installs exactly one exit hook —
+`process.once("exit", …)` by default, so it runs for a natural exit,
+`process.exit` and an uncaught error, and not for a signal the process cannot
+observe. The hook runs synchronously — no timer survives `process.exit` — and
+sends `SIGKILL` to the group (`process.kill(-pid, …)`), so a torn-down CLI does
+not leave a stray background command behind; the child's stdin is ignored and
+its output already goes to the log file, so nothing of the child's remains
+attached to the dying terminal. The hook is not installed at all when
+`preserveBackgroundProcesses` is set: the `preserveBackgroundProcesses` option
+when the caller passes it, otherwise `DROIDE_PRESERVE_BACKGROUND_PROCESSES`
+being `1` or `true`. Both the exit hook and the signal function are injected
+seams, so the watchdog is proven by running the handler, never by sleeping for
+a grace period.
+
+Windows reports the inner process, not the wrapper. The wrapper is one
+PowerShell that starts the command with `Start-Process -NoNewWindow -PassThru`
+and prints `$p.Id` and `$p.StartTime.ToFileTimeUtc()` on one line. The command
+text never appears on that wrapper's command line: it is written to a
+temporary `.ps1` file whose path alone is quoted into the wrapper, so no
+untrusted string is interpolated into PowerShell. The result carries that
+inner PID and the creation time (as `startToken`) as soon as the line arrives,
+and normally within 2 s; a wrapper that printed something else stops the wait
+at that budget, and one that neither answers nor exits is given up at a 10 s
+hard cap. Both bounds are read on the injected clock, and a wrapper that exits
+has its complete stdout parsed — without needing the trailing newline — before
+anything is given up. When the shell cannot provide them — no line at all, or
+a line that is not exactly `<pid> <filetime>` — the result falls back to the
+wrapper PID with no `startToken`, and the launch is not retried. The same
+watchdog applies: the exit hook stops the inner process with `taskkill /T /F`,
+because Windows has no group signal.
 
 **B32 — Output scrubbing.** Shell output passes through the secret scrubber over a
 sliding 100-line window before it reaches the model; a scrub failure falls back to
@@ -607,7 +677,7 @@ reason (`denyRead_not_enforced`, `denyWriteFloor_not_enforced`,
 | credential deny-read floor         | `~/.droide/{auth.v2.*,auth.encrypted,computer-identity,prem-auth,config.json,mcp-oauth.*}`                                                                                                                                       | —          | —                                                                                                     | never readable                                       |
 | trusted-config deny-write floor    | `~/.droide/{settings.json,settings.local.json,hooks.json,mcp.json,update-policy.json,org-managed-settings.json,host.json,computer.json,certs,bin,tools,sandbox-runtime,exit-spool,…}` + `DROIDE_ORG_MANAGED_SETTINGS_LOCAL_PATH` | —          | —                                                                                                     | never writable                                       |
 | background log                     | `os.tmpdir()/droide-bg-<epoch>-<uuid>.out`                                                                                                                                                                                       | —          | —                                                                                                     | fire-and-forget only                                 |
-| tool output spill                  | `~/.droide/tool-outputs/<…>`                                                                                                                                                                                                     | —          | —                                                                                                     | named by the cut notice                              |
+| tool output spill                  | `~/.droide/tool-outputs/<sha256[0:32]>.txt`                                                                                                                                                                                       | —          | —                                                                                                     | content-addressed; dir `0700`, file `0600`; named by the cut notice |
 
 Flags: `--auto low|medium|high`, `--skip-permissions-unsafe`, `--only-tools`,
 `--add-tools`, `--remove-tools`, `--use-spec` (`@src/entrypoints/exec/help.ts:96-125`).

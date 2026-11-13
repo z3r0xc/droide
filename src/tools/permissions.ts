@@ -33,7 +33,15 @@ export interface PermissionRequest {
   readonly toolId: string;
   readonly llmId?: string;
   readonly toolClass: ToolClass;
-  /** Present for a filesystem call; omitted for process/network tools. */
+  /**
+   * The assistant `tool_use` block's id for the call being decided (B69). A
+   * permission card sends it as ACP's `toolCallId`, so the client attaches the
+   * card to the call it already holds; absent for a call made outside the loop.
+   */
+  readonly toolUseId?: string;
+  /**
+   * Present for a filesystem call; omitted for process/network tools.
+   */
   readonly pathClass?: PathClass;
   readonly path?: string;
   /** `Execute`'s model-declared risk, raw: invalid or missing reads as high. */
