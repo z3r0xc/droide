@@ -88,15 +88,30 @@ function anthropicBlock(block: LlmContentBlock): unknown[] {
           input: block.input,
         },
       ];
-    case "tool_result":
+    case "tool_result": {
+      const media = block.media ?? [];
       return [
         {
           type: "tool_result",
           tool_use_id: block.toolUseId,
-          content: block.content,
+          content:
+            media.length === 0
+              ? block.content
+              : [
+                  { type: "text", text: block.content },
+                  ...media.map((image) => ({
+                    type: "image",
+                    source: {
+                      type: "base64",
+                      media_type: image.mediaType,
+                      data: image.data,
+                    },
+                  })),
+                ],
           ...(block.isError === true ? { is_error: true } : {}),
         },
       ];
+    }
   }
 }
 
@@ -145,6 +160,8 @@ export function encodeChatRequest(
     }
 
     // A tool result is its own `tool` message in this dialect, one per call.
+    // A `tool` message carries text only here, so tool-result media is dropped
+    // and the result's string summary is what the model reads (B35).
     const results = message.content.filter(
       (block): block is Extract<LlmContentBlock, { type: "tool_result" }> =>
         block.type === "tool_result",

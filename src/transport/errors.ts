@@ -709,17 +709,271 @@ export interface ModelFailureInput {
   /** B104: the body is the legacy `{"detail":"Forbidden"}` gate form. */
   readonly legacyForbidden?: boolean;
   readonly retryAfterMs?: number | null;
+  /** B101: the response body exactly as received; untrusted, never echoed. */
+  readonly bodyText?: string | null;
+  /**
+   * B101: the body when the caller already parsed it. A JSON string, array or
+   * scalar is not an error envelope and carries no marker.
+   */
+  readonly bodyJson?: unknown;
 }
 
 /**
- * B101/B104: status (and only the documented proxy codes) selects the class.
- * Provider-controlled text never becomes a reason, so the caller must pass
- * flags it parsed, not prose.
- *
- * TODO(spec B101): the body markers for quota-vs-payment (non-proxy), content
- * moderation, context limit, request-too-large and thinking-signature/PDF
- * invalidity are not quoted in the spec; only the proxy's two `code` values and
- * the status bands are implemented.
+ * B101: the body-marker vocabulary, quoted from the recovered classifier
+ * (`orig/packages/core/src/llms/errors/utils.ts`,
+ * `constants.ts`) and reproduced row for row in spec 50 B101. Each entry is a
+ * literal the provider or proxy prints, never a guess about intent: a message
+ * that merely mentions a rate, a limit or a bill stays unclassified.
+ */
+export const MODEL_FAILURE_MARKERS: {
+  readonly quotaCodes: readonly string[];
+  readonly quotaMessages: readonly RegExp[];
+  readonly moderationCodes: readonly string[];
+  readonly moderationMessages: readonly RegExp[];
+  readonly contextLimitCodes: readonly string[];
+  readonly contextLimitMessages: readonly RegExp[];
+  readonly requestTooLargeCodes: readonly string[];
+  readonly requestTooLargeMessages: readonly RegExp[];
+  readonly invalidRequestMessages: readonly RegExp[];
+} = {
+  quotaCodes: [
+    "insufficient_quota",
+    "account_quota_exceeded",
+    "billing_error",
+    "billing_hard_limit_reached",
+    "billing_not_active",
+    "credit_balance_too_low",
+  ],
+  quotaMessages: [
+    /\b(?:weekly|monthly|daily)\s*\/?\s*(?:weekly|monthly|daily)?\s*limit\s+exhausted\b/i,
+    /\bquota\s+exhausted\b/i,
+    /check (?:your )?plan and billing/i,
+    /\bbilling (?:hard )?limit\s+(?:(?:has been|was|is)\s+)?(?:reached|exceeded|exhausted)\b/i,
+    /\b(?:reached|exceeded|exhausted)\s+(?:your\s+)?billing (?:hard )?limit\b/i,
+    /\b(?:credits?|balance)\b[^.;]*\b(?:insufficient|exhausted|too low)\b/i,
+    /exhausted your available credits/i,
+  ],
+  moderationCodes: ["content_filter", "cyber_policy", "moderation_blocked"],
+  moderationMessages: [
+    /content moderation/i,
+    /content_filter/i,
+    /cyber(?:[_\s-]?policy|security reasons)/i,
+    /violating our usage policy/i,
+    /rejected as a result of our safety system/i,
+  ],
+  contextLimitCodes: ["context_length_exceeded"],
+  contextLimitMessages: [
+    /context length/i,
+    /context limit/i,
+    /context size (?:has been )?exceeded/i,
+    /exceed\s.*context\s.*limit/i,
+    /exceeds?\s+(?:the\s+)?(?:available\s+)?context\s+size/i,
+    /exceeds?\s+(?:the\s+)?.*context\s+window/i,
+    /maximum context/i,
+    /prompt\s+(?:is\s+)?too\s+long/i,
+    /input is too long/i,
+    /input is too many tokens/i,
+    /context\s+window\s+(?:is\s+full|exceeded)/i,
+    /context window exceeds limit/i,
+    /request size exceed(?:s|ed)/i,
+    /request too large for (?:the )?context window/i,
+    /required for long context requests/i,
+  ],
+  requestTooLargeCodes: ["413"],
+  requestTooLargeMessages: [/request entity too large/i],
+  invalidRequestMessages: [
+    // Anthropic: "Invalid `signature` in `thinking` block".
+    /invalid.*signature.*thinking/i,
+    // Gemini: "Thought signature is not valid", "thought_signature invalid".
+    /thought[-_ ]?signature.*(?:not |in)valid/i,
+    // Gemini: "missing a `thought_signature`", "Invalid value at ... thought_signature".
+    /(?:invalid|missing).*thought[-_ ]?signature/i,
+    // OpenAI: an encrypted reasoning artifact issued to another caller/org.
+    /(?:encrypted[_ ]content.*(?:organization_id|could not be (?:verified|decrypted|parsed))|could not decrypt.*encrypted[_ ]content|encrypted[_ ]content`? was not issued to this caller)/i,
+    // Anthropic: "A maximum of 100 PDF pages may be provided".
+    /maximum of \d+ PDF pages/i,
+  ],
+};
+
+const QUOTA_CODE_SET = new Set<string>(MODEL_FAILURE_MARKERS.quotaCodes);
+const MODERATION_CODE_SET = new Set<string>(
+  MODEL_FAILURE_MARKERS.moderationCodes,
+);
+const CONTEXT_LIMIT_CODE_SET = new Set<string>(
+  MODEL_FAILURE_MARKERS.contextLimitCodes,
+);
+const REQUEST_TOO_LARGE_CODE_SET = new Set<string>(
+  MODEL_FAILURE_MARKERS.requestTooLargeCodes,
+);
+
+/** Bound on the body prefix read for markers; a body is untrusted input. */
+const MAX_MARKER_BODY_CHARS = 65_536;
+
+/** The body fields a marker may be read from, already lowercased/trimmed. */
+interface BodyFields {
+  readonly codes: readonly string[];
+  readonly messages: readonly string[];
+}
+
+/** B101 marker reasons, and the class each one produces. */
+type MarkerReason =
+  | "quota-exhausted"
+  | "content-moderation"
+  | "context-limit"
+  | "request-too-large"
+  | "invalid-request";
+
+const MARKER_ERRORS: Readonly<
+  Record<
+    MarkerReason,
+    (operation: Operation, options: LlmErrorOptions) => LlmError
+  >
+> = {
+  "quota-exhausted": (operation, options) =>
+    new LlmQuotaExhaustedError(operation, options),
+  "content-moderation": (operation, options) =>
+    new LlmContentModerationError(operation, options),
+  "context-limit": (operation, options) =>
+    new LlmContextLimitError(operation, options),
+  "request-too-large": (operation, options) =>
+    new LlmRequestTooLargeError(operation, options),
+  "invalid-request": (operation, options) =>
+    new LlmInvalidRequestError(operation, options),
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+/**
+ * An HTML body is a gateway/firewall page, not an API error envelope (B104's
+ * block-page exclusion). Its prose is never read as a marker.
+ */
+function looksLikeMarkup(text: string): boolean {
+  return /<(?:!doctype\s+html|html|head|body)\b/.test(
+    text.slice(0, 512).toLowerCase(),
+  );
+}
+
+function collectBodyFields(
+  record: Record<string, unknown>,
+  codes: string[],
+  messages: string[],
+): void {
+  for (const key of ["code", "type", "status"] as const) {
+    const value = record[key];
+    if (typeof value !== "string") continue;
+    const normalized = value.trim().toLowerCase();
+    if (normalized !== "") codes.push(normalized);
+  }
+  for (const key of ["message", "detail"] as const) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim() !== "") messages.push(value);
+  }
+}
+
+/**
+ * B101: read the marker fields out of the body. Only documented envelope
+ * fields (`code`, `type`, `status`, `message`, `detail`, and the same under
+ * `error`) carry a marker; a bare JSON string, an array, a number and an HTML
+ * page carry none, so they stay unclassified.
+ */
+function readBodyFields(
+  bodyJson: unknown,
+  bodyText: string | null,
+): BodyFields | null {
+  const codes: string[] = [];
+  const messages: string[] = [];
+  const text =
+    bodyText === null ? null : bodyText.slice(0, MAX_MARKER_BODY_CHARS);
+  let root: Record<string, unknown> | null = null;
+
+  if (typeof bodyJson === "string") return null;
+  if (bodyJson !== undefined && bodyJson !== null) {
+    root = asRecord(bodyJson);
+    if (root === null) return null;
+  } else if (text !== null) {
+    const trimmed = text.trim();
+    if (trimmed === "" || looksLikeMarkup(trimmed)) return null;
+    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+      messages.push(trimmed);
+      return { codes, messages };
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+    root = asRecord(parsed);
+    if (root === null) return null;
+  } else {
+    return null;
+  }
+
+  collectBodyFields(root, codes, messages);
+  const nested = asRecord(root.error);
+  if (nested !== null) collectBodyFields(nested, codes, messages);
+  if (codes.length === 0 && messages.length === 0) return null;
+  return { codes, messages };
+}
+
+function hasQuotedCode(
+  fields: BodyFields,
+  quoted: ReadonlySet<string>,
+): boolean {
+  return fields.codes.some((code) => quoted.has(code));
+}
+
+function hasQuotedMessage(
+  fields: BodyFields,
+  patterns: readonly RegExp[],
+): boolean {
+  return fields.messages.some((message) =>
+    patterns.some((pattern) => pattern.test(message)),
+  );
+}
+
+/** B101 priority inside the body: spend, then policy, then size, then form. */
+function reasonFromBody(fields: BodyFields): MarkerReason | null {
+  if (
+    hasQuotedCode(fields, QUOTA_CODE_SET) ||
+    hasQuotedMessage(fields, MODEL_FAILURE_MARKERS.quotaMessages)
+  ) {
+    return "quota-exhausted";
+  }
+  if (
+    hasQuotedCode(fields, MODERATION_CODE_SET) ||
+    hasQuotedMessage(fields, MODEL_FAILURE_MARKERS.moderationMessages)
+  ) {
+    return "content-moderation";
+  }
+  if (
+    hasQuotedCode(fields, CONTEXT_LIMIT_CODE_SET) ||
+    hasQuotedMessage(fields, MODEL_FAILURE_MARKERS.contextLimitMessages)
+  ) {
+    return "context-limit";
+  }
+  if (
+    hasQuotedCode(fields, REQUEST_TOO_LARGE_CODE_SET) ||
+    hasQuotedMessage(fields, MODEL_FAILURE_MARKERS.requestTooLargeMessages)
+  ) {
+    return "request-too-large";
+  }
+  if (hasQuotedMessage(fields, MODEL_FAILURE_MARKERS.invalidRequestMessages)) {
+    return "invalid-request";
+  }
+  return null;
+}
+
+/**
+ * B101/B104: the proxy's exact codes first, then a quoted body marker, then the
+ * status band. Provider-controlled text never becomes a reason: the caller
+ * passes the body it parsed (or the raw text) and only the quoted marker
+ * vocabulary is read from it; the reason enum is the only thing that escapes.
  */
 export function classifyModelFailure(input: ModelFailureInput): LlmError {
   const options: LlmErrorOptions = {
@@ -736,10 +990,24 @@ export function classifyModelFailure(input: ModelFailureInput): LlmError {
   if (gateApplies && status === 403 && input.legacyForbidden === true) {
     return new LlmContentModerationError(input.operation, options);
   }
+  if (gateApplies && status === 402 && code === "no_active_subscription") {
+    return new LlmPaymentRequiredError(input.operation, options);
+  }
+
+  // B101: a quoted body marker narrows a client refusal — a 429 that states a
+  // spend or context cause is not throttling, and a 413 that names the context
+  // window is a context limit. A 5xx is an availability signal, so its prose is
+  // never re-read as a deterministic cause.
+  if (status === null || (status >= 400 && status < 500)) {
+    const fields = readBodyFields(input.bodyJson, input.bodyText ?? null);
+    const reason = fields === null ? null : reasonFromBody(fields);
+    if (reason !== null) {
+      return MARKER_ERRORS[reason](input.operation, options);
+    }
+  }
+
   if (gateApplies && status === 402) {
-    return code === "no_active_subscription"
-      ? new LlmPaymentRequiredError(input.operation, options)
-      : new LlmQuotaExhaustedError(input.operation, options);
+    return new LlmQuotaExhaustedError(input.operation, options);
   }
   if (status === 413) {
     return new LlmRequestTooLargeError(input.operation, options);

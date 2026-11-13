@@ -416,10 +416,7 @@ async function resolveIssuer(input: {
     }
   }
 
-  // TODO(spec B26): B26 says the issuer comes from
-  // `authorizationServerIssuer` "or the server URL's well-known document" but
-  // does not pin which document, nor what happens when the server publishes
-  // none. This build falls back to the resource origin.
+  // B26 pins this chain: protected-resource metadata first, then the origin.
   return normalizeIssuer(origin);
 }
 
@@ -455,10 +452,7 @@ async function registerClient(input: {
   readonly redirectUris: readonly string[];
   readonly request: HttpRequestContext;
 }): Promise<ResolvedClient> {
-  // TODO(spec B26): B26 pins the published client metadata (B27) and the
-  // redirect coverage, but not the registration body's `client_name`, grant
-  // types or auth method for a dynamic client. This build registers a public
-  // client with the loopback redirect set.
+  // B26 quotes this body: a public client for the loopback redirect set.
   const body = JSON.stringify({
     client_name: "droide",
     redirect_uris: [...input.redirectUris],
@@ -615,9 +609,8 @@ function validatedOAuthOptions(
     method !== "none" &&
     method !== "client_secret_basic"
   ) {
-    // TODO(spec B26): B26 lists `tokenEndpointAuthMethod` without pinning the
-    // accepted values; only public auth and client_secret_basic are implemented
-    // (client_secret_post needs a form body this token client does not send).
+    // B26 pins the two accepted methods; client_secret_post needs a form body
+    // this token client does not send, so it stays refused.
     throw new McpOAuthError(
       "unsupported-config",
       serverName,

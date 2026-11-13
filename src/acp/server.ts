@@ -20,9 +20,11 @@ import {
   runAcpTurn,
   type AcpPermissionResponse,
   type AcpTurnRequest,
+  type AcpTurnResult,
   type AcpTurnRunner,
   type AcpTurnSink,
 } from "../exec/acp-runner.ts";
+import type { ExecUsage } from "../exec/records.ts";
 import { isBrokenPipeError } from "../exec/writer.ts";
 import {
   ACP_CONFIG_IDS,
@@ -32,13 +34,16 @@ import {
   ACP_REASONING_EFFORTS,
   AcpProtocolError,
   authMethodsFor,
+  availableCommandsUpdate,
   buildInitializeResult,
   clampMode,
+  configOptionUpdate,
   configOptionsFor,
   createAcpFailure,
   createAcpRequest,
   createAcpSuccess,
   createSessionUpdateNotification,
+  currentModeUpdate,
   extractImagesFromPrompt,
   formatPromptForExec,
   parseAcpFrame,
@@ -56,7 +61,10 @@ import {
   parseSetModeParams,
   parseSetModelParams,
   serializeAcpMessage,
+  sessionInfoUpdate,
   sessionUpdatesFromTranscript,
+  usageUpdate,
+  type AcpAvailableCommand,
   type AcpDeployment,
   type AcpInboundMessage,
   type AcpListSessionsResult,
@@ -92,6 +100,8 @@ export interface AcpSessionStore {
     readonly cwd?: string | null;
     readonly projectKey?: string;
     readonly firstEventAt?: number | null;
+    /** `cli_acp` for a session this agent creates (B63); absent means none. */
+    readonly originHint?: string | null;
   }): { readonly sessionId: string };
   deleteSession(sessionId: string): boolean;
   /** Rows for `session/list`; absent means only live sessions are listed. */
@@ -101,6 +111,20 @@ export interface AcpSessionStore {
   }): readonly AcpStoredSession[];
   /** A session's transcript; absent or a throw means it cannot be loaded. */
   readSession?(sessionId: string): readonly Readonly<Record<string, unknown>>[];
+  /**
+   * A session's stored metadata, or `null` when the row is gone: the title
+   * `session_info_update` reports (B68) and the producer hint `session/load`
+   * and `session/resume` keep (B63). Absent means this embedding keeps
+   * neither, so no info update is sent and a re-opened session reports no
+   * hint. A throw is treated as "no metadata".
+   */
+  readSessionMeta?(sessionId: string): AcpSessionMeta | null;
+}
+
+/** The stored columns `session_info_update` and `session/list` report. */
+export interface AcpSessionMeta {
+  readonly title: string | null;
+  readonly originHint?: string | null;
 }
 
 /** The columns `session/list` reads from a stored session row. */
@@ -109,6 +133,8 @@ export interface AcpStoredSession {
   readonly cwd: string | null;
   readonly title: string | null;
   readonly updatedAt: number | null;
+  /** The row's producer hint, reported as `_meta.droide.originHint` (B63). */
+  readonly originHint?: string | null;
 }
 
 export interface AcpServerOptions {
@@ -138,6 +164,21 @@ export interface AcpServerOptions {
   readonly tools?: readonly string[];
   readonly maxFrameBytes?: number;
   readonly isModerationRefusal?: (message: string) => boolean;
+  /**
+   * The session's slash commands, resolved from the user-invocable skills
+   * (B57), sent as `available_commands_update` (B68). Absent means the client
+   * is offered none and no update is sent.
+   */
+  readonly commands?: (
+    sessionId: string,
+  ) => readonly AcpAvailableCommand[] | Promise<readonly AcpAvailableCommand[]>;
+  /**
+   * The context window of a model in tokens, for `usage_update`'s `size`
+   * (B68). Absent or `null` means the size is unknown, and no usage update is
+   * sent: the update says how full the window is, so a guessed denominator
+   * would be a wrong percentage rather than an absent one.
+   */
+  readonly contextLimitFor?: (model: string) => number | null;
 }
 
 export interface AcpServer {
@@ -154,6 +195,13 @@ export interface AcpServer {
 }
 
 const DEFAULT_REASONING_EFFORT = "medium";
+
+/**
+ * The producer hint an ACP session's row carries (B63). A later process reads
+ * it back through `session/list`, so a `cli_acp` session stays distinguishable
+ * from one another producer created.
+ */
+const ACP_ORIGIN_HINT = "cli_acp";
 
 /** Ceiling for one `session/list` page; matches the store's list limit. */
 const MAX_LISTED_SESSIONS = 1000;
@@ -305,12 +353,20 @@ interface ServerSession {
   readonly sessionId: string;
   readonly cwd: string;
   readonly mcpServers: readonly AcpSessionMcpServer[];
+  /** The row's producer hint, `cli_acp` for a session this agent made (B63). */
+  readonly originHint: string | null;
   /** Per-session settings, changed by `session/set_*` (B70). */
   model: string;
   reasoningEffort: string;
   modeId: AcpModeId;
   readonly createdAt: number;
   turn: ActiveTurn | null;
+  /** The title the client was last told; `undefined` means never reported. */
+  reportedTitle: string | null | undefined;
+  /** The command set last sent, serialised; `null` means none yet. */
+  sentCommands: string | null;
+  /** The usage update last sent, serialised (B68's "no repeats"). */
+  sentUsage: string | null;
 }
 
 interface PendingPermission {
@@ -467,23 +523,31 @@ class AcpServerImpl implements AcpServer {
           return;
         }
         case ACP_METHODS.sessionNew: {
-          const result = await this.#newSession(request.params);
-          await this.#writer.write(createAcpSuccess(request.id, result));
+          const created = await this.#newSession(request.params);
+          await this.#writer.write(
+            createAcpSuccess(request.id, created.result),
+          );
+          await this.#publishSessionStart(created.session);
           return;
         }
         case ACP_METHODS.sessionLoad: {
-          await this.#loadSession(request.params);
+          const session = await this.#loadSession(request.params);
           await this.#writer.write(createAcpSuccess(request.id, {}));
+          await this.#publishSessionStart(session);
           return;
         }
         case ACP_METHODS.sessionResume: {
-          await this.#resumeSession(request.params);
+          const session = await this.#resumeSession(request.params);
           await this.#writer.write(createAcpSuccess(request.id, {}));
+          await this.#publishSessionStart(session);
           return;
         }
         case ACP_METHODS.sessionFork: {
-          const result = await this.#forkSession(request.params);
-          await this.#writer.write(createAcpSuccess(request.id, result));
+          const created = await this.#forkSession(request.params);
+          await this.#writer.write(
+            createAcpSuccess(request.id, created.result),
+          );
+          await this.#publishSessionStart(created.session);
           return;
         }
         case ACP_METHODS.sessionList: {
@@ -575,55 +639,75 @@ class AcpServerImpl implements AcpServer {
     await this.#writer.write(createAcpSuccess(request.id, {}));
   }
 
-  async #newSession(params: unknown): Promise<AcpNewSessionResult> {
+  /**
+   * B63: the row records this producer, so a later process can tell a
+   * `cli_acp` session from one another producer made. Nothing about "loading"
+   * is stored: a load that fails must leave no mark on the row, so a load in
+   * flight is this process's state alone.
+   */
+  async #newSession(params: unknown): Promise<{
+    readonly result: AcpNewSessionResult;
+    readonly session: ServerSession;
+  }> {
     this.#requireAuth();
     const parsed = parseNewSessionParams(params);
     const sessionId = (this.#options.nextSessionId ?? (() => randomUUID()))();
-    // TODO(spec B63): the session is registered with its cwd and converted
-    // MCP servers, but this store has no loading state and no
-    // sessionOriginHint column; a reload therefore cannot distinguish a
-    // cli_acp session from any other, and the filesystem MCP config the
-    // session would merge those servers with is resolved by the caller.
     const row = this.#options.store.registerSession({
       sessionId,
       cwd: parsed.cwd,
       projectKey: "",
       firstEventAt: this.#options.clock(),
+      originHint: ACP_ORIGIN_HINT,
     });
     const session = this.#adopt({
       sessionId: row.sessionId,
       cwd: parsed.cwd,
       mcpServers: parsed.mcpServers,
+      originHint: ACP_ORIGIN_HINT,
     });
-    return { sessionId: session.sessionId };
+    return { result: { sessionId: session.sessionId }, session };
   }
 
   /**
    * Re-open a stored session and replay its transcript as `session/update`
    * notifications before the response (B71). A session this process already
    * holds is re-attached without a second replay, so a client that reloads
-   * twice does not see its history twice.
+   * twice does not see its history twice. The row keeps its producer hint, so
+   * a re-opened `cli_acp` session is still one (B63).
    */
-  async #loadSession(rawParams: unknown): Promise<void> {
+  async #loadSession(rawParams: unknown): Promise<ServerSession> {
     this.#requireAuth();
     const params = parseSessionHandleParams(rawParams);
-    if (this.#sessions.has(params.sessionId)) return;
+    const live = this.#sessions.get(params.sessionId);
+    if (live !== undefined) return live;
     const { known, records } = this.#readTranscript(params.sessionId);
     if (!known) throw this.#unknownStoredSession(params.sessionId);
-    const session = this.#adopt(params);
+    const session = this.#adopt({
+      sessionId: params.sessionId,
+      cwd: params.cwd,
+      mcpServers: params.mcpServers,
+      originHint: this.#storedMeta(params.sessionId)?.originHint ?? null,
+    });
     for (const update of sessionUpdatesFromTranscript(records)) {
       await this.#sendUpdate(session, update);
     }
+    return session;
   }
 
   /** Re-attach a stored session without replaying its history (B71). */
-  async #resumeSession(rawParams: unknown): Promise<void> {
+  async #resumeSession(rawParams: unknown): Promise<ServerSession> {
     this.#requireAuth();
     const params = parseSessionHandleParams(rawParams);
-    if (this.#sessions.has(params.sessionId)) return;
+    const live = this.#sessions.get(params.sessionId);
+    if (live !== undefined) return live;
     const { known } = this.#readTranscript(params.sessionId);
     if (!known) throw this.#unknownStoredSession(params.sessionId);
-    this.#adopt(params);
+    return this.#adopt({
+      sessionId: params.sessionId,
+      cwd: params.cwd,
+      mcpServers: params.mcpServers,
+      originHint: this.#storedMeta(params.sessionId)?.originHint ?? null,
+    });
   }
 
   /**
@@ -631,7 +715,10 @@ class AcpServerImpl implements AcpServer {
    * can continue down a second branch (B71). The parent may be live or stored;
    * an id the agent knows nothing about is not found.
    */
-  async #forkSession(rawParams: unknown): Promise<AcpNewSessionResult> {
+  async #forkSession(rawParams: unknown): Promise<{
+    readonly result: AcpNewSessionResult;
+    readonly session: ServerSession;
+  }> {
     this.#requireAuth();
     const params = parseSessionHandleParams(rawParams);
     const live = this.#sessions.get(params.sessionId);
@@ -645,16 +732,18 @@ class AcpServerImpl implements AcpServer {
       cwd: params.cwd,
       projectKey: "",
       firstEventAt: this.#options.clock(),
+      originHint: ACP_ORIGIN_HINT,
     });
     const session = this.#adopt({
       sessionId: row.sessionId,
       cwd: params.cwd,
       mcpServers: live?.mcpServers ?? params.mcpServers,
+      originHint: ACP_ORIGIN_HINT,
     });
     for (const update of sessionUpdatesFromTranscript(records)) {
       await this.#sendUpdate(session, update);
     }
-    return { sessionId: session.sessionId };
+    return { result: { sessionId: session.sessionId }, session };
   }
 
   /**
@@ -666,13 +755,14 @@ class AcpServerImpl implements AcpServer {
   #listSessions(rawParams: unknown): AcpListSessionsResult {
     const params = parseListSessionsParams(rawParams);
     const listSessions = this.#options.store.listSessions;
-    const rows =
+    const rows: readonly AcpStoredSession[] =
       listSessions === undefined
         ? [...this.#sessions.values()].map((session) => ({
             sessionId: session.sessionId,
             cwd: session.cwd,
             title: null,
             updatedAt: session.createdAt,
+            originHint: session.originHint,
           }))
         : listSessions.call(this.#options.store, {
             limit: MAX_LISTED_SESSIONS,
@@ -681,12 +771,16 @@ class AcpServerImpl implements AcpServer {
     const sessions: AcpSessionInfo[] = [];
     for (const row of rows) {
       if (row.cwd === null || row.cwd === "") continue;
+      const originHint = row.originHint ?? null;
       sessions.push({
         sessionId: row.sessionId,
         cwd: row.cwd,
         title: row.title,
         updatedAt:
           row.updatedAt === null ? null : new Date(row.updatedAt).toISOString(),
+        ...(originHint === null || originHint === ""
+          ? {}
+          : { _meta: { droide: { originHint } } }),
       });
     }
     return { sessions };
@@ -773,15 +867,12 @@ class AcpServerImpl implements AcpServer {
     modeChanged: boolean,
   ): Promise<void> {
     if (modeChanged) {
-      await this.#sendUpdate(session, {
-        sessionUpdate: "current_mode_update",
-        currentModeId: session.modeId,
-      });
+      await this.#sendUpdate(session, currentModeUpdate(session.modeId));
     }
-    await this.#sendUpdate(session, {
-      sessionUpdate: "config_option_update",
-      configOptions: this.#configOptions(session),
-    });
+    await this.#sendUpdate(
+      session,
+      configOptionUpdate(this.#configOptions(session)),
+    );
   }
 
   #configOptions(session: ServerSession): readonly AcpSessionConfigOption[] {
@@ -865,11 +956,13 @@ class AcpServerImpl implements AcpServer {
     readonly sessionId: string;
     readonly cwd: string;
     readonly mcpServers: readonly AcpSessionMcpServer[];
+    readonly originHint: string | null;
   }): ServerSession {
     const session: ServerSession = {
       sessionId: input.sessionId,
       cwd: input.cwd,
       mcpServers: input.mcpServers,
+      originHint: input.originHint,
       model: this.#options.model ?? "",
       reasoningEffort:
         this.#options.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
@@ -879,9 +972,25 @@ class AcpServerImpl implements AcpServer {
       ),
       createdAt: this.#options.clock(),
       turn: null,
+      // A session re-opened into a new client has reported nothing to it yet,
+      // so the first title and command set do go out (B68).
+      reportedTitle: undefined,
+      sentCommands: null,
+      sentUsage: null,
     };
     this.#sessions.set(session.sessionId, session);
     return session;
+  }
+
+  /** The row's title and producer hint; `null` when the row or seam is gone. */
+  #storedMeta(sessionId: string): AcpSessionMeta | null {
+    const readSessionMeta = this.#options.store.readSessionMeta;
+    if (readSessionMeta === undefined) return null;
+    try {
+      return readSessionMeta.call(this.#options.store, sessionId);
+    } catch {
+      return null;
+    }
   }
 
   async #prompt(
@@ -930,8 +1039,13 @@ class AcpServerImpl implements AcpServer {
       signal: controller.signal,
     });
 
+    // The command set is resolved as the turn starts: a skill enabled, added
+    // or removed since the last prompt reaches the client's menu before the
+    // turn's own updates (B68).
+    await this.#announceCommands(session);
+    let result: AcpTurnResult;
     try {
-      return await runAcpTurn({
+      result = await runAcpTurn({
         runner: this.#options.turnRunner,
         request,
         sink,
@@ -943,6 +1057,87 @@ class AcpServerImpl implements AcpServer {
       if (session.turn === turn) session.turn = null;
       this.#resolvePermissions(turn);
     }
+    // Both keep their last reported value, so a turn that changed neither
+    // sends neither (B68), and both flush before the prompt response (B65).
+    await this.#announceUsage(session, result.usage);
+    await this.#announceSessionInfo(session);
+    return { stopReason: result.stopReason };
+  }
+
+  /**
+   * `usage_update` when a completed turn reports token counts and the model's
+   * context limit is known (B68). `used` is what the turn put in the window —
+   * input, cache reads and output — and `size` is the limit the same model
+   * compacts against, so a repeat of the same numbers is not re-sent.
+   */
+  async #announceUsage(
+    session: ServerSession,
+    usage: ExecUsage | null,
+  ): Promise<void> {
+    if (usage === null) return;
+    const size = this.#options.contextLimitFor?.(session.model) ?? null;
+    if (size === null || !Number.isFinite(size) || size <= 0) return;
+    const used =
+      usage.input_tokens + usage.cache_read_input_tokens + usage.output_tokens;
+    const update = usageUpdate(used, size);
+    const seen = JSON.stringify(update);
+    if (seen === session.sentUsage) return;
+    session.sentUsage = seen;
+    await this.#sendUpdate(session, update);
+  }
+
+  /**
+   * `session_info_update` when the stored title differs from the one this
+   * process last told the client (B68). A session with no title has nothing to
+   * report, and an unchanged title is not a change.
+   */
+  async #announceSessionInfo(session: ServerSession): Promise<void> {
+    const meta = this.#storedMeta(session.sessionId);
+    if (meta === null) return;
+    if (meta.title === session.reportedTitle) return;
+    const previous = session.reportedTitle;
+    session.reportedTitle = meta.title;
+    // A title that was never there is not news; one that was cleared is.
+    if (meta.title === null && previous === undefined) return;
+    await this.#sendUpdate(
+      session,
+      sessionInfoUpdate(
+        meta.title,
+        new Date(this.#options.clock()).toISOString(),
+      ),
+    );
+  }
+
+  /**
+   * `available_commands_update` when the session's command set differs from
+   * the set last sent (B68). Withheld until the `session/new` response, so a
+   * client knows the session id an update belongs to.
+   */
+  async #announceCommands(session: ServerSession): Promise<void> {
+    const commands = this.#options.commands;
+    if (commands === undefined) return;
+    let resolved: readonly AcpAvailableCommand[];
+    try {
+      resolved = await commands(session.sessionId);
+    } catch {
+      return;
+    }
+    const update = availableCommandsUpdate(resolved);
+    const seen = JSON.stringify(update.availableCommands);
+    if (seen === session.sentCommands) return;
+    session.sentCommands = seen;
+    await this.#sendUpdate(session, update);
+  }
+
+  /**
+   * What a client learns about a session once its id is known: its stored
+   * title and its slash commands (B68). Both are no-ops when nothing changed,
+   * and both are sent after the response, so an update never names a session
+   * the client has not been given yet.
+   */
+  async #publishSessionStart(session: ServerSession): Promise<void> {
+    await this.#announceSessionInfo(session);
+    await this.#announceCommands(session);
   }
 
   async #sendUpdate(

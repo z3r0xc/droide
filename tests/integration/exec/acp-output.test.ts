@@ -170,7 +170,11 @@ test(
               ? params.update.sessionUpdate
               : undefined;
           }),
-          ["agent_message_chunk"],
+          // B68: the session's command set is published once, after the
+          // `session/new` response, so it reaches the client ahead of the
+          // first turn's content; an unchanged set at the next prompt says
+          // nothing.
+          ["available_commands_update", "agent_message_chunk"],
         );
 
         child.end();

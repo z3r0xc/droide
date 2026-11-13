@@ -45,8 +45,10 @@ Out of scope, covered elsewhere:
   entry point and failure messages.
 
 Deliberately deferred: human-facing i18n strings for `commands:daemon.*` and
-`commands:computer.*` (catalogues are absent; Open question 1), and the exact
-Bun behaviour for a pre-existing Unix socket path (Open question 3).
+`commands:computer.*` outside the readiness banner (catalogues are absent;
+Open question 1). The banner's own catalogue now exists in English only —
+B5 pins its text and `src/daemon/strings.ts` owns it — and the exact Bun
+behaviour for a pre-existing Unix socket path (Open question 3).
 
 ## Terms
 
@@ -108,8 +110,10 @@ module loads, so runtime settings resolve from that file.
 **B3 — Transport selection.** `--listen ipc` makes the daemon IPC-only and it
 opens no socket. Otherwise an explicit `--unix` wins over `--port`; with
 neither, the daemon starts with **no inbound transport** (relay-only or
-useless) and logs that fact. `--port 0` asks the OS for a port and the daemon
-advertises the bound port, not `0`.
+useless) and says so on the banner line `commands:daemon.noTransport`
+(`No inbound transport: the daemon is reachable only through Remote Control`).
+`--port 0` asks the OS for a port and the daemon advertises the bound port,
+not `0`.
 (`src/entrypoints/daemon/handler.ts:533-535`;
 `packages/daemon-core/src/DaemonCore.ts:263-278`;
 `packages/daemon-core/src/server/daemon-server.ts:312-315`;
@@ -129,13 +133,32 @@ absence across `src/entrypoints/daemon/**` and
 resolves, the daemon (a) emits `sd_notify` `READY=1` when `NOTIFY_SOCKET` is
 set, and (b) if a parent IPC channel is connected, sends the message
 `{ type: "droide.daemon.ready", pid, version }`. It then prints a fixed
-banner to stdout: `commands:daemon.running`, `commands:daemon.version`,
-`commands:daemon.pid`, `commands:daemon.logs`, then the endpoint line
-(`commands:daemon.unixSocket` with the path, `commands:daemon.wsEndpoint`
-with host/port, or the literal `IPC transport: parent process`), the relay
-line when Remote Control is on, and `commands:daemon.pressCtrlCToStop`. It
-then blocks until shutdown. A failed `READY=1` marks startup failed but does
-not abort the daemon.
+banner to stdout, one line per catalogue message, in this order:
+
+| #   | Key                                | English text (B5)                                                                          |
+| --- | ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1   | `commands:daemon.running`          | `Daemon running`                                                                           |
+| 2   | `commands:daemon.version`          | `Version: {{version}}`                                                                     |
+| 3   | `commands:daemon.pid`              | `PID: {{pid}}`                                                                             |
+| 4   | `commands:daemon.logs`             | `Logs: {{path}}` — with `commands:daemon.logsNotConfigured` (`(not configured)`) when none |
+| 5   | endpoint line, exactly one of:     |                                                                                            |
+|     | `commands:daemon.wsEndpoint`       | `WebSocket endpoint: ws://{{host}}:{{port}}`                                               |
+|     | `commands:daemon.unixSocket`       | `Unix socket: {{path}}`                                                                    |
+|     | `commands:daemon.ipcTransport`     | `IPC transport: parent process`                                                            |
+|     | `commands:daemon.noTransport`      | `No inbound transport: the daemon is reachable only through Remote Control`                |
+| 6   | `commands:daemon.remoteControl`    | `Remote Control: enabled` — only when Remote Control is on                                 |
+| 7   | `commands:daemon.pressCtrlCToStop` | `Press Ctrl+C to stop`                                                                     |
+
+The reference build names only the keys; its catalogue files
+(`src/i18n/locales/*/commands.json`) are absent, so the English column is this
+build's copy, pinned here and in `src/daemon/strings.ts`. The recovery names
+keys for rows 1–4 and 7 (and the `unixSocket`/`wsEndpoint` variants of row 5);
+`logsNotConfigured`, `ipcTransport` (the reference used a literal here),
+`noTransport` and `remoteControl` are derived from the same namespace. A
+renderer takes the catalogue as one record, so another locale substitutes
+every value without touching the server. The daemon then blocks until
+shutdown. A failed `READY=1` marks startup failed but does not abort the
+daemon.
 (`src/entrypoints/daemon/handler.ts:839-960`;
 `src/services/daemon/notifyReady.ts:38-80`.)
 
@@ -712,6 +735,7 @@ SESSION_DISCONNECTED, `-32006` CONFLICT, `-32800` REQUEST_CANCELLED.
 | B3                | `tests/daemon/test_transport_selection`             | config table: `{listen,unix,port}` → expected constructor config (ipc-only / unix / tcp / none)                                                                                                                                                                                                                                                                                                                            |
 | B4                | `tests/daemon/test_no_discovery_file`               | temp `HOME`; start daemon with `--port 0`; assert the state dir gains no port/pid file                                                                                                                                                                                                                                                                                                                                     |
 | B5                | `tests/daemon/test_readiness_signals`               | fake parent IPC sink + `NOTIFY_SOCKET` temp socket; assert ready message keys and `READY=1` before the banner                                                                                                                                                                                                                                                                                                              |
+| B5 (catalogue)    | `tests/unit/daemon/strings.test.ts`                 | every catalogue value non-empty printable ASCII; the rendered banner equals the keys in the order above with their pinned text; replacing one catalogue value changes that line and nothing else                                                                                                                                                                                                                           |
 | B6, B7            | `tests/daemon/test_single_instance_two_starts`      | two daemons, same fixed loopback port, in-process harness; second exits 1 with `Startup failed:`; first still answers `/health`                                                                                                                                                                                                                                                                                            |
 | B7                | `tests/daemon/test_stale_port_retry`                | injected `serve` that throws `EADDRINUSE` 5× then succeeds with fake timers; assert delays `[500,1000,2000,4000,8000]`, success logged on attempt 5; 6 failures rethrow                                                                                                                                                                                                                                                    |
 | B7 (unix)         | `tests/daemon/test_stale_unix_socket_cleanup`       | (a) socket file with no listener → bind succeeds; (b) socket held by a live listener → exit 1 with bind message. Marked inferred until Open question 3 settles                                                                                                                                                                                                                                                             |
@@ -772,8 +796,9 @@ fixed free port; timer tests use fake timers.
    the keys are (`commands:daemon.*`, `commands:computer.*`,
    `common:droidsView.*`). Settled by capturing those outputs from the binary
    with a temp `HOME` (allowed `--help` runs cover only `help-daemon`).
-   Blocks exact-text assertions in B5, B28, B34; the keys and structure are
-   pinned.
+   Blocks exact-text assertions in B28 and B34; the keys and structure are
+   pinned. B5 is no longer blocked: its banner text is this build's own copy,
+   pinned in the clause and implemented in `src/daemon/strings.ts`.
 2. **`--unix` on Windows.** The daemon has no platform gate before
    `Bun.serve({unix})`; whether a Windows build binds a named pipe or fails is
    unobserved. Settled by running `droide daemon --unix <tmp>` on Windows with

@@ -355,6 +355,13 @@ result stores content prefixed `Error: ` and `isError: true`. A call whose
 arguments never parsed is stored as
 `Tool call rejected: arguments were not a valid JSON object. Re-send the call
 with complete, valid JSON arguments.` with `isError: true`.
+A result that carries media stores its text plus its image blocks as the
+`tool_result` block's content array — one `text` block, then the image blocks,
+each a base64 source with its media type — while the same text stays what a
+transcript draws. The loop's `ToolResult.media` field is the only way a tool
+supplies them; a text-only result keeps the plain string. An adapter whose
+dialect cannot place an image inside a tool result sends the text alone, so the
+string summary is always present (`src/agent/ports.ts`, `src/agent/loop.ts`).
 `evidence/original/windows-x64/src/core/ToolExecutor.ts:1336-1420`,
 `evidence/original/windows-x64/packages/utils/src/messages/contentBlocks.ts:264-268`,
 `evidence/original/windows-x64/src/constants/constants.ts:44-46`.

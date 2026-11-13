@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { createExecToolRunner } from "../../../src/exec/runner.ts";
 import { runTurn } from "../../../src/agent/loop.ts";
 import { toolCallId, type Message } from "../../../src/agent/messages.ts";
 import type {
@@ -12,6 +14,9 @@ import type {
   TurnDependencies,
   TurnEvent,
 } from "../../../src/agent/ports.ts";
+import { PNG_SIGNATURE, readTool } from "../../../src/tools/fs/read.ts";
+import { ToolRegistry } from "../../../src/tools/registry.ts";
+import { makeToolFixture } from "../tools/helpers.ts";
 
 const AT = 1_700_000_000_000;
 
@@ -357,4 +362,103 @@ test("tool ordering follows the model's slot order, not completion order", async
   );
   const toolMessage = outcome.messages[2];
   assert.equal(toolMessage?.content.length, 2);
+});
+
+test("a tool result with media becomes a content array carrying the image", async () => {
+  const image = {
+    type: "image" as const,
+    source: {
+      type: "base64" as const,
+      mediaType: "image/png" as const,
+      data: "AAAA",
+    },
+  };
+  const test_harness = harness(
+    (call) =>
+      call === 0
+        ? [
+            { type: "tool_use_start", name: "Read", slot: 0 },
+            { type: "tool_use_input", slot: 0, json: '{"file_path":"a.png"}' },
+            { type: "done" },
+          ]
+        : [{ type: "text", text: "seen" }, { type: "done" }],
+    {
+      toolResult: {
+        content: "Read of a.png: image/png, 3 bytes",
+        media: [image],
+      },
+    },
+  );
+
+  const outcome = await runTurn(test_harness.deps, {
+    messages: [user("read the png")],
+    maxTurns: 4,
+  });
+
+  const result = outcome.messages[2]?.content[0];
+  assert.equal(result?.type, "tool_result");
+  assert.deepEqual(
+    result?.type === "tool_result" ? result.content : undefined,
+    [{ type: "text", text: "Read of a.png: image/png, 3 bytes" }, image],
+  );
+});
+
+test("a real PNG read reaches the tool message as an image block", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("pixel.png");
+    writeFileSync(file, Buffer.concat([PNG_SIGNATURE, Buffer.from("pixel")]));
+    const registry = new ToolRegistry();
+    registry.register(readTool);
+    const tools = createExecToolRunner({
+      registry,
+      root: fixture.root,
+      environment: fixture.environment,
+      permission: {
+        autonomy: "off",
+        interactionMode: "auto",
+        interactive: false,
+      },
+    });
+    const test_harness = harness((call) =>
+      call === 0
+        ? [
+            { type: "tool_use_start", name: "Read", slot: 0 },
+            {
+              type: "tool_use_input",
+              slot: 0,
+              json: JSON.stringify({ file_path: file }),
+            },
+            { type: "done" },
+          ]
+        : [{ type: "text", text: "seen" }, { type: "done" }],
+    );
+
+    const outcome = await runTurn(
+      { ...test_harness.deps, tools },
+      { messages: [user("read the png")], maxTurns: 4 },
+    );
+
+    const result = outcome.messages[2]?.content[0];
+    assert.equal(result?.type, "tool_result");
+    if (result?.type !== "tool_result") return;
+    assert.equal(Array.isArray(result.content), true);
+    if (!Array.isArray(result.content)) return;
+    assert.deepEqual(result.content[0], {
+      type: "text",
+      text: `Read of ${file}: image/png, 13 bytes`,
+    });
+    assert.deepEqual(result.content[1], {
+      type: "image",
+      source: {
+        type: "base64",
+        mediaType: "image/png",
+        data: Buffer.concat([PNG_SIGNATURE, Buffer.from("pixel")]).toString(
+          "base64",
+        ),
+      },
+    });
+  } finally {
+    fixture.cleanup();
+  }
 });

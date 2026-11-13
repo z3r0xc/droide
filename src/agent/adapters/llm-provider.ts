@@ -68,20 +68,39 @@ function toContentBlocks(content: Message["content"]): LlmContentBlock[] {
         });
         break;
       case "tool_result": {
+        const parts =
+          typeof block.content === "string" ? undefined : block.content;
         const text =
           typeof block.content === "string"
             ? block.content
             : (block.modelContent ??
-              block.content
-                ?.map((part) =>
-                  part.type === "text" ? part.text : `[${part.type}]`,
+              parts
+                ?.flatMap((part) =>
+                  part.type === "text"
+                    ? [part.text]
+                    : part.type === "image"
+                      ? []
+                      : [`[${part.type}]`],
                 )
                 .join("\n") ??
               "");
+        const media = parts?.filter(
+          (part): part is Extract<typeof part, { type: "image" }> =>
+            part.type === "image",
+        );
         blocks.push({
           type: "tool_result",
           toolUseId: block.toolUseId,
           content: text,
+          ...(media === undefined || media.length === 0
+            ? {}
+            : {
+                media: media.map((part) => ({
+                  type: "image" as const,
+                  mediaType: part.source.mediaType,
+                  data: part.source.data,
+                })),
+              }),
           ...(block.isError === true ? { isError: true } : {}),
         });
         break;

@@ -47,10 +47,12 @@ const TRIGGERS = [
 
 function asRows(value: unknown): Record<string, unknown>[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (row): row is Record<string, unknown> =>
-      row !== null && typeof row === "object" && !Array.isArray(row),
-  );
+  return value
+    .filter(
+      (row): row is Record<string, unknown> =>
+        row !== null && typeof row === "object" && !Array.isArray(row),
+    )
+    .map((row) => ({ ...row }));
 }
 
 function columnSnapshot(db: DatabaseSync, table: string): string[] {
@@ -100,7 +102,7 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
     TABLES.map((table) => `${table}:${columnSnapshot(db, table).length}`),
     [
       "meta:2",
-      "sessions:20",
+      "sessions:21",
       "session_ingest:12",
       "session_spans:12",
       "session_term_filters:2",
@@ -113,6 +115,7 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
   assert.equal(sessions[0], "c0=session_id|TEXT|0|-|1");
   assert.equal(sessions[10], "c10=tags|BLOB|1|jsonb('{}')|0");
   assert.equal(sessions[19], "c19=settings_write_seq|INTEGER|0|-|0");
+  assert.equal(sessions[20], "c20=origin_hint|TEXT|0|-|0");
 
   const ingest = columnSnapshot(db, "session_ingest");
   assert.deepEqual(ingest.slice(9), [
@@ -147,6 +150,7 @@ test("migrating an empty database produces the head schema snapshot", (t) => {
     "8:whole-transcript-records",
     "9:vector-bookkeeping",
     "10:transcript-index",
+    "11:session-origin-hint",
   ]);
 
   const journal = asRows(db.prepare("PRAGMA journal_mode").all())[0];
@@ -261,4 +265,77 @@ test("a released migration whose checksum changed fails the open", (t) => {
       return true;
     },
   );
+});
+
+test("an existing database gains the origin hint and keeps its rows", (t) => {
+  const fixture = makeSessionFixture("droide-migrate-origin-hint-");
+  const sessionId = "0b8f2f0e-9b1a-4c3d-8e4f-1a2b3c4d5e6f";
+
+  // A file as this build released it before the producer hint (version 10),
+  // already holding a session row.
+  const released = openSessionIndexDatabase({
+    dbPath: fixture.dbPath,
+    clock: mutableClock(1000),
+  });
+  released.db.close();
+  const previous = new DatabaseSync(fixture.dbPath);
+  previous.exec("ALTER TABLE sessions DROP COLUMN origin_hint");
+  previous.prepare("DELETE FROM schema_migrations WHERE version = 11").run();
+  previous
+    .prepare(
+      `INSERT INTO sessions
+         (session_id, project_key, cwd, title, messages_count)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(sessionId, "project", "/work", "A row that predates the hint", 4);
+  previous.close();
+
+  const reopened = openSessionIndexDatabase({
+    dbPath: fixture.dbPath,
+    clock: mutableClock(2000),
+  });
+  t.after(() => fixture.cleanup());
+
+  // Additive: the pending migration is the only one applied, and it adds the
+  // column without touching what the row already held (B6, B7).
+  assert.deepEqual(reopened.migration.applied, [11]);
+  const row = asRows(
+    reopened.db
+      .prepare(
+        `SELECT session_id, project_key, cwd, title, messages_count, origin_hint
+           FROM sessions`,
+      )
+      .all(),
+  );
+  assert.deepEqual(row, [
+    {
+      session_id: sessionId,
+      project_key: "project",
+      cwd: "/work",
+      title: "A row that predates the hint",
+      messages_count: 4,
+      origin_hint: null,
+    },
+  ]);
+
+  // The column is writable and survives the next open, which is what lets a
+  // later process recognise the session (spec 60 B63).
+  reopened.db
+    .prepare("UPDATE sessions SET origin_hint = 'cli_acp' WHERE session_id = ?")
+    .run(sessionId);
+  reopened.db.close();
+  const next = openSessionIndexDatabase({
+    dbPath: fixture.dbPath,
+    clock: mutableClock(3000),
+  });
+  assert.deepEqual(next.migration, {
+    applied: [],
+    headVersion: CACHE_SCHEMA_VERSION,
+    alreadyCurrent: true,
+  });
+  assert.deepEqual(
+    asRows(next.db.prepare("SELECT origin_hint FROM sessions").all()),
+    [{ origin_hint: "cli_acp" }],
+  );
+  next.db.close();
 });

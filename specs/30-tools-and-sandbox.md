@@ -197,6 +197,12 @@ fail validation for a malformed value; a missing `riskLevel` is denied separatel
 with its own guidance (`@packages/core/src/tools/definitions/cli/schema.ts:1075-1090`,
 `@src/agent/tools.ts:1629-1672`).
 
+The denial this build prints for a missing `riskLevel` is fixed:
+`Execute call rejected: missing required parameter "riskLevel". Declare the
+command's impact as low, medium or high.` (`src/tools/shell/exec.ts`; regression:
+`tests/unit/tools/exec.test.ts`). A malformed value of any of the three lenient
+fields is accepted and ignored, never a refusal. `[observed]`
+
 **B10 — Schema compile failure is not a refusal.** If a schema cannot compile, the
 call proceeds and a once-per-tool warning is logged
 (`@packages/core/src/tools/utils/validate-tool-parameters.ts:214-224`).
@@ -266,13 +272,21 @@ lines. UTF-16 text that large is refused with a conversion instruction
 (`@packages/core/src/tools/utils/file-encoding.ts:1-20`, `:40-190`,
 `@src/tools/executors/client/read-cli.ts:72-95`, `:214-270`).
 
-**B17 — `Read` media.** JPEG/PNG/GIF up to 5 MB return an image block (a GIF
-returns its first frame); PDFs up to 3 MB and ≤100 pages return a document block,
-larger or longer PDFs fall back to extracted text with a header naming the reason.
-A password-protected PDF and an unsupported image type are errors. Secret-looking
-content is scrubbed and a redaction reminder accompanies the result
-(`@packages/core/src/tools/definitions/cli/constants.ts:1-46`,
-`@src/tools/executors/client/read-cli.ts:600-790`).
+**B17 — `Read` media.** A PNG or JPEG is returned as one image block: the file's
+bytes base64-encoded, its media type (`image/png` or `image/jpeg`), and a
+one-line text part `Read of <path>: <media type>, <n> bytes` where `n` is the
+file's byte length. The decoded-byte ceiling is 3 MiB (3145728 bytes): 3 MiB of
+image encodes to 4 MiB of base64, inside the 5 MB per-image base64 ceiling
+providers apply and ACP's 8 MiB frame, while a turn-attachment-sized 5 MiB image
+would exceed both. An image over the ceiling is refused before its bytes are
+read, with a message naming the ceiling and pointing at Execute. A GIF and a PDF
+are refused with `Read of <path>: <kind> content is not supported by this build;
+supported media are PNG and JPEG images up to 3 MiB. Use Execute to convert it
+to text.` where `<kind>` is `image/gif` or `PDF`. A file with no recognised
+media signature stays on the text path (B15/B16), so other binary formats are
+still decoded as text, exactly as before. `image_quality` is accepted and does
+not change the bytes returned; a GIF's first frame and PDF text extraction are
+not implemented (`src/tools/fs/read.ts`). `[observed]`
 
 **B18 — `LS`.** Input `directory_path` (absolute; omitted or `.` = workspace root)
 and `ignorePatterns` (glob names). Entries are sorted by name, without `.`/`..`,
@@ -363,6 +377,15 @@ mission worker/validator, and shared-space files the sync service protects. The
 check runs both on the path as given and on the resolved write target; an
 unresolvable symlink chain is itself a refusal (`@src/tools/executors/client/utils/protectedWritePath.ts:182-268`).
 
+This build has no artifacts directory, mission system, automation runs or shared
+space, so those guards have nothing to protect and are not implemented. What it
+does guard, under the same rule — name relative to the state directory, checked
+on the path as given and on the resolved target, with a credential file also
+refused for reading — is: the trusted configuration files
+(`settings.json`, `settings.local.json`, `mcp.json`, `host.json`), the credential
+prefixes, and the whole state directory for writes from a tool
+(`src/tools/fs/paths.ts`, `TRUSTED_CONFIG_FILES`, `CREDENTIAL_FILES`). `[observed]`
+
 **B25 — Writes are atomic and bound to what was seen.** A write is temp-file +
 rename, preserving symlinks and permissions, refused if the file appeared,
 disappeared, or changed since the preview/approval (`@src/agent/file-edit/utils.ts:1069-1180`).
@@ -390,6 +413,12 @@ Windows: PowerShell (Windows PowerShell preferred), always
 callers, `shell:false`, stdin ignored, `windowsHide:true`. No `cmd.exe` fallback.
 A shell-less fallback (`shell:true`) exists only for the no-shell path
 (`@src/tools/executors/client/shell/shell-executor.ts:226-386`).
+
+A foreground run keeps `detached:false` on POSIX, as above. The background path
+is the one exception: it spawns with `detached:true` so the child leads its own
+process group, which is what the B31 watchdog signals; its stdin is ignored and
+its output is the log file. Windows never detaches — the wrapper is a normal
+child that reports the inner PID (`src/tools/shell/exec.ts`). `[observed]`
 
 **B29 — Shell environment.** The child inherits `process.env` plus
 `PYTHONUNBUFFERED=1`, non-interactive git/ssh variables
@@ -861,9 +890,12 @@ with `vendor:` (then `evidence/original-vendor/windows-x64/`).
 | `vendor:node_modules/@anthropic-ai/sandbox-runtime/dist/sandbox/windows-sandbox-utils.js:1-24` | B54           | read   |
 | `vendor:node_modules/@anthropic-ai/sandbox-runtime/dist/sandbox/sandbox-manager.js:332-380`    | B53, B54      | read   |
 
-Clauses B15's outline thresholds, B17's media caps, B29's env list, B30's
+Clauses B15's outline thresholds, B29's env list, B30's
 2500 ms observation clamp, B33's numeric limits and B46's guidance strings are
-`[observed]`. The mapping "`--auto` level X auto-runs risk ≤ X" is `[derived]` from
+`[observed]`. B17's 3 MiB image cap is `[derived]` here from base64 inflation
+and the ACP frame size, because this build returns PNG and JPEG only; the
+upstream GIF-first-frame, PDF-document and 5 MB/3 MB limits are not reproduced.
+The mapping "`--auto` level X auto-runs risk ≤ X" is `[derived]` from
 the numeric comparison plus the enum order; the platform statement "Windows has no
 filesystem enforcement" is `[observed]` in the vendored SRT comment and therefore
 `[derived]` as a CLI-visible contract.

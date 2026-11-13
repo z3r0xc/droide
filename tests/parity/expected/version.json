@@ -1,6 +1,6 @@
 {
  "case": "version",
  "exit_code": 0,
- "stdout": "0.7.1\n",
+ "stdout": "0.8.0\n",
  "stderr": ""
 }

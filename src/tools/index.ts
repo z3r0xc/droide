@@ -110,7 +110,7 @@ export {
   type ValidationIssue,
   type ValidationResult,
 } from "./validate.ts";
-export { readText, readTool } from "./fs/read.ts";
+export { readFile, readText, readTool } from "./fs/read.ts";
 export { createFile, createTool, writeFileAtomic } from "./fs/write.ts";
 export { editFile, editTool } from "./fs/edit.ts";
 export { globFiles, globTool } from "./fs/glob.ts";

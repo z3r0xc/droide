@@ -172,6 +172,48 @@ test("tool messages become user messages carrying tool_result blocks", () => {
   ]);
 });
 
+test("a tool result's image blocks become adapter media", () => {
+  const messages: Message[] = [
+    {
+      id: "t1",
+      role: "tool",
+      content: [
+        {
+          type: "tool_result",
+          toolUseId: "call_1",
+          content: [
+            { type: "text", text: "Read of a.png: image/png, 3 bytes" },
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                mediaType: "image/png",
+                data: "AAAA",
+              },
+            },
+          ],
+        },
+      ],
+      createdAt: AT,
+      updatedAt: AT,
+    },
+  ];
+
+  assert.deepEqual(toLlmMessages(messages), [
+    {
+      role: "user",
+      content: [
+        {
+          type: "tool_result",
+          toolUseId: "call_1",
+          content: "Read of a.png: image/png, 3 bytes",
+          media: [{ type: "image", mediaType: "image/png", data: "AAAA" }],
+        },
+      ],
+    },
+  ]);
+});
+
 test("consecutive user messages merge and system messages are omitted", () => {
   const messages: Message[] = [
     {

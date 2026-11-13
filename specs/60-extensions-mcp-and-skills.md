@@ -296,6 +296,26 @@ client credentials and requires public token-endpoint auth; configured client cr
 `authorizationServerIssuer`; every rejection is a validation issue on `mcp.json` load
 (`evidence/original/windows-x64/packages/sdk-core/src/protocol/settings/schema.ts:96-160`).
 
+Three points B26 leaves open, fixed here (`src/extensions/mcp/oauth/flow.ts`):
+
+- **Issuer discovery.** The issuer is the `authorizationServerIssuer` option when
+  set; otherwise the first `authorization_servers` entry of the server's
+  protected-resource metadata (`/.well-known/oauth-protected-resource`, then the
+  same document under the resource path); otherwise the resource origin itself,
+  normalized without a trailing slash. A server that publishes protected-resource
+  metadata with an empty list takes the origin fallback; a document that does not
+  parse is treated as absent, never as an error.
+- **Dynamic registration body.** A public client for the loopback set:
+  `{client_name: "droide", redirect_uris: <the loopback ports>, grant_types:
+["authorization_code", "refresh_token"], response_types: ["code"],
+token_endpoint_auth_method: "none"}`, posted as `application/json`. A refusal is
+  the `registration` error naming the status.
+- **Accepted `tokenEndpointAuthMethod`.** `none` (default) and
+  `client_secret_basic`. Anything else is the `unsupported-config` refusal
+  quoting the value and naming those two: `client_secret_post` would need a form
+  body this token client does not send, so it is refused rather than silently
+  downgraded to a header.
+
 **B27 — Redirect and client identity.** The loopback callback server starts at port 54621 and tries up to
 100 consecutive ports. The published client metadata is `<apiBase>/mcp/oauth-client`, where `<apiBase>`
 is the managed backend base URL (`DROIDE_API_BASE_URL`), with the loopback redirect set, the hosted
@@ -626,6 +646,13 @@ agent: all console output is redirected to stderr, and the protocol is NDJSON ov
 (`evidence/original/windows-x64/src/exec/acpDaemonRunner.ts:14-47`,
 `evidence/original/windows-x64/src/entrypoints/exec/handler.ts:824-831`).
 
+One frame is one line and at most 8 MiB (`ACP_MAX_FRAME_BYTES`, mirroring the
+daemon's `MAX_FRAME_BYTES`): a longer line is answered with a parse error, the
+rest of that line is discarded, and the stream continues on the next newline. The
+limit exists so a broken peer cannot grow the process's memory without bound; it
+is not a message-size contract a client may rely on for larger payloads, which is
+what the `embeddedContext` capability is for. `[derived]`
+
 **B61 — Method surface.** The agent serves `initialize`, `authenticate`, `session/new`, `session/load`,
 `session/resume`, `session/fork`, `session/list`, `session/close`, `session/prompt`,
 `session/set_mode`, `session/set_config_option`, `logout`, plus the legacy `session/set_model`, and
@@ -641,11 +668,22 @@ next prompt (`evidence/original/windows-x64/src/exec/acpDaemonRunner.ts:49-92`).
 and `droide-api-key`
 (`evidence/original/windows-x64/src/acp/AcpAgent.ts:1450-1517`).
 
-**B63 — Session creation.** `session/new` requires authentication, mints a UUID session id, marks the
-session loading, and initializes it with the request `cwd`, the converted `mcpServers`, and
+**B63 — Session creation.** `session/new` requires authentication, mints a UUID session id, and
+initializes it with the request `cwd`, the converted `mcpServers`, and
 `sessionOriginHint = cli_acp`. ACP-supplied MCP servers are merged with the session's filesystem MCP
 config (`evidence/original/windows-x64/src/acp/AcpAgent.ts:1519-1560`,
 `evidence/original/windows-x64/src/acp/session/convertAcpMcpServer.ts:9-13`).
+
+The hint is stored, not just held for the life of the process: the session's row records it in
+`sessions.origin_hint` (migration 11, spec 40 §B57), which is what lets a later process tell a
+`cli_acp` session from one another producer made. `session/new` and `session/fork` write `cli_acp`;
+`session/load` and `session/resume` read it back and never overwrite it, so a reloaded session is
+still an ACP session; `session/list` reports it as `_meta.droide.originHint`, because ACP's
+`SessionInfo` has no field for it, and a client that does not know the key ignores it. A row another
+producer created carries no hint and reports none.
+
+Loading is not stored state: a load in flight is this process's own, so a load that fails leaves no
+mark on the row and a reload of an already-held session replays nothing twice (B71).
 
 **B64 — ACP MCP server conversion.** A `command` server becomes `{name, command, args: []|args,
 env: {}}` (env list flattened to a map); an `http`/`sse` server becomes `{type, name, url, headers}`
@@ -699,6 +737,21 @@ cancelled by a stale request (`evidence/original/windows-x64/src/acp/AcpAgent.ts
 (`evidence/original/windows-x64/src/acp/protocol/sessionUpdates.ts:266-705`,
 `evidence/original/windows-x64/src/acp/protocol/schemas.ts:1-40`,
 `evidence/original/windows-x64/src/acp/AcpAgent.ts:1238`, `:1313-1333`, `:2033-2044`).
+
+Every kind has a producer, and each fires only when something changed behind it; an update whose
+value equals the one last sent for that session is dropped, so a client that re-prompts with nothing
+new sees no repeat.
+
+| update                                                             | emitted at                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `user_message_chunk`, `agent_message_chunk`, `agent_thought_chunk` | as the turn produces the user echo, assistant text and reasoning                                                                                                                                                                                                                                              |
+| `plan`                                                             | when a `TodoWrite` call replaces the session's plan (one update per call)                                                                                                                                                                                                                                     |
+| `tool_call`, `tool_call_update`                                    | when a tool call is announced, and again when its result or status lands                                                                                                                                                                                                                                      |
+| `session_info_update`                                              | when the stored title differs from the one this process last reported: after the `session/new`/`load`/`resume`/`fork` response, and after a turn settles (an embedding may have titled the session while it ran). `updatedAt` is the clock at emission; a session that never had a title reports nothing      |
+| `available_commands_update`                                        | after the `session/new`/`load`/`resume`/`fork` response, and at the start of each prompt when the resolved command set differs from the last one sent. Commands are the user-invocable skills (B57), sorted by name; no command supplier means no update                                                      |
+| `current_mode_update`                                              | `session/set_mode`, or `session/set_config_option` on `autonomy_level`, when the mode actually changes                                                                                                                                                                                                        |
+| `config_option_update`                                             | any `session/set_*` that actually changes mode, model or effort; carries the full option set, so a client that lost the previous one is back in sync                                                                                                                                                          |
+| `usage_update`                                                     | after a turn completes with token counts: `used` is that turn's input, cache-read and output tokens, `size` the model's context limit. Nothing is sent when the limit is unknown (a guessed denominator is a wrong percentage, not an absent one), when the turn did not complete, or when the numbers repeat |
 
 **B69 — Permission requests.** Droide's confirmation options are mapped to ACP kinds: proceed-once and
 proceed-edit → `allow_once`; proceed-always, always-tools, always-server and the auto-run variants →

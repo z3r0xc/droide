@@ -8,13 +8,17 @@ import {
   AuthenticationError,
   DeploymentUnavailableError,
   FetchError,
+  LlmContentModerationError,
+  LlmContextLimitError,
   LlmForbiddenError,
   LlmInternalError,
   LlmInvalidRequestError,
   LlmOverloadedError,
   LlmPaymentRequiredError,
   LlmQuotaExhaustedError,
+  LlmRequestTooLargeError,
   LlmThrottlingError,
+  MODEL_FAILURE_MARKERS,
   ResponseError,
   ResponseError400BadRequest,
   ResponseError401Unauthorized,
@@ -244,4 +248,287 @@ test("retryability is part of the reason set (B103)", () => {
   assert.equal(isRetryableLlmReason("context-limit"), false);
   assert.equal(isRetryableLlmReason("request-too-large"), false);
   assert.equal(isRetryableLlmReason("output-degeneration"), false);
+});
+
+test("B101 body markers: quota codes separate exhaustion from throttling", () => {
+  for (const code of MODEL_FAILURE_MARKERS.quotaCodes) {
+    const error = classifyModelFailure({
+      operation: "llm",
+      status: 429,
+      bodyJson: { error: { code } },
+    });
+    assert.ok(error instanceof LlmQuotaExhaustedError, code);
+    assert.equal(error.reason, "quota-exhausted");
+    assert.equal(error.retryable, false);
+  }
+});
+
+test("B101 body markers: a quota marker is read from code, type and status", () => {
+  for (const key of ["code", "type", "status"] as const) {
+    const error = classifyModelFailure({
+      operation: "llm",
+      status: 400,
+      bodyJson: { [key]: "billing_not_active" },
+    });
+    assert.equal(error.reason, "quota-exhausted", key);
+    assert.ok(error instanceof LlmQuotaExhaustedError, key);
+  }
+});
+
+test("B101 body markers: a quota message, plain text or JSON, is exhaustion", () => {
+  const json = classifyModelFailure({
+    operation: "llm",
+    status: 400,
+    bodyJson: {
+      error: { message: "You have reached your billing hard limit." },
+    },
+  });
+  assert.equal(json.reason, "quota-exhausted");
+
+  const raw = classifyModelFailure({
+    operation: "llm",
+    status: 400,
+    bodyText: '{"error":{"code":"insufficient_quota"}}',
+  });
+  assert.equal(raw.reason, "quota-exhausted");
+
+  const prose = classifyModelFailure({
+    operation: "llm",
+    status: 400,
+    bodyText: "Your monthly limit exhausted. Check your plan and billing.",
+  });
+  assert.equal(prose.reason, "quota-exhausted");
+
+  const statusless = classifyModelFailure({
+    operation: "llm",
+    status: null,
+    bodyJson: { detail: "exhausted your available credits" },
+  });
+  assert.equal(statusless.reason, "quota-exhausted");
+});
+
+test("B101 body markers: a subscription gate outranks quota text on a 402", () => {
+  const payment = classifyModelFailure({
+    operation: "llm",
+    status: 402,
+    code: "no_active_subscription",
+    bodyJson: { error: { code: "insufficient_quota" } },
+  });
+  assert.ok(payment instanceof LlmPaymentRequiredError);
+
+  const quota = classifyModelFailure({
+    operation: "llm",
+    status: 402,
+    bodyJson: { error: { code: "insufficient_quota" } },
+  });
+  assert.ok(quota instanceof LlmQuotaExhaustedError);
+});
+
+test("B101 body markers: moderation codes and messages are content moderation", () => {
+  for (const code of MODEL_FAILURE_MARKERS.moderationCodes) {
+    const error = classifyModelFailure({
+      operation: "llm",
+      status: 400,
+      bodyJson: { error: { code } },
+    });
+    assert.ok(error instanceof LlmContentModerationError, code);
+    assert.equal(error.retryable, false);
+  }
+
+  for (const message of [
+    "Your request was rejected as a result of our safety system.",
+    "This request was blocked for violating our usage policy.",
+    "The prompt was flagged by content moderation.",
+  ]) {
+    const error = classifyModelFailure({
+      operation: "llm",
+      status: 403,
+      bodyJson: { error: { message } },
+    });
+    assert.equal(error.reason, "content-moderation", message);
+  }
+
+  // B104: an upstream-marked 403 is still the provider's own moderation body.
+  const upstream = classifyModelFailure({
+    operation: "llm",
+    status: 403,
+    upstreamError: true,
+    bodyJson: { error: { code: "content_filter" } },
+  });
+  assert.equal(upstream.reason, "content-moderation");
+});
+
+test("B101 body markers: context limit beats throttling and 413", () => {
+  const code = classifyModelFailure({
+    operation: "llm",
+    status: 400,
+    bodyJson: { error: { code: "context_length_exceeded" } },
+  });
+  assert.ok(code instanceof LlmContextLimitError);
+
+  const throttled = classifyModelFailure({
+    operation: "llm",
+    status: 429,
+    bodyJson: {
+      error: {
+        message: "This model's maximum context length is 200000 tokens",
+      },
+    },
+  });
+  assert.equal(throttled.reason, "context-limit");
+  assert.equal(throttled.retryable, false);
+
+  const sized = classifyModelFailure({
+    operation: "llm",
+    status: 413,
+    bodyJson: {
+      error: { message: "Request size exceeds model context window" },
+    },
+  });
+  assert.equal(sized.reason, "context-limit");
+});
+
+test("B101 body markers: a size refusal is request-too-large, not a context limit", () => {
+  const byCode = classifyModelFailure({
+    operation: "llm",
+    status: 400,
+    bodyJson: { error: { code: "413" } },
+  });
+  assert.ok(byCode instanceof LlmRequestTooLargeError);
+
+  const byMessage = classifyModelFailure({
+    operation: "llm",
+    status: 400,
+    bodyText: "413 Request Entity Too Large",
+  });
+  assert.equal(byMessage.reason, "request-too-large");
+});
+
+test("B101 body markers: signature and PDF shapes are invalid requests", () => {
+  for (const message of [
+    "Invalid `signature` in `thinking` block",
+    "Thought signature is not valid",
+    "Function call is missing a thought_signature",
+    "A maximum of 100 PDF pages may be provided",
+  ]) {
+    const error = classifyModelFailure({
+      operation: "llm",
+      status: 400,
+      bodyJson: { error: { message } },
+    });
+    assert.equal(error.reason, "invalid-request", message);
+    assert.equal(error.retryable, false);
+  }
+});
+
+test("B101 near misses stay unclassified: a rate, a bare quota phrase, a length", () => {
+  const unclassified: ReadonlyArray<{
+    readonly status: number;
+    readonly bodyJson: unknown;
+    readonly expected: string;
+  }> = [
+    {
+      status: 429,
+      bodyJson: {
+        error: {
+          message: "Rate limit reached for requests",
+          code: "rate_limit_exceeded",
+        },
+      },
+      expected: "throttling",
+    },
+    {
+      status: 429,
+      bodyJson: { error: { message: "Resource exhausted: quota exceeded" } },
+      expected: "throttling",
+    },
+    {
+      status: 429,
+      bodyJson: { error: { message: "insufficient credits" } },
+      expected: "throttling",
+    },
+    {
+      status: 400,
+      bodyJson: { error: { message: "The model has used too many tokens." } },
+      expected: "invalid-request",
+    },
+    {
+      status: 400,
+      bodyJson: {
+        error: { message: "This value is over the maximum length." },
+      },
+      expected: "invalid-request",
+    },
+  ];
+
+  for (const item of unclassified) {
+    const error = classifyModelFailure({
+      operation: "llm",
+      status: item.status,
+      bodyJson: item.bodyJson,
+    });
+    assert.equal(error.reason, item.expected, String(item.bodyJson));
+  }
+});
+
+test("B101 body markers: a non-JSON body is prose, never a marker", () => {
+  const gateway = classifyModelFailure({
+    operation: "llm",
+    status: 502,
+    bodyText: "upstream connect error or disconnect/reset before headers",
+  });
+  assert.ok(gateway instanceof LlmOverloadedError);
+
+  const plain = classifyModelFailure({
+    operation: "llm",
+    status: 400,
+    bodyText: "bad request",
+  });
+  assert.ok(plain instanceof LlmInvalidRequestError);
+});
+
+test("B101 body markers: an HTML gateway page is never read for markers", () => {
+  const page =
+    "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body>Content moderation is unavailable: insufficient_quota</body></html>";
+  const error = classifyModelFailure({
+    operation: "llm",
+    status: 403,
+    bodyText: page,
+  });
+  assert.ok(error instanceof LlmForbiddenError);
+  assert.equal(error.reason, "forbidden");
+});
+
+test("B101 body markers: a JSON string body is not an error envelope", () => {
+  const bodies: readonly unknown[] = [
+    "insufficient_quota",
+    '{"error":{"code":"insufficient_quota"}}',
+    42,
+    ["insufficient_quota"],
+  ];
+  for (const bodyJson of bodies) {
+    const error = classifyModelFailure({
+      operation: "llm",
+      status: 400,
+      bodyJson,
+    });
+    assert.ok(error instanceof LlmInvalidRequestError, String(bodyJson));
+  }
+
+  const quoted = classifyModelFailure({
+    operation: "llm",
+    status: 400,
+    bodyText: '"insufficient_quota"',
+  });
+  assert.ok(quoted instanceof LlmInvalidRequestError);
+});
+
+test("B101 body markers: a 5xx body is never re-read as a deterministic cause", () => {
+  const error = classifyModelFailure({
+    operation: "llm",
+    status: 500,
+    bodyJson: { error: { code: "insufficient_quota" } },
+  });
+  assert.ok(error instanceof LlmOverloadedError);
+  assert.equal(error.retryable, true);
 });

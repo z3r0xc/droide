@@ -188,9 +188,8 @@ function protectedDirectory(
 
 /**
  * The write guard (B24, B50): checked on the path as given and on the resolved
- * target. `TODO(spec B24)`: the artifacts directory, mission system files,
- * automation state, `features.json` and shared-space guards are not added
- * because this spec does not pin their locations.
+ * target. The locations are the ones spec 30 B24 lists for this build; the
+ * reference's artifacts/mission/automation trees do not exist here.
  */
 export function assertWritablePath(
   context: FsContext,

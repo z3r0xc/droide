@@ -13,7 +13,12 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 
 import { ToolFailure } from "../../../src/tools/errors.ts";
-import { readTool } from "../../../src/tools/fs/read.ts";
+import {
+  MAX_READ_IMAGE_BYTES,
+  PNG_SIGNATURE,
+  readFile,
+  readTool,
+} from "../../../src/tools/fs/read.ts";
 import { readText } from "../../../src/tools/fs/read.ts";
 import type { SpillFileSystem } from "../../../src/tools/fs/spill.ts";
 import { ToolRegistry } from "../../../src/tools/registry.ts";
@@ -284,21 +289,105 @@ test("a symlink that leaves the workspace root is refused", async (context) => {
   }
 });
 
-test("image content is refused instead of decoded", async () => {
+test("a PNG is returned as an image block with its media type", async () => {
   const fixture = makeToolFixture();
   try {
-    const file = fixture.path("image.png");
-    writeFileSync(
-      file,
-      Buffer.concat([
-        Buffer.from([0x89, 0x50, 0x4e, 0x47]),
-        Buffer.from("rest"),
-      ]),
+    const file = fixture.path("pixel.png");
+    const bytes = Buffer.concat([PNG_SIGNATURE, Buffer.from("pixel-bytes")]);
+    writeFileSync(file, bytes);
+    const output = await readFile({ file_path: file }, fixture.context);
+    assert.equal(typeof output, "object");
+    if (typeof output === "string") return;
+    assert.equal(
+      output.content,
+      `Read of ${file}: image/png, ${bytes.length} bytes`,
     );
-    await assert.rejects(
-      readText({ file_path: file }, fixture.context),
-      /image and PDF content is not supported/,
+    assert.deepEqual(output.media, [
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          mediaType: "image/png",
+          data: bytes.toString("base64"),
+        },
+      },
+    ]);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("a JPEG is returned as an image block with its media type", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("photo.jpg");
+    const bytes = Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      Buffer.from("jpeg-bytes"),
+    ]);
+    writeFileSync(file, bytes);
+    const output = await readFile({ file_path: file }, fixture.context);
+    assert.equal(typeof output, "object");
+    if (typeof output === "string") return;
+    assert.equal(
+      output.content,
+      `Read of ${file}: image/jpeg, ${bytes.length} bytes`,
     );
+    assert.equal(output.media[0]?.source.mediaType, "image/jpeg");
+    assert.equal(
+      output.media[0]?.source.data,
+      Buffer.from(bytes).toString("base64"),
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("a GIF is refused naming the supported media", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("anim.gif");
+    writeFileSync(file, "GIF89a-rest");
+    await assert.rejects(readText({ file_path: file }, fixture.context), {
+      message:
+        `Read of ${file}: image/gif content is not supported by this build; ` +
+        "supported media are PNG and JPEG images up to 3 MiB. " +
+        "Use Execute to convert it to text.",
+    });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("a PDF is refused naming the supported media", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("doc.pdf");
+    writeFileSync(file, "%PDF-1.7\nrest");
+    await assert.rejects(readText({ file_path: file }, fixture.context), {
+      message:
+        `Read of ${file}: PDF content is not supported by this build; ` +
+        "supported media are PNG and JPEG images up to 3 MiB. " +
+        "Use Execute to convert it to text.",
+    });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("an image over the cap is refused naming the cap", async () => {
+  const fixture = makeToolFixture();
+  try {
+    const file = fixture.path("huge.png");
+    const bytes = Buffer.alloc(MAX_READ_IMAGE_BYTES + 1);
+    PNG_SIGNATURE.copy(bytes, 0);
+    writeFileSync(file, bytes);
+    await assert.rejects(readFile({ file_path: file }, fixture.context), {
+      message:
+        `Read of ${file}: image/png is ${bytes.length} bytes, over the ` +
+        `${MAX_READ_IMAGE_BYTES} byte cap for an image a read may return; ` +
+        "use Execute to resize or crop it first.",
+    });
   } finally {
     fixture.cleanup();
   }
