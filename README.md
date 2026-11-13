@@ -39,7 +39,7 @@ What runs today, run against this tree:
 
 | Surface                                                                                    | Today                                                                                                                                                                                                                                                                                                                                    |
 | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--version`, `--help`, subcommand help                                                     | works — reports `0.7.1`; 20 recorded CLI cases replay green (snapshots are tracked in `tests/parity/expected/`, see [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md))                                                                                                                                                       |
+| `--version`, `--help`, subcommand help                                                     | works — reports `0.8.0`; 20 recorded CLI cases replay green (snapshots are tracked in `tests/parity/expected/`, see [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md))                                                                                                                                                       |
 | `doctor`                                                                                   | works — 16 named checks, twelve of them by default: config, environment, system, binaries, updates, filesystem, git, proxy, certs, connectivity, auth, daemon; `--checks all` adds custom-models, inference, mcp and exec, which start servers or spend money. A check that cannot run reports `skip` with a reason                      |
 | `search` / `find`                                                                          | works — served from a local transcript index with a proving fallback to the literal scan; `--reindex` refreshes it                                                                                                                                                                                                                       |
 | `mcp list`, `mcp add`, `mcp remove`, `mcp permissions`                                     | work — merged configuration, surgical JSONC edits that keep comments, atomic writes, permission list/revoke/clear                                                                                                                                                                                                                        |
@@ -50,7 +50,7 @@ What runs today, run against this tree:
 | `daemon`                                                                                   | works locally — WebSocket transport, JSON-RPC, auth gate, single instance, ordered shutdown; Remote Control and the port proxy are declared, not built                                                                                                                                                                                   |
 | `droide` with no arguments                                                                 | launches the interactive shell on a TTY pair after a ~1.4 s logo animation (`general.logoAnimation`: `once` by default, `always`, `off`; `DROIDE_NO_ANIMATION=1` silences it); a typed prompt runs an agent turn with streamed rows, approvals, a queued-message list and Esc-cancel                                                     |
 | native helper                                                                              | 15 JSON-line methods (including PTY sessions), typed and validated on the TypeScript side, 69 Rust tests, plus a contract test that spawns a real process through the compiled binary (`npm run test:native`); the tool runtime uses it for discovery when the binary is present and degrades to the TypeScript implementation otherwise |
-| test suite                                                                                 | 1430 tests in 139 files: 1422 pass, 7 skipped, plus 69 Rust tests                                                                                                                                                                                                                                                                        |
+| test suite                                                                                 | 1481 tests in 143 files: 1473 pass, 7 skipped, plus 69 Rust tests                                                                                                                                                                                                                                                                        |
 
 `exec` needs a model credential. Without one it refuses instead of guessing:
 
@@ -91,12 +91,12 @@ Node 24 or newer, and a Rust toolchain for the native layer.
 
 ```sh
 npm ci                          # install once; there is no build step
-node bin/droide.mjs --version   # 0.7.1
+node bin/droide.mjs --version   # 0.8.0
 node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 12 named checks by default (--checks all: 16)
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 1430 tests
+npm test                        # 1481 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 69 tests

@@ -37,7 +37,7 @@
 
 | 功能面                                                                                     | 当前                                                                                                                                                                                                                                                                          |
 | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--version`、`--help`、子命令帮助                                                          | 可用——报告 `0.7.1`；20 条录制的 CLI 用例回放通过（快照在本地，见 [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md)）                                                                                                                                              |
+| `--version`、`--help`、子命令帮助                                                          | 可用——报告 `0.8.0`；20 条录制的 CLI 用例回放通过（快照在本地，见 [ADR 0010](./docs/adr/0010-own-brand-and-snapshot-harness.md)）                                                                                                                                              |
 | `doctor`                                                                                   | 可用——16 项具名检查，默认运行其中十二项：config, environment, system, binaries, updates, filesystem, git, proxy, certs, connectivity, auth, daemon；`--checks all` 会加上 custom-models、inference、mcp 与 exec，它们会启动服务器或花钱。无法运行的检查报告 `skip` 并给出原因 |
 | `search` / `find`                                                                          | 可用——由本地转录索引提供，并可回退到字面扫描作为佐证；`--reindex` 会刷新它                                                                                                                                                                                                    |
 | `mcp list`、`mcp add`、`mcp remove`、`mcp permissions`                                     | 可用——合并配置，保留注释的定点 JSONC 编辑，原子写入，权限的列出、撤销与清空                                                                                                                                                                                                   |
@@ -89,12 +89,12 @@ $ node bin/droide.mjs exec --mission "build it"
 
 ```sh
 npm ci                          # install once; there is no build step
-node bin/droide.mjs --version   # 0.7.1
+node bin/droide.mjs --version   # 0.8.0
 node bin/droide.mjs --help
 node bin/droide.mjs doctor      # 默认 12 项具名检查（--checks all：16）
 node bin/droide.mjs mcp list
 node bin/droide.mjs search x --json
-npm test                        # 1430 tests
+npm test                        # 1481 tests
 npm run typecheck
 npm run test:parity             # 20/20
 cargo test --workspace          # 69 tests

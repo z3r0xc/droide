@@ -4,6 +4,39 @@ The CLI's `--version` reports `PRODUCT_VERSION` from `src/cli/brand.ts`, which a
 unit test keeps equal to the package version; a release bumps both. The recorded
 CLI cases check the version line by shape, not by number. See `docs/release.md`.
 
+## 0.8.0 — 2026-11-13
+
+### Added
+
+- **Images reach the model from the filesystem.** `Read` passes a PNG or JPEG
+  through as an image block — the tool result carries it, the Anthropic payload
+  keeps the block, the chat dialect keeps the text summary — capped at 3 MiB
+  decoded and refused before any bytes are read. GIF, PDF and anything else keep
+  the refusal, which now names what is supported. Spec 30 B17.
+- **The provider error classifier reads the body.** 44 markers in five families
+  (quota, moderation, context limit, request too large, invalid request), with a
+  fixed precedence and a documented near-miss list that stays unclassified: a
+  `429` mentioning "rate limit" is throttling, not exhaustion. Spec 50 B101.
+- **The daemon's readiness banner is a catalogue.** Every line comes from a
+  `commands:daemon.*` key with typed parameters, so the surface can be translated
+  and a changed value changes exactly one line. Spec 70 B5.
+- **An ACP session records where it came from**, so a reload after a restart
+  recognises a `cli_acp` session; the update kinds that had no producer —
+  session info, available commands, mode, config option and usage — now have one,
+  each with a no-op test proving nothing is emitted without a change. Spec 60
+  B63/B68.
+
+### Changed — clauses that were silent now say what the build does
+
+- Spec 60 **B26**: the issuer chain (protected-resource metadata, then origin),
+  the dynamic-registration body, and the two accepted
+  `tokenEndpointAuthMethod` values.
+- Spec 60 **B60**: the 8 MiB ACP frame ceiling and what happens past it.
+- Spec 30 **B9**: the missing-`riskLevel` sentence, quoted; **B24**: the
+  locations this build actually guards; **B28**: the background group as the one
+  exception to `detached:false`.
+- READMEs document the startup animation and how to silence it.
+
 ## 0.7.1 — 2026-11-13
 
 ### Added
