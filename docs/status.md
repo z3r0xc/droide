@@ -17,7 +17,7 @@ cargo test --workspace                   # native layer (CI only here)
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Specifications           | 11 numbered specs + shared context, 10,117 lines, every clause cited and mapped to tests                                                                               |
 | TypeScript product layer | 156 files, 58,008 lines: CLI, app, config, session, agent, transport, exec, extensions, tools, UI, native client                                                       |
-| Tests                    | 1481 TypeScript tests in 143 files (1473 pass, 8 skipped) + 69 Rust tests                                                                                              |
+| Tests                    | 1515 TypeScript tests in 144 files (1505 pass, 10 skipped) + 69 Rust tests                                                                                              |
 | CLI parity               | 20/20 recorded cases against the tracked snapshots                                                                                                                     |
 | Native (Rust)            | `crates/droide-native`: protocol (15 methods), safe paths, file search, sandbox profiles, PTY sessions, DPAPI secrets — 69 tests, clippy `-D warnings`, builds locally |
 

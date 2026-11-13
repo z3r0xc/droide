@@ -5,13 +5,11 @@ Each row is a place where the implementation is narrower than the clause it
 cites — never a guess dressed up as behaviour. `npm run gaps:check` fails when
 this file is stale.
 
-Total: **6** markers across **6** clauses.
+Total: **4** markers across **4** clauses.
 
 | where | clause | missing behaviour |
 |---|---|---|
 | `src/cli/mcp-mutations.ts:321` | `B7` | org MCP policy is remote-only and this build does not resolve it into AppContext, so a server the policy would block is not refused here. |
-| `src/daemon/command.ts:170` | `B1` | --droide-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
-| `src/daemon/command.ts:36` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
-| `src/daemon/command.ts:45` | `B15` | the spec verifies a WorkOS token or fk- key against the backend and answers with that account's userId/orgId; this build has no backend client, so it accepts the ambient DROIDE_API_KEY and reports a local identity. |
+| `src/daemon/command.ts:207` | `B1` | --droide-path is parsed but no session spawner in this build consumes it; spawned sessions are outside the implemented slice. |
+| `src/daemon/command.ts:41` | `B28` | registration, reconciliation and the relay dial are not implemented; the flag is refused rather than ignored. |
 | `src/extensions/mcp/client.ts:579` | `B22` | image blocks are reported by type and size instead of being compressed; the two placeholders themselves are quoted by the clause. |
-| `src/tools/shell/exec.ts:10` | `90 B15` | Execute keeps a pipe child. The pinned pseudo-terminal surface (B13-B22: login-shell environment, its blocklist and the PTY session lifecycle) belongs to the daemon terminal, which this build does not spawn, so there is no terminal to hand this command to. |

@@ -28,6 +28,7 @@ import {
   type DaemonLogger,
 } from "../../../src/daemon/server.ts";
 import type { DaemonTimers } from "../../../src/daemon/timers.ts";
+import { HttpClient, type FetchLike } from "../../../src/transport/client.ts";
 import { ManualTimers } from "./helpers.ts";
 
 function platformOf(): Platform {
@@ -113,6 +114,92 @@ test("the ambient DROIDE_API_KEY becomes the single accepted apiKey", () => {
     undefined,
   );
   assert.equal(environmentAuthPolicy(environmentOf()).apiKey, undefined);
+});
+
+/** A fake backend boundary: one recorded call, one canned account. */
+function fakeHttp(): {
+  readonly client: HttpClient;
+  readonly calls: { url: string; headers: RequestInit["headers"] }[];
+} {
+  const calls: { url: string; headers: RequestInit["headers"] }[] = [];
+  const fetchImpl: FetchLike = (url, init) => {
+    calls.push({ url: url.href, headers: init.headers });
+    return Promise.resolve(
+      new Response(JSON.stringify({ userId: "u-1", orgId: "o-1" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  };
+  return {
+    client: new HttpClient({
+      fetch: fetchImpl,
+      sleep: async () => {},
+      clock: { now: () => 0 },
+    }),
+    calls,
+  };
+}
+
+test("a configured base verifies the presented credential instead of accepting the ambient key", async () => {
+  const http = fakeHttp();
+  const environment = environmentOf({
+    DROIDE_API_KEY: "fk-ambient",
+    DROIDE_API_BASE_URL: "http://127.0.0.1:9",
+  });
+  const policy = environmentAuthPolicy(environment, http.client);
+  assert.equal(policy.apiKey, undefined);
+  assert.equal(policy.token, undefined);
+  assert.equal(policy.identity, undefined);
+  assert.ok(policy.verify !== undefined);
+  assert.deepEqual(await policy.verify({ apiKey: "fk-presented" }), {
+    userId: "u-1",
+    orgId: "o-1",
+  });
+  assert.deepEqual(
+    http.calls.map((call) => call.url),
+    ["http://127.0.0.1:9/api/cli/whoami"],
+  );
+  const headers = new Headers(http.calls[0]?.headers);
+  assert.equal(headers.get("authorization"), "Bearer fk-presented");
+  assert.equal(headers.get("x-droide-whoami-extended"), "true");
+  assert.equal(headers.get("x-droide-org-id"), null);
+
+  await policy.verify({
+    apiKey: "fk-presented",
+    activeOrganizationId: "org-9",
+  });
+  assert.equal(
+    new Headers(http.calls[1]?.headers).get("x-droide-org-id"),
+    "org-9",
+  );
+});
+
+test("server options carry the verification policy when a base is configured", () => {
+  const http = fakeHttp();
+  const environment = environmentOf({
+    DROIDE_API_KEY: "fk-ambient",
+    DROIDE_API_BASE_URL: "http://127.0.0.1:9",
+  });
+  const options = daemonServerOptions(
+    {},
+    { ...capture(environment).deps, http: http.client },
+  );
+  assert.equal(options.auth.apiKey, undefined);
+  assert.equal(options.auth.identity, undefined);
+  assert.equal(typeof options.auth.verify, "function");
+});
+
+test("a configured but unusable verification base refuses startup", async () => {
+  const captured = capture(
+    environmentOf({ DROIDE_API_BASE_URL: "backend.example" }),
+  );
+  const code = await runDaemonCommand({ port: 0 }, captured.deps);
+  assert.equal(code, 1);
+  assert.match(
+    captured.err()[0] ?? "",
+    /^Startup failed: .*DROIDE_API_BASE_URL/u,
+  );
 });
 
 test("the daemon log path lives under the state dir", () => {

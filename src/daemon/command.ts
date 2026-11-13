@@ -1,7 +1,7 @@
 /**
  * `droide daemon` wiring: parsed flags in, process exit code out. Contract:
- * `specs/70-daemon-and-remote-control.md` B1–B3, B5, B7, B8, B10, B11, B28
- * (refusal) and B31.
+ * `specs/70-daemon-and-remote-control.md` B1–B3, B5, B7, B8, B10, B11, B15
+ * (verification), B28 (refusal) and B31.
  *
  * The CLI layer owns option parsing and presentation; this module owns the
  * translation into {@link DaemonServerOptions} so the mapping is testable
@@ -15,7 +15,12 @@ import {
   joinPath,
   type Environment,
 } from "../config/paths.ts";
+import { HttpClient, type FetchLike } from "../transport/client.ts";
 import type { DaemonAuthPolicy, DaemonIdentity } from "./auth.ts";
+import {
+  configuredVerificationBase,
+  verifyCredentialWithBackend,
+} from "./identity.ts";
 import type { LivenessPipeOpener } from "./liveness.ts";
 import {
   DEFAULT_HOST,
@@ -40,12 +45,9 @@ export const REMOTE_CONTROL_UNAVAILABLE =
   "Remote Control requires a registered computer, which this build cannot create";
 
 /**
- * The single-user identity this daemon reports.
- *
- * TODO(spec B15): the spec verifies a WorkOS token or `fk-` key against the
- * backend and answers with that account's `userId`/`orgId`; this build has no
- * backend client, so it accepts the ambient `DROIDE_API_KEY` and reports a
- * local identity.
+ * The identity the daemon reports when no backend is configured. It names no
+ * real account, and the authenticate result says so with `verified:false`
+ * (B15/B16), so a client can refuse to trust it.
  */
 export const LOCAL_IDENTITY: DaemonIdentity = {
   userId: "local-user",
@@ -87,16 +89,51 @@ export interface DaemonCommandDeps {
   readonly openLiveness?: LivenessPipeOpener;
   readonly isProcessAlive?: (pid: number) => boolean;
   readonly parentPollIntervalMs?: number;
+  /** The HTTP boundary credential verification uses; tests inject a fake. */
+  readonly http?: HttpClient;
 }
 
 /**
- * B15/B31: the credential the daemon accepts is the ambient `DROIDE_API_KEY`
- * (the only `fk-` credential this build can read). Without one every
- * `daemon.authenticate` is refused, which fails closed.
+ * The production HTTP boundary: the process global `fetch` with a real clock.
+ * Verification is one request with no retry, so the sleeper is never used,
+ * but the boundary requires one.
+ */
+function systemHttpClient(): HttpClient {
+  const fetchImpl: FetchLike = (url, init) => fetch(url, init);
+  return new HttpClient({
+    fetch: fetchImpl,
+    sleep: (ms) => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setTimeout(resolve, ms);
+      return promise;
+    },
+    clock: { now: () => Date.now() },
+  });
+}
+
+/**
+ * B15/B31: what the daemon accepts as proof of identity.
+ *
+ * With `DROIDE_API_BASE_URL` configured the presented credential is verified
+ * against that backend and the answer is the account it names; a base that is
+ * configured but unusable refuses startup instead of degrading. Without a
+ * base the daemon accepts the ambient `DROIDE_API_KEY` (the only `fk-`
+ * credential this process can read) and reports {@link LOCAL_IDENTITY},
+ * which the answer marks `verified:false`. With no credential configured
+ * every `daemon.authenticate` is refused, which fails closed.
  */
 export function environmentAuthPolicy(
   environment: Environment,
+  http?: HttpClient,
 ): DaemonAuthPolicy {
+  const base = configuredVerificationBase(environment.env);
+  if (base !== null) {
+    const client = http ?? systemHttpClient();
+    return {
+      verify: (request) =>
+        verifyCredentialWithBackend(request, { base, http: client }),
+    };
+  }
   const apiKey = environment.env["DROIDE_API_KEY"]?.trim();
   return {
     identity: LOCAL_IDENTITY,
@@ -181,7 +218,7 @@ export function daemonServerOptions(
     host: argv.host ?? DEFAULT_HOST,
     ...(argv.port === undefined ? {} : { port: argv.port }),
     ...(argv.unixPath === undefined ? {} : { unixPath: argv.unixPath }),
-    auth: deps.auth ?? environmentAuthPolicy(environment),
+    auth: deps.auth ?? environmentAuthPolicy(environment, deps.http),
     homedir: stateHome(environment),
     platform: environment.platform,
     pid: deps.pid ?? process.pid,
@@ -241,5 +278,16 @@ export async function runDaemonCommand(
     deps.stderr(`Startup failed: ${REMOTE_CONTROL_UNAVAILABLE}`);
     return 1;
   }
-  return await runDaemon(daemonServerOptions(argv, deps));
+  let options: DaemonServerOptions;
+  try {
+    options = daemonServerOptions(argv, deps);
+  } catch (error) {
+    // A configured-but-unusable verification base is a refused startup, not a
+    // quiet fall-back to the local identity (B15).
+    deps.stderr(
+      `Startup failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return 1;
+  }
+  return await runDaemon(options);
 }

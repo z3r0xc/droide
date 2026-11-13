@@ -78,6 +78,29 @@ export class DaemonAuthenticationError extends Error {
 }
 
 /**
+ * B15: a credential the configured backend refused, or one that could not be
+ * checked at all. `outcome` is the stable kind a caller switches on and is
+ * also the `error.data.reason` the peer sees; `message` never contains the
+ * credential itself.
+ */
+export type CredentialVerificationOutcome =
+  "invalid_credential" | "verification_unavailable";
+
+export class DaemonCredentialVerificationError extends DaemonAuthenticationError {
+  readonly outcome: CredentialVerificationOutcome;
+
+  constructor(
+    outcome: CredentialVerificationOutcome,
+    message: string,
+    options: DaemonErrorOptions = {},
+  ) {
+    super(message, { ...options, reason: outcome });
+    this.name = "DaemonCredentialVerificationError";
+    this.outcome = outcome;
+  }
+}
+
+/**
  * A remote JSON-RPC error response (B18). `data` is whatever the peer sent,
  * unvalidated beyond being JSON.
  */

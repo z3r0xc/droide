@@ -5,9 +5,12 @@
  * A connection starts unauthenticated: the first request must be
  * `daemon.authenticate`, and anything else is answered `AUTHENTICATION_ERROR`
  * with the fixed sentence below. State is per connection only — there is no
- * process-wide "someone authenticated" flag. The daemon is single-user, so a
- * credential either belongs to the configured account or is refused; the
- * version comparison is advisory and only decorates failures.
+ * process-wide "someone authenticated" flag. The daemon is single-user, and a
+ * credential is checked one of two ways: with a configured backend it is
+ * verified and the answer is that account (`verified:true`), without one it is
+ * compared with the local placeholder identity and the answer says
+ * `verified:false`. The version comparison is advisory and only decorates
+ * failures.
  */
 
 import {
@@ -46,13 +49,44 @@ export interface DaemonIdentity {
   readonly orgId: string;
 }
 
+/**
+ * One authenticated account plus how it was established. `verified:true` means
+ * the configured backend named it (B15's verification path); `verified:false`
+ * means the daemon reported its local placeholder identity and a client that
+ * needs a real account must refuse it.
+ */
+export interface AuthenticatedAccount extends DaemonIdentity {
+  readonly verified: boolean;
+}
+
+/**
+ * The backend check one credential goes through (B15). It resolves with the
+ * account the backend named and throws a typed
+ * `DaemonCredentialVerificationError` when the credential is refused or the
+ * backend cannot be reached.
+ */
+export type CredentialVerifier = (
+  request: AuthenticateRequest,
+) => Promise<DaemonIdentity>;
+
 /** What the daemon accepts as proof of identity. */
 export interface DaemonAuthPolicy {
-  readonly identity: DaemonIdentity;
-  /** A WorkOS token this daemon accepts, when token auth is configured. */
+  /**
+   * The account a locally accepted credential maps to. Absent when the
+   * daemon only accepts credentials a backend has verified, so a policy can
+   * never quietly name an account it was not given.
+   */
+  readonly identity?: DaemonIdentity;
+  /** A WorkOS token this daemon accepts, when local token auth is configured. */
   readonly token?: string;
-  /** An `fk-` API key this daemon accepts, when key auth is configured. */
+  /** An `fk-` API key this daemon accepts, when local key auth is configured. */
   readonly apiKey?: string;
+  /**
+   * When set, a presented credential is verified with the backend and the
+   * identity it answers with is the one reported; the local `token`/`apiKey`
+   * fields are then unused.
+   */
+  readonly verify?: CredentialVerifier;
 }
 
 /** One request folded into the authenticate pipeline. */
@@ -72,7 +106,7 @@ export interface AuthenticateRequest {
 }
 
 /** The decoded `daemon.authenticate` result (B16). */
-export interface AuthenticateSuccess extends DaemonIdentity {
+export interface AuthenticateSuccess extends AuthenticatedAccount {
   readonly encoding?: string;
   readonly pipelined?: boolean;
 }
@@ -252,6 +286,7 @@ export function verifyCredential(
 ): DaemonIdentity {
   if (
     request.activeOrganizationId !== undefined &&
+    policy.identity !== undefined &&
     request.activeOrganizationId !== policy.identity.orgId
   ) {
     throw new DaemonAuthenticationError(
@@ -272,10 +307,14 @@ export function verifyCredential(
     if (!request.apiKey.startsWith("fk-")) {
       throw new DaemonAuthenticationError("API key must start with fk-");
     }
-    if (policy.apiKey !== undefined && request.apiKey === policy.apiKey) {
+    if (
+      policy.apiKey !== undefined &&
+      policy.identity !== undefined &&
+      request.apiKey === policy.apiKey
+    ) {
       return policy.identity;
     }
-    if (policy.apiKey === undefined) {
+    if (policy.apiKey === undefined || policy.identity === undefined) {
       throw new DaemonAuthenticationError(
         "API key authentication is not configured",
       );
@@ -284,10 +323,14 @@ export function verifyCredential(
   }
 
   if (request.token !== undefined) {
-    if (policy.token !== undefined && request.token === policy.token) {
+    if (
+      policy.token !== undefined &&
+      policy.identity !== undefined &&
+      request.token === policy.token
+    ) {
       return policy.identity;
     }
-    if (policy.token === undefined) {
+    if (policy.token === undefined || policy.identity === undefined) {
       throw new DaemonAuthenticationError(
         "Token authentication is not configured",
       );
@@ -301,13 +344,52 @@ export function verifyCredential(
 }
 
 /**
+ * One credential check, in whichever mode the policy names (B15): a
+ * configured verifier asks the backend and reports `verified:true`; without
+ * one the daemon compares locally and marks the answer `verified:false`,
+ * because a local string comparison is not a statement about a real account.
+ */
+export async function verifyCredentialAsync(
+  request: AuthenticateRequest,
+  policy: DaemonAuthPolicy,
+): Promise<AuthenticatedAccount> {
+  if (policy.verify === undefined) {
+    return { ...verifyCredential(request, policy), verified: false };
+  }
+
+  // The shape checks belong to the daemon, not to the backend: they are the
+  // same refusals a local policy makes, and they happen before any request.
+  if (request.apiKey === undefined && request.token === undefined) {
+    throw new DaemonAuthenticationError(
+      "Authentication requires a token or an API key",
+    );
+  }
+  if (request.apiKey !== undefined && !request.apiKey.startsWith("fk-")) {
+    throw new DaemonAuthenticationError("API key must start with fk-");
+  }
+
+  const identity = await policy.verify(request);
+  if (
+    request.activeOrganizationId !== undefined &&
+    request.activeOrganizationId !== identity.orgId
+  ) {
+    throw new DaemonAuthenticationError(
+      "The selected organization does not match this daemon",
+      { reason: "organization_selection_mismatch" },
+    );
+  }
+  return { userId: identity.userId, orgId: identity.orgId, verified: true };
+}
+
+/**
  * Gate state for one connection. Authentication is sticky: once the gate has
  * opened, a second `daemon.authenticate` answers with the same identity and
  * never re-verifies the credential (B17).
  */
 export class DaemonConnectionAuth {
   readonly policy: DaemonAuthPolicy;
-  private identityValue: DaemonIdentity | undefined;
+  private identityValue: AuthenticatedAccount | undefined;
+  private pending: Promise<AuthenticatedAccount> | undefined;
 
   constructor(policy: DaemonAuthPolicy) {
     this.policy = policy;
@@ -317,18 +399,29 @@ export class DaemonConnectionAuth {
     return this.identityValue !== undefined;
   }
 
-  get identity(): DaemonIdentity | undefined {
+  get identity(): AuthenticatedAccount | undefined {
     return this.identityValue;
   }
 
-  /** Verify and remember the first successful credential. */
-  authenticate(request: AuthenticateRequest): DaemonIdentity {
-    if (this.identityValue !== undefined) {
-      return this.identityValue;
+  /**
+   * Verify and remember the first successful credential. A second frame that
+   * arrives while the check is in flight joins it rather than asking the
+   * backend twice; a failed check clears the slot so a later attempt (with a
+   * different credential) starts fresh.
+   */
+  async authenticate(
+    request: AuthenticateRequest,
+  ): Promise<AuthenticatedAccount> {
+    if (this.identityValue === undefined) {
+      this.pending ??= verifyCredentialAsync(request, this.policy);
+      try {
+        this.identityValue = await this.pending;
+      } catch (error) {
+        this.pending = undefined;
+        throw error;
+      }
     }
-    const identity = verifyCredential(request, this.policy);
-    this.identityValue = identity;
-    return identity;
+    return this.identityValue;
   }
 }
 
@@ -376,9 +469,20 @@ export function parseAuthenticateResult(result: unknown): AuthenticateSuccess {
       "pipelined must be a boolean",
     );
   }
+  const verified = result["verified"];
+  if (verified !== undefined && typeof verified !== "boolean") {
+    throw new DaemonInvalidResponseError(
+      AUTHENTICATE_METHOD,
+      undefined,
+      "verified must be a boolean",
+    );
+  }
   return {
     userId,
     orgId,
+    // Absent means "this daemon did not claim verification", which a client
+    // must treat as unverified rather than assume the safer opposite.
+    verified: verified === true,
     ...(encoding === undefined ? {} : { encoding }),
     ...(pipelined === undefined ? {} : { pipelined }),
   };

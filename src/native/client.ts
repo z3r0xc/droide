@@ -285,6 +285,15 @@ export class NativeClient {
     return this.closePromise;
   }
 
+  /**
+   * Synchronously kill the helper. For a `process` exit hook, where no promise
+   * can run: the killed helper's descriptors close, which closes the PTY
+   * sessions it owned and hangs up their children. Prefer {@link close}.
+   */
+  terminate(): void {
+    this.killChild();
+  }
+
   private async performClose(): Promise<void> {
     if (this.state === "open") this.state = "closing";
     this.rejectPending(

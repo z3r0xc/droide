@@ -395,9 +395,26 @@ disappeared, or changed since the preview/approval (`@src/agent/file-edit/utils.
 **B26 — `Execute` input.** `summary` (required; Sentence case, 3–8 words,
 `^[A-Z]\S*(?:\s+\S+){2,7}$`), `command` (required), `timeout` (seconds, default
 60), `riskLevelReason` (default `High risk command`), `riskLevel`
-(default `high`), `fireAndForget` (default false)
-(`@packages/core/src/tools/definitions/cli/schema.ts:1033-1077`,
+(default `high`), `fireAndForget` (default false), `pty` (boolean, default
+false) (`@packages/core/src/tools/definitions/cli/schema.ts:1033-1077`,
 `@packages/utils/src/toolCallSummary/constants.ts:3`).
+
+A call is given a pseudo-terminal exactly when `pty` is `true` and the call is
+not `fireAndForget`. `pty` is the whole condition: never inferred from the
+command text, argv0 or the environment, because a terminal changes stdout
+buffering, echo and signal delivery, and only the caller knows it wants those.
+A background launch is never given one — it outlives the call and no reader
+stays attached — so `pty: true` together with `fireAndForget` runs as a pipe
+child and B27's `ptyFallbackReason` says why. The session is the native helper's
+`pty.*` surface (`crates/droide-native`, `src/native/methods.ts`); spec 90
+B13–B22 pins the daemon terminal's surface, which this build does not spawn.
+When the helper is absent, fails its handshake, or refuses a PTY (a platform
+without a backend), the command runs as a pipe child and the result carries the
+reason. The permission decision is settled before `run`, exactly as for a pipe
+child, and the session spawns the same shell and command line the pipe path
+would, with B29's PTY environment, so a sandbox wrapper or path guard that wraps
+the command is never bypassed by choosing a PTY; the session is created only
+after that point.
 
 **B27 — `Execute` result.** Success or failure is carried by `exitCode` (null when
 signalled), `signal`, `stoppedProcesses` (count of leftover processes stopped as
@@ -405,6 +422,13 @@ the call returned) and the output. Output within the Script result cap (32 MiB)
 is returned inline as `output`; past it the result carries `outputBytes` and
 `outputFile`, and the file is kept (`@packages/core/src/tools/definitions/cli/schema.ts:113-147`,
 `@src/tools/executors/client/execute-cli.ts:278-305`).
+
+A call that asked for a PTY (`pty: true`, B26) also reports which transport it
+got: `transport` is `"pty"` when the helper granted a session and `"pipe"` when
+it did not, and `ptyFallbackReason` names the fallback — the helper is not
+installed, it failed or refused the platform, or the call was `fireAndForget`.
+The fallback is never silent. Calls that did not ask for a PTY gain neither
+field.
 
 **B28 — Shell per OS.** POSIX: `spawn(script, [], {shell:'bash', detached:false})`
 with stdin ignored, `TERM=dumb`, `PS1=''`, `DEBIAN_FRONTEND=noninteractive`.
@@ -420,6 +444,12 @@ process group, which is what the B31 watchdog signals; its stdin is ignored and
 its output is the log file. Windows never detaches — the wrapper is a normal
 child that reports the inner PID (`src/tools/shell/exec.ts`). `[observed]`
 
+A PTY run (B26) spawns the same shell and arguments inside the helper's session
+— `bash -c <command>` on POSIX, the same PowerShell and flags on Windows — so
+the command line is interpreted by one shell, not two. The terminal is
+`xterm-256color`, 80×24; stdin is the terminal master and nothing writes to it
+(`src/tools/shell/pty.ts`). `[observed]`
+
 **B29 — Shell environment.** The child inherits `process.env` plus
 `PYTHONUNBUFFERED=1`, non-interactive git/ssh variables
 (`GIT_EDITOR=true`, `GIT_SEQUENCE_EDITOR=true`, `GIT_TERMINAL_PROMPT=0`,
@@ -432,6 +462,14 @@ the ripgrep directory) is prepended to `PATH`/`Path`
 (`@src/tools/executors/client/shell/shell-executor.ts:420-475`, `@src/sandbox/env.ts:27-56`,
 `@packages/utils/src/shell/constants.ts:6-15`).
 
+A PTY run applies the spec 90 B15 blocklist to the session: `LD_PRELOAD`,
+`LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `HOME`, `USER`, `LOGNAME`, `SHELL`,
+`TMPDIR`, `SUDO_USER`, `SSH_AUTH_SOCK`, `SSH_AGENT_PID` and `GPG_AGENT_INFO` are
+removed from the helper's inherited environment and from the session overrides,
+so neither layer can reintroduce them. `TERM` is `xterm-256color` on POSIX (the
+pipe child keeps `TERM=dumb`); the non-interactive variables above stay, so a
+PTY does not turn a prompt back on (`src/tools/shell/pty.ts`). `[observed]`
+
 **B30 — Timeout and kill.** Foreground execution polls output every ~50 ms and
 kills the terminal on timeout, abort, or a detected interactive-TTY wait. The
 timeout budget counts only observed running time: each observation contributes at
@@ -441,6 +479,14 @@ family sweep that adopts children orphaned by the dying wrapper. An
 `agent-browser` command is capped at 600 s (`min(timeout, 600)`)
 (`@src/tools/executors/client/execute-cli.ts:1228-1360`, `:1036-1041`,
 `@src/services/TerminalService/LocalTerminalService.ts:1197-1320`).
+
+A PTY run shares that budget and reports a timeout the same way: it reads in
+~250 ms observations against the wall clock, sends `pty.kill` then `pty.close`
+when the budget is spent, and returns `exitCode: null`, `signal: "SIGKILL"`,
+`timedOut: true`, `stoppedProcesses` counting the killed session. The session is
+released on every path; if the CLI ends mid-call, the same exit hook a background
+launch installs terminates the helper synchronously, which closes the terminal
+and its child (`src/tools/shell/exec.ts`, `src/tools/shell/pty.ts`). `[observed]`
 
 **B31 — Streaming and background.** Output is streamed as throttled (200 ms)
 status updates carrying the last two lines and, for detailed views, the full

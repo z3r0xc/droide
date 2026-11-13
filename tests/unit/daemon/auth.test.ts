@@ -18,13 +18,16 @@ import {
   parseAuthenticateRequest,
   parseAuthenticateResult,
   verifyCredential,
+  verifyCredentialAsync,
 } from "../../../src/daemon/auth.ts";
 import {
   DaemonAuthenticationError,
+  DaemonCredentialVerificationError,
   DaemonInvalidResponseError,
 } from "../../../src/daemon/errors.ts";
 import { JSON_RPC_ERRORS } from "../../../src/daemon/protocol.ts";
 import {
+  TEST_ACCOUNT,
   TEST_API_KEY,
   TEST_IDENTITY,
   TEST_TOKEN,
@@ -73,9 +76,9 @@ test("an unauthenticated notification or response is dropped, never answered", (
   assert.deepEqual(gateEnvelope(auth, { type: "response" }), { kind: "drop" });
 });
 
-test("once authenticated every envelope is allowed", () => {
+test("once authenticated every envelope is allowed", async () => {
   const auth = new DaemonConnectionAuth(testAuthPolicy());
-  auth.authenticate({ token: TEST_TOKEN });
+  await auth.authenticate({ token: TEST_TOKEN });
   assert.deepEqual(
     gateEnvelope(auth, { type: "request", method: "anything" }),
     { kind: "allow" },
@@ -85,11 +88,11 @@ test("once authenticated every envelope is allowed", () => {
   });
 });
 
-test("each connection holds its own gate state", () => {
+test("each connection holds its own gate state", async () => {
   const policy = testAuthPolicy();
   const first = new DaemonConnectionAuth(policy);
   const second = new DaemonConnectionAuth(policy);
-  first.authenticate({ token: TEST_TOKEN });
+  await first.authenticate({ token: TEST_TOKEN });
   assert.equal(first.authenticated, true);
   assert.equal(second.authenticated, false);
   assert.equal(second.identity, undefined);
@@ -168,12 +171,126 @@ test("a selected organization is checked before the credential and carries a rea
   );
 });
 
-test("re-authenticating never re-verifies the credential (B17)", () => {
+test("re-authenticating never re-verifies the credential (B17)", async () => {
   const auth = new DaemonConnectionAuth(testAuthPolicy());
-  const first = auth.authenticate({ token: TEST_TOKEN });
-  const second = auth.authenticate({ apiKey: "fk-not-valid" });
+  const first = await auth.authenticate({ token: TEST_TOKEN });
+  const second = await auth.authenticate({ apiKey: "fk-not-valid" });
   assert.deepEqual(second, first);
   assert.equal(auth.authenticated, true);
+});
+
+test("a local credential is answered with the placeholder marked unverified", async () => {
+  const auth = new DaemonConnectionAuth(testAuthPolicy());
+  const account = await auth.authenticate({ apiKey: TEST_API_KEY });
+  assert.deepEqual(account, TEST_ACCOUNT);
+  assert.equal(account.verified, false);
+  assert.deepEqual(auth.identity, TEST_ACCOUNT);
+  assert.deepEqual(
+    await verifyCredentialAsync({ token: TEST_TOKEN }, testAuthPolicy()),
+    { ...TEST_IDENTITY, verified: false },
+  );
+});
+
+test("a configured verifier supplies the account and the answer is verified", async () => {
+  const seen: unknown[] = [];
+  const policy = {
+    verify: async (request: { token?: string; apiKey?: string }) => {
+      seen.push(request.token ?? request.apiKey);
+      return { userId: "backend-user", orgId: "backend-org" };
+    },
+  };
+  assert.deepEqual(await verifyCredentialAsync({ token: "t" }, policy), {
+    userId: "backend-user",
+    orgId: "backend-org",
+    verified: true,
+  });
+  assert.deepEqual(seen, ["t"]);
+});
+
+test("two authenticate frames in flight ask the backend once", async () => {
+  let calls = 0;
+  const auth = new DaemonConnectionAuth({
+    verify: async () => {
+      calls += 1;
+      return { userId: "u", orgId: "o" };
+    },
+  });
+  const [first, second] = await Promise.all([
+    auth.authenticate({ token: "t" }),
+    auth.authenticate({ token: "t" }),
+  ]);
+  assert.equal(calls, 1);
+  assert.deepEqual(second, first);
+});
+
+test("a failed check leaves the gate open for a later attempt", async () => {
+  let attempts = 0;
+  const auth = new DaemonConnectionAuth({
+    verify: async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("backend blip");
+      return { userId: "u", orgId: "o" };
+    },
+  });
+  await assert.rejects(auth.authenticate({ token: "t" }), {
+    message: "backend blip",
+  });
+  assert.equal(auth.authenticated, false);
+  assert.deepEqual(await auth.authenticate({ token: "t" }), {
+    userId: "u",
+    orgId: "o",
+    verified: true,
+  });
+});
+
+test("a verifier refusal stays a typed auth failure", async () => {
+  const policy = {
+    verify: async () => {
+      throw new DaemonCredentialVerificationError(
+        "invalid_credential",
+        "Invalid credential",
+      );
+    },
+  };
+  await assert.rejects(verifyCredentialAsync({ token: "secret" }, policy), {
+    name: "DaemonCredentialVerificationError",
+    reason: "invalid_credential",
+    message: "Invalid credential",
+  });
+});
+
+test("the organization is checked against the verified account, not a local one", async () => {
+  const policy = {
+    verify: async () => ({ userId: "u", orgId: "verified-org" }),
+  };
+  const error = await verifyCredentialAsync(
+    { token: "t", activeOrganizationId: "another-org" },
+    policy,
+  ).then(
+    () => undefined,
+    (thrown: unknown) => thrown,
+  );
+  assert.ok(error instanceof DaemonAuthenticationError);
+  assert.equal(error.reason, "organization_selection_mismatch");
+  assert.deepEqual(
+    await verifyCredentialAsync(
+      { token: "t", activeOrganizationId: "verified-org" },
+      policy,
+    ),
+    { userId: "u", orgId: "verified-org", verified: true },
+  );
+});
+
+test("a verified policy still refuses a malformed or missing credential locally", async () => {
+  const policy = {
+    verify: async () => ({ userId: "u", orgId: "o" }),
+  };
+  await assert.rejects(verifyCredentialAsync({}, policy), {
+    message: "Authentication requires a token or an API key",
+  });
+  await assert.rejects(verifyCredentialAsync({ apiKey: "sk-nope" }, policy), {
+    message: "API key must start with fk-",
+  });
 });
 
 test("authenticate params are validated as a schema: grants are refused", () => {
@@ -236,13 +353,24 @@ test("the authenticate result must carry a non-empty userId and orgId", () => {
       encoding: "deflate-raw",
       pipelined: true,
     }),
-    { userId: "u", orgId: "o", encoding: "deflate-raw", pipelined: true },
+    {
+      userId: "u",
+      orgId: "o",
+      verified: false,
+      encoding: "deflate-raw",
+      pipelined: true,
+    },
+  );
+  assert.deepEqual(
+    parseAuthenticateResult({ userId: "u", orgId: "o", verified: true }),
+    { userId: "u", orgId: "o", verified: true },
   );
   for (const bad of [
     {},
     { userId: "", orgId: "o" },
     { userId: "u", orgId: 7 },
     { userId: "u", orgId: "o", pipelined: "yes" },
+    { userId: "u", orgId: "o", verified: "yes" },
     null,
   ]) {
     assert.throws(() => parseAuthenticateResult(bad), {

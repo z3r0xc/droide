@@ -42,6 +42,15 @@ export const TEST_IDENTITY: DaemonIdentity = {
   userId: "user-1",
   orgId: "org-1",
 };
+
+/**
+ * What a local-mode daemon answers with: the same account, marked unverified
+ * because no backend confirmed it (B15/B16).
+ */
+export const TEST_ACCOUNT: DaemonIdentity & { readonly verified: boolean } = {
+  ...TEST_IDENTITY,
+  verified: false,
+};
 export const TEST_TOKEN = "workos-token-1";
 export const TEST_API_KEY = "fk-test-api-key";
 

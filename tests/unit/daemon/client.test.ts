@@ -33,6 +33,7 @@ import {
 import {
   FakeTransport,
   ManualTimers,
+  TEST_ACCOUNT,
   TEST_IDENTITY,
   TEST_TOKEN,
   nextTick,
@@ -95,7 +96,9 @@ async function answerAuthenticate(
     throw new assert.AssertionError({ message: "expected a request" });
   }
   assert.equal(request.method, "daemon.authenticate");
-  transport.deliverEnvelope(createSuccessResponse(request.id, { ...identity }));
+  transport.deliverEnvelope(
+    createSuccessResponse(request.id, { ...identity, verified: false }),
+  );
   return request;
 }
 
@@ -110,7 +113,7 @@ async function connected(overrides: ClientOverrides = {}): Promise<Connected> {
 
 test("connect sends daemon.authenticate first and remembers the identity", async () => {
   const { client, transport } = await connected();
-  assert.deepEqual(client.identity, TEST_IDENTITY);
+  assert.deepEqual(client.identity, TEST_ACCOUNT);
   assert.equal(client.connected, true);
   const sent = parseTextFrame(transport.sent[0] ?? "");
   assert.equal(sent.type, "request");
@@ -321,7 +324,7 @@ test("reconnect rejects pending work with 1000 Connection reopened and re-authen
   await answerAuthenticate(transport);
   await reopening;
   assert.equal(client.connected, true);
-  assert.deepEqual(client.identity, TEST_IDENTITY);
+  assert.deepEqual(client.identity, TEST_ACCOUNT);
   const after = client.request("daemon.echo");
   await nextTick();
   const sent = transport.lastSent;

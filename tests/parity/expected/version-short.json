@@ -1,6 +1,6 @@
 {
  "case": "version-short",
  "exit_code": 0,
- "stdout": "0.8.1\n",
+ "stdout": "0.9.0\n",
  "stderr": ""
 }

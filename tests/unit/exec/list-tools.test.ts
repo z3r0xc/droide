@@ -128,3 +128,37 @@ test("every built-in tool declares one of the specified categories", async () =>
     .map((row) => row.llmId);
   assert.deepEqual(files, ["Create", "Edit", "LS", "Read"]);
 });
+
+test("an MCP tool is grouped under MCP, not Other", async () => {
+  const { createMcpToolDefinitions } =
+    await import("../../../src/extensions/mcp/tools.ts");
+  const called: string[] = [];
+  const definitions = createMcpToolDefinitions([
+    {
+      name: "linear",
+      config: {
+        type: "http",
+        url: "https://mcp.example.test",
+        headers: {},
+        disabled: false,
+      },
+      tools: [
+        {
+          name: "create_issue",
+          description: "Create an issue",
+          inputSchema: { type: "object" },
+          outputSchema: undefined,
+        },
+      ],
+      callTool: async (tool: string) => {
+        called.push(tool);
+        return { text: "ok", content: [], structuredContent: undefined };
+      },
+    },
+  ]);
+
+  const rows = buildToolListRows(definitions, new Set(), new Set());
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.category, "MCP");
+  assert.equal(called.length, 0);
+});
