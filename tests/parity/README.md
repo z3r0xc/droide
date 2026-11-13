@@ -29,5 +29,5 @@ shows up in diffs.
 - Environment is pinned: `TZ=UTC`, `LANG=C`, `TERM=dumb`, `NO_COLOR=1`, no
   colour, unroutable proxy.
 - No case may depend on wall clock, network, credentials, or another case.
-- A case that needs the oracle is reported `skipped(no-oracle)`, never silently
+- A case the sandbox cannot serve is reported `skipped(reason)`, never silently
   passed.

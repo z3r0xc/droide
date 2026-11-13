@@ -207,7 +207,7 @@ test("the scope filter narrows the listing", async () => {
 });
 
 test("versions compare numerically, not lexically", () => {
-  assert.equal(compareVersions("1.10.0", "1.9.0") > 0, true);
+  assert.equal(compareVersions("1.10.0", "1.2.0") > 0, true);
   assert.equal(compareVersions("2.0.0", "2.0.0"), 0);
   assert.equal(compareVersions(undefined, "1.0.0") < 0, true);
   assert.equal(compareVersions("1.0.0-beta", "1.0.0") < 0, true);

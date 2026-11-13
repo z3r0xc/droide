@@ -67,9 +67,9 @@ program name, its options, its subcommands and its `[prompt...]` argument
 `Droide - a terminal coding agent for your repository`
 (`orig/src/cli.ts:428`). `[observed]`
 
-**B3** `-v` / `--version` prints the version and exits 0. The value is
-`process.env.CLI_VERSION`, or the literal `unknown` when unset; the CLI reports
-`0.4.0` (`orig/src/cli.ts:429`;
+**B3** `-v` / `--version` prints the version and exits 0. The value is the
+build's version constant (`PRODUCT_VERSION` in `src/cli/brand.ts`, equal to
+`package.json`); this build reports `0.4.0` (`orig/src/cli.ts:429`;
 `tests/parity/expected/version.json`). `[observed]`
 
 **B4** The help page ends with an `Examples:` block of six lines followed by the

@@ -28,23 +28,23 @@ function snapshot(
 }
 
 test("an operational snapshot yields auth, client attribution and organization", () => {
-  assert.deepEqual(buildHeaders(snapshot(), { version: "1.9.0" }), {
+  assert.deepEqual(buildHeaders(snapshot(), { version: "2.0.0" }), {
     Authorization: "Bearer t",
-    "X-Factory-Client": "cli",
-    "X-Client-Version": "1.9.0",
-    "X-Factory-Org-Id": "o",
+    "X-Droide-Client": "cli",
+    "X-Client-Version": "2.0.0",
+    "X-Droide-Org-Id": "o",
   });
 });
 
 test("no token means no Authorization key", () => {
-  const headers = buildHeaders(snapshot({ token: null }), { version: "1.9.0" });
+  const headers = buildHeaders(snapshot({ token: null }), { version: "2.0.0" });
   assert.equal("Authorization" in headers, false);
-  assert.equal(headers["X-Factory-Org-Id"], "o");
+  assert.equal(headers["X-Droide-Org-Id"], "o");
 });
 
 test("no organization means no organization header", () => {
   const headers = buildHeaders(snapshot({ organization: null }));
-  assert.equal("X-Factory-Org-Id" in headers, false);
+  assert.equal("X-Droide-Org-Id" in headers, false);
 });
 
 test("X-Client-Version is sent only when a version is set", () => {
@@ -57,33 +57,33 @@ test("X-Client-Version is sent only when a version is set", () => {
 
 test("a usage route sends no default client attribution", () => {
   const headers = buildHeaders(snapshot({ purpose: "usage" }), {
-    version: "1.9.0",
+    version: "2.0.0",
   });
-  assert.equal("X-Factory-Client" in headers, false);
+  assert.equal("X-Droide-Client" in headers, false);
   assert.equal(headers.Authorization, "Bearer t");
 });
 
 test("a usage route sends a known caller's attribution", () => {
   const headers = buildHeaders(
     snapshot({ purpose: "usage", callerKnown: true, client: "daemon" }),
-    { version: "1.9.0" },
+    { version: "2.0.0" },
   );
-  assert.equal(headers["X-Factory-Client"], "daemon");
+  assert.equal(headers["X-Droide-Client"], "daemon");
 });
 
-test("SDK attribution adds X-Factory-Sdk", () => {
-  const headers = buildHeaders(snapshot({ sdk: "1.9.0" }));
-  assert.equal(headers["X-Factory-Sdk"], "1.9.0");
+test("SDK attribution adds X-Droide-Sdk", () => {
+  const headers = buildHeaders(snapshot({ sdk: "2.0.0" }));
+  assert.equal(headers["X-Droide-Sdk"], "2.0.0");
 });
 
 test("a caller header differing only in case never duplicates", () => {
-  const base = buildHeaders(snapshot(), { version: "1.9.0" });
+  const base = buildHeaders(snapshot(), { version: "2.0.0" });
   const merged = mergeHeaders(base, {
     authorization: "Bearer caller",
-    "x-factory-org-id": "caller-org",
+    "x-droide-org-id": "caller-org",
   });
   assert.equal(merged.Authorization, "Bearer caller");
-  assert.equal(merged["X-Factory-Org-Id"], "caller-org");
+  assert.equal(merged["X-Droide-Org-Id"], "caller-org");
   const names = Object.keys(merged).map((name) => name.toLowerCase());
   assert.equal(new Set(names).size, names.length);
 });
@@ -107,12 +107,12 @@ test("the daemon builder adds Content-Type and a caller override wins", () => {
 
 test("usage-route attribution supplied by a caller is stripped", () => {
   const stripped = stripAttributionHeaders({
-    ...buildHeaders(snapshot(), { version: "1.9.0" }),
-    "X-Factory-Request-Surface": "sdk",
+    ...buildHeaders(snapshot(), { version: "2.0.0" }),
+    "X-Droide-Request-Surface": "sdk",
     "x-factory-exec-output-format": "json",
   });
-  assert.equal("X-Factory-Request-Surface" in stripped, false);
-  assert.equal("X-Factory-Exec-Output-Format" in stripped, false);
+  assert.equal("X-Droide-Request-Surface" in stripped, false);
+  assert.equal("X-Droide-Exec-Output-Format" in stripped, false);
   assert.equal(stripped.Authorization, "Bearer t");
 });
 
@@ -137,23 +137,23 @@ test("a supplied user agent is sent (B17)", () => {
 test("customer Prem auth headers carry only auth, organization and content type (B22)", () => {
   assert.deepEqual(buildCustomerPremAuthHeaders(snapshot(), true), {
     Authorization: "Bearer t",
-    "X-Factory-Org-Id": "o",
+    "X-Droide-Org-Id": "o",
     "Content-Type": "application/json",
   });
   assert.deepEqual(
     buildCustomerPremAuthHeaders(snapshot({ token: null }), false),
     {
-      "X-Factory-Org-Id": "o",
+      "X-Droide-Org-Id": "o",
     },
   );
 });
 
 test("whoami headers always ask for the extended answer", () => {
   const headers = buildWhoamiHeaders(snapshot(), {}, "attribution-1");
-  assert.equal(headers["X-Factory-Whoami-Extended"], "true");
-  assert.equal(headers["X-Factory-Session-Attribution"], "attribution-1");
+  assert.equal(headers["X-Droide-Whoami-Extended"], "true");
+  assert.equal(headers["X-Droide-Session-Attribution"], "attribution-1");
   assert.equal(
-    "X-Factory-Session-Attribution" in buildWhoamiHeaders(snapshot()),
+    "X-Droide-Session-Attribution" in buildWhoamiHeaders(snapshot()),
     false,
   );
 });
@@ -161,7 +161,7 @@ test("whoami headers always ask for the extended answer", () => {
 test("redaction replaces every credential-bearing value, not just Authorization", () => {
   const redacted = redactHeaders({
     Authorization: "Bearer secret-token",
-    "X-Factory-Org-Id": "o",
+    "X-Droide-Org-Id": "o",
     "x-api-key": "fk-secret",
     Cookie: "session=abc",
     "proxy-authorization": "Basic abc",
@@ -169,7 +169,7 @@ test("redaction replaces every credential-bearing value, not just Authorization"
   });
   assert.deepEqual(redacted, {
     Authorization: REDACTED,
-    "X-Factory-Org-Id": "o",
+    "X-Droide-Org-Id": "o",
     "x-api-key": REDACTED,
     Cookie: REDACTED,
     "proxy-authorization": REDACTED,
@@ -201,15 +201,15 @@ test("redactUrl drops credentials, query and fragment", () => {
 test("the literal header names match the spec table", () => {
   assert.deepEqual(HEADER_NAMES, {
     authorization: "Authorization",
-    organization: "X-Factory-Org-Id",
-    client: "X-Factory-Client",
-    sdk: "X-Factory-Sdk",
-    requestSurface: "X-Factory-Request-Surface",
-    execOutputFormat: "X-Factory-Exec-Output-Format",
-    execInputFormat: "X-Factory-Exec-Input-Format",
+    organization: "X-Droide-Org-Id",
+    client: "X-Droide-Client",
+    sdk: "X-Droide-Sdk",
+    requestSurface: "X-Droide-Request-Surface",
+    execOutputFormat: "X-Droide-Exec-Output-Format",
+    execInputFormat: "X-Droide-Exec-Input-Format",
     clientVersion: "X-Client-Version",
-    whoamiExtended: "X-Factory-Whoami-Extended",
-    sessionAttribution: "X-Factory-Session-Attribution",
+    whoamiExtended: "X-Droide-Whoami-Extended",
+    sessionAttribution: "X-Droide-Session-Attribution",
     contentType: "Content-Type",
     traceparent: "traceparent",
   });

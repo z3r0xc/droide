@@ -461,7 +461,7 @@ test("the archive limits are the published numbers and each refusal is enforced"
 
     const url = "https://files.example.test/demo.zip";
     const big = buildZip([{ name: "SKILL.md", data: "x".repeat(64) }]);
-    await refuses(/larger than Droid allows/, url, {
+    await refuses(/larger than Droide allows/, url, {
       fetch: fakeFetch({ [url]: { body: big } }).fetch,
       limits: { ...ARCHIVE_LIMITS, maxDownloadBytes: 8 },
     });
@@ -477,7 +477,7 @@ test("the archive limits are the published numbers and each refusal is enforced"
     });
 
     const largeFile = buildZip([{ name: "SKILL.md", data: "x".repeat(10) }]);
-    await refuses(/file larger than Droid allows/, url, {
+    await refuses(/file larger than Droide allows/, url, {
       fetch: fakeFetch({ [url]: { body: largeFile } }).fetch,
       limits: { ...ARCHIVE_LIMITS, maxFileBytes: 5 },
     });
@@ -486,7 +486,7 @@ test("the archive limits are the published numbers and each refusal is enforced"
       { name: "skills/a/SKILL.md", data: "x".repeat(6) },
       { name: "skills/b/SKILL.md", data: "y".repeat(6) },
     ]);
-    await refuses(/larger than Droid allows/, url, {
+    await refuses(/larger than Droide allows/, url, {
       fetch: fakeFetch({ [url]: { body: total } }).fetch,
       limits: { ...ARCHIVE_LIMITS, maxFileBytes: 8, maxTotalBytes: 10 },
     });

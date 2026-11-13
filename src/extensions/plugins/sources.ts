@@ -24,7 +24,6 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { cp } from "node:fs/promises";
 import {
   dirname,
   isAbsolute,
@@ -703,7 +702,6 @@ export interface SourceIo {
   readonly rename: (from: string, to: string) => void;
   readonly remove: (path: string) => void;
   readonly exists: (path: string) => boolean;
-  readonly copyDirectory: (from: string, to: string) => Promise<void>;
   /** Immediate directory entry names, sorted, for plugin-root discovery. */
   readonly listDirectory: (path: string) => readonly string[];
 }
@@ -725,9 +723,6 @@ export const defaultSourceIo: SourceIo = {
   },
   exists(path) {
     return existsSync(path);
-  },
-  async copyDirectory(from, to) {
-    await cp(from, to, { recursive: true });
   },
   listDirectory(path) {
     try {
@@ -915,14 +910,14 @@ async function readBody(
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > maxBytes) {
     throw limitError(
-      "The plugin archive is larger than Droid allows. Contact the plugin's publisher.",
+      "The plugin archive is larger than Droide allows. Contact the plugin's publisher.",
     );
   }
   if (response.body === undefined || response.body === null) {
     const buffer = await response.arrayBuffer();
     if (buffer.byteLength > maxBytes)
       throw limitError(
-        "The plugin archive is larger than Droid allows. Contact the plugin's publisher.",
+        "The plugin archive is larger than Droide allows. Contact the plugin's publisher.",
       );
     return new Uint8Array(buffer);
   }
@@ -937,7 +932,7 @@ async function readBody(
     if (total > maxBytes) {
       await reader.cancel();
       throw limitError(
-        "The plugin archive is larger than Droid allows. Contact the plugin's publisher.",
+        "The plugin archive is larger than Droide allows. Contact the plugin's publisher.",
       );
     }
     chunks.push(value);
@@ -1047,6 +1042,31 @@ function unsafeEntry(): PluginOperationError {
   );
 }
 
+function overlongEntry(): PluginOperationError {
+  return new PluginOperationError(
+    "source-invalid",
+    "The archive contains a file path that is too long. Contact the plugin's publisher.",
+  );
+}
+
+function linkedEntry(): PluginOperationError {
+  return new PluginOperationError(
+    "source-invalid",
+    "The archive contains a symbolic link, which Droide does not install. Contact the plugin's publisher.",
+  );
+}
+
+/** Longest entry name, and longest single segment, an archive may carry. */
+const MAX_ENTRY_NAME_LENGTH = 1024;
+const MAX_ENTRY_SEGMENT_LENGTH = 255;
+
+/**
+ * The path an archive entry is written to, relative to the extraction root, or
+ * `null` for the root itself. Absolute names, drive letters, backslashes,
+ * `..` segments and over-long names are refused before anything is written;
+ * the caller then joins the result under the extraction root, so no entry can
+ * escape it.
+ */
 function safeEntryPath(name: string): string | null {
   if (
     name.includes("\\") ||
@@ -1059,7 +1079,22 @@ function safeEntryPath(name: string): string | null {
     .split("/")
     .filter((part) => part !== "" && part !== ".");
   if (segments.includes("..")) throw unsafeEntry();
-  return segments.length === 0 ? null : segments.join("/");
+  const relative = segments.join("/");
+  if (
+    relative.length > MAX_ENTRY_NAME_LENGTH ||
+    segments.some((part) => part.length > MAX_ENTRY_SEGMENT_LENGTH)
+  )
+    throw overlongEntry();
+  return segments.length === 0 ? null : relative;
+}
+
+/** A destination inside `target`, refusing anything that resolves outside it. */
+function entryTarget(target: string, relative: string): string {
+  const destination = resolvePath(target, relative);
+  const root = resolvePath(target);
+  if (destination !== root && !destination.startsWith(`${root}${sep}`))
+    throw unsafeEntry();
+  return destination;
 }
 
 function isInsignificantZeros(
@@ -1080,6 +1115,8 @@ interface ZipEntry {
   readonly compressedSize: number;
   readonly uncompressedSize: number;
   readonly localOffset: number;
+  /** The high 16 bits are the Unix mode when the archive was built on Unix. */
+  readonly externalAttributes: number;
 }
 
 function findEndOfCentralDirectory(view: DataView): number {
@@ -1157,6 +1194,7 @@ function readCentralDirectory(bytes: Uint8Array): readonly ZipEntry[] {
     const nameLength = view.getUint16(offset + 28, true);
     const extraLength = view.getUint16(offset + 30, true);
     const commentLength = view.getUint16(offset + 32, true);
+    const externalAttributes = view.getUint32(offset + 38, true);
     const localOffset = view.getUint32(offset + 42, true);
     const nameBytes = bytes.subarray(offset + 46, offset + 46 + nameLength);
     const extra = bytes.subarray(
@@ -1177,6 +1215,7 @@ function readCentralDirectory(bytes: Uint8Array): readonly ZipEntry[] {
       compressedSize: sizes.compressed,
       uncompressedSize: sizes.size,
       localOffset: sizes.offset,
+      externalAttributes,
     });
     offset += 46 + nameLength + extraLength + commentLength;
   }
@@ -1225,24 +1264,28 @@ function extractZipArchive(
   for (const entry of entries) {
     const relative = safeEntryPath(entry.name);
     if (relative === null) continue;
+    // Unix mode lives in the high 16 bits; 0o120000 is S_IFLNK.
+    if (((entry.externalAttributes >>> 16) & 0o170000) === 0o120000)
+      throw linkedEntry();
     if ((entry.flags & 0x1) !== 0)
       throw new PluginOperationError(
         "source-invalid",
-        "The archive contains an encrypted file, which Droid cannot read.",
+        "The archive contains an encrypted file, which Droide cannot read.",
       );
+    const destination = entryTarget(target, relative);
     if (entry.name.endsWith("/")) {
-      io.makeDirectory(join(target, relative));
+      io.makeDirectory(destination);
       continue;
     }
     if (entry.uncompressedSize > limits.maxFileBytes)
       throw limitError(
-        "The plugin archive contains a file larger than Droid allows. Contact the plugin's publisher.",
+        "The plugin archive contains a file larger than Droide allows. Contact the plugin's publisher.",
       );
     if (written + entry.uncompressedSize > effectiveTotal)
       throw limitError(
         ratioBound
           ? "The plugin archive expands far more than it should. Contact the plugin's publisher."
-          : "The plugin archive is larger than Droid allows. Contact the plugin's publisher.",
+          : "The plugin archive is larger than Droide allows. Contact the plugin's publisher.",
       );
     const data = entryData(bytes, entry);
     let output: Uint8Array;
@@ -1269,15 +1312,15 @@ function extractZipArchive(
     } else {
       throw new PluginOperationError(
         "source-invalid",
-        "The archive uses a compression method Droid cannot read.",
+        "The archive uses a compression method Droide cannot read.",
       );
     }
     if (output.byteLength > limits.maxFileBytes)
       throw limitError(
-        "The plugin archive contains a file larger than Droid allows. Contact the plugin's publisher.",
+        "The plugin archive contains a file larger than Droide allows. Contact the plugin's publisher.",
       );
     written += output.byteLength;
-    io.writeFile(join(target, relative), output);
+    io.writeFile(destination, output);
   }
 }
 
@@ -1362,21 +1405,24 @@ function extractTarball(
     const fullName =
       pendingLongName ?? (prefix === "" ? name : `${prefix}/${name}`);
     pendingLongName = undefined;
+    // Tar types 1 and 2 are hard links and symbolic links; neither is installed.
+    if (type === "1" || type === "2") throw linkedEntry();
     const relative = safeEntryPath(fullName.replace(/^package\//u, ""));
     if (relative !== null) {
+      const destination = entryTarget(target, relative);
       if (type === "5") {
-        io.makeDirectory(join(target, relative));
+        io.makeDirectory(destination);
       } else if (type === "0" || type === "\0") {
         if (size > limits.maxFileBytes)
           throw limitError(
-            "The plugin package contains a file larger than Droid allows. Contact the plugin's publisher.",
+            "The plugin package contains a file larger than Droide allows. Contact the plugin's publisher.",
           );
         if (written + size > limits.maxTotalBytes)
           throw limitError(
-            "The plugin package is larger than Droid allows. Contact the plugin's publisher.",
+            "The plugin package is larger than Droide allows. Contact the plugin's publisher.",
           );
         written += size;
-        io.writeFile(join(target, relative), tar.subarray(dataStart, dataEnd));
+        io.writeFile(destination, tar.subarray(dataStart, dataEnd));
       }
     }
     offset = dataStart + Math.ceil(size / 512) * 512;
@@ -1666,14 +1712,14 @@ function parseNpmMetadata(bytes: Uint8Array): NpmMetadata {
   } catch (error) {
     throw new PluginOperationError(
       "source-invalid",
-      "The npm registry returned a document Droid could not read.",
+      "The npm registry returned a document Droide could not read.",
       { cause: error },
     );
   }
   if (!isRecord(parsed) || !isRecord(parsed["versions"]))
     throw new PluginOperationError(
       "source-invalid",
-      "The npm registry returned a document Droid could not read.",
+      "The npm registry returned a document Droide could not read.",
     );
   const versions: Record<string, NpmVersionDocument> = {};
   for (const [version, value] of Object.entries(parsed["versions"])) {

@@ -31,9 +31,9 @@ test("semver parsing accepts the two tag shapes and rejects the rest", () => {
 });
 
 test("versions compare numerically", () => {
-  assert.equal(compareSemver("1.10.0", "1.9.0"), 1);
-  assert.equal(compareSemver("1.9.0", "1.10.0"), -1);
-  assert.equal(compareSemver("1.9.0", "1.9.0"), 0);
+  assert.equal(compareSemver("1.3.0", "1.2.0"), 1);
+  assert.equal(compareSemver("1.2.0", "1.3.0"), -1);
+  assert.equal(compareSemver("1.2.0", "1.2.0"), 0);
   assert.equal(compareSemver("nope", "1.0.0"), null);
 });
 

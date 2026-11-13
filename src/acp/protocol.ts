@@ -470,13 +470,13 @@ export function authMethodsFor(
       id: "device-pairing",
       name: "Login",
       description:
-        "Authenticate with Factory using a device pairing code in your browser.",
+        "Authenticate with Droide using a device pairing code in your browser.",
     },
     {
-      id: "factory-api-key",
-      name: "Factory API Key",
+      id: "droide-api-key",
+      name: "Droide API Key",
       description:
-        "Authenticate using a Factory API key set in the DROIDE_API_KEY environment variable.",
+        "Authenticate using a Droide API key set in the DROIDE_API_KEY environment variable.",
     },
   ];
 }
@@ -1059,6 +1059,28 @@ export type AcpToolKind =
 export type AcpToolCallStatus =
   "pending" | "in_progress" | "completed" | "failed";
 
+/**
+ * The ACP kind of each tool this build exposes. A tool outside the table is
+ * `other`, so a new tool still gets a card.
+ */
+const TOOL_KINDS: Readonly<Record<string, AcpToolKind>> = {
+  Read: "read",
+  LS: "read",
+  Glob: "search",
+  Grep: "search",
+  Edit: "edit",
+  Create: "edit",
+  Execute: "execute",
+  WebFetch: "fetch",
+  WebSearch: "fetch",
+  TodoWrite: "think",
+};
+
+/** ACP kind for one tool name (B68). */
+export function toolKindFor(toolName: string): AcpToolKind {
+  return TOOL_KINDS[toolName] ?? "other";
+}
+
 export type AcpToolCallContent =
   | { readonly type: "content"; readonly content: AcpContentBlock }
   | {
@@ -1238,7 +1260,7 @@ export interface AcpPermissionOption {
   readonly _meta?: Record<string, unknown>;
 }
 
-/** Droid's confirmation outcomes, as they appear on the wire. */
+/** Confirmation outcomes, as they appear on the wire. */
 export type AcpToolConfirmationOutcome =
   | "proceed_once"
   | "proceed_always"
@@ -1463,4 +1485,318 @@ const CONFIRMATION_OUTCOMES: readonly AcpToolConfirmationOutcome[] = [
 /** Whether an ACP option kind authorizes the call. */
 export function isAllowKind(kind: AcpPermissionOptionKind): boolean {
   return kind === "allow_once" || kind === "allow_always";
+}
+
+/* -------------------------------------------------------------------------- */
+/* Modes and config options (B70)                                             */
+/* -------------------------------------------------------------------------- */
+
+/** The autonomy modes ACP advertises, weakest first. */
+export const ACP_MODE_IDS = [
+  "normal",
+  "spec",
+  "auto-low",
+  "auto-medium",
+  "auto-high",
+] as const;
+
+export type AcpModeId = (typeof ACP_MODE_IDS)[number];
+
+export interface AcpMode {
+  readonly id: AcpModeId;
+  readonly name: string;
+  readonly description: string;
+}
+
+const MODE_ORDER: Readonly<Record<AcpModeId, number>> = {
+  normal: 0,
+  spec: 1,
+  "auto-low": 2,
+  "auto-medium": 3,
+  "auto-high": 4,
+};
+
+const MODE_COPY: Readonly<Record<AcpModeId, Omit<AcpMode, "id">>> = {
+  normal: { name: "Normal", description: "Ask before every tool call." },
+  spec: {
+    name: "Spec",
+    description: "Plan the change first, then ask before acting.",
+  },
+  "auto-low": {
+    name: "Auto (low risk)",
+    description: "Run low-risk tools without asking.",
+  },
+  "auto-medium": {
+    name: "Auto (medium risk)",
+    description: "Run low- and medium-risk tools without asking.",
+  },
+  "auto-high": {
+    name: "Auto (high risk)",
+    description: "Run every tool without asking.",
+  },
+};
+
+/** Whether a string names an autonomy mode. */
+export function isAcpModeId(value: string): value is AcpModeId {
+  return Object.hasOwn(MODE_ORDER, value);
+}
+
+/**
+ * The modes an org allows, weakest first (B70). `normal` and `spec` never run
+ * a tool unattended, so a cap only removes the auto-run modes above it; an
+ * unrecognised cap is treated as the highest level.
+ */
+export function sessionModesFor(maxAutonomy?: string): readonly AcpMode[] {
+  const ceiling =
+    maxAutonomy !== undefined && isAcpModeId(maxAutonomy)
+      ? MODE_ORDER[maxAutonomy]
+      : MODE_ORDER["auto-high"];
+  return ACP_MODE_IDS.filter(
+    (id) => !id.startsWith("auto-") || MODE_ORDER[id] <= ceiling,
+  ).map((id) => ({ id, ...MODE_COPY[id] }));
+}
+
+/** Clamp a requested mode to what the org allows, refusing an unknown id. */
+export function clampMode(modeId: string, maxAutonomy?: string): AcpModeId {
+  if (!isAcpModeId(modeId)) {
+    throw invalidParams(`modeId "${modeId}" is not a mode`, { modeId });
+  }
+  const allowed = sessionModesFor(maxAutonomy).some((mode) => mode.id === modeId);
+  if (!allowed) {
+    throw invalidParams(
+      `modeId "${modeId}" is above this organization's autonomy level`,
+      { modeId, maxAutonomy },
+    );
+  }
+  return modeId;
+}
+
+export interface AcpSessionSettings {
+  readonly model: string;
+  readonly reasoningEffort: string;
+  readonly modeId: AcpModeId;
+}
+
+export const ACP_CONFIG_IDS = {
+  model: "model",
+  reasoningEffort: "reasoning_effort",
+  autonomy: "autonomy_level",
+} as const;
+
+export type AcpConfigId =
+  (typeof ACP_CONFIG_IDS)[keyof typeof ACP_CONFIG_IDS];
+
+const REASONING_EFFORTS: readonly string[] = ["low", "medium", "high"];
+
+/**
+ * The full config option set (B70): `model`, `reasoning_effort` and
+ * `autonomy_level`, each a select whose `currentValue` is the live setting.
+ */
+export function configOptionsFor(
+  settings: AcpSessionSettings,
+  maxAutonomy?: string,
+): readonly AcpSessionConfigOption[] {
+  return [
+    {
+      id: ACP_CONFIG_IDS.model,
+      name: "Model",
+      type: "select",
+      category: "model",
+      currentValue: settings.model,
+      options:
+        settings.model === ""
+          ? []
+          : [{ value: settings.model, name: settings.model }],
+    },
+    {
+      id: ACP_CONFIG_IDS.reasoningEffort,
+      name: "Reasoning effort",
+      type: "select",
+      category: "thought_level",
+      currentValue: settings.reasoningEffort,
+      options: REASONING_EFFORTS.map((value) => ({ value, name: value })),
+    },
+    {
+      id: ACP_CONFIG_IDS.autonomy,
+      name: "Autonomy level",
+      type: "select",
+      category: "mode",
+      currentValue: settings.modeId,
+      options: sessionModesFor(maxAutonomy).map((mode) => ({
+        value: mode.id,
+        name: mode.name,
+      })),
+    },
+  ];
+}
+
+export interface AcpSetModeParams {
+  readonly sessionId: string;
+  readonly modeId: string;
+}
+
+export function parseSetModeParams(params: unknown): AcpSetModeParams {
+  if (!isRecord(params)) {
+    throw invalidParams("session/set_mode params must be an object");
+  }
+  return {
+    sessionId: requireString(params["sessionId"], "sessionId"),
+    modeId: requireString(params["modeId"], "modeId"),
+  };
+}
+
+export interface AcpSetModelParams {
+  readonly sessionId: string;
+  readonly modelId: string;
+}
+
+/** The legacy `session/set_model` shape (B70). */
+export function parseSetModelParams(params: unknown): AcpSetModelParams {
+  if (!isRecord(params)) {
+    throw invalidParams("session/set_model params must be an object");
+  }
+  return {
+    sessionId: requireString(params["sessionId"], "sessionId"),
+    modelId: requireString(params["modelId"], "modelId"),
+  };
+}
+
+export interface AcpSetConfigOptionParams {
+  readonly sessionId: string;
+  readonly configId: string;
+  readonly value: string | boolean;
+}
+
+export function parseSetConfigOptionParams(
+  params: unknown,
+): AcpSetConfigOptionParams {
+  if (!isRecord(params)) {
+    throw invalidParams("session/set_config_option params must be an object");
+  }
+  const value = params["value"];
+  if (typeof value !== "string" && typeof value !== "boolean") {
+    throw invalidParams("value must be a string or a boolean");
+  }
+  return {
+    sessionId: requireString(params["sessionId"], "sessionId"),
+    configId: requireString(params["configId"], "configId"),
+    value,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* session/load, session/resume, session/fork and session/list (B61, B71)     */
+/* -------------------------------------------------------------------------- */
+
+/** One `session/list` row. */
+export interface AcpSessionInfo {
+  readonly sessionId: string;
+  readonly cwd: string;
+  readonly title?: string | null;
+  readonly updatedAt?: string | null;
+}
+
+export interface AcpListSessionsResult {
+  readonly sessions: readonly AcpSessionInfo[];
+}
+
+/**
+ * `session/load`, `session/resume` and `session/fork` share one param shape:
+ * the session to act on plus the environment it is re-opened with.
+ */
+export interface AcpSessionHandleParams {
+  readonly sessionId: string;
+  readonly cwd: string;
+  readonly mcpServers: readonly AcpSessionMcpServer[];
+}
+
+export function parseSessionHandleParams(
+  params: unknown,
+): AcpSessionHandleParams {
+  if (!isRecord(params)) {
+    throw invalidParams("params must be an object");
+  }
+  const base = parseNewSessionParams(params);
+  return {
+    sessionId: requireString(params["sessionId"], "sessionId"),
+    cwd: base.cwd,
+    mcpServers: base.mcpServers,
+  };
+}
+
+export interface AcpListSessionsParams {
+  readonly cwd?: string;
+}
+
+/** `session/list` takes an optional object; `cwd` narrows the rows. */
+export function parseListSessionsParams(
+  params: unknown,
+): AcpListSessionsParams {
+  if (params === undefined || params === null) return {};
+  if (!isRecord(params)) {
+    throw invalidParams("session/list params must be an object");
+  }
+  const cwd = parseOptionalString(params["cwd"], "cwd");
+  return cwd === undefined ? {} : { cwd };
+}
+
+/**
+ * A stored transcript as the updates a re-opened session replays (B71). Only
+ * the record kinds a client can render become updates: messages, reasoning,
+ * tool calls and tool results. `system`, `completion` and `error` records are
+ * transcript metadata, so they are skipped.
+ */
+export function sessionUpdatesFromTranscript(
+  records: readonly Readonly<Record<string, unknown>>[],
+): readonly AcpSessionUpdate[] {
+  const updates: AcpSessionUpdate[] = [];
+  for (const record of records) {
+    const type = record["type"];
+    const id = record["id"];
+    const text = record["text"];
+    if (type === "message" && typeof text === "string" && text !== "") {
+      const messageId = typeof id === "string" ? id : undefined;
+      updates.push(
+        record["role"] === "user"
+          ? userMessageChunk(text, messageId)
+          : agentMessageChunk(text, messageId),
+      );
+      continue;
+    }
+    if (type === "reasoning" && typeof text === "string" && text !== "") {
+      updates.push(
+        agentThoughtChunk(text, typeof id === "string" ? id : undefined),
+      );
+      continue;
+    }
+    if (type === "tool_call" && typeof id === "string") {
+      const toolName =
+        typeof record["toolName"] === "string" ? record["toolName"] : "tool";
+      updates.push({
+        sessionUpdate: "tool_call",
+        toolCallId: id,
+        title: toolName,
+        name: toolName,
+        kind: toolKindFor(toolName),
+        status: "pending",
+        rawInput: record["parameters"],
+        content: [],
+      });
+      continue;
+    }
+    if (type === "tool_result" && typeof id === "string") {
+      const output = typeof record["value"] === "string" ? record["value"] : "";
+      updates.push({
+        sessionUpdate: "tool_call_update",
+        toolCallId: id,
+        status: record["isError"] === true ? "failed" : "completed",
+        rawOutput: output,
+        content:
+          output === ""
+            ? []
+            : [{ type: "content", content: { type: "text", text: output } }],
+      });
+    }
+  }
+  return updates;
 }

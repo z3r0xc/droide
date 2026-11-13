@@ -15,7 +15,7 @@ import { JsoncParseError, parseJsonc } from "../jsonc.ts";
 
 /**
  * Manifest locations, most specific first (B33). `.droide-plugin/` is the
- * Factory layout; `.claude-plugin/` is the Claude Code root marker.
+ * plugin layout; `.claude-plugin/` is the Claude Code root marker.
  *
  * TODO(spec): B33 states that `.droide-plugin/plugin.json` is read and that
  * `.claude-plugin/` marks a plugin root, but does not pin reading

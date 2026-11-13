@@ -25,6 +25,8 @@ jobs:
         run: npm run format:check
       - name: Specification gaps are current
         run: npm run gaps:check
+      - name: Our identity only
+        run: npm run brand:check
       - name: Unit and integration tests
         run: npm test
 

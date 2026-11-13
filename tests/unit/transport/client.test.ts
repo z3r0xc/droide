@@ -429,14 +429,14 @@ test("error paths carry redacted request headers and never the token", async () 
       request({
         headers: {
           Authorization: "Bearer super-secret",
-          "X-Factory-Org-Id": "org",
+          "X-Droide-Org-Id": "org",
         },
       }),
     ),
     (error: unknown) => {
       assert.ok(error instanceof FetchError);
       assert.equal(error.requestHeaders.Authorization, REDACTED);
-      assert.equal(error.requestHeaders["X-Factory-Org-Id"], "org");
+      assert.equal(error.requestHeaders["X-Droide-Org-Id"], "org");
       assert.equal(
         JSON.stringify(error.requestHeaders).includes("super-secret"),
         false,
@@ -449,7 +449,7 @@ test("error paths carry redacted request headers and never the token", async () 
   const sent = testHarness.calls[0]?.init.headers;
   assert.deepEqual(sent, {
     Authorization: "Bearer super-secret",
-    "X-Factory-Org-Id": "org",
+    "X-Droide-Org-Id": "org",
   });
 });
 
@@ -459,7 +459,7 @@ test("request headers are sent verbatim, bodies only when provided", async () =>
     jsonResponse({ ok: true }),
   ]);
   await testHarness.client.request(
-    request({ method: "GET", headers: { "X-Factory-Client": "cli" } }),
+    request({ method: "GET", headers: { "X-Droide-Client": "cli" } }),
   );
   assert.equal(testHarness.calls[0]?.init.body, undefined);
   assert.equal(testHarness.calls[0]?.init.credentials, "omit");

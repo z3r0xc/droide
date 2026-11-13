@@ -10,7 +10,7 @@ Two earlier decisions assumed the project would present itself as a
 reimplementation of someone else's CLI:
 
 - **ADR 0004** recorded goldens from that binary and diffed our output against
-  it, with an optional "oracle" mode.
+  it, with an optional mode that replayed the comparison against the binary.
 - **ADR 0005** kept the other product's name in user-facing text and normalised
   our program name back to it during comparison, and printed the other
   product's version from `--version`.
@@ -46,9 +46,9 @@ but the shipped artefact must not claim to be, or point at, another product.
 
 - `--version`, `--help` and every error string now belong to Droide; a snapshot
   records them so a change is visible in review.
-- There is no longer any "oracle" in the harness: re-recording is a deliberate
-  act against our build, so a regression cannot be laundered into a new golden
-  by pointing it at another binary.
+- Nothing in the harness reaches for another binary: re-recording is a
+  deliberate act against our build, so a regression cannot be laundered into a
+  new golden by pointing the recorder somewhere else.
 - The specifications keep neutral provenance language ("the reference build")
   and cite the untracked corpus; nothing in them names another product.
 
@@ -58,6 +58,6 @@ but the shipped artefact must not claim to be, or point at, another product.
   not that product, and `update --check` compares against our own releases.
 - **Drop the harness entirely**: loses the cheap regression net over the CLI
   surface, which is the part users notice first.
-- **Keep an optional oracle mode**: reintroduces the cross-product comparison
-  the owner asked to remove, and makes "pass" depend on an artefact we no longer
+- **Keep an optional cross-product mode**: reintroduces the comparison the owner
+  asked to remove, and makes "pass" depend on an artefact we no longer
   reference.

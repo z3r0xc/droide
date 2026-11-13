@@ -37,7 +37,7 @@ export interface ResolveOptions {
   readonly requireAbsolute?: boolean;
 }
 
-/** Names under the Factory dir that are never writable (B48/B50 floor). */
+/** Names under the state directory that are never writable (B48/B50 floor). */
 const TRUSTED_CONFIG_FILES: Readonly<Record<string, true>> = {
   "settings.json": true,
   "settings.local.json": true,

@@ -477,7 +477,7 @@ export interface RunAcpDaemonOptions extends Omit<
 }
 
 /**
- * The `droid exec --output-format acp` handoff: console output moves to
+ * The `droide exec --output-format acp` handoff: console output moves to
  * stderr, the server owns stdout, and a signal closes it cleanly.
  *
  * TODO(spec B60): `src/exec/command.ts` still refuses `-o acp` before this

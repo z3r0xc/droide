@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "Droide \u2014 a terminal coding agent: TypeScript product layer with a Rust native helper.",
+  "description": "Droide — a terminal coding agent: TypeScript product layer with a Rust native helper.",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -20,6 +20,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.{ts,mjs}\" \"*.json\"",
     "gaps": "node tools/gaps.mjs",
     "gaps:check": "node tools/gaps.mjs --check",
+    "brand:check": "node tools/brand-check.mjs",
     "native:build": "cargo build -p droide-native",
     "test:native": "node tools/run-native-tests.mjs",
     "verify": "npm run typecheck && npm run format:check && npm run gaps:check && npm test && npm run test:parity",

@@ -289,7 +289,7 @@ test("image content is refused instead of decoded", async () => {
   }
 });
 
-test("a credential file under the Factory dir is never readable", async () => {
+test("a credential file under the state directory is never readable", async () => {
   const fixture = makeToolFixture();
   try {
     const factory = `${fixture.home}/.droide`;

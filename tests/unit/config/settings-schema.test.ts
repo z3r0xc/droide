@@ -127,7 +127,7 @@ test("an unknown key inside a structured section is ignored", () => {
   assert.equal("nope" in server, false);
 });
 
-test('the "general" wrapper is refused, as the subject refuses it', () => {
+test('the "general" wrapper is refused', () => {
   assert.throws(
     () =>
       parseSettingsDocument({ general: { worktreeDirectory: "x" } }, SOURCE),

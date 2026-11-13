@@ -1,7 +1,7 @@
 # tools/
 
 Scripts that belong to the **implementation** (formatting, code generation,
-local verification helpers). Anything that analyses the subject binary lives in
+local verification helpers). Anything that analyses the reference binary lives in
 the untracked `.work/` workspace instead, so no reverse-engineering artefact is
 committed.
 
@@ -10,7 +10,7 @@ committed.
 ```
 tools/            our own developer tooling (tracked)
 .work/            untracked analysis workspace, never committed
-├── tools/        extractors and analysers for the subject payload
+├── tools/        extractors and analysers for the reference payload
 └── parity/       recorded parity cases and goldens
 ```
 

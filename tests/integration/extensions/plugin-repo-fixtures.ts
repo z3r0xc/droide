@@ -204,6 +204,8 @@ export interface ZipEntryInput {
   readonly data: string;
   /** `deflate` exercises the compressed path; `store` writes bytes verbatim. */
   readonly method?: "store" | "deflate";
+  /** Unix mode; `0o120777` marks a symbolic link. */
+  readonly mode?: number;
 }
 
 /** A deterministic zip writer, enough for the extractor's contract. */
@@ -227,12 +229,13 @@ export function buildZip(entries: readonly ZipEntryInput[]): Uint8Array {
 
     const central = Buffer.alloc(46);
     central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE((3 << 8) | 20, 4);
     central.writeUInt16LE(20, 6);
     central.writeUInt16LE(method, 10);
     central.writeUInt32LE(data.byteLength, 20);
     central.writeUInt32LE(raw.byteLength, 24);
     central.writeUInt16LE(name.byteLength, 28);
+    central.writeUInt32LE(((entry.mode ?? 0) << 16) >>> 0, 38);
     central.writeUInt32LE(offset, 42);
     centrals.push(central, name);
     offset += 30 + name.byteLength + data.byteLength;
@@ -247,7 +250,14 @@ export function buildZip(entries: readonly ZipEntryInput[]): Uint8Array {
   return new Uint8Array(Buffer.concat([...locals, ...centrals, end]));
 }
 
-function tarHeader(name: string, size: number, type: "0" | "5"): Buffer {
+/** One tar member: `type` `0` is a file, `5` a directory, `2` a symlink. */
+export interface TarEntryInput {
+  readonly name: string;
+  readonly data?: string;
+  readonly type?: "0" | "5" | "2";
+}
+
+function tarHeader(name: string, size: number, type: "0" | "5" | "2"): Buffer {
   const header = Buffer.alloc(512);
   header.write(name, 0, 100, "utf8");
   header.write("0000644\0", 100);
@@ -269,10 +279,22 @@ function tarHeader(name: string, size: number, type: "0" | "5"): Buffer {
 export function buildTarball(
   files: Readonly<Record<string, string>>,
 ): Uint8Array {
+  return buildTarballEntries(
+    Object.entries(files).map(([name, data]) => ({ name, data })),
+  );
+}
+
+/** A `.tgz` from explicit members, for the unsafe-entry cases. */
+export function buildTarballEntries(
+  entries: readonly TarEntryInput[],
+): Uint8Array {
   const parts: Buffer[] = [];
-  for (const [name, content] of Object.entries(files)) {
-    const data = Buffer.from(content, "utf8");
-    parts.push(tarHeader(`package/${name}`, data.byteLength, "0"), data);
+  for (const entry of entries) {
+    const data = Buffer.from(entry.data ?? "", "utf8");
+    parts.push(
+      tarHeader(`package/${entry.name}`, data.byteLength, entry.type ?? "0"),
+      data,
+    );
     parts.push(Buffer.alloc((512 - (data.byteLength % 512)) % 512));
   }
   parts.push(Buffer.alloc(1024));
