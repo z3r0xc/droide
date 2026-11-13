@@ -16,6 +16,10 @@ import {
   headerHeight,
   headerGeometry,
 } from "../../../src/ui/components/Header.ts";
+import {
+  queuedListHeight,
+  type QueuedRow,
+} from "../../../src/ui/components/QueuedList.ts";
 import { statusLineHeight } from "../../../src/ui/components/StatusLine.ts";
 import { displayWidth } from "../../../src/ui/text.ts";
 import { headerContent } from "./harness.ts";
@@ -102,5 +106,22 @@ test("the status-line height follows its configuration", () => {
   assert.equal(
     statusLineHeight(80, { text: "one\ntwo\nthree", maxRows: 9 }),
     3,
+  );
+});
+
+test("the queued list takes one row per line, three visible, plus overflow", () => {
+  const row = (position: number): QueuedRow => ({
+    position,
+    text: `line ${String(position)}`,
+    mode: "queue",
+  });
+  assert.equal(queuedListHeight([]), 0);
+  assert.equal(queuedListHeight([row(1)]), 1);
+  assert.equal(queuedListHeight([row(1), row(2)]), 2);
+  assert.equal(queuedListHeight([row(1), row(2), row(3)]), 3);
+  assert.equal(queuedListHeight([row(1), row(2), row(3), row(4)]), 4);
+  assert.equal(
+    queuedListHeight(Array.from({ length: 8 }, (_x, i) => row(i + 1))),
+    4,
   );
 });

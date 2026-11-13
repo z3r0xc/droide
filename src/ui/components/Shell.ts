@@ -18,6 +18,7 @@ import type { TranscriptEntry } from "../transcript.ts";
 import { Composer, type ComposerContent } from "./Composer.ts";
 import { Footer, type FooterContent } from "./Footer.ts";
 import { Header, type HeaderContent } from "./Header.ts";
+import { QueuedList, type QueuedRow } from "./QueuedList.ts";
 import { StatusLine, type StatusLineContent } from "./StatusLine.ts";
 import { Transcript } from "./Transcript.ts";
 
@@ -33,6 +34,8 @@ export interface ShellProps {
   readonly height: number;
   readonly header: HeaderContent;
   readonly transcript: readonly TranscriptEntry[];
+  /** The pending queued-message list (B10); absent or empty takes no rows. */
+  readonly queued?: readonly QueuedRow[];
   readonly composer: ComposerContent;
   readonly modeRow: ModeRowContent;
   readonly footer: FooterContent;
@@ -83,6 +86,13 @@ export function Shell(props: ShellProps): ReactNode {
       entries: props.transcript,
     }),
     h(Box, { height: 1 }),
+    props.queued === undefined || props.queued.length === 0
+      ? null
+      : h(QueuedList, {
+          capabilities,
+          width,
+          rows: props.queued,
+        }),
     h(ModeRow, {
       capabilities,
       width,

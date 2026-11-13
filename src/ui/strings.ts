@@ -87,9 +87,10 @@ export const APPROVAL_DECISION_TEXTS = {
   deny: "denied",
 } as const;
 
-/** B10 — a submit while a turn runs has no queue yet. */
-export const TURN_ALREADY_RUNNING =
-  "A turn is already running. Press Esc to cancel it.";
+/** B10 — the notice a submit at the queue's bound appends (the draft stays). */
+export function queuedFullNotice(bound: number): string {
+  return `The queue is full (${String(bound)} messages). Press Esc to cancel the turn and clear the queue.`;
+}
 
 /** B12/R? — the notice a cancelled or failed turn appends. */
 export const TURN_CANCELLED = "Cancelled";

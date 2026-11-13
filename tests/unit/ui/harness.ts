@@ -23,6 +23,7 @@ import type {
   HeaderContent,
   HeaderStatus,
 } from "../../../src/ui/components/Header.ts";
+import type { QueuedRow } from "../../../src/ui/components/QueuedList.ts";
 import type { ShellProps } from "../../../src/ui/components/Shell.ts";
 import type { TranscriptEntry } from "../../../src/ui/transcript.ts";
 
@@ -125,6 +126,7 @@ export function shellAt(
   options: {
     readonly transcript?: readonly TranscriptEntry[];
     readonly changelog?: boolean;
+    readonly queued?: readonly QueuedRow[];
   } = {},
 ): ShellProps {
   return {
@@ -133,6 +135,7 @@ export function shellAt(
     height: rows,
     header: headerContent(options.changelog === true),
     transcript: options.transcript ?? [],
+    ...(options.queued === undefined ? {} : { queued: options.queued }),
     composer: {
       draft: "",
       placeholder: STARTUP_PLACEHOLDER,

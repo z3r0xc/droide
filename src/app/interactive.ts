@@ -30,10 +30,13 @@ import { resolveModelTarget } from "../exec/command.ts";
 import type { AppContext } from "./context.ts";
 import {
   createTurnDriver,
+  type SubmitMode,
+  type SubmitOutcome,
   type TurnAgent,
   type TurnDriver,
 } from "./interactive-turn.ts";
 import { buildStartupPrompt } from "./prompt.ts";
+import type { SessionSeed } from "./session-seed.ts";
 import { createSessionTooling } from "./tooling.ts";
 import { detectCapabilities, type Capabilities } from "../ui/capabilities.ts";
 import type { ShellProps } from "../ui/components/Shell.ts";
@@ -68,7 +71,6 @@ import {
   HEADER_STATUS_LABELS,
   MODE_ROW_AUTONOMY_OFF,
   STARTUP_PLACEHOLDER,
-  TURN_ALREADY_RUNNING,
 } from "../ui/strings.ts";
 
 /** The exit code for the `Ctrl+C` exit; `/quit` exits 0. */
@@ -119,6 +121,12 @@ export interface InteractiveShellOptions {
    * no test reaches a network or a real terminal.
    */
   readonly agent?: () => ShellAgent | Promise<ShellAgent>;
+  /**
+   * A resumed session's stored state: the rows painted before the first
+   * keystroke and the messages the next turn's request extends. Absent for a
+   * fresh shell, which starts empty.
+   */
+  readonly seed?: SessionSeed;
 }
 
 /** The agent wiring a shell turn runs against; `close` releases MCP clients. */
@@ -312,6 +320,15 @@ export async function runInteractiveShell(
       shortcuts: HEADER_SHORTCUTS,
     },
     transcript: driver?.entries ?? [],
+    ...(driver === undefined || driver.queued.length === 0
+      ? {}
+      : {
+          queued: driver.queued.map((message, index) => ({
+            position: index + 1,
+            text: message.text,
+            mode: message.mode,
+          })),
+        }),
     composer: {
       draft: composer.draft,
       placeholder: STARTUP_PLACEHOLDER,
@@ -394,10 +411,21 @@ export async function runInteractiveShell(
     connect: () => agentWiring,
     clock,
     timers,
+    ...(options.seed === undefined
+      ? {}
+      : {
+          initialEntries: options.seed.entries,
+          initialMessages: options.seed.messages,
+        }),
     onChange: () => {
       if (!settled) void paint();
     },
   });
+
+  // A resumed session's rows exist before the shell mounts (the mount paints
+  // the frame it was handed), so the first screen gets one repaint that shows
+  // them; a fresh shell has nothing to repaint.
+  if (driver.entries.length > 0) void paint();
 
   const close = async (code: number, failure?: unknown): Promise<void> => {
     if (settled) return;
@@ -483,16 +511,20 @@ export async function runInteractiveShell(
   };
   if (pendingSignal !== undefined) handleSignal(pendingSignal);
 
-  const applyTransition = (transition: ComposerTransition): void => {
+  const applyTransition = (
+    transition: ComposerTransition,
+    routing: SubmitMode | "none" = "steer",
+  ): SubmitOutcome | undefined => {
     composer = transition.state;
     keyState = {
       ...keyState,
       draftLength: composer.draft.length,
       suggestionsOpen: composer.completion.open,
     };
-    if (transition.submitted !== undefined) {
+    let outcome: SubmitOutcome | undefined;
+    if (transition.submitted !== undefined && routing !== "none") {
       // The driver appends the user row itself and owns the turn from here.
-      driver?.submit(transition.submitted);
+      outcome = driver?.submit(transition.submitted, routing);
     }
     if (transition.notice !== undefined) {
       // The ephemeral system-message renderer is a later slice; until then the
@@ -501,15 +533,16 @@ export async function runInteractiveShell(
     }
     if (transition.exit === "quit") {
       requestExit(0);
-      return;
+      return outcome;
     }
     if (transition.exit === "interrupt") {
       requestExit(INTERRUPT_EXIT_CODE);
-      return;
+      return outcome;
     }
     scheduleDeferred(
       transition.deferredSubmitAtMs ?? composer.deferredSubmitAtMs,
     );
+    return outcome;
   };
 
   const handleActions = (actions: readonly KeyAction[], now: number): void => {
@@ -531,26 +564,44 @@ export async function runInteractiveShell(
         }
       }
 
-      // B12: Esc stops the running turn instead of editing the draft. The
-      // composer keeps the draft, so it is usable the moment the turn settles.
-      if (action.kind === "escape" && driver?.running === true) {
-        driver.cancel();
+      // B12/B10: Esc stops the running turn and clears the queue in the same
+      // press; with no turn it only clears the queue. The composer keeps the
+      // draft, so it is usable the moment the turn settles.
+      if (
+        action.kind === "escape" &&
+        (driver?.running === true || (driver?.queued.length ?? 0) > 0)
+      ) {
+        driver?.cancel();
         dirty = true;
         continue;
       }
 
-      // B10: steering and the queued-message list are not implemented, so a
-      // plain submit during a turn is refused in the transcript, never lost.
-      // `/quit` still leaves the session and takes the turn down with it.
+      // B10: a submit during a turn joins the queue — `Enter` steers (the line
+      // rides the next prompt) and `Ctrl+Enter` queues a turn — so a second
+      // turn never starts. `/quit` still leaves the session, and its line is
+      // not a message for the model.
       if (action.kind === "submit" && driver?.running === true) {
+        const transition = applyComposerAction(
+          composer,
+          action,
+          now,
+          composerWidth(width),
+        );
         if (composer.draft.trim() === "/quit") {
-          applyTransition(
-            applyComposerAction(composer, action, now, composerWidth(width)),
-          );
+          applyTransition(transition, "none");
           dirty = true;
           continue;
         }
-        driver.appendNotice(TURN_ALREADY_RUNNING);
+        const before = composer;
+        const outcome = applyTransition(
+          transition,
+          action.queue ? "queue" : "steer",
+        );
+        if (outcome === "refused") {
+          // The queue is at its bound: the line stays where the user typed it.
+          composer = before;
+          keyState = { ...keyState, draftLength: composer.draft.length };
+        }
         dirty = true;
         continue;
       }
